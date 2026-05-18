@@ -8,6 +8,14 @@ export function Chat() {
   useEffect(() => {
     const off = window.api.ai.onEvent(({ event }) => {
       if (event.type === 'text') updateLastAssistant(event.text)
+      else if (event.type === 'pending-write') {
+        useProject.getState().setPendingWrite({
+          callId: event.callId,
+          path: event.path,
+          before: event.before,
+          after: event.after
+        })
+      }
       else if (event.type === 'done') {
         const path = useProject.getState().path
         const msgs = useProject.getState().messages

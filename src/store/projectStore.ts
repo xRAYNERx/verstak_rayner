@@ -1,15 +1,24 @@
 import { create } from 'zustand'
 import type { FileNode, ChatMessage } from '../types/api'
 
+interface PendingWrite {
+  callId: string
+  path: string
+  before: string
+  after: string
+}
+
 interface ProjectState {
   path: string | null
   tree: FileNode[]
   messages: ChatMessage[]
   isStreaming: boolean
+  pendingWrite: PendingWrite | null
   setProject: (path: string) => Promise<void>
   addMessage: (msg: ChatMessage) => void
   updateLastAssistant: (text: string) => void
   setStreaming: (v: boolean) => void
+  setPendingWrite: (w: PendingWrite | null) => void
 }
 
 export const useProject = create<ProjectState>((set) => ({
@@ -17,10 +26,11 @@ export const useProject = create<ProjectState>((set) => ({
   tree: [],
   messages: [],
   isStreaming: false,
+  pendingWrite: null,
   setProject: async (path) => {
     const tree = await window.api.files.tree(path)
     const history = await window.api.chats.list(path)
-    set({ path, tree, messages: history.map(m => ({ role: m.role, content: m.content })) })
+    set({ path, tree, messages: history.map(m => ({ role: m.role, content: m.content })), pendingWrite: null })
   },
   addMessage: (msg) => set(s => ({ messages: [...s.messages, msg] })),
   updateLastAssistant: (text) => set(s => {
@@ -29,5 +39,6 @@ export const useProject = create<ProjectState>((set) => ({
     if (last?.role === 'assistant') msgs[msgs.length - 1] = { ...last, content: last.content + text }
     return { messages: msgs }
   }),
-  setStreaming: (v) => set({ isStreaming: v })
+  setStreaming: (v) => set({ isStreaming: v }),
+  setPendingWrite: (w) => set({ pendingWrite: w })
 }))

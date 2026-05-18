@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { Settings } from './components/Settings'
 import { Chat } from './components/Chat'
+import { DiffView } from './components/DiffView'
 
 export function App() {
   const [showSettings, setShowSettings] = useState(false)
@@ -13,6 +14,7 @@ export function App() {
         <Chat />
       </main>
       {showSettings && <Settings onClose={() => setShowSettings(false)} />}
+      <DiffView />
     </div>
   )
 }

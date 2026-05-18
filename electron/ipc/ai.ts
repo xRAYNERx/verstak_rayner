@@ -5,6 +5,13 @@ import type { ChatMessage, ToolCall } from '../ai/types'
 
 let currentSendId = 0
 
+interface PendingWrite {
+  call: ToolCall
+  projectPath: string
+  resolve: (accept: boolean) => void
+}
+const pendingWrites = new Map<string, PendingWrite>()
+
 export function registerAiIpc(getApiKey: () => string | null): void {
   ipcMain.handle('ai:send', async (e, messages: ChatMessage[], projectPath: string | null) => {
     const apiKey = getApiKey()
@@ -16,8 +23,16 @@ export function registerAiIpc(getApiKey: () => string | null): void {
     const provider = createGeminiProvider({ apiKey })
     const tools = projectPath ? createFileTools(projectPath) : null
 
-    void runConversation(e.sender, sendId, provider, tools, messages)
+    void runConversation(e.sender, sendId, provider, tools, projectPath, messages)
     return sendId
+  })
+
+  ipcMain.handle('ai:resolve-write', (_e, callId: string, accept: boolean) => {
+    const p = pendingWrites.get(callId)
+    if (p) {
+      p.resolve(accept)
+      pendingWrites.delete(callId)
+    }
   })
 }
 
@@ -26,6 +41,7 @@ async function runConversation(
   sendId: number,
   provider: ReturnType<typeof createGeminiProvider>,
   tools: ReturnType<typeof createFileTools> | null,
+  projectPath: string | null,
   initialMessages: ChatMessage[]
 ): Promise<void> {
   const currentMessages = [...initialMessages]
@@ -54,7 +70,33 @@ async function runConversation(
       return
     }
     if (assistantText) currentMessages.push({ role: 'assistant', content: assistantText })
+
     for (const call of toolCalls) {
+      if (call.name === 'write_file' && projectPath) {
+        const path = String(call.args.path)
+        const after = String(call.args.content)
+        let before = ''
+        try {
+          before = await tools.execute('read_file', { path }) as string
+        } catch {
+          before = ''
+        }
+        sender.send('ai:event', { id: sendId, event: { type: 'pending-write', callId: call.id, path, before, after } })
+        const accepted = await new Promise<boolean>(resolve => {
+          pendingWrites.set(call.id, { call, projectPath, resolve })
+        })
+        if (accepted) {
+          try {
+            await tools.execute('write_file', call.args)
+            currentMessages.push({ role: 'user', content: `[tool write_file applied to ${path}]` })
+          } catch (err) {
+            currentMessages.push({ role: 'user', content: `[tool write_file error]\n${err instanceof Error ? err.message : String(err)}` })
+          }
+        } else {
+          currentMessages.push({ role: 'user', content: `[user rejected write to ${path}]` })
+        }
+        continue
+      }
       try {
         const result = await tools.execute(call.name, call.args)
         currentMessages.push({

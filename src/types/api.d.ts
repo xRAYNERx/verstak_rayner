@@ -4,7 +4,7 @@ export interface StoredChatMessage { id: number; role: 'user' | 'assistant' | 's
 export interface ToolCall { id: string; name: string; args: Record<string, unknown> }
 export type ChatEvent =
   | { type: 'text'; text: string }
-  | { type: 'tool-call'; call: ToolCall }
+  | { type: 'pending-write'; callId: string; path: string; before: string; after: string }
   | { type: 'done' }
   | { type: 'error'; message: string }
 
@@ -22,6 +22,7 @@ declare global {
       }
       ai: {
         send: (messages: ChatMessage[], projectPath: string | null) => Promise<number>
+        resolveWrite: (callId: string, accept: boolean) => Promise<void>
         onEvent: (cb: (data: { id: number; event: ChatEvent }) => void) => () => void
       }
       chats: {

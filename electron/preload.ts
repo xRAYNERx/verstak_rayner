@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('api', {
   ai: {
     send: (messages: unknown[], projectPath: string | null) =>
       ipcRenderer.invoke('ai:send', messages, projectPath),
+    resolveWrite: (callId: string, accept: boolean) =>
+      ipcRenderer.invoke('ai:resolve-write', callId, accept),
     onEvent: (cb: (data: { id: number; event: unknown }) => void) => {
       const handler = (_e: unknown, data: { id: number; event: unknown }) => cb(data)
       ipcRenderer.on('ai:event', handler)

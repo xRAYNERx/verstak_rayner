@@ -25,6 +25,7 @@ export interface ToolDefinition {
 export type ChatEvent =
   | { type: 'text'; text: string }
   | { type: 'tool-call'; call: ToolCall }
+  | { type: 'pending-write'; callId: string; path: string; before: string; after: string }
   | { type: 'done' }
   | { type: 'error'; message: string }
 
