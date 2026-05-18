@@ -11,7 +11,8 @@ contextBridge.exposeInMainWorld('api', {
     setKey: (key: string, value: string) => ipcRenderer.invoke('settings:set-key', key, value)
   },
   ai: {
-    send: (messages: unknown[]) => ipcRenderer.invoke('ai:send', messages),
+    send: (messages: unknown[], projectPath: string | null) =>
+      ipcRenderer.invoke('ai:send', messages, projectPath),
     onEvent: (cb: (data: { id: number; event: unknown }) => void) => {
       const handler = (_e: unknown, data: { id: number; event: unknown }) => cb(data)
       ipcRenderer.on('ai:event', handler)

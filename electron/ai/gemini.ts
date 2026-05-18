@@ -1,10 +1,11 @@
 import { GoogleGenAI } from '@google/genai'
+import { randomUUID } from 'crypto'
 import type { ChatProvider, ChatMessage, ChatEvent, ToolDefinition, ToolResult } from './types'
 
 interface GeminiOptions {
   apiKey: string
   model?: string
-  sdk?: { models: { generateContentStream: (opts: unknown) => Promise<AsyncIterable<{ text?: string }>> } }
+  sdk?: { models: { generateContentStream: (opts: unknown) => Promise<AsyncIterable<unknown>> } }
 }
 
 const MODELS = ['gemini-2.5-pro', 'gemini-2.5-flash']
@@ -18,17 +19,32 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
     name: 'Gemini',
     models: MODELS,
 
-    async *send(messages: ChatMessage[], _tools: ToolDefinition[], _toolResults?: ToolResult[]): AsyncIterable<ChatEvent> {
+    async *send(messages: ChatMessage[], tools: ToolDefinition[], _toolResults?: ToolResult[]): AsyncIterable<ChatEvent> {
       const contents = messages.map(m => ({
         role: m.role === 'assistant' ? 'model' : 'user',
         parts: [{ text: m.content }]
       }))
 
+      const config = tools.length > 0 ? {
+        tools: [{ functionDeclarations: tools.map(t => ({
+          name: t.name,
+          description: t.description,
+          parameters: t.parameters as Record<string, unknown>
+        })) }]
+      } : undefined
+
       try {
-        const stream = await client.models.generateContentStream({ model, contents })
+        const stream = await client.models.generateContentStream(
+          config ? { model, contents, config } : { model, contents }
+        )
         for await (const chunk of stream) {
-          const text = (chunk as { text?: string }).text
-          if (text) yield { type: 'text', text }
+          const c = chunk as { text?: string; functionCalls?: Array<{ name: string; args: Record<string, unknown> }> }
+          if (c.text) yield { type: 'text', text: c.text }
+          if (c.functionCalls) {
+            for (const fc of c.functionCalls) {
+              yield { type: 'tool-call', call: { id: randomUUID(), name: fc.name, args: fc.args } }
+            }
+          }
         }
         yield { type: 'done' }
       } catch (err) {

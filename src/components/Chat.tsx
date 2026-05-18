@@ -35,7 +35,7 @@ export function Chat() {
     addMessage({ role: 'assistant', content: '' })
     setStreaming(true)
     const allMessages = [...useProject.getState().messages].slice(0, -1)
-    await window.api.ai.send(allMessages)
+    await window.api.ai.send(allMessages, path)
   }
 
   return (
