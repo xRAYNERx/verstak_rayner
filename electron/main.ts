@@ -6,6 +6,7 @@ import { registerFilesIpc } from './ipc/files'
 import { registerSettingsIpc } from './ipc/settings'
 import { registerAiIpc } from './ipc/ai'
 import { registerChatsIpc } from './ipc/chats'
+import { registerTerminalIpc } from './ipc/terminal'
 import { openDb } from './storage/db'
 import { createSettings } from './storage/settings'
 import { createChats } from './storage/chats'
@@ -40,6 +41,7 @@ app.whenReady().then(() => {
   registerSettingsIpc(settings)
   registerAiIpc(() => settings.getSecret('gemini_api_key'))
   registerChatsIpc(chats)
+  registerTerminalIpc()
   createWindow()
 })
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })

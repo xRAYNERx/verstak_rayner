@@ -32,6 +32,15 @@ export const TOOL_DEFS: ToolDefinition[] = [
       },
       required: ['path', 'content']
     }
+  },
+  {
+    name: 'run_command',
+    description: 'Запустить shell-команду в корне проекта. Возвращает stdout/stderr.',
+    parameters: {
+      type: 'object',
+      properties: { command: { type: 'string' } },
+      required: ['command']
+    }
   }
 ]
 
@@ -69,6 +78,16 @@ export function createFileTools(root: string): FileTools {
         const abs = safeJoin(root, String(args.path))
         await writeFile(abs, String(args.content), 'utf8')
         return { ok: true }
+      }
+      if (name === 'run_command') {
+        const { execSync } = await import('child_process')
+        try {
+          const out = execSync(String(args.command), { cwd: root, encoding: 'utf8', timeout: 30_000 })
+          return { stdout: out, exitCode: 0 }
+        } catch (err) {
+          const e = err as { stdout?: string; stderr?: string; status?: number }
+          return { stdout: e.stdout ?? '', stderr: e.stderr ?? '', exitCode: e.status ?? 1 }
+        }
       }
       throw new Error(`Неизвестный tool: ${name}`)
     }

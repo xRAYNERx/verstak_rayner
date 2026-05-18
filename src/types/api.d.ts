@@ -29,7 +29,16 @@ declare global {
         list: (projectPath: string) => Promise<StoredChatMessage[]>
         append: (projectPath: string, role: 'user' | 'assistant', content: string) => Promise<void>
       }
+      term: {
+        spawn: (cwd: string) => Promise<number>
+        write: (id: number, data: string) => Promise<void>
+        resize: (id: number, cols: number, rows: number) => Promise<void>
+        kill: (id: number) => Promise<void>
+        onData: (cb: (data: { id: number; data: string }) => void) => () => void
+        onExit: (cb: (data: { id: number }) => void) => () => void
+      }
     }
   }
 }
+declare module '*.css'
 export {}

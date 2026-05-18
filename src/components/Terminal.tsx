@@ -1,0 +1,37 @@
+import { useEffect, useRef } from 'react'
+import { Terminal as XTerm } from 'xterm'
+import { FitAddon } from 'xterm-addon-fit'
+import 'xterm/css/xterm.css'
+import { useProject } from '../store/projectStore'
+
+export function Terminal() {
+  const ref = useRef<HTMLDivElement>(null)
+  const { path } = useProject()
+
+  useEffect(() => {
+    if (!ref.current || !path) return
+    const term = new XTerm({ fontSize: 12, theme: { background: '#0d0d0d' } })
+    const fit = new FitAddon()
+    term.loadAddon(fit)
+    term.open(ref.current)
+    fit.fit()
+
+    let termId = -1
+    let offData: (() => void) | null = null
+    void window.api.term.spawn(path).then(id => {
+      termId = id
+      offData = window.api.term.onData(({ id: gotId, data }) => {
+        if (gotId === termId) term.write(data)
+      })
+      term.onData(d => { void window.api.term.write(termId, d) })
+    })
+
+    return () => {
+      offData?.()
+      if (termId > 0) void window.api.term.kill(termId)
+      term.dispose()
+    }
+  }, [path])
+
+  return <div ref={ref} style={{ height: 200, background: '#0d0d0d', borderTop: '1px solid #222' }} />
+}
