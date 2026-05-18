@@ -1,5 +1,6 @@
 export interface FileNode { name: string; path: string; isDirectory: boolean; children?: FileNode[] }
 export interface ChatMessage { role: 'user' | 'assistant' | 'system'; content: string }
+export interface StoredChatMessage { id: number; role: 'user' | 'assistant' | 'system'; content: string; createdAt: number }
 export type ChatEvent =
   | { type: 'text'; text: string }
   | { type: 'done' }
@@ -20,6 +21,10 @@ declare global {
       ai: {
         send: (messages: ChatMessage[]) => Promise<number>
         onEvent: (cb: (data: { id: number; event: ChatEvent }) => void) => () => void
+      }
+      chats: {
+        list: (projectPath: string) => Promise<StoredChatMessage[]>
+        append: (projectPath: string, role: 'user' | 'assistant', content: string) => Promise<void>
       }
     }
   }

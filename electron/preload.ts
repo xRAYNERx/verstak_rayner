@@ -17,5 +17,10 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.on('ai:event', handler)
       return () => { ipcRenderer.off('ai:event', handler) }
     }
+  },
+  chats: {
+    list: (projectPath: string) => ipcRenderer.invoke('chats:list', projectPath),
+    append: (projectPath: string, role: 'user' | 'assistant', content: string) =>
+      ipcRenderer.invoke('chats:append', projectPath, role, content)
   }
 })

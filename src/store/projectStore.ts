@@ -19,7 +19,8 @@ export const useProject = create<ProjectState>((set) => ({
   isStreaming: false,
   setProject: async (path) => {
     const tree = await window.api.files.tree(path)
-    set({ path, tree, messages: [] })
+    const history = await window.api.chats.list(path)
+    set({ path, tree, messages: history.map(m => ({ role: m.role, content: m.content })) })
   },
   addMessage: (msg) => set(s => ({ messages: [...s.messages, msg] })),
   updateLastAssistant: (text) => set(s => {

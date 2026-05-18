@@ -5,8 +5,10 @@ import { registerProjectIpc } from './ipc/projects'
 import { registerFilesIpc } from './ipc/files'
 import { registerSettingsIpc } from './ipc/settings'
 import { registerAiIpc } from './ipc/ai'
+import { registerChatsIpc } from './ipc/chats'
 import { openDb } from './storage/db'
 import { createSettings } from './storage/settings'
+import { createChats } from './storage/chats'
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -31,11 +33,13 @@ app.whenReady().then(() => {
   mkdirSync(dir, { recursive: true })
   const db = openDb(join(dir, 'geminigrok.db'))
   const settings = createSettings(db, safeStorage)
+  const chats = createChats(db)
 
   registerProjectIpc()
   registerFilesIpc()
   registerSettingsIpc(settings)
   registerAiIpc(() => settings.getSecret('gemini_api_key'))
+  registerChatsIpc(chats)
   createWindow()
 })
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })

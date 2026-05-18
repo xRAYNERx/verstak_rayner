@@ -8,7 +8,15 @@ export function Chat() {
   useEffect(() => {
     const off = window.api.ai.onEvent(({ event }) => {
       if (event.type === 'text') updateLastAssistant(event.text)
-      else if (event.type === 'done') setStreaming(false)
+      else if (event.type === 'done') {
+        const path = useProject.getState().path
+        const msgs = useProject.getState().messages
+        const lastAssistant = msgs[msgs.length - 1]
+        if (path && lastAssistant?.role === 'assistant' && lastAssistant.content) {
+          void window.api.chats.append(path, 'assistant', lastAssistant.content)
+        }
+        setStreaming(false)
+      }
       else if (event.type === 'error') {
         updateLastAssistant(`\n\n[Ошибка: ${event.message}]`)
         setStreaming(false)
@@ -20,8 +28,10 @@ export function Chat() {
   async function send() {
     const text = input.trim()
     if (!text || isStreaming) return
+    const path = useProject.getState().path
     setInput('')
     addMessage({ role: 'user', content: text })
+    if (path) await window.api.chats.append(path, 'user', text)
     addMessage({ role: 'assistant', content: '' })
     setStreaming(true)
     const allMessages = [...useProject.getState().messages].slice(0, -1)
