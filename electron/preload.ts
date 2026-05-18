@@ -1,5 +1,11 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('api', {
-  ping: () => 'pong'
+  projects: {
+    pick: () => ipcRenderer.invoke('projects:pick') as Promise<string | null>
+  },
+  files: {
+    tree: (root: string) => ipcRenderer.invoke('files:tree', root),
+    read: (path: string) => ipcRenderer.invoke('files:read', path) as Promise<string>
+  }
 })

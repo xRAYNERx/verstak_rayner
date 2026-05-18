@@ -1,5 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
+import { registerProjectIpc } from './ipc/projects'
+import { registerFilesIpc } from './ipc/files'
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -19,5 +21,9 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  registerProjectIpc()
+  registerFilesIpc()
+  createWindow()
+})
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
