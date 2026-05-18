@@ -1,7 +1,12 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, safeStorage } from 'electron'
 import { join } from 'path'
+import { mkdirSync } from 'fs'
 import { registerProjectIpc } from './ipc/projects'
 import { registerFilesIpc } from './ipc/files'
+import { registerSettingsIpc } from './ipc/settings'
+import { registerAiIpc } from './ipc/ai'
+import { openDb } from './storage/db'
+import { createSettings } from './storage/settings'
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -22,8 +27,15 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  const dir = join(app.getPath('userData'), 'storage')
+  mkdirSync(dir, { recursive: true })
+  const db = openDb(join(dir, 'geminigrok.db'))
+  const settings = createSettings(db, safeStorage)
+
   registerProjectIpc()
   registerFilesIpc()
+  registerSettingsIpc(settings)
+  registerAiIpc(() => settings.getSecret('gemini_api_key'))
   createWindow()
 })
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
