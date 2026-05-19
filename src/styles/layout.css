@@ -333,6 +333,70 @@
   outline: none;
 }
 
+/* In-app browser view */
+.gg-browser-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-panel);
+}
+.gg-browser-btn {
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.gg-browser-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); }
+.gg-browser-btn:disabled { opacity: 0.35; cursor: default; }
+.gg-browser-url {
+  flex: 1;
+  padding: 6px 10px;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  outline: none;
+}
+.gg-browser-url:focus { border-color: var(--accent); }
+.gg-browser-go { padding: 6px 14px; }
+.gg-browser-status {
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 14px;
+  background: var(--bg-overlay);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--text-xs);
+}
+.gg-browser-title {
+  font-weight: 500;
+  color: var(--text-secondary);
+  max-width: 60%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.gg-browser-host {
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+}
+.gg-browser-error {
+  padding: 6px 14px;
+  background: rgba(220, 53, 69, 0.08);
+  color: var(--error);
+  font-size: var(--text-xs);
+  border-bottom: 1px solid rgba(220, 53, 69, 0.2);
+}
+.gg-browser-frame {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  background: #fff;
+}
+
 /* File tree */
 .gg-tree { padding: 0 6px; }
 

@@ -22,7 +22,7 @@ interface ActivityEntry {
   timestamp: number
 }
 
-export type ViewId = 'chat' | 'tasks' | 'journal' | 'plan' | 'workflow' | 'calendar' | 'feedback'
+export type ViewId = 'chat' | 'tasks' | 'journal' | 'plan' | 'workflow' | 'calendar' | 'feedback' | 'browser'
 
 export interface SessionUsage {
   inputTokens: number

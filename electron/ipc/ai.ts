@@ -22,7 +22,11 @@ interface AiDeps {
 let currentSendId = 0
 const activeAborts = new Map<number, AbortController>()
 
-type TaggedSender = { send: (channel: string, payload: { id: number; event: unknown }) => void }
+type TaggedSender = {
+  send: (channel: string, payload: { id: number; event: unknown }) => void
+  /** Run JS in the renderer and get its result (used to invoke browser tools). */
+  exec: (code: string) => Promise<unknown>
+}
 
 /**
  * Tag every ai:event with the project it belongs to so the renderer can route
@@ -32,7 +36,8 @@ function tagSender(sender: Electron.WebContents, projectPath: string | null): Ta
   return {
     send: (channel: string, payload: { id: number; event: unknown }) => {
       sender.send(channel, { ...payload, projectPath })
-    }
+    },
+    exec: (code: string) => sender.executeJavaScript(code, true)
   }
 }
 
@@ -271,6 +276,10 @@ async function runApiConversation(
         toolResults[i] = await handleRunCommand(sender, sendId, tools, call)
         continue
       }
+      if (call.name === 'browser_navigate' || call.name === 'browser_read_page' || call.name === 'browser_screenshot') {
+        toolResults[i] = await handleBrowserTool(sender, call)
+        continue
+      }
       if (call.name === 'create_plan') {
         try {
           const title = String(call.args.title ?? 'План без названия')
@@ -396,6 +405,46 @@ async function handleWriteFile(
     }
   }
   return { id: call.id, name: call.name, result: `User rejected write to ${path}`, error: 'User rejected' }
+}
+
+async function handleBrowserTool(sender: TaggedSender, call: ToolCall): Promise<ToolResult> {
+  try {
+    // Build a JS snippet that calls the renderer-side BrowserView dispatcher
+    // and returns a JSON-encoded result. executeJavaScript awaits any returned
+    // Promise automatically, so we can use an async IIFE.
+    const argsJson = JSON.stringify(call.args ?? {})
+    let snippet = ''
+    if (call.name === 'browser_navigate') {
+      snippet = `(async () => {
+        const api = window.geminigrokBrowser;
+        if (!api) return { __err: 'Вкладка Browser не открыта — попроси пользователя открыть её' };
+        const a = ${argsJson};
+        return await api.navigate(String(a.url ?? ''));
+      })()`
+    } else if (call.name === 'browser_read_page') {
+      snippet = `(async () => {
+        const api = window.geminigrokBrowser;
+        if (!api) return { __err: 'Вкладка Browser не открыта — попроси пользователя открыть её' };
+        const a = ${argsJson};
+        const text = await api.readPage(a.selector ? String(a.selector) : undefined);
+        return { url: api.getURL(), title: api.getTitle(), text };
+      })()`
+    } else {
+      snippet = `(async () => {
+        const api = window.geminigrokBrowser;
+        if (!api) return { __err: 'Вкладка Browser не открыта — попроси пользователя открыть её' };
+        const dataUrl = await api.screenshot();
+        return { url: api.getURL(), dataUrl };
+      })()`
+    }
+    const result = await sender.exec(snippet)
+    if (result && typeof result === 'object' && '__err' in result) {
+      return { id: call.id, name: call.name, result: '', error: String((result as { __err: unknown }).__err) }
+    }
+    return { id: call.id, name: call.name, result: result ?? '' }
+  } catch (err) {
+    return { id: call.id, name: call.name, result: '', error: err instanceof Error ? err.message : String(err) }
+  }
 }
 
 async function handleRunCommand(

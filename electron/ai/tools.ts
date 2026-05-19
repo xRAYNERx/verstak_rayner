@@ -80,6 +80,23 @@ export const TOOL_DEFS: ToolDefinition[] = [
     }
   },
   {
+    name: 'browser_navigate',
+    description: 'Открыть URL во встроенном браузере GeminiGrok (вкладка Browser). Возвращает финальный URL после редиректов. Если пользователь не открыл вкладку Browser, инструмент вернёт ошибку — попроси открыть вкладку.',
+    parameters: {
+      type: 'object',
+      properties: { url: { type: 'string', description: 'URL или поисковый запрос. Без схемы — будет добавлено https://.' } },
+      required: ['url']
+    }
+  },
+  {
+    name: 'browser_read_page',
+    description: 'Получить текстовое содержимое текущей страницы во встроенном браузере (innerText, до 50 000 символов). Опционально передай CSS-селектор чтобы достать только нужный кусок.',
+    parameters: {
+      type: 'object',
+      properties: { selector: { type: 'string', description: 'Опциональный CSS-селектор, например "main article" или "#content".' } }
+    }
+  },
+  {
     name: 'create_plan',
     description: 'Создать структурированный план многошаговой задачи. Используй когда задача требует 3+ шагов или явного согласования с пользователем. План отобразится во вкладке Plan; пользователь сможет выполнять шаги по одному.',
     parameters: {

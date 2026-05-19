@@ -38,7 +38,8 @@ function createWindow(): void {
     icon: iconPath,
     webPreferences: {
       preload: join(HERE, '../preload/preload.mjs'),
-      sandbox: false
+      sandbox: false,
+      webviewTag: true  // Allow <webview> for the in-app browser
     }
   })
 

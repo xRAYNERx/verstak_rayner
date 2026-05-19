@@ -202,6 +202,13 @@ const JournalIcon = (
     <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
   </svg>
 )
+const BrowserIcon = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <line x1="2" y1="12" x2="22" y2="12" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  </svg>
+)
 const FeedbackIcon = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 11.5a8.38 8.38 0 0 1 -8.5 8.5 8.5 8.5 0 0 1 -3.8 -0.9L3 21l1.4 -5.5a8.38 8.38 0 0 1 -0.9 -3.5 8.5 8.5 0 0 1 17 -0.5z" />
@@ -214,6 +221,7 @@ const NAV: NavItem[] = [
   { id: 'tasks',    label: 'Tasks',    icon: TasksIcon },
   { id: 'journal',  label: 'Journal',  icon: JournalIcon },
   { id: 'plan',     label: 'Plan',     icon: PlanIcon },
+  { id: 'browser',  label: 'Browser',  icon: BrowserIcon },
   { id: 'workflow', label: 'Workflow', icon: WorkflowIcon, badge: 'soon' },
   { id: 'calendar', label: 'Calendar', icon: CalendarIcon, badge: 'soon' },
   { id: 'feedback', label: 'Feedback', icon: FeedbackIcon }

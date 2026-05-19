@@ -7,6 +7,7 @@ import { TasksView } from './components/TasksView'
 import { JournalView } from './components/JournalView'
 import { PlanView } from './components/PlanView'
 import { FeedbackView } from './components/FeedbackView'
+import { BrowserView } from './components/BrowserView'
 import { StubView } from './components/StubView'
 import { DiffView } from './components/DiffView'
 import { CommandConfirm } from './components/CommandConfirm'
@@ -53,6 +54,7 @@ export function App() {
         {activeView === 'workflow' && <StubView title="Workflow" description="Здесь будут пайплайны и цепочки агентов. В работе." />}
         {activeView === 'calendar' && <StubView title="Calendar" description="Здесь будут события и дедлайны проекта. В работе." />}
         {activeView === 'feedback' && <FeedbackView />}
+        {activeView === 'browser' && <BrowserView />}
         {activeView === 'chat' && canShowTerminal && (
           <div className="gg-terminal-wrap">
             <div className="gg-terminal-header">
