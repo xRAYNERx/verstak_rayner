@@ -15,6 +15,11 @@ export interface ChatMessage {
   role: Role
   content: string
   attachments?: Attachment[]
+  /** Tool calls emitted by the assistant (only set on assistant messages). */
+  toolCalls?: ToolCall[]
+  /** Tool results being fed back to the assistant (only set on user messages
+   *  that exist to carry these results — content may be empty). */
+  toolResults?: ToolResult[]
 }
 
 export interface ToolCall {
@@ -25,7 +30,12 @@ export interface ToolCall {
 
 export interface ToolResult {
   id: string
+  /** Tool call name (some providers — Claude — don't require it, others — Gemini — do). */
+  name: string
+  /** Whatever the tool returned; will be JSON-stringified before sending. */
   result: unknown
+  /** If the tool failed, the error message. When set, `result` is the error context. */
+  error?: string
 }
 
 export interface ToolDefinition {

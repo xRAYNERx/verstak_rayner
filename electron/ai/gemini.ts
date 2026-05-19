@@ -10,6 +10,37 @@ interface GeminiOptions {
 
 const MODELS = ['gemini-2.5-pro', 'gemini-2.5-flash']
 
+function partsForMessage(m: ChatMessage): Array<Record<string, unknown>> {
+  const parts: Array<Record<string, unknown>> = []
+  if (m.content) parts.push({ text: m.content })
+  if (m.attachments?.length) {
+    for (const att of m.attachments) {
+      parts.push({ inlineData: { mimeType: att.mimeType, data: att.data } })
+    }
+  }
+  // Assistant message that includes tool calls — pack each as functionCall part
+  if (m.toolCalls?.length) {
+    for (const call of m.toolCalls) {
+      parts.push({ functionCall: { name: call.name, args: call.args } })
+    }
+  }
+  // User message carrying tool results — pack each as functionResponse part
+  if (m.toolResults?.length) {
+    for (const r of m.toolResults) {
+      parts.push({
+        functionResponse: {
+          name: r.name,
+          response: r.error
+            ? { error: r.error, result: r.result }
+            : { result: r.result }
+        }
+      })
+    }
+  }
+  if (parts.length === 0) parts.push({ text: '' })
+  return parts
+}
+
 export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
   const model = opts.model ?? 'gemini-2.5-pro'
   const client = opts.sdk ?? new GoogleGenAI({ apiKey: opts.apiKey })
@@ -20,21 +51,10 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
     models: MODELS,
 
     async *send(messages: ChatMessage[], tools: ToolDefinition[], _toolResults?: ToolResult[]): AsyncIterable<ChatEvent> {
-      const contents = messages.map(m => {
-        const parts: Array<Record<string, unknown>> = []
-        if (m.content) parts.push({ text: m.content })
-        if (m.attachments?.length) {
-          for (const att of m.attachments) {
-            parts.push({ inlineData: { mimeType: att.mimeType, data: att.data } })
-          }
-        }
-        // Gemini requires at least one part per content block
-        if (parts.length === 0) parts.push({ text: '' })
-        return {
-          role: m.role === 'assistant' ? 'model' : 'user',
-          parts
-        }
-      })
+      const contents = messages.map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: partsForMessage(m)
+      }))
 
       const config = tools.length > 0 ? {
         tools: [{ functionDeclarations: tools.map(t => ({

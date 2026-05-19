@@ -53,7 +53,7 @@ export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
     secretKey: 'anthropic_api_key',
     models: CLAUDE_MODELS,
     defaultModel: 'claude-sonnet-4-5-20251101',
-    supportsTools: false,  // TODO: wire claude tool_use in a follow-up
+    supportsTools: true,
     shortLabel: 'Claude'
   },
   'claude-cli': {
@@ -73,7 +73,7 @@ export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
     secretKey: 'xai_api_key',
     models: GROK_MODELS,
     defaultModel: 'grok-4',
-    supportsTools: false,
+    supportsTools: true,
     shortLabel: 'Grok'
   },
   openai: {
@@ -83,7 +83,7 @@ export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
     secretKey: 'openai_api_key',
     models: OPENAI_MODELS,
     defaultModel: 'gpt-5',
-    supportsTools: false,
+    supportsTools: true,
     shortLabel: 'ChatGPT'
   },
   'codex-cli': {

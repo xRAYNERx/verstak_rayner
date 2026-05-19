@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { randomUUID } from 'crypto'
 import type { ChatProvider, ChatMessage, ChatEvent, ToolDefinition, ToolResult } from './types'
 
 interface ClaudeOptions {
@@ -14,25 +15,48 @@ export const CLAUDE_MODELS = [
 
 const DEFAULT_MODEL = CLAUDE_MODELS[1]
 
-interface ClaudeContentBlock {
-  type: 'text' | 'image' | 'document'
-  text?: string
-  source?: { type: 'base64'; media_type: string; data: string }
-}
+type AnyBlock = Record<string, unknown>
 
-function buildContent(message: ChatMessage): string | ClaudeContentBlock[] {
-  if (!message.attachments?.length) return message.content
-  const blocks: ClaudeContentBlock[] = []
+function buildContent(message: ChatMessage): string | AnyBlock[] {
+  const blocks: AnyBlock[] = []
   if (message.content) blocks.push({ type: 'text', text: message.content })
-  for (const att of message.attachments) {
-    if (att.mimeType.startsWith('image/')) {
-      blocks.push({ type: 'image', source: { type: 'base64', media_type: att.mimeType, data: att.data } })
-    } else if (att.mimeType === 'application/pdf') {
-      blocks.push({ type: 'document', source: { type: 'base64', media_type: att.mimeType, data: att.data } })
+
+  if (message.attachments?.length) {
+    for (const att of message.attachments) {
+      if (att.mimeType.startsWith('image/')) {
+        blocks.push({ type: 'image', source: { type: 'base64', media_type: att.mimeType, data: att.data } })
+      } else if (att.mimeType === 'application/pdf') {
+        blocks.push({ type: 'document', source: { type: 'base64', media_type: att.mimeType, data: att.data } })
+      }
     }
-    // other types: skip silently (Claude only supports images and PDFs as document)
   }
-  return blocks.length === 0 ? '' : blocks
+
+  // Assistant turn with tool calls
+  if (message.toolCalls?.length) {
+    for (const call of message.toolCalls) {
+      blocks.push({ type: 'tool_use', id: call.id, name: call.name, input: call.args })
+    }
+  }
+
+  // User turn carrying tool results
+  if (message.toolResults?.length) {
+    for (const r of message.toolResults) {
+      const content = r.error
+        ? `Error: ${r.error}\n${typeof r.result === 'string' ? r.result : JSON.stringify(r.result).slice(0, 5000)}`
+        : (typeof r.result === 'string' ? r.result : JSON.stringify(r.result).slice(0, 5000))
+      blocks.push({
+        type: 'tool_result',
+        tool_use_id: r.id,
+        content,
+        ...(r.error ? { is_error: true } : {})
+      })
+    }
+  }
+
+  if (blocks.length === 0) return ''
+  // If only one text block, send as a plain string (Anthropic accepts both)
+  if (blocks.length === 1 && blocks[0].type === 'text') return blocks[0].text as string
+  return blocks
 }
 
 export function createClaudeProvider(opts: ClaudeOptions): ChatProvider {
@@ -44,26 +68,58 @@ export function createClaudeProvider(opts: ClaudeOptions): ChatProvider {
     name: 'Claude',
     models: CLAUDE_MODELS,
 
-    async *send(messages: ChatMessage[], _tools: ToolDefinition[], _results?: ToolResult[]): AsyncIterable<ChatEvent> {
-      const systemMessages = messages.filter(m => m.role === 'system').map(m => m.content).join('\n\n')
+    async *send(messages: ChatMessage[], tools: ToolDefinition[], _results?: ToolResult[]): AsyncIterable<ChatEvent> {
+      const systemMessages = messages.filter(m => m.role === 'system').map(m => m.content).filter(Boolean).join('\n\n')
       const conversation = messages
         .filter(m => m.role !== 'system')
         .map(m => ({
           role: (m.role === 'assistant' ? 'assistant' : 'user') as 'assistant' | 'user',
           content: buildContent(m)
         }))
-        .filter(m => m.content && (typeof m.content === 'string' ? m.content : m.content.length > 0))
+        .filter(m => {
+          const c = m.content
+          return typeof c === 'string' ? c.length > 0 : c.length > 0
+        })
+
+      const apiTools = tools.length > 0
+        ? tools.map(t => ({
+            name: t.name,
+            description: t.description,
+            input_schema: t.parameters as Anthropic.Messages.Tool.InputSchema
+          }))
+        : undefined
+
+      // Accumulators for in-progress tool_use blocks (Claude streams partial JSON)
+      const activeToolUses: Record<number, { id: string; name: string; input: string }> = {}
 
       try {
         const stream = await client.messages.stream({
           model,
           max_tokens: 4096,
           system: systemMessages || undefined,
-          messages: conversation as Anthropic.Messages.MessageParam[]
+          messages: conversation as Anthropic.Messages.MessageParam[],
+          ...(apiTools ? { tools: apiTools } : {})
         })
+
         for await (const event of stream) {
-          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-            yield { type: 'text', text: event.delta.text }
+          if (event.type === 'content_block_start' && event.content_block.type === 'tool_use') {
+            activeToolUses[event.index] = {
+              id: event.content_block.id ?? randomUUID(),
+              name: event.content_block.name,
+              input: ''
+            }
+          } else if (event.type === 'content_block_delta') {
+            if (event.delta.type === 'text_delta') {
+              yield { type: 'text', text: event.delta.text }
+            } else if (event.delta.type === 'input_json_delta' && activeToolUses[event.index]) {
+              activeToolUses[event.index].input += event.delta.partial_json
+            }
+          } else if (event.type === 'content_block_stop' && activeToolUses[event.index]) {
+            const tu = activeToolUses[event.index]
+            let args: Record<string, unknown> = {}
+            try { args = tu.input ? JSON.parse(tu.input) : {} } catch { args = {} }
+            yield { type: 'tool-call', call: { id: tu.id, name: tu.name, args } }
+            delete activeToolUses[event.index]
           }
         }
         yield { type: 'done' }

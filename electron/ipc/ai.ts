@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import { createFileTools, TOOL_DEFS } from '../ai/tools'
 import { createProvider, PROVIDERS, type ProviderId } from '../ai/registry'
-import type { ChatMessage, ToolCall, ChatProvider } from '../ai/types'
+import type { ChatMessage, ToolCall, ToolResult, ChatProvider } from '../ai/types'
 
 export type { ProviderId } from '../ai/registry'
 
@@ -126,6 +126,7 @@ async function runApiConversation(
   initialMessages: ChatMessage[],
   signal: AbortSignal
 ): Promise<void> {
+  void projectPath
   const currentMessages = [...initialMessages]
   const maxTurns = 5
   for (let turn = 0; turn < maxTurns; turn++) {
@@ -159,31 +160,36 @@ async function runApiConversation(
       sender.send('ai:event', { id: sendId, event: { type: 'done' } })
       return
     }
-    if (assistantText) currentMessages.push({ role: 'assistant', content: assistantText })
 
+    // Record the assistant turn with its tool calls so the next round preserves
+    // structured context for providers that require it (Claude, OpenAI/Grok).
+    currentMessages.push({ role: 'assistant', content: assistantText, toolCalls })
+
+    // Execute each tool, collect structured results. Special tools that require
+    // user confirmation (write_file, run_command) handle their own UI flow.
+    const toolResults: ToolResult[] = []
     for (const call of toolCalls) {
       if (call.name === 'write_file') {
-        await handleWriteFile(sender, sendId, tools, call, currentMessages)
+        toolResults.push(await handleWriteFile(sender, sendId, tools, call))
         continue
       }
       if (call.name === 'run_command') {
-        await handleRunCommand(sender, sendId, tools, call, currentMessages)
+        toolResults.push(await handleRunCommand(sender, sendId, tools, call))
         continue
       }
       try {
         const result = await tools.execute(call.name, call.args)
-        currentMessages.push({
-          role: 'user',
-          content: `[tool ${call.name} result]\n${JSON.stringify(result).slice(0, 5000)}`
-        })
+        toolResults.push({ id: call.id, name: call.name, result })
       } catch (err) {
-        currentMessages.push({
-          role: 'user',
-          content: `[tool ${call.name} error]\n${err instanceof Error ? err.message : String(err)}`
+        toolResults.push({
+          id: call.id,
+          name: call.name,
+          result: '',
+          error: err instanceof Error ? err.message : String(err)
         })
       }
     }
-    void projectPath  // silence unused
+    currentMessages.push({ role: 'user', content: '', toolResults })
   }
   sender.send('ai:event', { id: sendId, event: { type: 'done' } })
 }
@@ -192,9 +198,8 @@ async function handleWriteFile(
   sender: Electron.WebContents,
   sendId: number,
   tools: ReturnType<typeof createFileTools>,
-  call: ToolCall,
-  messages: ChatMessage[]
-): Promise<void> {
+  call: ToolCall
+): Promise<ToolResult> {
   const path = String(call.args.path)
   const after = String(call.args.content)
   let before = ''
@@ -205,22 +210,20 @@ async function handleWriteFile(
   if (accepted) {
     try {
       await tools.execute('write_file', call.args)
-      messages.push({ role: 'user', content: `[tool write_file applied to ${path}]` })
+      return { id: call.id, name: call.name, result: `Applied write to ${path}` }
     } catch (err) {
-      messages.push({ role: 'user', content: `[tool write_file error]\n${err instanceof Error ? err.message : String(err)}` })
+      return { id: call.id, name: call.name, result: '', error: err instanceof Error ? err.message : String(err) }
     }
-  } else {
-    messages.push({ role: 'user', content: `[user rejected write to ${path}]` })
   }
+  return { id: call.id, name: call.name, result: `User rejected write to ${path}`, error: 'User rejected' }
 }
 
 async function handleRunCommand(
   sender: Electron.WebContents,
   sendId: number,
   tools: ReturnType<typeof createFileTools>,
-  call: ToolCall,
-  messages: ChatMessage[]
-): Promise<void> {
+  call: ToolCall
+): Promise<ToolResult> {
   const command = String(call.args.command ?? '')
   const verdict = tools.classifyCommand(command)
   if (!verdict.allowed) {
@@ -228,11 +231,12 @@ async function handleRunCommand(
       id: sendId,
       event: { type: 'tool-blocked', callId: call.id, name: 'run_command', command, reason: verdict.reason ?? 'denylist' }
     })
-    messages.push({
-      role: 'user',
-      content: `[tool run_command blocked by safety policy]\nКоманда: ${command}\nПричина: ${verdict.reason ?? 'denylist'}`
-    })
-    return
+    return {
+      id: call.id,
+      name: call.name,
+      result: `Command: ${command}`,
+      error: `Blocked by safety policy: ${verdict.reason ?? 'denylist'}`
+    }
   }
 
   sender.send('ai:event', { id: sendId, event: { type: 'pending-command', callId: call.id, command } })
@@ -242,8 +246,7 @@ async function handleRunCommand(
       id: sendId,
       event: { type: 'command-result', callId: call.id, command, status: 'rejected' }
     })
-    messages.push({ role: 'user', content: `[user rejected run_command]\nКоманда: ${command}` })
-    return
+    return { id: call.id, name: call.name, result: `Command: ${command}`, error: 'User rejected' }
   }
 
   try {
@@ -252,16 +255,13 @@ async function handleRunCommand(
       id: sendId,
       event: { type: 'command-result', callId: call.id, command, status: 'ok', exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr }
     })
-    messages.push({
-      role: 'user',
-      content: `[tool run_command result]\n${JSON.stringify(result).slice(0, 5000)}`
-    })
+    return { id: call.id, name: call.name, result }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     sender.send('ai:event', {
       id: sendId,
       event: { type: 'command-result', callId: call.id, command, status: 'error', error: msg }
     })
-    messages.push({ role: 'user', content: `[tool run_command error]\n${msg}` })
+    return { id: call.id, name: call.name, result: '', error: msg }
   }
 }

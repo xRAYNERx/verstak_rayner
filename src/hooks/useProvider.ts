@@ -33,7 +33,7 @@ const PROVIDER_META: Record<ProviderId, Omit<ProviderInfo, 'model' | 'id'>> = {
     label: 'Claude',
     transport: 'API',
     models: ['claude-opus-4-5-20251101', 'claude-sonnet-4-5-20251101', 'claude-haiku-4-5-20251101'],
-    supportsTools: false
+    supportsTools: true
   },
   'claude-cli': {
     label: 'Claude Code',
@@ -45,13 +45,13 @@ const PROVIDER_META: Record<ProviderId, Omit<ProviderInfo, 'model' | 'id'>> = {
     label: 'Grok',
     transport: 'API',
     models: ['grok-4', 'grok-4-fast', 'grok-3'],
-    supportsTools: false
+    supportsTools: true
   },
   openai: {
     label: 'ChatGPT',
     transport: 'API',
     models: ['gpt-5', 'gpt-5-mini', 'gpt-4o', 'gpt-4o-mini', 'o1', 'o1-mini'],
-    supportsTools: false
+    supportsTools: true
   },
   'codex-cli': {
     label: 'Codex',

@@ -42,13 +42,13 @@ const PROVIDERS: ProviderConfig[] = [
     id: 'claude',
     name: 'Claude',
     transport: 'API',
-    description: 'Anthropic. Chat-only пока.',
+    description: 'Anthropic. Полный агентский режим с tools.',
     models: ['claude-opus-4-5-20251101', 'claude-sonnet-4-5-20251101', 'claude-haiku-4-5-20251101'],
     defaultModel: 'claude-sonnet-4-5-20251101',
     secretKey: 'anthropic_api_key',
     keyHint: 'sk-ant-…',
     keyLink: { url: 'https://console.anthropic.com', label: 'Anthropic Console' },
-    supportsTools: false
+    supportsTools: true
   },
   {
     id: 'claude-cli',
@@ -65,25 +65,25 @@ const PROVIDERS: ProviderConfig[] = [
     id: 'grok',
     name: 'Grok',
     transport: 'API',
-    description: 'xAI. Chat-only пока.',
+    description: 'xAI. Полный агентский режим с tools.',
     models: ['grok-4', 'grok-4-fast', 'grok-3'],
     defaultModel: 'grok-4',
     secretKey: 'xai_api_key',
     keyHint: 'xai-…',
     keyLink: { url: 'https://console.x.ai', label: 'xAI Console' },
-    supportsTools: false
+    supportsTools: true
   },
   {
     id: 'openai',
     name: 'ChatGPT',
     transport: 'API',
-    description: 'OpenAI. Chat-only пока.',
+    description: 'OpenAI. Полный агентский режим с tools.',
     models: ['gpt-5', 'gpt-5-mini', 'gpt-4o', 'gpt-4o-mini', 'o1', 'o1-mini'],
     defaultModel: 'gpt-5',
     secretKey: 'openai_api_key',
     keyHint: 'sk-…',
     keyLink: { url: 'https://platform.openai.com/api-keys', label: 'OpenAI Platform' },
-    supportsTools: false
+    supportsTools: true
   },
   {
     id: 'codex-cli',
