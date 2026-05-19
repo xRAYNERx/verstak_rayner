@@ -1,11 +1,13 @@
 import { createGeminiProvider } from './gemini'
 import { createGeminiCliProvider } from './gemini-cli'
 import { createClaudeProvider, CLAUDE_MODELS } from './claude'
+import { createClaudeCliProvider } from './claude-cli'
 import { createGrokProvider, GROK_MODELS } from './grok'
 import { createOpenAiProvider, OPENAI_MODELS } from './openai'
+import { createCodexCliProvider } from './codex-cli'
 import type { ChatProvider } from './types'
 
-export type ProviderId = 'gemini-api' | 'gemini-cli' | 'claude' | 'grok' | 'openai'
+export type ProviderId = 'gemini-api' | 'gemini-cli' | 'claude' | 'claude-cli' | 'grok' | 'openai' | 'codex-cli'
 
 export interface ProviderDescriptor {
   id: ProviderId
@@ -54,6 +56,16 @@ export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
     supportsTools: false,  // TODO: wire claude tool_use in a follow-up
     shortLabel: 'Claude'
   },
+  'claude-cli': {
+    id: 'claude-cli',
+    name: 'Claude Code',
+    transport: 'CLI',
+    secretKey: null,
+    models: ['auto'],
+    defaultModel: 'auto',
+    supportsTools: false,
+    shortLabel: 'Claude Code'
+  },
   grok: {
     id: 'grok',
     name: 'Grok',
@@ -73,6 +85,16 @@ export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
     defaultModel: 'gpt-5',
     supportsTools: false,
     shortLabel: 'ChatGPT'
+  },
+  'codex-cli': {
+    id: 'codex-cli',
+    name: 'Codex',
+    transport: 'CLI',
+    secretKey: null,
+    models: ['auto'],
+    defaultModel: 'auto',
+    supportsTools: false,
+    shortLabel: 'Codex'
   }
 }
 
@@ -95,6 +117,8 @@ export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvide
       if (!opts.apiKey) throw new Error('Anthropic API key not set')
       return createClaudeProvider({ apiKey: opts.apiKey, model: opts.model })
     }
+    case 'claude-cli':
+      return createClaudeCliProvider({ cwd: opts.cwd, signal: opts.signal })
     case 'grok': {
       if (!opts.apiKey) throw new Error('xAI (Grok) API key not set')
       return createGrokProvider({ apiKey: opts.apiKey, model: opts.model })
@@ -103,5 +127,7 @@ export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvide
       if (!opts.apiKey) throw new Error('OpenAI API key not set')
       return createOpenAiProvider({ apiKey: opts.apiKey, model: opts.model })
     }
+    case 'codex-cli':
+      return createCodexCliProvider({ cwd: opts.cwd, signal: opts.signal })
   }
 }

@@ -10,9 +10,11 @@ interface ProviderOption {
 const PROVIDER_OPTIONS: ProviderOption[] = [
   { id: 'gemini-api', label: 'Gemini',       description: 'API · с tools' },
   { id: 'gemini-cli', label: 'Gemini Ultra', description: 'CLI · подписка' },
-  { id: 'claude',     label: 'Claude',       description: 'API · chat-only' },
-  { id: 'grok',       label: 'Grok',         description: 'API · chat-only' },
-  { id: 'openai',     label: 'ChatGPT',      description: 'API · chat-only' }
+  { id: 'claude',     label: 'Claude',       description: 'API · ключ' },
+  { id: 'claude-cli', label: 'Claude Code',  description: 'CLI · Pro/Max подписка' },
+  { id: 'grok',       label: 'Grok',         description: 'API · ключ' },
+  { id: 'openai',     label: 'ChatGPT',      description: 'API · ключ' },
+  { id: 'codex-cli',  label: 'Codex',        description: 'CLI · Plus подписка' }
 ]
 
 interface Props {

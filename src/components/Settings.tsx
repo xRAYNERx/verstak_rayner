@@ -51,6 +51,17 @@ const PROVIDERS: ProviderConfig[] = [
     supportsTools: false
   },
   {
+    id: 'claude-cli',
+    name: 'Claude Code',
+    transport: 'CLI',
+    description: 'Твоя Claude Pro/Max подписка через claude CLI.',
+    models: ['auto'],
+    defaultModel: 'auto',
+    secretKey: null,
+    keyHint: '',
+    supportsTools: false
+  },
+  {
     id: 'grok',
     name: 'Grok',
     transport: 'API',
@@ -64,7 +75,7 @@ const PROVIDERS: ProviderConfig[] = [
   },
   {
     id: 'openai',
-    name: 'ChatGPT / Codex',
+    name: 'ChatGPT',
     transport: 'API',
     description: 'OpenAI. Chat-only пока.',
     models: ['gpt-5', 'gpt-5-mini', 'gpt-4o', 'gpt-4o-mini', 'o1', 'o1-mini'],
@@ -72,6 +83,17 @@ const PROVIDERS: ProviderConfig[] = [
     secretKey: 'openai_api_key',
     keyHint: 'sk-…',
     keyLink: { url: 'https://platform.openai.com/api-keys', label: 'OpenAI Platform' },
+    supportsTools: false
+  },
+  {
+    id: 'codex-cli',
+    name: 'Codex CLI',
+    transport: 'CLI',
+    description: 'Твоя ChatGPT Plus/Pro подписка через codex CLI.',
+    models: ['auto'],
+    defaultModel: 'auto',
+    secretKey: null,
+    keyHint: '',
     supportsTools: false
   }
 ]
@@ -172,6 +194,19 @@ export function Settings({ onClose }: { onClose: () => void }) {
               <div className="gg-notice" style={{ marginTop: 12 }}>
                 Нужно установлен <code>gemini-cli</code> и пройден OAuth твоим Google аккаунтом с Ultra подпиской.
                 Открой обычный терминал, набери <code>gemini</code>, согласись с авторизацией. После этого работает в нашем приложении.
+              </div>
+            )}
+            {activeCfg.id === 'claude-cli' && (
+              <div className="gg-notice" style={{ marginTop: 12 }}>
+                Нужен установленный <code>claude</code> CLI (Claude Code). Установить:{' '}
+                <code>irm https://claude.ai/install.ps1 | iex</code> или <code>curl -fsSL https://claude.ai/install.sh | bash</code>.
+                Залогинься через <code>claude</code> в обычном терминале своей Pro/Max подпиской — после этого работает у нас.
+              </div>
+            )}
+            {activeCfg.id === 'codex-cli' && (
+              <div className="gg-notice" style={{ marginTop: 12 }}>
+                Нужен установленный <code>codex</code> CLI. Установить: <code>npm install -g @openai/codex</code>.
+                Залогинься через <code>codex login</code> своей ChatGPT Plus/Pro подпиской — после этого работает у нас.
               </div>
             )}
 

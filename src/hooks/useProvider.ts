@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 
-export type ProviderId = 'gemini-api' | 'gemini-cli' | 'claude' | 'grok' | 'openai'
+export type ProviderId = 'gemini-api' | 'gemini-cli' | 'claude' | 'claude-cli' | 'grok' | 'openai' | 'codex-cli'
 
 export interface ProviderInfo {
   id: ProviderId
@@ -35,6 +35,12 @@ const PROVIDER_META: Record<ProviderId, Omit<ProviderInfo, 'model' | 'id'>> = {
     models: ['claude-opus-4-5-20251101', 'claude-sonnet-4-5-20251101', 'claude-haiku-4-5-20251101'],
     supportsTools: false
   },
+  'claude-cli': {
+    label: 'Claude Code',
+    transport: 'CLI',
+    models: ['auto'],
+    supportsTools: false
+  },
   grok: {
     label: 'Grok',
     transport: 'API',
@@ -46,6 +52,12 @@ const PROVIDER_META: Record<ProviderId, Omit<ProviderInfo, 'model' | 'id'>> = {
     transport: 'API',
     models: ['gpt-5', 'gpt-5-mini', 'gpt-4o', 'gpt-4o-mini', 'o1', 'o1-mini'],
     supportsTools: false
+  },
+  'codex-cli': {
+    label: 'Codex',
+    transport: 'CLI',
+    models: ['auto'],
+    supportsTools: false
   }
 }
 
@@ -53,12 +65,16 @@ const DEFAULT_MODEL: Record<ProviderId, string> = {
   'gemini-api': 'gemini-2.5-pro',
   'gemini-cli': 'auto',
   claude: 'claude-sonnet-4-5-20251101',
+  'claude-cli': 'auto',
   grok: 'grok-4',
-  openai: 'gpt-5'
+  openai: 'gpt-5',
+  'codex-cli': 'auto'
 }
 
+const KNOWN_IDS: ProviderId[] = ['gemini-api', 'gemini-cli', 'claude', 'claude-cli', 'grok', 'openai', 'codex-cli']
+
 function parseProviderId(v: string | null | undefined): ProviderId {
-  if (v === 'gemini-cli' || v === 'claude' || v === 'grok' || v === 'openai') return v
+  if (v && (KNOWN_IDS as string[]).includes(v)) return v as ProviderId
   return 'gemini-api'
 }
 

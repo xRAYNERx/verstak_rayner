@@ -62,7 +62,8 @@ app.whenReady().then(() => {
     getSecret: (key: string) => settings.getSecret(key),
     getProviderId: () => {
       const v = settings.getSecret('provider')
-      if (v === 'gemini-cli' || v === 'claude' || v === 'grok' || v === 'openai') return v
+      if (v === 'gemini-cli' || v === 'claude' || v === 'claude-cli'
+        || v === 'grok' || v === 'openai' || v === 'codex-cli') return v
       return 'gemini-api'
     },
     getProviderModel: (id) => settings.getSecret(`model_${id}`)
