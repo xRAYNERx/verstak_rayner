@@ -158,6 +158,21 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
           cachedInputTokens: event.usage.cachedInputTokens
         })
       }
+      else if (event.type === 'plan-created') {
+        store.pushActivity({
+          id: `plan-${event.planId}`,
+          kind: 'write',
+          label: `📋 План: ${event.title}`,
+          detail: `${event.stepCount} шагов — открой вкладку Plan`,
+          status: 'ok',
+          timestamp: Date.now()
+        })
+        if (store.path) {
+          void window.api.journal.append(store.path, 'tool',
+            `Создан план: ${event.title}`,
+            `${event.stepCount} шагов`)
+        }
+      }
       else if (event.type === 'done') {
         const path = store.path
         const msgs = store.messages
