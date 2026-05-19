@@ -32,6 +32,20 @@ contextBridge.exposeInMainWorld('api', {
     append: (projectPath: string, role: 'user' | 'assistant', content: string) =>
       ipcRenderer.invoke('chats:append', projectPath, role, content)
   },
+  tasks: {
+    list: (projectPath: string) => ipcRenderer.invoke('tasks:list', projectPath),
+    add: (projectPath: string, text: string) => ipcRenderer.invoke('tasks:add', projectPath, text),
+    toggle: (id: number, done: boolean) => ipcRenderer.invoke('tasks:toggle', id, done),
+    remove: (id: number) => ipcRenderer.invoke('tasks:remove', id),
+    clearDone: (projectPath: string) => ipcRenderer.invoke('tasks:clear-done', projectPath)
+  },
+  journal: {
+    list: (projectPath: string, limit?: number) => ipcRenderer.invoke('journal:list', projectPath, limit),
+    append: (projectPath: string, kind: string, title: string, detail?: string | null) =>
+      ipcRenderer.invoke('journal:append', projectPath, kind, title, detail),
+    remove: (id: number) => ipcRenderer.invoke('journal:remove', id),
+    clear: (projectPath: string) => ipcRenderer.invoke('journal:clear', projectPath)
+  },
   term: {
     spawn: (cwd: string) => ipcRenderer.invoke('term:spawn', cwd) as Promise<number>,
     write: (id: number, data: string) => ipcRenderer.invoke('term:write', id, data),

@@ -22,6 +22,8 @@ interface ActivityEntry {
   timestamp: number
 }
 
+export type ViewId = 'chat' | 'tasks' | 'journal' | 'plan' | 'workflow' | 'calendar'
+
 interface ProjectState {
   path: string | null
   tree: FileNode[]
@@ -30,7 +32,9 @@ interface ProjectState {
   pendingWrite: PendingWrite | null
   pendingCommand: PendingCommand | null
   activity: ActivityEntry[]
+  activeView: ViewId
   setProject: (path: string) => Promise<void>
+  setActiveView: (v: ViewId) => void
   addMessage: (msg: ChatMessage) => void
   updateLastAssistant: (text: string) => void
   setStreaming: (v: boolean) => void
@@ -49,6 +53,7 @@ export const useProject = create<ProjectState>((set) => ({
   pendingWrite: null,
   pendingCommand: null,
   activity: [],
+  activeView: 'chat',
   setProject: async (path) => {
     const tree = await window.api.files.tree(path)
     const history = await window.api.chats.list(path)
@@ -59,9 +64,11 @@ export const useProject = create<ProjectState>((set) => ({
       messages: history.map(m => ({ role: m.role, content: m.content })),
       pendingWrite: null,
       pendingCommand: null,
-      activity: []
+      activity: [],
+      activeView: 'chat'
     })
   },
+  setActiveView: (v) => set({ activeView: v }),
   addMessage: (msg) => set(s => ({ messages: [...s.messages, msg] })),
   updateLastAssistant: (text) => set(s => {
     const msgs = [...s.messages]

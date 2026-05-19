@@ -2,6 +2,9 @@ export interface FileNode { name: string; path: string; isDirectory: boolean; ch
 export interface Attachment { name: string; mimeType: string; data: string; size: number }
 export interface ChatMessage { role: 'user' | 'assistant' | 'system'; content: string; attachments?: Attachment[] }
 export interface StoredChatMessage { id: number; role: 'user' | 'assistant' | 'system'; content: string; createdAt: number }
+export interface Task { id: number; text: string; done: boolean; createdAt: number; doneAt: number | null }
+export type JournalKind = 'manual' | 'session' | 'tool' | 'note'
+export interface JournalEntry { id: number; kind: JournalKind; title: string; detail: string | null; createdAt: number }
 export interface ToolCall { id: string; name: string; args: Record<string, unknown> }
 export type ChatEvent =
   | { type: 'text'; text: string }
@@ -37,6 +40,19 @@ declare global {
       chats: {
         list: (projectPath: string) => Promise<StoredChatMessage[]>
         append: (projectPath: string, role: 'user' | 'assistant', content: string) => Promise<void>
+      }
+      tasks: {
+        list: (projectPath: string) => Promise<Task[]>
+        add: (projectPath: string, text: string) => Promise<Task>
+        toggle: (id: number, done: boolean) => Promise<void>
+        remove: (id: number) => Promise<void>
+        clearDone: (projectPath: string) => Promise<number>
+      }
+      journal: {
+        list: (projectPath: string, limit?: number) => Promise<JournalEntry[]>
+        append: (projectPath: string, kind: JournalKind, title: string, detail?: string | null) => Promise<JournalEntry>
+        remove: (id: number) => Promise<void>
+        clear: (projectPath: string) => Promise<number>
       }
       term: {
         spawn: (cwd: string) => Promise<number>

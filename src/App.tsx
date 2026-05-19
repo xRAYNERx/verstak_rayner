@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { Settings } from './components/Settings'
 import { Chat } from './components/Chat'
+import { TasksView } from './components/TasksView'
+import { JournalView } from './components/JournalView'
+import { StubView } from './components/StubView'
 import { DiffView } from './components/DiffView'
 import { CommandConfirm } from './components/CommandConfirm'
 import { Terminal } from './components/Terminal'
@@ -10,18 +13,26 @@ import { useProject } from './store/projectStore'
 export function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showTerminal, setShowTerminal] = useState(false)
-  const { path } = useProject()
+  const { path, activeView } = useProject()
   const canShowTerminal = path && showTerminal
+
   return (
     <div className="gg-app">
       <Sidebar onOpenSettings={() => setShowSettings(true)} />
       <main className="gg-main">
-        <Chat
-          onOpenSettings={() => setShowSettings(true)}
-          onToggleTerminal={() => setShowTerminal(t => !t)}
-          terminalOpen={showTerminal}
-        />
-        {canShowTerminal && (
+        {activeView === 'chat' && (
+          <Chat
+            onOpenSettings={() => setShowSettings(true)}
+            onToggleTerminal={() => setShowTerminal(t => !t)}
+            terminalOpen={showTerminal}
+          />
+        )}
+        {activeView === 'tasks' && <TasksView />}
+        {activeView === 'journal' && <JournalView />}
+        {activeView === 'plan' && <StubView title="Plan" description="Здесь будет план проекта — список целей и фаз. В работе." />}
+        {activeView === 'workflow' && <StubView title="Workflow" description="Здесь будут пайплайны и цепочки агентов. В работе." />}
+        {activeView === 'calendar' && <StubView title="Calendar" description="Здесь будут события и дедлайны проекта. В работе." />}
+        {activeView === 'chat' && canShowTerminal && (
           <div className="gg-terminal-wrap">
             <div className="gg-terminal-header">
               <span className="gg-terminal-dot" />

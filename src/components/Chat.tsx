@@ -121,6 +121,14 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
           status,
           detail: status === 'error' ? event.error ?? event.command : event.command
         })
+        // persist to project journal
+        if (store.path && status === 'ok') {
+          void window.api.journal.append(store.path, 'tool', `Команда: ${event.command}`,
+            event.stdout ? event.stdout.slice(0, 500) : null)
+        } else if (store.path && status === 'error') {
+          void window.api.journal.append(store.path, 'tool', `Команда упала: ${event.command}`,
+            event.error ?? null)
+        }
       }
       else if (event.type === 'tool-blocked') {
         store.pushActivity({
@@ -131,6 +139,9 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
           status: 'blocked',
           timestamp: Date.now()
         })
+        if (store.path) {
+          void window.api.journal.append(store.path, 'tool', `Заблокировано: ${event.command ?? event.name}`, event.reason)
+        }
       }
       else if (event.type === 'done') {
         const path = store.path
@@ -239,7 +250,13 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
       ? `${text}${text ? '\n\n' : ''}📎 ${userAttachments.map(a => a.name).join(', ')}`
       : text
     addMessage({ role: 'user', content: text, attachments: userAttachments })
-    if (path) await window.api.chats.append(path, 'user', summary)
+    if (path) {
+      await window.api.chats.append(path, 'user', summary)
+      // log the start of a session — title is the first 80 chars of the request
+      const journalTitle = text.length > 80 ? text.slice(0, 80) + '…' : (text || 'Сообщение с вложением')
+      void window.api.journal.append(path, 'session', journalTitle,
+        userAttachments.length > 0 ? `Вложений: ${userAttachments.length} (${userAttachments.map(a => a.name).join(', ')})` : null)
+    }
     addMessage({ role: 'assistant', content: '' })
     setStreaming(true)
     const allMessages = [...useProject.getState().messages].slice(0, -1)

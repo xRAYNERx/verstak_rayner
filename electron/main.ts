@@ -3,6 +3,8 @@ import { join } from 'path'
 import { mkdirSync } from 'fs'
 import { registerProjectIpc } from './ipc/projects'
 import { registerFilesIpc } from './ipc/files'
+import { registerTasksIpc } from './ipc/tasks'
+import { registerJournalIpc } from './ipc/journal'
 import { getActiveProjectPath } from './state/project-state'
 import { registerSettingsIpc } from './ipc/settings'
 import { registerAiIpc } from './ipc/ai'
@@ -11,6 +13,8 @@ import { registerTerminalIpc } from './ipc/terminal'
 import { openDb } from './storage/db'
 import { createSettings } from './storage/settings'
 import { createChats } from './storage/chats'
+import { createTasks } from './storage/tasks'
+import { createJournal } from './storage/journal'
 
 function createWindow(): void {
   // In dev: __dirname is out/main; in prod packaged build the path resolves the same way
@@ -46,6 +50,8 @@ app.whenReady().then(() => {
   const db = openDb(join(dir, 'geminigrok.db'))
   const settings = createSettings(db, safeStorage)
   const chats = createChats(db)
+  const tasks = createTasks(db)
+  const journal = createJournal(db)
 
   registerProjectIpc()
   registerFilesIpc({ getProjectRoot: getActiveProjectPath })
@@ -58,6 +64,8 @@ app.whenReady().then(() => {
     }
   })
   registerChatsIpc(chats)
+  registerTasksIpc(tasks)
+  registerJournalIpc(journal)
   registerTerminalIpc()
   createWindow()
 })

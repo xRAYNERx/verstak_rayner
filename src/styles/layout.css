@@ -83,6 +83,53 @@
   word-break: break-all;
 }
 
+/* Project nav (Chat / Tasks / Journal / ...) */
+.gg-nav {
+  padding: 12px 6px 4px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.gg-nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: all 120ms ease;
+}
+.gg-nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.gg-nav-item.is-active {
+  background: var(--bg-active);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.gg-nav-item.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.gg-nav-item.is-disabled:hover { background: transparent; color: var(--text-secondary); }
+.gg-nav-icon {
+  display: inline-flex;
+  width: 14px; height: 14px;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+.gg-nav-item.is-active .gg-nav-icon { color: var(--accent); }
+.gg-nav-label { flex: 1; }
+.gg-nav-badge {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  background: var(--bg-overlay);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
 /* File tree */
 .gg-tree { padding: 0 6px; }
 .gg-tree-node {
@@ -413,6 +460,188 @@
 }
 .gg-msg-image {
   border: 1px solid var(--border-subtle);
+}
+
+/* ─── Generic panel (Tasks, Journal, Stub) ─── */
+.gg-panel {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+  background: var(--bg-base);
+}
+.gg-panel-header {
+  padding: 18px 28px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex; align-items: baseline; justify-content: space-between;
+  flex-shrink: 0;
+}
+.gg-panel-title {
+  margin: 0;
+  font-size: 18px; font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+}
+.gg-panel-meta {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.gg-panel-body {
+  flex: 1; min-height: 0;
+  padding: 20px 28px;
+  overflow-y: auto;
+}
+.gg-panel-empty {
+  color: var(--text-tertiary);
+  font-size: var(--text-base);
+  padding: 32px 0;
+  text-align: center;
+  line-height: 1.6;
+}
+
+/* ─── Tasks view ─── */
+.gg-task-add {
+  display: flex; gap: 8px;
+  margin-bottom: 18px;
+}
+.gg-task-add .gg-input { flex: 1; }
+
+.gg-task-list { display: flex; flex-direction: column; gap: 2px; }
+.gg-task-list.is-done { opacity: 0.6; }
+
+.gg-task-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  transition: background 120ms ease;
+}
+.gg-task-row:hover { background: var(--bg-elevated); }
+.gg-task-row.is-done .gg-task-text {
+  color: var(--text-tertiary);
+  text-decoration: line-through;
+}
+
+.gg-task-check {
+  width: 18px; height: 18px;
+  background: transparent;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 5px;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: transparent;
+  font-size: 11px; font-weight: 700;
+  flex-shrink: 0;
+  transition: all 120ms ease;
+}
+.gg-task-check:hover { border-color: var(--accent); }
+.gg-task-check.is-done {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.gg-task-text {
+  flex: 1;
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.gg-task-remove {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 16px; line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  transition: all 120ms ease;
+}
+.gg-task-row:hover .gg-task-remove { opacity: 1; }
+.gg-task-remove:hover { background: var(--error-muted); color: var(--error); }
+
+.gg-task-section { margin-top: 24px; }
+.gg-task-section-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 10px 8px;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ─── Journal view ─── */
+.gg-journal-compose {
+  display: flex; flex-direction: column; gap: 6px;
+  margin-bottom: 22px;
+  padding: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.gg-journal-detail {
+  height: auto;
+  min-height: 48px;
+  padding: 8px 12px;
+  resize: vertical;
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+.gg-journal-compose .gg-btn { align-self: flex-end; }
+
+.gg-journal-list { display: flex; flex-direction: column; gap: 10px; }
+
+.gg-journal-entry {
+  padding: 12px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  position: relative;
+}
+.gg-journal-meta {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 6px;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+.gg-journal-kind {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 9.5px;
+  font-weight: 500;
+}
+.gg-journal-time { flex: 1; }
+.gg-journal-remove {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 16px; line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  transition: all 120ms ease;
+}
+.gg-journal-entry:hover .gg-journal-remove { opacity: 1; }
+.gg-journal-remove:hover { background: var(--error-muted); color: var(--error); }
+
+.gg-journal-title {
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.gg-journal-detail-text {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  line-height: 1.55;
 }
 
 /* ─── Drag-and-drop overlay ─── */
