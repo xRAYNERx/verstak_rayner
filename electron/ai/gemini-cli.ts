@@ -11,6 +11,14 @@ interface GeminiCliOptions {
   signal?: AbortSignal
 }
 
+export const GEMINI_CLI_MODELS = [
+  'auto',
+  'gemini-2.5-pro',
+  'gemini-2.5-flash',
+  'gemini-3-pro-preview',
+  'gemini-3-flash-preview'
+]
+
 function findBinary(): string {
   if (platform() === 'win32') {
     const home = process.env.APPDATA ?? ''
@@ -38,7 +46,7 @@ export function createGeminiCliProvider(opts: GeminiCliOptions = {}): ChatProvid
   return {
     id: 'gemini-cli',
     name: 'Gemini CLI (subscription)',
-    models: ['auto'],
+    models: GEMINI_CLI_MODELS,
 
     async *send(messages: ChatMessage[], _tools: ToolDefinition[], _results?: ToolResult[]): AsyncIterable<ChatEvent> {
       const lastUser = messages.filter(m => m.role === 'user').at(-1)
@@ -56,6 +64,9 @@ export function createGeminiCliProvider(opts: GeminiCliOptions = {}): ChatProvid
       }
 
       const args = ['--output-format', 'stream-json']
+      if (opts.model && opts.model !== 'auto') {
+        args.push('-m', opts.model)
+      }
       const child = spawn(binary, args, {
         cwd,
         shell: binary.endsWith('.cmd') || binary.endsWith('.ps1'),

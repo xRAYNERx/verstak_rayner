@@ -1,10 +1,10 @@
 import { createGeminiProvider } from './gemini'
-import { createGeminiCliProvider } from './gemini-cli'
+import { createGeminiCliProvider, GEMINI_CLI_MODELS } from './gemini-cli'
 import { createClaudeProvider, CLAUDE_MODELS } from './claude'
-import { createClaudeCliProvider } from './claude-cli'
+import { createClaudeCliProvider, CLAUDE_CLI_MODELS } from './claude-cli'
 import { createGrokProvider, GROK_MODELS } from './grok'
 import { createOpenAiProvider, OPENAI_MODELS } from './openai'
-import { createCodexCliProvider } from './codex-cli'
+import { createCodexCliProvider, CODEX_CLI_MODELS } from './codex-cli'
 import type { ChatProvider } from './types'
 
 export type ProviderId = 'gemini-api' | 'gemini-cli' | 'claude' | 'claude-cli' | 'grok' | 'openai' | 'codex-cli'
@@ -41,7 +41,7 @@ export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
     name: 'Gemini CLI',
     transport: 'CLI',
     secretKey: null,
-    models: ['auto'],
+    models: GEMINI_CLI_MODELS,
     defaultModel: 'auto',
     supportsTools: false,
     shortLabel: 'Gemini Ultra'
@@ -61,7 +61,7 @@ export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
     name: 'Claude Code',
     transport: 'CLI',
     secretKey: null,
-    models: ['auto'],
+    models: CLAUDE_CLI_MODELS,
     defaultModel: 'auto',
     supportsTools: false,
     shortLabel: 'Claude Code'
@@ -91,7 +91,7 @@ export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
     name: 'Codex',
     transport: 'CLI',
     secretKey: null,
-    models: ['auto'],
+    models: CODEX_CLI_MODELS,
     defaultModel: 'auto',
     supportsTools: false,
     shortLabel: 'Codex'
@@ -112,13 +112,13 @@ export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvide
       return createGeminiProvider({ apiKey: opts.apiKey, model: opts.model })
     }
     case 'gemini-cli':
-      return createGeminiCliProvider({ cwd: opts.cwd, signal: opts.signal })
+      return createGeminiCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model })
     case 'claude': {
       if (!opts.apiKey) throw new Error('Anthropic API key not set')
       return createClaudeProvider({ apiKey: opts.apiKey, model: opts.model })
     }
     case 'claude-cli':
-      return createClaudeCliProvider({ cwd: opts.cwd, signal: opts.signal })
+      return createClaudeCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model })
     case 'grok': {
       if (!opts.apiKey) throw new Error('xAI (Grok) API key not set')
       return createGrokProvider({ apiKey: opts.apiKey, model: opts.model })
@@ -128,6 +128,6 @@ export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvide
       return createOpenAiProvider({ apiKey: opts.apiKey, model: opts.model })
     }
     case 'codex-cli':
-      return createCodexCliProvider({ cwd: opts.cwd, signal: opts.signal })
+      return createCodexCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model })
   }
 }

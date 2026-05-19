@@ -26,7 +26,7 @@ const PROVIDER_META: Record<ProviderId, Omit<ProviderInfo, 'model' | 'id'>> = {
   'gemini-cli': {
     label: 'Gemini Ultra',
     transport: 'CLI',
-    models: ['auto'],
+    models: ['auto', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-3-pro-preview', 'gemini-3-flash-preview'],
     supportsTools: false
   },
   claude: {
@@ -38,7 +38,7 @@ const PROVIDER_META: Record<ProviderId, Omit<ProviderInfo, 'model' | 'id'>> = {
   'claude-cli': {
     label: 'Claude Code',
     transport: 'CLI',
-    models: ['auto'],
+    models: ['auto', 'claude-sonnet-4-6', 'claude-opus-4-5', 'claude-haiku-4-5', 'claude-sonnet-4-5'],
     supportsTools: false
   },
   grok: {
@@ -56,7 +56,7 @@ const PROVIDER_META: Record<ProviderId, Omit<ProviderInfo, 'model' | 'id'>> = {
   'codex-cli': {
     label: 'Codex',
     transport: 'CLI',
-    models: ['auto'],
+    models: ['auto', 'gpt-5-codex', 'gpt-5', 'gpt-5-mini', 'o3', 'o3-mini', 'gpt-4o'],
     supportsTools: false
   }
 }

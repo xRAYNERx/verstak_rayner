@@ -8,7 +8,16 @@ interface ClaudeCliOptions {
   binary?: string
   cwd?: string
   signal?: AbortSignal
+  model?: string
 }
+
+export const CLAUDE_CLI_MODELS = [
+  'auto',
+  'claude-sonnet-4-6',
+  'claude-opus-4-5',
+  'claude-haiku-4-5',
+  'claude-sonnet-4-5'
+]
 
 function findBinary(): string {
   // Claude Code installs to ~/.local/bin/claude by default on Windows/macOS/Linux
@@ -41,7 +50,7 @@ export function createClaudeCliProvider(opts: ClaudeCliOptions = {}): ChatProvid
   return {
     id: 'claude-cli',
     name: 'Claude Code',
-    models: ['auto'],
+    models: CLAUDE_CLI_MODELS,
 
     async *send(messages: ChatMessage[], _tools: ToolDefinition[], _results?: ToolResult[]): AsyncIterable<ChatEvent> {
       const lastUser = messages.filter(m => m.role === 'user').at(-1)
@@ -51,6 +60,9 @@ export function createClaudeCliProvider(opts: ClaudeCliOptions = {}): ChatProvid
       }
 
       const args = ['--print', '--output-format', 'stream-json', '--verbose']
+      if (opts.model && opts.model !== 'auto') {
+        args.push('--model', opts.model)
+      }
       const child = spawn(binary, args, {
         cwd,
         shell: binary.endsWith('.cmd') || binary.endsWith('.ps1'),

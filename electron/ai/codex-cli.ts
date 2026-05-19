@@ -8,7 +8,18 @@ interface CodexCliOptions {
   binary?: string
   cwd?: string
   signal?: AbortSignal
+  model?: string
 }
+
+export const CODEX_CLI_MODELS = [
+  'auto',
+  'gpt-5-codex',
+  'gpt-5',
+  'gpt-5-mini',
+  'o3',
+  'o3-mini',
+  'gpt-4o'
+]
 
 function findBinary(): string {
   if (platform() === 'win32' && process.env.APPDATA) {
@@ -39,7 +50,7 @@ export function createCodexCliProvider(opts: CodexCliOptions = {}): ChatProvider
   return {
     id: 'codex-cli',
     name: 'Codex',
-    models: ['auto'],
+    models: CODEX_CLI_MODELS,
 
     async *send(messages: ChatMessage[], _tools: ToolDefinition[], _results?: ToolResult[]): AsyncIterable<ChatEvent> {
       const lastUser = messages.filter(m => m.role === 'user').at(-1)
@@ -49,6 +60,9 @@ export function createCodexCliProvider(opts: CodexCliOptions = {}): ChatProvider
       }
 
       const args = ['exec', '--json']
+      if (opts.model && opts.model !== 'auto') {
+        args.push('-m', opts.model)
+      }
       const child = spawn(binary, args, {
         cwd,
         shell: binary.endsWith('.cmd') || binary.endsWith('.ps1'),

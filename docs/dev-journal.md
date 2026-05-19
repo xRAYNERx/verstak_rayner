@@ -42,6 +42,7 @@
 | 2026-05-19 | **Fix.** Author label в чате | `f55a5cc` | Раньше было хардкод "Gemini" — теперь dynamic из `useProvider().label`. Под сообщением AI пишется реальное имя текущего провайдера (Claude / Grok / Codex / …) |
 | 2026-05-19 | **Fix.** `__dirname is not defined` в main.mjs | `280de72` | После добавления `externalizeDepsPlugin` в build config Vite перестал инжектить CJS shim для `__dirname`. Заменил на `dirname(fileURLToPath(import.meta.url))` явно. Окно перестало падать при старте |
 | 2026-05-19 | **UX.** Terminal toggle | — | Раньше открывался автоматически при выборе проекта. Теперь по умолчанию скрыт. Кнопка-иконка терминала в composer (рядом с model pill) разворачивает; `×` в шапке панели сворачивает |
+| 2026-05-19 | **Feature.** Model selection for CLI providers | — | Раньше у `gemini-cli` / `claude-cli` / `codex-cli` была одна модель `auto`. Теперь у каждого свой список: Gemini Ultra (2.5-pro/flash, 3-pro/flash-preview), Claude Code (sonnet/opus/haiku 4-5/4-6), Codex (gpt-5-codex/gpt-5/o3/o3-mini/4o). Provider передаёт выбранную модель в субпроцесс через `--model` или `-m`. ModelPicker и Settings показывают полный список для CLI |
 
 ---
 
