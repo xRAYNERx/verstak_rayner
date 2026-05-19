@@ -8,12 +8,20 @@ export interface JournalEntry { id: number; kind: JournalKind; title: string; de
 export interface UndoEntry { id: number; filePath: string; beforeContent: string | null; afterContent: string | null; createdAt: number }
 export interface ProjectMeta { path: string; name: string; color: string; lastOpenedAt: number }
 export interface ToolCall { id: string; name: string; args: Record<string, unknown> }
+export interface UsageDelta {
+  inputTokens?: number
+  outputTokens?: number
+  cachedInputTokens?: number
+  model?: string
+}
+
 export type ChatEvent =
   | { type: 'text'; text: string }
   | { type: 'pending-write'; callId: string; path: string; before: string; after: string }
   | { type: 'pending-command'; callId: string; command: string }
   | { type: 'command-result'; callId: string; command: string; status: 'ok' | 'error' | 'rejected'; exitCode?: number; stdout?: string; stderr?: string; error?: string }
   | { type: 'tool-blocked'; callId: string; name: string; command?: string; reason: string }
+  | { type: 'usage'; usage: UsageDelta }
   | { type: 'done' }
   | { type: 'error'; message: string }
 

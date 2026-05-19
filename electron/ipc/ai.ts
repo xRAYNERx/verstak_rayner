@@ -129,6 +129,9 @@ async function runPlainConversation(
   sender.send('ai:event', { id: sendId, event: { type: 'done' } })
 }
 
+// Type re-exports for renderer (api.d.ts)
+export type { UsageDelta } from '../ai/types'
+
 /**
  * Full agentic loop with file tools + diff confirmation + command sandbox.
  * Only providers that support function calling go through here.
@@ -170,6 +173,8 @@ async function runApiConversation(
         sender.send('ai:event', { id: sendId, event })
       } else if (event.type === 'tool-call') {
         toolCalls.push(event.call)
+      } else if (event.type === 'usage') {
+        sender.send('ai:event', { id: sendId, event })
       } else if (event.type === 'done') {
         if (toolCalls.length === 0) {
           sender.send('ai:event', { id: sendId, event })

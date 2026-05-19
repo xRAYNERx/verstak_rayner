@@ -24,6 +24,12 @@ interface ActivityEntry {
 
 export type ViewId = 'chat' | 'tasks' | 'journal' | 'plan' | 'workflow' | 'calendar'
 
+export interface SessionUsage {
+  inputTokens: number
+  outputTokens: number
+  cachedInputTokens: number
+}
+
 interface ProjectState {
   path: string | null
   tree: FileNode[]
@@ -33,6 +39,7 @@ interface ProjectState {
   pendingCommand: PendingCommand | null
   activity: ActivityEntry[]
   activeView: ViewId
+  sessionUsage: SessionUsage
   projectList: ProjectMeta[]
   setProject: (path: string) => Promise<void>
   closeProject: () => void
@@ -47,6 +54,8 @@ interface ProjectState {
   pushActivity: (entry: ActivityEntry) => void
   updateActivity: (id: string, patch: Partial<ActivityEntry>) => void
   clearActivity: () => void
+  addUsage: (delta: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number }) => void
+  resetUsage: () => void
 }
 
 export const useProject = create<ProjectState>((set, get) => ({
@@ -58,6 +67,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   pendingCommand: null,
   activity: [],
   activeView: 'chat',
+  sessionUsage: { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 },
   projectList: [],
   setProject: async (path) => {
     const tree = await window.api.files.tree(path)
@@ -72,7 +82,8 @@ export const useProject = create<ProjectState>((set, get) => ({
       pendingCommand: null,
       activity: [],
       activeView: 'chat',
-      projectList
+      projectList,
+      sessionUsage: { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 }
     })
   },
   closeProject: () => set({
@@ -112,7 +123,15 @@ export const useProject = create<ProjectState>((set, get) => ({
   updateActivity: (id, patch) => set(s => ({
     activity: s.activity.map(a => a.id === id ? { ...a, ...patch } : a)
   })),
-  clearActivity: () => set({ activity: [] })
+  clearActivity: () => set({ activity: [] }),
+  addUsage: (delta) => set(s => ({
+    sessionUsage: {
+      inputTokens: s.sessionUsage.inputTokens + (delta.inputTokens ?? 0),
+      outputTokens: s.sessionUsage.outputTokens + (delta.outputTokens ?? 0),
+      cachedInputTokens: s.sessionUsage.cachedInputTokens + (delta.cachedInputTokens ?? 0)
+    }
+  })),
+  resetUsage: () => set({ sessionUsage: { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 } })
 }))
 
 export type { ActivityEntry, PendingCommand }

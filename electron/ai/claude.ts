@@ -101,8 +101,16 @@ export function createClaudeProvider(opts: ClaudeOptions): ChatProvider {
           ...(apiTools ? { tools: apiTools } : {})
         })
 
+        let inputTokens = 0
+        let outputTokens = 0
+        let cachedInputTokens = 0
         for await (const event of stream) {
-          if (event.type === 'content_block_start' && event.content_block.type === 'tool_use') {
+          if (event.type === 'message_start' && event.message?.usage) {
+            inputTokens = event.message.usage.input_tokens ?? 0
+            cachedInputTokens = (event.message.usage as { cache_read_input_tokens?: number }).cache_read_input_tokens ?? 0
+          } else if (event.type === 'message_delta' && event.usage) {
+            outputTokens = event.usage.output_tokens ?? 0
+          } else if (event.type === 'content_block_start' && event.content_block.type === 'tool_use') {
             activeToolUses[event.index] = {
               id: event.content_block.id ?? randomUUID(),
               name: event.content_block.name,
@@ -121,6 +129,9 @@ export function createClaudeProvider(opts: ClaudeOptions): ChatProvider {
             yield { type: 'tool-call', call: { id: tu.id, name: tu.name, args } }
             delete activeToolUses[event.index]
           }
+        }
+        if (inputTokens || outputTokens) {
+          yield { type: 'usage', usage: { inputTokens, outputTokens, cachedInputTokens, model } }
         }
         yield { type: 'done' }
       } catch (err) {

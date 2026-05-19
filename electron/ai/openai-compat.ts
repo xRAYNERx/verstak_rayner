@@ -107,10 +107,26 @@ export function createOpenAiCompatProvider(opts: OpenAiCompatOptions): ChatProvi
           messages: apiMessages,
           stream: true,
           max_tokens: 4096,
+          stream_options: { include_usage: true },
           ...(apiTools ? { tools: apiTools } : {})
         })
 
+        let usageSent = false
         for await (const chunk of stream) {
+          // Final chunk may carry only usage (no choices)
+          if ((chunk as { usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } } }).usage && !usageSent) {
+            const u = (chunk as { usage: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } } }).usage
+            usageSent = true
+            yield {
+              type: 'usage',
+              usage: {
+                inputTokens: u.prompt_tokens,
+                outputTokens: u.completion_tokens,
+                cachedInputTokens: u.prompt_tokens_details?.cached_tokens,
+                model
+              }
+            }
+          }
           const delta = chunk.choices?.[0]?.delta
           if (!delta) continue
           if (typeof delta.content === 'string' && delta.content.length > 0) {

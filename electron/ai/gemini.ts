@@ -68,13 +68,31 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
         const stream = await client.models.generateContentStream(
           config ? { model, contents, config } : { model, contents }
         )
+        let lastUsage: { prompt?: number; output?: number; cached?: number } = {}
         for await (const chunk of stream) {
-          const c = chunk as { text?: string; functionCalls?: Array<{ name: string; args: Record<string, unknown> }> }
+          const c = chunk as {
+            text?: string
+            functionCalls?: Array<{ name: string; args: Record<string, unknown> }>
+            usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; cachedContentTokenCount?: number }
+          }
           if (c.text) yield { type: 'text', text: c.text }
           if (c.functionCalls) {
             for (const fc of c.functionCalls) {
               yield { type: 'tool-call', call: { id: randomUUID(), name: fc.name, args: fc.args } }
             }
+          }
+          if (c.usageMetadata) {
+            lastUsage = {
+              prompt: c.usageMetadata.promptTokenCount,
+              output: c.usageMetadata.candidatesTokenCount,
+              cached: c.usageMetadata.cachedContentTokenCount
+            }
+          }
+        }
+        if (lastUsage.prompt || lastUsage.output) {
+          yield {
+            type: 'usage',
+            usage: { inputTokens: lastUsage.prompt, outputTokens: lastUsage.output, cachedInputTokens: lastUsage.cached, model }
           }
         }
         yield { type: 'done' }

@@ -23,6 +23,12 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function formatTokens(n: number): string {
+  if (n < 1000) return String(n)
+  if (n < 1_000_000) return `${(n / 1000).toFixed(n < 10_000 ? 1 : 0)}k`
+  return `${(n / 1_000_000).toFixed(1)}M`
+}
+
 function isAcceptable(mime: string): boolean {
   return ACCEPTED_MIME_PREFIXES.some(p => mime.startsWith(p))
 }
@@ -45,7 +51,7 @@ async function blobToAttachment(blob: Blob, fallbackName: string): Promise<Attac
 }
 
 export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatProps) {
-  const { messages, addMessage, updateLastAssistant, isStreaming, setStreaming, activity } = useProject()
+  const { messages, addMessage, updateLastAssistant, isStreaming, setStreaming, activity, sessionUsage } = useProject()
   const provider = useProvider()
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
@@ -144,6 +150,13 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
         if (store.path) {
           void window.api.journal.append(store.path, 'tool', `Заблокировано: ${event.command ?? event.name}`, event.reason)
         }
+      }
+      else if (event.type === 'usage') {
+        store.addUsage({
+          inputTokens: event.usage.inputTokens,
+          outputTokens: event.usage.outputTokens,
+          cachedInputTokens: event.usage.cachedInputTokens
+        })
       }
       else if (event.type === 'done') {
         const path = store.path
@@ -463,6 +476,13 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
         <div className="gg-composer-hint">
           <span><span className="gg-kbd">Enter</span> отправить · <span className="gg-kbd">Shift</span>+<span className="gg-kbd">Enter</span> новая строка · <span className="gg-kbd">Ctrl+V</span> картинка</span>
           <div className="gg-composer-meta">
+            {(sessionUsage.inputTokens > 0 || sessionUsage.outputTokens > 0) && (
+              <span className="gg-usage-pill" title="Токены потраченные в этом проекте">
+                <span>↑{formatTokens(sessionUsage.inputTokens)}</span>
+                <span className="gg-usage-sep">·</span>
+                <span>↓{formatTokens(sessionUsage.outputTokens)}</span>
+              </span>
+            )}
             {undoCount > 0 && (
               <button
                 type="button"

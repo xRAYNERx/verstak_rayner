@@ -44,6 +44,17 @@ export interface ToolDefinition {
   parameters: Record<string, unknown>  // JSON Schema
 }
 
+export interface UsageDelta {
+  /** Tokens in the prompt for this turn */
+  inputTokens?: number
+  /** Tokens produced by the model in this turn */
+  outputTokens?: number
+  /** Tokens already cached on the provider side (Anthropic / OpenAI) */
+  cachedInputTokens?: number
+  /** Model that produced the usage, helps cost lookup */
+  model?: string
+}
+
 export type ChatEvent =
   | { type: 'text'; text: string }
   | { type: 'tool-call'; call: ToolCall }
@@ -51,6 +62,7 @@ export type ChatEvent =
   | { type: 'pending-command'; callId: string; command: string }
   | { type: 'command-result'; callId: string; command: string; status: 'ok' | 'error' | 'rejected'; exitCode?: number; stdout?: string; stderr?: string; error?: string }
   | { type: 'tool-blocked'; callId: string; name: string; command?: string; reason: string }
+  | { type: 'usage'; usage: UsageDelta }
   | { type: 'done' }
   | { type: 'error'; message: string }
 
