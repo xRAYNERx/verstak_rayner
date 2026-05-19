@@ -55,6 +55,7 @@
 | 2026-05-19 | **Chore.** Test pipeline fix | `a777fe2` | `npm test` теперь сам ребилдит better-sqlite3 под node перед vitest. `predev` ребилдит под Electron. `test:fast` пропускает ребилд. Решена боль ABI mismatch из аудита |
 | 2026-05-19 | **Docs.** README → GGC = Gemini Grok Claude | `49f4894` | Обновлён под актуальный набор: 8 провайдеров (4 API + 4 CLI), список фич, инструкции для каждого CLI, скрипты, статус |
 | 2026-05-19 | **Safety.** Confirm project switch mid-stream | `2903cc1` | Stop-gap до полного background-agents. При клике на другой проект во время стрима — confirm `AI ещё отвечает. Прервать?`. Без подтверждения остаёмся в текущем |
+| 2026-05-19 | **Feature.** Background agents (4 коммита) | `1cc05e5` → `34a9326` | Полная фоновая работа AI во время переключения проектов. Backend: каждое `ai:event` теперь тегируется `projectPath` (taggedSender wrapper). Store: `SessionSnapshot` per-проект, snapshot/restore при `setProject`, `applyEventToSession` action для фоновых сессий. Chat: листенер маршрутизирует по `projectPath` — если событие не для текущего проекта, мутирует snapshot. UI: на ProjectChip синяя точка `hasUnread` (AI закончил пока ты был в другом проекте) или зелёная пульсирующая `isStreaming` (ещё работает). Stop-gap confirm-mid-stream удалён. Переключение проектов во время стрима безопасно: AI продолжает писать в свой проект, ты видишь точку, вернулся — увидел готовый ответ |
 
 ---
 
