@@ -58,10 +58,6 @@ declare global {
         remove: (id: number) => Promise<void>
         clear: (projectPath: string) => Promise<number>
       }
-      systemLayer: {
-        get: () => Promise<{ version: string; prompt: string }>
-        user: (projectPath: string | null) => Promise<{ path: string | null; content: string }>
-      }
       term: {
         spawn: (cwd: string) => Promise<number>
         write: (id: number, data: string) => Promise<void>

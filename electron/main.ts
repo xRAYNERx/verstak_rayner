@@ -9,7 +9,6 @@ import { registerProjectIpc } from './ipc/projects'
 import { registerFilesIpc } from './ipc/files'
 import { registerTasksIpc } from './ipc/tasks'
 import { registerJournalIpc } from './ipc/journal'
-import { registerSystemLayerIpc } from './ipc/system-layer'
 import { getActiveProjectPath } from './state/project-state'
 import { registerSettingsIpc } from './ipc/settings'
 import { registerAiIpc } from './ipc/ai'
@@ -76,7 +75,6 @@ app.whenReady().then(() => {
   registerChatsIpc(chats)
   registerTasksIpc(tasks)
   registerJournalIpc(journal)
-  registerSystemLayerIpc()
   registerTerminalIpc()
   createWindow()
 })

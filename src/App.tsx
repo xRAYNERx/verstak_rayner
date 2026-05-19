@@ -9,13 +9,11 @@ import { StubView } from './components/StubView'
 import { DiffView } from './components/DiffView'
 import { CommandConfirm } from './components/CommandConfirm'
 import { Terminal } from './components/Terminal'
-import { SystemLayerViewer } from './components/SystemLayerViewer'
 import { useProject } from './store/projectStore'
 
 export function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showTerminal, setShowTerminal] = useState(false)
-  const [showSysLayer, setShowSysLayer] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const { path, activeView } = useProject()
   const canShowTerminal = path && showTerminal
@@ -45,7 +43,6 @@ export function App() {
             onOpenSettings={() => setShowSettings(true)}
             onToggleTerminal={() => setShowTerminal(t => !t)}
             terminalOpen={showTerminal}
-            onOpenSystemLayer={() => setShowSysLayer(true)}
           />
         )}
         {activeView === 'tasks' && <TasksView />}
@@ -71,7 +68,6 @@ export function App() {
         )}
       </main>
       {showSettings && <Settings onClose={() => setShowSettings(false)} />}
-      {showSysLayer && <SystemLayerViewer onClose={() => setShowSysLayer(false)} />}
       <DiffView />
       <CommandConfirm />
     </div>
