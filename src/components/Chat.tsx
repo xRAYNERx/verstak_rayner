@@ -12,6 +12,8 @@ const ACCEPTED_MIME_PREFIXES = ['image/', 'text/', 'application/pdf', 'applicati
 
 interface ChatProps {
   onOpenSettings: () => void
+  onToggleTerminal: () => void
+  terminalOpen: boolean
 }
 
 function formatSize(bytes: number): string {
@@ -41,7 +43,7 @@ async function blobToAttachment(blob: Blob, fallbackName: string): Promise<Attac
   }
 }
 
-export function Chat({ onOpenSettings }: ChatProps) {
+export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatProps) {
   const { messages, addMessage, updateLastAssistant, isStreaming, setStreaming, activity } = useProject()
   const provider = useProvider()
   const [input, setInput] = useState('')
@@ -413,17 +415,30 @@ export function Chat({ onOpenSettings }: ChatProps) {
         </div>
         <div className="gg-composer-hint">
           <span><span className="gg-kbd">Enter</span> отправить · <span className="gg-kbd">Shift</span>+<span className="gg-kbd">Enter</span> новая строка · <span className="gg-kbd">Ctrl+V</span> картинка</span>
-          <button
-            type="button"
-            className="gg-model-pill"
-            onClick={onOpenSettings}
-            title="Сменить модель / провайдер"
-          >
-            <span className={`gg-provider-dot ${provider.id === 'gemini-cli' ? 'cli' : ''}`} />
-            <span className="gg-model-pill-name">{provider.model}</span>
-            <span className="gg-model-pill-sep">·</span>
-            <span className="gg-model-pill-transport">{provider.transport}</span>
-          </button>
+          <div className="gg-composer-meta">
+            <button
+              type="button"
+              className={`gg-terminal-toggle ${terminalOpen ? 'is-open' : ''}`}
+              onClick={onToggleTerminal}
+              title={terminalOpen ? 'Скрыть терминал' : 'Показать терминал'}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="4 17 10 11 4 5" />
+                <line x1="12" y1="19" x2="20" y2="19" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="gg-model-pill"
+              onClick={onOpenSettings}
+              title="Сменить модель / провайдер"
+            >
+              <span className={`gg-provider-dot ${provider.id === 'gemini-cli' ? 'cli' : ''}`} />
+              <span className="gg-model-pill-name">{provider.model}</span>
+              <span className="gg-model-pill-sep">·</span>
+              <span className="gg-model-pill-transport">{provider.transport}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
