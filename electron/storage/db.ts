@@ -19,6 +19,17 @@ export function openDb(path: string): DB {
     );
     CREATE INDEX IF NOT EXISTS idx_chats_project ON chats(project_path, created_at);
 
+    CREATE TABLE IF NOT EXISTS chat_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_path TEXT NOT NULL,
+      title TEXT NOT NULL,
+      provider_id TEXT,
+      model TEXT,
+      created_at INTEGER NOT NULL,
+      last_message_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_chat_sessions_project ON chat_sessions(project_path, last_message_at DESC);
+
     CREATE TABLE IF NOT EXISTS tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       project_path TEXT NOT NULL,
@@ -87,6 +98,27 @@ export function openDb(path: string): DB {
       created_at INTEGER NOT NULL
     );
   `)
+
+  // Migrate chats → session-aware. Add session_id column if missing, then
+  // backfill: for every project that has orphan chats, create a default
+  // session and tag those rows. Idempotent.
+  const chatCols = (db.prepare("PRAGMA table_info(chats)").all() as Array<{ name: string }>).map(c => c.name)
+  if (!chatCols.includes('session_id')) {
+    db.exec('ALTER TABLE chats ADD COLUMN session_id INTEGER')
+  }
+  const orphans = db.prepare(`
+    SELECT DISTINCT project_path FROM chats WHERE session_id IS NULL
+  `).all() as Array<{ project_path: string }>
+  for (const { project_path } of orphans) {
+    const now = Date.now()
+    const info = db.prepare(
+      'INSERT INTO chat_sessions (project_path, title, created_at, last_message_at) VALUES (?, ?, ?, ?)'
+    ).run(project_path, 'Основной чат', now, now)
+    db.prepare('UPDATE chats SET session_id = ? WHERE project_path = ? AND session_id IS NULL').run(
+      info.lastInsertRowid, project_path
+    )
+  }
+  db.exec('CREATE INDEX IF NOT EXISTS idx_chats_session ON chats(session_id, created_at)')
 
   return db
 }
