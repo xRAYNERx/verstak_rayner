@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useProject } from '../store/projectStore'
-import type { Plan, PlanStep, StepStatus } from '../types/api'
+import type { Plan, PlanStep, StepStatus, ChatMessage } from '../types/api'
 
 const STEP_LABEL: Record<StepStatus, string> = {
   pending: 'ждёт',
@@ -19,7 +19,7 @@ const STEP_COLOR: Record<StepStatus, string> = {
 }
 
 export function PlanView() {
-  const { path } = useProject()
+  const { path, setActiveView, addMessage, setStreaming, setRunningPlanStep, runningPlanStep, isStreaming } = useProject()
   const [plans, setPlans] = useState<Plan[]>([])
   const [activeId, setActiveId] = useState<number | null>(null)
   const [composer, setComposer] = useState<{ title: string; rawSteps: string }>({ title: '', rawSteps: '' })
@@ -63,6 +63,34 @@ export function PlanView() {
     if (!window.confirm('Удалить план?')) return
     await window.api.plans.remove(id)
     await refresh()
+  }
+
+  async function runStep(plan: Plan, step: PlanStep) {
+    if (!path || isStreaming) return
+    // 1) DB: mark step running
+    await window.api.plans.updateStep(step.id, { status: 'running', result: null })
+    // 2) Store: remember which step is being executed so Chat can finalize on 'done'
+    setRunningPlanStep({ planId: plan.id, stepId: step.id, title: step.title })
+    // 3) Build a focused prompt and send via the regular AI pipeline
+    const remaining = plan.steps.filter(s => s.status !== 'done').slice(0, 4).map((s, i) => `${i + 1}. ${s.title}`).join('\n')
+    const prompt = `Выполни ОДИН шаг плана и больше ничего.
+
+ПЛАН: ${plan.title}
+ТЕКУЩИЙ ШАГ: ${step.title}${step.detail ? `\nДЕТАЛИ: ${step.detail}` : ''}
+
+Соседние ещё не выполненные шаги (для контекста, НЕ выполнять):
+${remaining || '— нет —'}
+
+Когда шаг готов — кратко напиши результат (что сделано, какие файлы тронуты). Не лезь в следующие шаги.`
+    addMessage({ role: 'user', content: prompt })
+    if (path) await window.api.chats.append(path, 'user', prompt)
+    addMessage({ role: 'assistant', content: '' })
+    setStreaming(true)
+    setActiveView('chat')
+    const allMessages = [...useProject.getState().messages].slice(0, -1) as ChatMessage[]
+    await window.api.ai.send(allMessages, path)
+    // refresh on next paint cycle so user sees the step go to 'running'
+    void refresh()
   }
 
   const active = plans.find(p => p.id === activeId) ?? null
@@ -136,25 +164,41 @@ export function PlanView() {
                   <button className="gg-btn gg-btn-ghost gg-btn-danger" onClick={() => void removePlan(active.id)}>Удалить</button>
                 </div>
                 <div className="gg-plan-steps">
-                  {active.steps.map(step => (
-                    <div key={step.id} className={`gg-plan-step is-${step.status}`}>
-                      <button
-                        className={`gg-task-check ${step.status === 'done' ? 'is-done' : ''}`}
-                        onClick={() => void toggleStep(step)}
-                        title={STEP_LABEL[step.status]}
-                      >
-                        {step.status === 'done' ? '✓' : ''}
-                      </button>
-                      <div className="gg-plan-step-body">
-                        <div className="gg-plan-step-title">{step.title}</div>
-                        {step.detail && <div className="gg-plan-step-detail">{step.detail}</div>}
-                        {step.result && <div className="gg-plan-step-result">{step.result}</div>}
+                  {active.steps.map(step => {
+                    const isRunningThisOne = runningPlanStep?.stepId === step.id
+                    const canRun = step.status === 'pending' || step.status === 'failed'
+                    return (
+                      <div key={step.id} className={`gg-plan-step is-${step.status}`}>
+                        <button
+                          className={`gg-task-check ${step.status === 'done' ? 'is-done' : ''}`}
+                          onClick={() => void toggleStep(step)}
+                          title={STEP_LABEL[step.status]}
+                        >
+                          {step.status === 'done' ? '✓' : ''}
+                        </button>
+                        <div className="gg-plan-step-body">
+                          <div className="gg-plan-step-title">{step.title}</div>
+                          {step.detail && <div className="gg-plan-step-detail">{step.detail}</div>}
+                          {step.result && <div className="gg-plan-step-result">{step.result}</div>}
+                        </div>
+                        <div className="gg-plan-step-actions">
+                          {canRun && (
+                            <button
+                              className="gg-btn gg-btn-primary gg-plan-step-run"
+                              onClick={() => void runStep(active, step)}
+                              disabled={isStreaming}
+                              title="Выполнить этот шаг через AI"
+                            >
+                              ▶ Запустить
+                            </button>
+                          )}
+                          <div className="gg-plan-step-status" style={{ color: STEP_COLOR[step.status] }}>
+                            {isRunningThisOne ? 'выполняется…' : STEP_LABEL[step.status]}
+                          </div>
+                        </div>
                       </div>
-                      <div className="gg-plan-step-status" style={{ color: STEP_COLOR[step.status] }}>
-                        {STEP_LABEL[step.status]}
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}

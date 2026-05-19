@@ -30,6 +30,12 @@ export interface SessionUsage {
   cachedInputTokens: number
 }
 
+interface RunningPlanStep {
+  planId: number
+  stepId: number
+  title: string
+}
+
 interface ProjectState {
   path: string | null
   tree: FileNode[]
@@ -40,6 +46,8 @@ interface ProjectState {
   activity: ActivityEntry[]
   activeView: ViewId
   sessionUsage: SessionUsage
+  /** Set while a plan step is being executed through chat; cleared on 'done'. */
+  runningPlanStep: RunningPlanStep | null
   projectList: ProjectMeta[]
   setProject: (path: string) => Promise<void>
   closeProject: () => void
@@ -56,6 +64,7 @@ interface ProjectState {
   clearActivity: () => void
   addUsage: (delta: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number }) => void
   resetUsage: () => void
+  setRunningPlanStep: (s: RunningPlanStep | null) => void
 }
 
 export const useProject = create<ProjectState>((set, get) => ({
@@ -68,6 +77,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   activity: [],
   activeView: 'chat',
   sessionUsage: { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 },
+  runningPlanStep: null,
   projectList: [],
   setProject: async (path) => {
     const tree = await window.api.files.tree(path)
@@ -131,7 +141,8 @@ export const useProject = create<ProjectState>((set, get) => ({
       cachedInputTokens: s.sessionUsage.cachedInputTokens + (delta.cachedInputTokens ?? 0)
     }
   })),
-  resetUsage: () => set({ sessionUsage: { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 } })
+  resetUsage: () => set({ sessionUsage: { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 } }),
+  setRunningPlanStep: (s) => set({ runningPlanStep: s })
 }))
 
 export type { ActivityEntry, PendingCommand }

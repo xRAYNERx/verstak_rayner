@@ -975,6 +975,15 @@
   flex-shrink: 0;
   padding-top: 2px;
 }
+.gg-plan-step-actions {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+  flex-shrink: 0;
+}
+.gg-plan-step-run {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 11.5px;
+}
 
 /* ─── Journal view ─── */
 .gg-journal-compose {
