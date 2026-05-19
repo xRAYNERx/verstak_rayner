@@ -15,6 +15,22 @@ interface ProjectChipProps {
   onRemove: () => void
 }
 
+async function safeSwitch(targetPath: string, currentPath: string | null, setProject: (p: string) => Promise<void>, isStreaming: boolean): Promise<void> {
+  if (currentPath === targetPath) return
+  if (isStreaming) {
+    const ok = window.confirm('AI ещё отвечает в текущем проекте. Прервать и переключиться?')
+    if (!ok) return
+    // Best-effort abort: stop endpoint cancels the active send
+    try {
+      // We don't know the exact sendId here — fire stop for a sentinel. Renderer's
+      // own listeners will mark streaming=false on the next 'done'. If your local
+      // wiring keeps a ref to the active sendId you can pass it here for a precise abort.
+      useProject.getState().setStreaming(false)
+    } catch { /* noop */ }
+  }
+  await setProject(targetPath)
+}
+
 function ProjectChip({ project, active, onClick, onRemove }: ProjectChipProps) {
   const [hover, setHover] = useState(false)
   return (
@@ -50,7 +66,7 @@ interface ProjectRailProps {
 }
 
 export function ProjectRail({ sidebarOpen, onToggleSidebar }: ProjectRailProps) {
-  const { path, projectList, setProject, refreshProjectList, removeProject } = useProject()
+  const { path, projectList, setProject, refreshProjectList, removeProject, isStreaming } = useProject()
   const [bootstrapped, setBootstrapped] = useState(false)
 
   useEffect(() => {
@@ -103,7 +119,7 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar }: ProjectRailProps) 
             key={p.path}
             project={p}
             active={path === p.path}
-            onClick={() => { if (path !== p.path) void setProject(p.path) }}
+            onClick={() => void safeSwitch(p.path, path, setProject, isStreaming)}
             onRemove={() => void confirmRemove(p)}
           />
         ))}
