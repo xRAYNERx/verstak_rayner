@@ -77,6 +77,29 @@ export const TOOL_DEFS: ToolDefinition[] = [
       },
       required: ['pattern']
     }
+  },
+  {
+    name: 'create_plan',
+    description: 'Создать структурированный план многошаговой задачи. Используй когда задача требует 3+ шагов или явного согласования с пользователем. План отобразится во вкладке Plan; пользователь сможет выполнять шаги по одному.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Краткое название плана.' },
+        steps: {
+          type: 'array',
+          description: 'Упорядоченный список шагов плана.',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Конкретное действие.' },
+              detail: { type: 'string', description: 'Опциональные подробности: какие файлы, какие команды, критерии готовности.' }
+            },
+            required: ['title']
+          }
+        }
+      },
+      required: ['title', 'steps']
+    }
   }
 ]
 

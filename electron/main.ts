@@ -79,6 +79,10 @@ app.whenReady().then(() => {
     getProviderModel: (id) => settings.getSecret(`model_${id}`),
     recordWrite: (projectPath, filePath, before, after) => {
       undoStack.push(projectPath, filePath, before, after)
+    },
+    recordPlan: (projectPath, title, steps) => {
+      const plan = plans.create(projectPath, title, steps)
+      return { id: plan.id }
     }
   })
   registerChatsIpc(chats)

@@ -25,6 +25,7 @@ export type ChatEvent =
   | { type: 'pending-command'; callId: string; command: string }
   | { type: 'command-result'; callId: string; command: string; status: 'ok' | 'error' | 'rejected'; exitCode?: number; stdout?: string; stderr?: string; error?: string }
   | { type: 'tool-blocked'; callId: string; name: string; command?: string; reason: string }
+  | { type: 'plan-created'; planId: number; title: string; stepCount: number }
   | { type: 'usage'; usage: UsageDelta }
   | { type: 'done' }
   | { type: 'error'; message: string }

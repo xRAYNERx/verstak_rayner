@@ -13,6 +13,8 @@ interface AiDeps {
   getProviderModel: (id: ProviderId) => string | null
   /** Persist a write so the user can ↶ revert it later. */
   recordWrite: (projectPath: string, filePath: string, before: string, after: string) => void
+  /** Persist a plan emitted by the AI. */
+  recordPlan: (projectPath: string, title: string, steps: Array<{ title: string; detail?: string | null }>) => { id: number }
 }
 
 let currentSendId = 0
@@ -79,7 +81,7 @@ export function registerAiIpc(deps: AiDeps): void {
 
     if (descriptor.supportsTools && projectPath) {
       const tools = createFileTools(projectPath)
-      void runApiConversation(e.sender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite).finally(cleanup)
+      void runApiConversation(e.sender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan).finally(cleanup)
     } else {
       void runPlainConversation(e.sender, sendId, provider, messagesWithSystem, ctrl.signal).finally(cleanup)
     }
@@ -150,7 +152,8 @@ async function runApiConversation(
   projectPath: string,
   initialMessages: ChatMessage[],
   signal: AbortSignal,
-  recordWrite: (projectPath: string, filePath: string, before: string, after: string) => void
+  recordWrite: (projectPath: string, filePath: string, before: string, after: string) => void,
+  recordPlan: (projectPath: string, title: string, steps: Array<{ title: string; detail?: string | null }>) => { id: number }
 ): Promise<void> {
   const currentMessages = [...initialMessages]
   // Loop detection — same tool+args appearing 2+ times in a row is a bad sign.
@@ -236,6 +239,31 @@ async function runApiConversation(
       }
       if (call.name === 'run_command') {
         toolResults.push(await handleRunCommand(sender, sendId, tools, call))
+        continue
+      }
+      if (call.name === 'create_plan') {
+        try {
+          const title = String(call.args.title ?? 'План без названия')
+          const rawSteps = Array.isArray(call.args.steps) ? call.args.steps : []
+          const steps = rawSteps
+            .filter((s: unknown): s is Record<string, unknown> => typeof s === 'object' && s !== null)
+            .map((s) => ({
+              title: String((s as Record<string, unknown>).title ?? ''),
+              detail: (s as Record<string, unknown>).detail != null
+                ? String((s as Record<string, unknown>).detail)
+                : null
+            }))
+            .filter(s => s.title.length > 0)
+          if (steps.length === 0) {
+            toolResults.push({ id: call.id, name: call.name, result: '', error: 'create_plan: пустой список шагов' })
+          } else {
+            const plan = recordPlan(projectPath, title, steps)
+            sender.send('ai:event', { id: sendId, event: { type: 'plan-created', planId: plan.id, title, stepCount: steps.length } })
+            toolResults.push({ id: call.id, name: call.name, result: `Plan #${plan.id} created with ${steps.length} steps. User will execute/confirm in the Plan view.` })
+          }
+        } catch (err) {
+          toolResults.push({ id: call.id, name: call.name, result: '', error: err instanceof Error ? err.message : String(err) })
+        }
         continue
       }
       try {
