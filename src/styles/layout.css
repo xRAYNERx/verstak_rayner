@@ -6,6 +6,9 @@
   background: var(--bg-base);
   overflow: hidden;
 }
+.gg-app.is-sidebar-collapsed {
+  grid-template-columns: 56px 1fr;
+}
 
 /* ─── Project rail (leftmost narrow column) ─── */
 .gg-rail {
@@ -40,6 +43,24 @@
   background: var(--border-subtle);
   margin: 2px 0;
 }
+.gg-rail-toggle {
+  width: 36px; height: 28px;
+  margin-top: 2px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 120ms ease;
+}
+.gg-rail-toggle:hover {
+  background: var(--bg-elevated);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+.gg-rail-toggle.is-open { color: var(--accent); }
 .gg-rail-list { display: flex; flex-direction: column; align-items: center; gap: 6px; padding-bottom: 12px; }
 .gg-rail-chip { position: relative; }
 .gg-rail-square {

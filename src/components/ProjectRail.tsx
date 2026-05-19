@@ -44,7 +44,12 @@ function ProjectChip({ project, active, onClick, onRemove }: ProjectChipProps) {
   )
 }
 
-export function ProjectRail() {
+interface ProjectRailProps {
+  sidebarOpen: boolean
+  onToggleSidebar: () => void
+}
+
+export function ProjectRail({ sidebarOpen, onToggleSidebar }: ProjectRailProps) {
   const { path, projectList, setProject, refreshProjectList, removeProject } = useProject()
   const [bootstrapped, setBootstrapped] = useState(false)
 
@@ -79,6 +84,17 @@ export function ProjectRail() {
         title="Главная"
       >
         <img src={iconUrl} alt="GeminiGrok" />
+      </button>
+      <button
+        type="button"
+        className={`gg-rail-toggle ${sidebarOpen ? 'is-open' : ''}`}
+        onClick={onToggleSidebar}
+        title={sidebarOpen ? 'Скрыть боковую панель (Ctrl+B)' : 'Показать боковую панель (Ctrl+B)'}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <line x1="9" y1="4" x2="9" y2="20" />
+        </svg>
       </button>
       <div className="gg-rail-divider" />
       <div className="gg-rail-list">
