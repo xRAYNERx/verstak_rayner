@@ -253,6 +253,32 @@
 
 /* File tree */
 .gg-tree { padding: 0 6px; }
+
+.gg-sidebar-section-collapsible {
+  display: flex; align-items: center; gap: 6px;
+  width: calc(100% - 14px);
+  margin: 12px 7px 4px;
+  padding: 4px 6px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-tertiary);
+  text-align: left;
+  transition: color 120ms ease;
+}
+.gg-sidebar-section-collapsible:hover { color: var(--text-secondary); }
+.gg-sidebar-section-caret { font-size: 9px; width: 10px; opacity: 0.7; }
+.gg-sidebar-section-collapsible .gg-sidebar-section-title {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+}
+.gg-sidebar-section-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-disabled);
+}
 .gg-tree-node {
   display: flex; align-items: center; gap: 6px;
   padding: 3px 8px;

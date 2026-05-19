@@ -4,6 +4,28 @@ import { useProvider } from '../hooks/useProvider'
 import type { FileNode } from '../types/api'
 import iconUrl from '../assets/icon.png'
 
+function FilesSection({ tree }: { tree: FileNode[] }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button
+        type="button"
+        className="gg-sidebar-section-collapsible"
+        onClick={() => setOpen(v => !v)}
+      >
+        <span className="gg-sidebar-section-caret">{open ? '▾' : '▸'}</span>
+        <span className="gg-sidebar-section-title">Файлы</span>
+        <span className="gg-sidebar-section-count">{tree.length}</span>
+      </button>
+      {open && (
+        <div className="gg-tree">
+          {tree.map(node => <TreeNode key={node.path} node={node} depth={0} />)}
+        </div>
+      )}
+    </>
+  )
+}
+
 function TreeNode({ node, depth }: { node: FileNode; depth: number }) {
   const [open, setOpen] = useState(depth < 1)
   const isDir = node.isDirectory
@@ -136,12 +158,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
               ))}
             </div>
 
-            <div className="gg-sidebar-section">
-              <div className="gg-sidebar-section-title">Файлы</div>
-            </div>
-            <div className="gg-tree">
-              {tree.map(node => <TreeNode key={node.path} node={node} depth={0} />)}
-            </div>
+            <FilesSection tree={tree} />
           </>
         )}
       </div>
