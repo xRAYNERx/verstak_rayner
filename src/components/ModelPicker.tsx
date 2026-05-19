@@ -13,6 +13,7 @@ const PROVIDER_OPTIONS: ProviderOption[] = [
   { id: 'claude',     label: 'Claude',       description: 'API · с tools' },
   { id: 'claude-cli', label: 'Claude Code',  description: 'CLI · Pro/Max подписка' },
   { id: 'grok',       label: 'Grok',         description: 'API · с tools' },
+  { id: 'grok-cli',   label: 'Grok Build',   description: 'CLI · SuperGrok подписка' },
   { id: 'openai',     label: 'ChatGPT',      description: 'API · с tools' },
   { id: 'codex-cli',  label: 'Codex',        description: 'CLI · Plus подписка' }
 ]

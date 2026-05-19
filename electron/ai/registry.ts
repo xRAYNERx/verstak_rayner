@@ -3,11 +3,12 @@ import { createGeminiCliProvider, GEMINI_CLI_MODELS } from './gemini-cli'
 import { createClaudeProvider, CLAUDE_MODELS } from './claude'
 import { createClaudeCliProvider, CLAUDE_CLI_MODELS } from './claude-cli'
 import { createGrokProvider, GROK_MODELS } from './grok'
+import { createGrokCliProvider, GROK_CLI_MODELS } from './grok-cli'
 import { createOpenAiProvider, OPENAI_MODELS } from './openai'
 import { createCodexCliProvider, CODEX_CLI_MODELS } from './codex-cli'
 import type { ChatProvider } from './types'
 
-export type ProviderId = 'gemini-api' | 'gemini-cli' | 'claude' | 'claude-cli' | 'grok' | 'openai' | 'codex-cli'
+export type ProviderId = 'gemini-api' | 'gemini-cli' | 'claude' | 'claude-cli' | 'grok' | 'grok-cli' | 'openai' | 'codex-cli'
 
 export interface ProviderDescriptor {
   id: ProviderId
@@ -76,6 +77,16 @@ export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
     supportsTools: true,
     shortLabel: 'Grok'
   },
+  'grok-cli': {
+    id: 'grok-cli',
+    name: 'Grok Build',
+    transport: 'CLI',
+    secretKey: null,
+    models: GROK_CLI_MODELS,
+    defaultModel: 'auto',
+    supportsTools: false,
+    shortLabel: 'Grok Build'
+  },
   openai: {
     id: 'openai',
     name: 'ChatGPT',
@@ -123,6 +134,8 @@ export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvide
       if (!opts.apiKey) throw new Error('xAI (Grok) API key not set')
       return createGrokProvider({ apiKey: opts.apiKey, model: opts.model })
     }
+    case 'grok-cli':
+      return createGrokCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model })
     case 'openai': {
       if (!opts.apiKey) throw new Error('OpenAI API key not set')
       return createOpenAiProvider({ apiKey: opts.apiKey, model: opts.model })

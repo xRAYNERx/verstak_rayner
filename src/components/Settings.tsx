@@ -74,6 +74,17 @@ const PROVIDERS: ProviderConfig[] = [
     supportsTools: true
   },
   {
+    id: 'grok-cli',
+    name: 'Grok Build',
+    transport: 'CLI',
+    description: 'Твоя x.com/SuperGrok подписка через grok CLI.',
+    models: ['auto', 'grok-4', 'grok-4-fast', 'grok-code-fast-1', 'grok-3'],
+    defaultModel: 'auto',
+    secretKey: null,
+    keyHint: '',
+    supportsTools: false
+  },
+  {
     id: 'openai',
     name: 'ChatGPT',
     transport: 'API',
@@ -207,6 +218,12 @@ export function Settings({ onClose }: { onClose: () => void }) {
               <div className="gg-notice" style={{ marginTop: 12 }}>
                 Нужен установленный <code>codex</code> CLI. Установить: <code>npm install -g @openai/codex</code>.
                 Залогинься через <code>codex login</code> своей ChatGPT Plus/Pro подпиской — после этого работает у нас.
+              </div>
+            )}
+            {activeCfg.id === 'grok-cli' && (
+              <div className="gg-notice" style={{ marginTop: 12 }}>
+                Нужен <code>grok</code> CLI (Grok Build) из <code>~/.grok/bin/grok</code> — обычно ставится автоматически через установщик с <a href="https://grok.com/build" target="_blank" rel="noreferrer">grok.com/build</a>.
+                Залогинься через <code>grok</code> своей SuperGrok / x.com подпиской — после этого работает у нас.
               </div>
             )}
 
