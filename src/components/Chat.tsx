@@ -3,6 +3,7 @@ import { useProject } from '../store/projectStore'
 import { useProvider } from '../hooks/useProvider'
 import { Markdown } from './Markdown'
 import type { Attachment } from '../types/api'
+import iconUrl from '../assets/icon.png'
 
 const MAX_BYTES_PER_FILE = 5 * 1024 * 1024  // 5 MB
 const MAX_ATTACHMENTS = 8
@@ -273,7 +274,7 @@ export function Chat({ onOpenSettings }: ChatProps) {
       <div className="gg-chat-stream" ref={streamRef}>
         {!hasMessages && (
           <div className="gg-chat-empty">
-            <div className="gg-chat-empty-mark">G</div>
+            <img src={iconUrl} alt="GeminiGrok" className="gg-chat-empty-mark-img" />
             <div className="gg-chat-empty-title">Готов к работе</div>
             <div className="gg-chat-empty-hint">
               Открой проект слева и напиши задачу. Можно прикрепить файл, бросить скриншот через Ctrl+V или drag-and-drop.

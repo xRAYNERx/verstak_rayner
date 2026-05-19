@@ -34,6 +34,12 @@
   color: white;
   box-shadow: var(--shadow-glow);
 }
+.gg-brand-img {
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 8px rgba(91, 141, 255, 0.35));
+}
 .gg-brand-text { font-size: var(--text-md); }
 
 .gg-sidebar-section { padding: 12px 14px 0; }
@@ -159,6 +165,12 @@
   color: white;
   box-shadow: var(--shadow-glow);
   opacity: 0.9;
+}
+.gg-chat-empty-mark-img {
+  width: 96px; height: 96px;
+  border-radius: var(--radius-lg);
+  object-fit: contain;
+  filter: drop-shadow(0 0 24px rgba(91, 141, 255, 0.4));
 }
 .gg-chat-empty-title { font-size: 18px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.015em; }
 .gg-chat-empty-hint { font-size: var(--text-sm); max-width: 380px; line-height: 1.6; }

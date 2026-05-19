@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useProject } from '../store/projectStore'
 import { useProvider } from '../hooks/useProvider'
 import type { FileNode } from '../types/api'
+import iconUrl from '../assets/icon.png'
 
 function TreeNode({ node, depth }: { node: FileNode; depth: number }) {
   const [open, setOpen] = useState(depth < 1)
@@ -42,7 +43,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
     <aside className="gg-sidebar">
       <div className="gg-sidebar-header">
         <div className="gg-brand">
-          <div className="gg-brand-mark">G</div>
+          <img src={iconUrl} alt="GeminiGrok" className="gg-brand-img" />
           <span className="gg-brand-text">GeminiGrok</span>
         </div>
       </div>
