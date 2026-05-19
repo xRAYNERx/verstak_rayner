@@ -55,6 +55,28 @@ export function openDb(path: string): DB {
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_undo_project ON file_undo(project_path, id);
+
+    CREATE TABLE IF NOT EXISTS plans (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_path TEXT NOT NULL,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'draft',
+      created_at INTEGER NOT NULL,
+      completed_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_plans_project ON plans(project_path, id);
+
+    CREATE TABLE IF NOT EXISTS plan_steps (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      plan_id INTEGER NOT NULL,
+      idx INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      detail TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      result TEXT,
+      FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_plan_steps_plan ON plan_steps(plan_id, idx);
   `)
 
   return db
