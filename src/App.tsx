@@ -5,6 +5,7 @@ import { Settings } from './components/Settings'
 import { Chat } from './components/Chat'
 import { TasksView } from './components/TasksView'
 import { JournalView } from './components/JournalView'
+import { PlanView } from './components/PlanView'
 import { StubView } from './components/StubView'
 import { DiffView } from './components/DiffView'
 import { CommandConfirm } from './components/CommandConfirm'
@@ -47,7 +48,7 @@ export function App() {
         )}
         {activeView === 'tasks' && <TasksView />}
         {activeView === 'journal' && <JournalView />}
-        {activeView === 'plan' && <StubView title="Plan" description="Здесь будет план проекта — список целей и фаз. В работе." />}
+        {activeView === 'plan' && <PlanView />}
         {activeView === 'workflow' && <StubView title="Workflow" description="Здесь будут пайплайны и цепочки агентов. В работе." />}
         {activeView === 'calendar' && <StubView title="Calendar" description="Здесь будут события и дедлайны проекта. В работе." />}
         {activeView === 'chat' && canShowTerminal && (

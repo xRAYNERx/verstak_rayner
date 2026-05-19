@@ -76,7 +76,7 @@ const NAV: NavItem[] = [
   { id: 'chat',     label: 'Chat',     icon: ChatIcon },
   { id: 'tasks',    label: 'Tasks',    icon: TasksIcon },
   { id: 'journal',  label: 'Journal',  icon: JournalIcon },
-  { id: 'plan',     label: 'Plan',     icon: PlanIcon,     badge: 'soon' },
+  { id: 'plan',     label: 'Plan',     icon: PlanIcon },
   { id: 'workflow', label: 'Workflow', icon: WorkflowIcon, badge: 'soon' },
   { id: 'calendar', label: 'Calendar', icon: CalendarIcon, badge: 'soon' }
 ]
