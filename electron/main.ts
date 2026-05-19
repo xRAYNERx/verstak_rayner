@@ -88,6 +88,9 @@ app.whenReady().then(() => {
     recordPlan: (projectPath, title, steps) => {
       const plan = plans.create(projectPath, title, steps)
       return { id: plan.id }
+    },
+    recordJournal: (projectPath, kind, title, detail) => {
+      journal.append(projectPath, kind, title, detail ?? null)
     }
   })
   registerChatsIpc(chats, chatSessions)

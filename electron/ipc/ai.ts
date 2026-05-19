@@ -15,6 +15,8 @@ interface AiDeps {
   recordWrite: (projectPath: string, filePath: string, before: string, after: string) => void
   /** Persist a plan emitted by the AI. */
   recordPlan: (projectPath: string, title: string, steps: Array<{ title: string; detail?: string | null }>) => { id: number }
+  /** Auto-append a brief entry to the dev journal (file write, command, plan, session summary). */
+  recordJournal: (projectPath: string, kind: 'tool' | 'session' | 'note', title: string, detail?: string | null) => void
 }
 
 let currentSendId = 0
@@ -97,7 +99,7 @@ export function registerAiIpc(deps: AiDeps): void {
 
     if (descriptor.supportsTools && projectPath) {
       const tools = createFileTools(projectPath)
-      void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan).finally(cleanup)
+      void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal).finally(cleanup)
     } else {
       void runPlainConversation(taggedSender, sendId, provider, messagesWithSystem, ctrl.signal).finally(cleanup)
     }
@@ -169,11 +171,16 @@ async function runApiConversation(
   initialMessages: ChatMessage[],
   signal: AbortSignal,
   recordWrite: (projectPath: string, filePath: string, before: string, after: string) => void,
-  recordPlan: (projectPath: string, title: string, steps: Array<{ title: string; detail?: string | null }>) => { id: number }
+  recordPlan: (projectPath: string, title: string, steps: Array<{ title: string; detail?: string | null }>) => { id: number },
+  recordJournal: (projectPath: string, kind: 'tool' | 'session' | 'note', title: string, detail?: string | null) => void
 ): Promise<void> {
   const currentMessages = [...initialMessages]
   // Loop detection — same tool+args appearing 2+ times in a row is a bad sign.
   const recentSignatures: string[] = []
+  // Tally tool activity over the whole session so we can write one journal summary at the end.
+  const filesTouched = new Set<string>()
+  const commandsRun: string[] = []
+  let lastAssistantText = ''
 
   for (let turn = 0; turn < MAX_AGENT_TURNS; turn++) {
     if (signal.aborted) {
@@ -189,6 +196,7 @@ async function runApiConversation(
       }
       if (event.type === 'text') {
         assistantText += event.text
+        lastAssistantText = assistantText
         sender.send('ai:event', { id: sendId, event })
       } else if (event.type === 'tool-call') {
         toolCalls.push(event.call)
@@ -196,6 +204,7 @@ async function runApiConversation(
         sender.send('ai:event', { id: sendId, event })
       } else if (event.type === 'done') {
         if (toolCalls.length === 0) {
+          writeSessionJournal(recordJournal, projectPath, lastAssistantText, filesTouched, commandsRun)
           sender.send('ai:event', { id: sendId, event })
           return
         }
@@ -205,6 +214,7 @@ async function runApiConversation(
       }
     }
     if (toolCalls.length === 0) {
+      writeSessionJournal(recordJournal, projectPath, lastAssistantText, filesTouched, commandsRun)
       sender.send('ai:event', { id: sendId, event: { type: 'done' } })
       return
     }
@@ -278,6 +288,7 @@ async function runApiConversation(
             toolResults[i] = { id: call.id, name: call.name, result: '', error: 'create_plan: пустой список шагов' }
           } else {
             const plan = recordPlan(projectPath, title, steps)
+            try { recordJournal(projectPath, 'note', `План: ${title}`, `${steps.length} шагов`) } catch { /* journal not critical */ }
             sender.send('ai:event', { id: sendId, event: { type: 'plan-created', planId: plan.id, title, stepCount: steps.length } })
             toolResults[i] = { id: call.id, name: call.name, result: `Plan #${plan.id} created with ${steps.length} steps. User will execute/confirm in the Plan view.` }
           }
@@ -303,9 +314,23 @@ async function runApiConversation(
     for (const { idx, promise } of writePromises) {
       toolResults[idx] = await promise
     }
+    // Tally tool usage for the end-of-session journal summary
+    for (let i = 0; i < toolCalls.length; i++) {
+      const call = toolCalls[i]
+      const result = toolResults[i]
+      if (!result) continue
+      if (call.name === 'write_file' && !result.error) {
+        const p = String(call.args.path ?? '')
+        if (p) filesTouched.add(p)
+      } else if (call.name === 'run_command' && !result.error) {
+        const cmd = String(call.args.command ?? '')
+        if (cmd) commandsRun.push(cmd)
+      }
+    }
     currentMessages.push({ role: 'user', content: '', toolResults })
   }
   // Max turns reached — warn user and exit
+  writeSessionJournal(recordJournal, projectPath, lastAssistantText, filesTouched, commandsRun)
   sender.send('ai:event', {
     id: sendId,
     event: {
@@ -316,6 +341,34 @@ async function runApiConversation(
     }
   })
   sender.send('ai:event', { id: sendId, event: { type: 'done' } })
+}
+
+/**
+ * Write a brief journal summary for the just-finished agent session.
+ * Skipped if nothing meaningful happened (no text, no files, no commands).
+ */
+function writeSessionJournal(
+  recordJournal: (projectPath: string, kind: 'tool' | 'session' | 'note', title: string, detail?: string | null) => void,
+  projectPath: string,
+  lastAssistantText: string,
+  filesTouched: Set<string>,
+  commandsRun: string[]
+): void {
+  const hasFiles = filesTouched.size > 0
+  const hasCommands = commandsRun.length > 0
+  const text = lastAssistantText.trim()
+  if (!hasFiles && !hasCommands && text.length < 40) return
+  // Title: first sentence of the assistant's reply, capped at 100 chars.
+  const firstLine = text.split(/\n+/)[0] ?? ''
+  const title = (firstLine.length > 0 ? firstLine : 'AI-сессия').slice(0, 100)
+  const detailLines: string[] = []
+  if (hasFiles) detailLines.push(`Файлы (${filesTouched.size}): ${[...filesTouched].slice(0, 8).join(', ')}${filesTouched.size > 8 ? ' …' : ''}`)
+  if (hasCommands) detailLines.push(`Команды (${commandsRun.length}): ${commandsRun.slice(0, 5).join(' · ')}${commandsRun.length > 5 ? ' …' : ''}`)
+  if (text && text.length > firstLine.length) {
+    const rest = text.slice(firstLine.length).trim()
+    if (rest) detailLines.push(rest.slice(0, 600))
+  }
+  try { recordJournal(projectPath, 'session', title, detailLines.join('\n') || null) } catch { /* journal not critical */ }
 }
 
 async function handleWriteFile(
