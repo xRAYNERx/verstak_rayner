@@ -180,9 +180,28 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
         if (path && lastAssistant?.role === 'assistant' && lastAssistant.content) {
           void window.api.chats.append(path, 'assistant', lastAssistant.content)
         }
+        // If we were running a plan step, finalize it
+        const running = store.runningPlanStep
+        if (running) {
+          const result = lastAssistant?.role === 'assistant' ? (lastAssistant.content || '') : ''
+          void window.api.plans.updateStep(running.stepId, {
+            status: 'done',
+            result: result.length > 2000 ? result.slice(0, 2000) + '…' : result
+          })
+          store.setRunningPlanStep(null)
+        }
         setStreaming(false)
       }
       else if (event.type === 'error') {
+        // If a plan step was running, mark it failed
+        const running = store.runningPlanStep
+        if (running) {
+          void window.api.plans.updateStep(running.stepId, {
+            status: 'failed',
+            result: 'message' in event ? event.message : 'Ошибка выполнения'
+          })
+          store.setRunningPlanStep(null)
+        }
         updateLastAssistant(`\n\n[Ошибка: ${event.message}]`)
         setStreaming(false)
       }
