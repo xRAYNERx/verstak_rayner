@@ -1,5 +1,6 @@
 import { dialog, ipcMain, BrowserWindow } from 'electron'
 import { setActiveProjectPath } from '../state/project-state'
+import { ensureUserLayer } from '../ai/user-layer'
 import type { Projects } from '../storage/projects'
 
 export function registerProjectIpc(projects: Projects): void {
@@ -14,12 +15,16 @@ export function registerProjectIpc(projects: Projects): void {
     const picked = result.filePaths[0]
     projects.upsert(picked)
     setActiveProjectPath(picked)
+    void ensureUserLayer(picked).catch(() => { /* non-critical */ })
     return picked
   })
 
   ipcMain.handle('projects:set-current', (_e, path: string | null) => {
     setActiveProjectPath(path)
-    if (path) projects.touch(path)
+    if (path) {
+      projects.touch(path)
+      void ensureUserLayer(path).catch(() => { /* non-critical */ })
+    }
   })
 
   ipcMain.handle('projects:list', () => projects.list())

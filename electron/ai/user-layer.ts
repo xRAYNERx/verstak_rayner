@@ -1,5 +1,5 @@
-import { readFile, stat } from 'fs/promises'
-import { join } from 'path'
+import { readFile, stat, writeFile, mkdir } from 'fs/promises'
+import { join, dirname } from 'path'
 
 /**
  * Discovers and loads the user-defined "user layer" of agent instructions
@@ -41,4 +41,59 @@ export async function loadUserLayer(projectRoot: string | null): Promise<UserLay
     }
   }
   return { path: null, content: '' }
+}
+
+const DEFAULT_RULES = `# GeminiGrok Rules
+
+Эти правила читает AI агент при каждой задаче в этом проекте.
+Дополни их под свой стек и стиль — система прибавит их к встроенному
+протоколу безопасности и поведения.
+
+## Стек
+
+- (опиши: язык, фреймворк, важные библиотеки)
+
+## Стиль кода
+
+- Минимализм: только запрошенное изменение.
+- Сохранять существующий стиль, даже если можно иначе.
+- Не удалять чужой неиспользуемый код без явной просьбы.
+
+## Тесты
+
+- Перед фиксом бага — тест, воспроизводящий баг.
+- Перед фичей — критерий «как поймём что готово».
+
+## Доменные правила
+
+- (добавь правила специфичные для этого проекта)
+
+## Запреты
+
+- Не трогать секреты (.env, .ssh, credentials).
+- Не запускать миграции/деплой без явного разрешения.
+- Не расширять scope без подтверждения.
+`
+
+/**
+ * Create a default `.geminigrok/RULES.md` if no user layer exists in this
+ * project. Idempotent: returns false if any of the candidate files is already
+ * present. Called on project open.
+ */
+export async function ensureUserLayer(projectRoot: string): Promise<{ created: boolean; path: string | null }> {
+  for (const rel of CANDIDATES) {
+    const abs = join(projectRoot, rel)
+    try {
+      const st = await stat(abs)
+      if (st.isFile()) return { created: false, path: rel }
+    } catch { /* not present, keep looking */ }
+  }
+  const target = join(projectRoot, '.geminigrok', 'RULES.md')
+  try {
+    await mkdir(dirname(target), { recursive: true })
+    await writeFile(target, DEFAULT_RULES, 'utf8')
+    return { created: true, path: '.geminigrok/RULES.md' }
+  } catch {
+    return { created: false, path: null }
+  }
 }

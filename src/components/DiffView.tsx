@@ -34,9 +34,44 @@ export function DiffView() {
     }
   }, [pendingWrites, activeCallId])
 
-  if (pendingWrites.length === 0) return null
+  const active = pendingWrites.find(w => w.callId === activeCallId) ?? pendingWrites[0] ?? null
 
-  const active = pendingWrites.find(w => w.callId === activeCallId) ?? pendingWrites[0]
+  // Keyboard shortcuts while the modal is open. The handler closes over
+  // pendingWrites / active.callId via the dependency array.
+  useEffect(() => {
+    if (!active) return
+    function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement | null)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        void rejectAll()
+      } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault()
+        void acceptAll()
+      } else if (e.key === 'Enter') {
+        e.preventDefault()
+        if (active) void acceptOne(active.callId)
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+        if (pendingWrites.length < 2 || !active) return
+        e.preventDefault()
+        const idx = pendingWrites.findIndex(w => w.callId === active.callId)
+        const next = pendingWrites[(idx + 1) % pendingWrites.length]
+        if (next) setActiveCallId(next.callId)
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        if (pendingWrites.length < 2 || !active) return
+        e.preventDefault()
+        const idx = pendingWrites.findIndex(w => w.callId === active.callId)
+        const next = pendingWrites[(idx - 1 + pendingWrites.length) % pendingWrites.length]
+        if (next) setActiveCallId(next.callId)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active?.callId, pendingWrites.length])
+
+  if (pendingWrites.length === 0 || !active) return null
   const diff = computeDiff(active.before, active.after)
 
   async function acceptOne(callId: string) {
@@ -118,6 +153,13 @@ export function DiffView() {
         </div>
 
         <div className="gg-modal-footer">
+          <div className="gg-modal-footer-hint">
+            <span className="gg-kbd">Enter</span> принять
+            {' · '}<span className="gg-kbd">Esc</span> отклонить
+            {pendingWrites.length > 1 && (
+              <>{' · '}<span className="gg-kbd">Ctrl+Enter</span> принять все{' · '}<span className="gg-kbd">←→</span> между файлами</>
+            )}
+          </div>
           {pendingWrites.length > 1 ? (
             <>
               <button className="gg-btn gg-btn-danger" onClick={() => void rejectAll()}>Отклонить все</button>

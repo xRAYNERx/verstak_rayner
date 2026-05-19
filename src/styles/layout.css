@@ -333,6 +333,12 @@
   outline: none;
 }
 
+.gg-modal-footer-hint {
+  flex: 1;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
 /* Settings extra section (connectors etc.) */
 .gg-settings-extra {
   padding: 14px 22px 4px;
