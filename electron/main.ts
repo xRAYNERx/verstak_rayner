@@ -27,6 +27,7 @@ import { createPlans } from './storage/plans'
 import { registerPlansIpc } from './ipc/plans'
 import { createFeedback } from './storage/feedback'
 import { registerFeedbackIpc } from './ipc/feedback'
+import { createConnectorRegistry } from './connectors/registry'
 
 function createWindow(): void {
   // HERE = out/main in dev and prod
@@ -69,6 +70,7 @@ app.whenReady().then(() => {
   const undoStack = createUndoStack(db)
   const plans = createPlans(db)
   const feedback = createFeedback(db)
+  const connectorRegistry = createConnectorRegistry()
 
   registerProjectIpc(projects)
   registerFilesIpc({ getProjectRoot: getActiveProjectPath })
@@ -92,6 +94,13 @@ app.whenReady().then(() => {
     },
     recordJournal: (projectPath, kind, title, detail) => {
       journal.append(projectPath, kind, title, detail ?? null)
+    },
+    connectors: {
+      list: () => connectorRegistry.list().map(c => ({ ...c })),
+      query: (id, args, signal) => connectorRegistry.query(id, args, {
+        getSecret: (k) => settings.getSecret(k),
+        signal
+      })
     }
   })
   registerChatsIpc(chats, chatSessions)

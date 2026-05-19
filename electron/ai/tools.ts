@@ -80,6 +80,27 @@ export const TOOL_DEFS: ToolDefinition[] = [
     }
   },
   {
+    name: 'list_connectors',
+    description: 'Перечислить внешние коннекторы (1С OData и т.п.) — что подключено, готово ли к работе. Возвращает массив { id, label, kind, status, detail }.',
+    parameters: { type: 'object', properties: {} }
+  },
+  {
+    name: 'connector_query',
+    description: 'Выполнить запрос к внешнему коннектору. Для 1С (id="onec") передай entity и опционально filter/select/top, либо metadata:true для $metadata. Никогда не передавай пароли в args — креды берутся из настроек.',
+    parameters: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'ID коннектора (например "onec").' },
+        entity: { type: 'string', description: 'Имя OData-сущности, например "Catalog_Контрагенты".' },
+        filter: { type: 'string', description: 'OData $filter, например "IsFolder eq false".' },
+        select: { type: 'string', description: 'Список полей через запятую.' },
+        top: { type: 'number', description: 'Размер страницы 1..100, по умолчанию 20.' },
+        metadata: { type: 'boolean', description: 'Если true — вернёт $metadata вместо данных.' }
+      },
+      required: ['id']
+    }
+  },
+  {
     name: 'browser_navigate',
     description: 'Открыть URL во встроенном браузере GeminiGrok (вкладка Browser). Возвращает финальный URL после редиректов. Если пользователь не открыл вкладку Browser, инструмент вернёт ошибку — попроси открыть вкладку.',
     parameters: {

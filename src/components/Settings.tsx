@@ -115,6 +115,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [keys, setKeys] = useState<Record<string, string>>({})
   const [models, setModels] = useState<Record<string, string>>({})
   const [saved, setSaved] = useState(false)
+  const [onec, setOneC] = useState({ url: '', user: '', pass: '' })
   const { theme, setTheme } = useTheme()
 
   useEffect(() => {
@@ -134,6 +135,11 @@ export function Settings({ onClose }: { onClose: () => void }) {
       }
       setKeys(keyVals)
       setModels(modelVals)
+      // 1С connector creds
+      const url = await window.api.settings.getKey('onec_base_url')
+      const user = await window.api.settings.getKey('onec_username')
+      const pass = await window.api.settings.getKey('onec_password')
+      setOneC({ url: url ?? '', user: user ?? '', pass: pass ?? '' })
     })()
   }, [])
 
@@ -147,6 +153,9 @@ export function Settings({ onClose }: { onClose: () => void }) {
         await window.api.settings.setKey(`model_${p.id}`, models[p.id])
       }
     }
+    await window.api.settings.setKey('onec_base_url', onec.url)
+    await window.api.settings.setKey('onec_username', onec.user)
+    await window.api.settings.setKey('onec_password', onec.pass)
     setSaved(true)
     setTimeout(() => setSaved(false), 1500)
   }
@@ -270,6 +279,45 @@ export function Settings({ onClose }: { onClose: () => void }) {
                 Этот провайдер сейчас работает в режиме chat-only. AI tools (чтение/правка файлов, выполнение команд) пока поддерживаются только у Gemini API. Добавим в следующих итерациях.
               </div>
             )}
+          </div>
+        </div>
+
+        <div className="gg-settings-extra">
+          <div className="gg-settings-section-title">Коннекторы</div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">1С OData base URL</label>
+            <input
+              className="gg-input"
+              value={onec.url}
+              onChange={e => setOneC(s => ({ ...s, url: e.target.value }))}
+              placeholder="https://1c.example.com/base/odata/standard.odata"
+              spellCheck={false}
+            />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Логин</label>
+            <input
+              className="gg-input"
+              value={onec.user}
+              onChange={e => setOneC(s => ({ ...s, user: e.target.value }))}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Пароль</label>
+            <input
+              className="gg-input"
+              type="password"
+              value={onec.pass}
+              onChange={e => setOneC(s => ({ ...s, pass: e.target.value }))}
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="gg-settings-hint">
+            Кред хранится зашифрованным в Electron safeStorage. AI может звать
+            tool <code>connector_query</code> с id=<code>onec</code>; пароль
+            никогда не попадает в промпт.
           </div>
         </div>
 

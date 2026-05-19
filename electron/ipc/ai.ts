@@ -17,6 +17,11 @@ interface AiDeps {
   recordPlan: (projectPath: string, title: string, steps: Array<{ title: string; detail?: string | null }>) => { id: number }
   /** Auto-append a brief entry to the dev journal (file write, command, plan, session summary). */
   recordJournal: (projectPath: string, kind: 'tool' | 'session' | 'note', title: string, detail?: string | null) => void
+  /** Connector registry (list / query external services like 1C). */
+  connectors: {
+    list: () => Array<{ id: string; label: string; kind: string; status: string; detail?: string }>
+    query: (id: string, args: Record<string, unknown>, signal: AbortSignal) => Promise<unknown>
+  }
 }
 
 let currentSendId = 0
@@ -104,7 +109,7 @@ export function registerAiIpc(deps: AiDeps): void {
 
     if (descriptor.supportsTools && projectPath) {
       const tools = createFileTools(projectPath)
-      void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal).finally(cleanup)
+      void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.connectors).finally(cleanup)
     } else {
       void runPlainConversation(taggedSender, sendId, provider, messagesWithSystem, ctrl.signal).finally(cleanup)
     }
@@ -177,7 +182,11 @@ async function runApiConversation(
   signal: AbortSignal,
   recordWrite: (projectPath: string, filePath: string, before: string, after: string) => void,
   recordPlan: (projectPath: string, title: string, steps: Array<{ title: string; detail?: string | null }>) => { id: number },
-  recordJournal: (projectPath: string, kind: 'tool' | 'session' | 'note', title: string, detail?: string | null) => void
+  recordJournal: (projectPath: string, kind: 'tool' | 'session' | 'note', title: string, detail?: string | null) => void,
+  connectors: {
+    list: () => Array<{ id: string; label: string; kind: string; status: string; detail?: string }>
+    query: (id: string, args: Record<string, unknown>, signal: AbortSignal) => Promise<unknown>
+  }
 ): Promise<void> {
   const currentMessages = [...initialMessages]
   // Loop detection — same tool+args appearing 2+ times in a row is a bad sign.
@@ -278,6 +287,26 @@ async function runApiConversation(
       }
       if (call.name === 'browser_navigate' || call.name === 'browser_read_page' || call.name === 'browser_screenshot') {
         toolResults[i] = await handleBrowserTool(sender, call)
+        continue
+      }
+      if (call.name === 'list_connectors') {
+        toolResults[i] = { id: call.id, name: call.name, result: JSON.stringify(connectors.list()) }
+        continue
+      }
+      if (call.name === 'connector_query') {
+        try {
+          const cid = String(call.args.id ?? '')
+          if (!cid) {
+            toolResults[i] = { id: call.id, name: call.name, result: '', error: 'connector_query: id обязателен' }
+            continue
+          }
+          const { id: _omit, ...rest } = call.args as Record<string, unknown> & { id?: unknown }
+          void _omit
+          const result = await connectors.query(cid, rest, signal)
+          toolResults[i] = { id: call.id, name: call.name, result: typeof result === 'string' ? result : JSON.stringify(result) }
+        } catch (err) {
+          toolResults[i] = { id: call.id, name: call.name, result: '', error: err instanceof Error ? err.message : String(err) }
+        }
         continue
       }
       if (call.name === 'create_plan') {

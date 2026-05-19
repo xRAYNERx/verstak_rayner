@@ -333,6 +333,41 @@
   outline: none;
 }
 
+/* Settings extra section (connectors etc.) */
+.gg-settings-extra {
+  padding: 14px 22px 4px;
+  border-top: 1px solid var(--border-subtle);
+}
+.gg-settings-section-title {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  margin-bottom: 10px;
+}
+.gg-settings-row {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 8px;
+}
+.gg-settings-label {
+  flex: 0 0 160px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+.gg-settings-row .gg-input { flex: 1; }
+.gg-settings-hint {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin: 6px 0 4px;
+  line-height: 1.5;
+}
+.gg-settings-hint code {
+  font-family: var(--font-mono);
+  background: var(--bg-overlay);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
 /* In-app browser view */
 .gg-browser-bar {
   display: flex; align-items: center; gap: 6px;
