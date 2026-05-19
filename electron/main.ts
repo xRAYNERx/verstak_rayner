@@ -20,6 +20,8 @@ import { createChats } from './storage/chats'
 import { createTasks } from './storage/tasks'
 import { createJournal } from './storage/journal'
 import { createProjects } from './storage/projects'
+import { createUndoStack } from './storage/undo'
+import { registerUndoIpc } from './ipc/undo'
 
 function createWindow(): void {
   // HERE = out/main in dev and prod
@@ -57,6 +59,7 @@ app.whenReady().then(() => {
   const tasks = createTasks(db)
   const journal = createJournal(db)
   const projects = createProjects(db)
+  const undoStack = createUndoStack(db)
 
   registerProjectIpc(projects)
   registerFilesIpc({ getProjectRoot: getActiveProjectPath })
@@ -70,11 +73,15 @@ app.whenReady().then(() => {
         || v === 'openai' || v === 'codex-cli') return v
       return 'gemini-api'
     },
-    getProviderModel: (id) => settings.getSecret(`model_${id}`)
+    getProviderModel: (id) => settings.getSecret(`model_${id}`),
+    recordWrite: (projectPath, filePath, before, after) => {
+      undoStack.push(projectPath, filePath, before, after)
+    }
   })
   registerChatsIpc(chats)
   registerTasksIpc(tasks)
   registerJournalIpc(journal)
+  registerUndoIpc(undoStack)
   registerTerminalIpc()
   createWindow()
 })

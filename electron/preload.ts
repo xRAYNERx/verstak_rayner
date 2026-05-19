@@ -49,6 +49,12 @@ contextBridge.exposeInMainWorld('api', {
     remove: (id: number) => ipcRenderer.invoke('journal:remove', id),
     clear: (projectPath: string) => ipcRenderer.invoke('journal:clear', projectPath)
   },
+  undo: {
+    list: (projectPath: string) => ipcRenderer.invoke('undo:list', projectPath),
+    count: (projectPath: string) => ipcRenderer.invoke('undo:count', projectPath),
+    clear: (projectPath: string) => ipcRenderer.invoke('undo:clear', projectPath),
+    revert: (projectPath: string, id?: number) => ipcRenderer.invoke('undo:revert', projectPath, id)
+  },
   term: {
     spawn: (cwd: string) => ipcRenderer.invoke('term:spawn', cwd) as Promise<number>,
     write: (id: number, data: string) => ipcRenderer.invoke('term:write', id, data),

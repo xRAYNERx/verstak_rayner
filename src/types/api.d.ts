@@ -5,6 +5,7 @@ export interface StoredChatMessage { id: number; role: 'user' | 'assistant' | 's
 export interface Task { id: number; text: string; done: boolean; createdAt: number; doneAt: number | null }
 export type JournalKind = 'manual' | 'session' | 'tool' | 'note'
 export interface JournalEntry { id: number; kind: JournalKind; title: string; detail: string | null; createdAt: number }
+export interface UndoEntry { id: number; filePath: string; beforeContent: string | null; afterContent: string | null; createdAt: number }
 export interface ProjectMeta { path: string; name: string; color: string; lastOpenedAt: number }
 export interface ToolCall { id: string; name: string; args: Record<string, unknown> }
 export type ChatEvent =
@@ -57,6 +58,12 @@ declare global {
         append: (projectPath: string, kind: JournalKind, title: string, detail?: string | null) => Promise<JournalEntry>
         remove: (id: number) => Promise<void>
         clear: (projectPath: string) => Promise<number>
+      }
+      undo: {
+        list: (projectPath: string) => Promise<UndoEntry[]>
+        count: (projectPath: string) => Promise<number>
+        clear: (projectPath: string) => Promise<number>
+        revert: (projectPath: string, id?: number) => Promise<{ ok: boolean; filePath?: string; reason?: string }>
       }
       term: {
         spawn: (cwd: string) => Promise<number>

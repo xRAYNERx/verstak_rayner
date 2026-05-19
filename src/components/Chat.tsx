@@ -57,6 +57,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
   const screenshotCounter = useRef(0)
   const warningTimer = useRef<number | null>(null)
   const currentSendIdRef = useRef<number | null>(null)
+  const [undoCount, setUndoCount] = useState(0)
 
   function flashWarning(msg: string) {
     setWarning(msg)
@@ -165,6 +166,34 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
   useEffect(() => {
     if (streamRef.current) streamRef.current.scrollTop = streamRef.current.scrollHeight
   }, [messages])
+
+  // Refresh undo count when project changes / after each assistant turn settles
+  useEffect(() => {
+    const path = useProject.getState().path
+    if (!path) { setUndoCount(0); return }
+    void window.api.undo.count(path).then(setUndoCount)
+  }, [messages.length])
+
+  async function revertLastWrite() {
+    const path = useProject.getState().path
+    if (!path) return
+    const result = await window.api.undo.revert(path)
+    if (result.ok) {
+      // Refresh file tree so sidebar shows the restored state
+      const tree = await window.api.files.tree(path)
+      useProject.setState({ tree })
+      useProject.getState().pushActivity({
+        id: `undo-${Date.now()}`,
+        kind: 'write',
+        label: 'undo write_file',
+        detail: result.filePath,
+        status: 'ok',
+        timestamp: Date.now()
+      })
+      const newCount = await window.api.undo.count(path)
+      setUndoCount(newCount)
+    }
+  }
 
   // Auto-grow textarea
   function autoGrow() {
@@ -434,6 +463,17 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
         <div className="gg-composer-hint">
           <span><span className="gg-kbd">Enter</span> отправить · <span className="gg-kbd">Shift</span>+<span className="gg-kbd">Enter</span> новая строка · <span className="gg-kbd">Ctrl+V</span> картинка</span>
           <div className="gg-composer-meta">
+            {undoCount > 0 && (
+              <button
+                type="button"
+                className="gg-undo-btn"
+                onClick={() => void revertLastWrite()}
+                title="Откатить последнюю правку файла"
+              >
+                <span>↶</span>
+                <span className="gg-undo-count">{undoCount}</span>
+              </button>
+            )}
             <button
               type="button"
               className={`gg-terminal-toggle ${terminalOpen ? 'is-open' : ''}`}

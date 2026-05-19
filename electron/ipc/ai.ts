@@ -11,6 +11,8 @@ interface AiDeps {
   getSecret: (key: string) => string | null
   getProviderId: () => ProviderId
   getProviderModel: (id: ProviderId) => string | null
+  /** Persist a write so the user can ↶ revert it later. */
+  recordWrite: (projectPath: string, filePath: string, before: string, after: string) => void
 }
 
 let currentSendId = 0
@@ -77,7 +79,7 @@ export function registerAiIpc(deps: AiDeps): void {
 
     if (descriptor.supportsTools && projectPath) {
       const tools = createFileTools(projectPath)
-      void runApiConversation(e.sender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal).finally(cleanup)
+      void runApiConversation(e.sender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite).finally(cleanup)
     } else {
       void runPlainConversation(e.sender, sendId, provider, messagesWithSystem, ctrl.signal).finally(cleanup)
     }
@@ -131,6 +133,12 @@ async function runPlainConversation(
  * Full agentic loop with file tools + diff confirmation + command sandbox.
  * Only providers that support function calling go through here.
  */
+const MAX_AGENT_TURNS = 8
+
+function callSignature(call: ToolCall): string {
+  return `${call.name}::${JSON.stringify(call.args)}`
+}
+
 async function runApiConversation(
   sender: Electron.WebContents,
   sendId: number,
@@ -138,12 +146,14 @@ async function runApiConversation(
   tools: ReturnType<typeof createFileTools>,
   projectPath: string,
   initialMessages: ChatMessage[],
-  signal: AbortSignal
+  signal: AbortSignal,
+  recordWrite: (projectPath: string, filePath: string, before: string, after: string) => void
 ): Promise<void> {
-  void projectPath
   const currentMessages = [...initialMessages]
-  const maxTurns = 5
-  for (let turn = 0; turn < maxTurns; turn++) {
+  // Loop detection — same tool+args appearing 2+ times in a row is a bad sign.
+  const recentSignatures: string[] = []
+
+  for (let turn = 0; turn < MAX_AGENT_TURNS; turn++) {
     if (signal.aborted) {
       sender.send('ai:event', { id: sendId, event: { type: 'done' } })
       return
@@ -175,16 +185,48 @@ async function runApiConversation(
       return
     }
 
-    // Record the assistant turn with its tool calls so the next round preserves
-    // structured context for providers that require it (Claude, OpenAI/Grok).
+    // Loop detection — check if AI repeated the same tool call this turn
+    const loopHits: ToolCall[] = []
+    for (const c of toolCalls) {
+      const sig = callSignature(c)
+      const seen = recentSignatures.filter(s => s === sig).length
+      if (seen >= 2) loopHits.push(c)
+      recentSignatures.push(sig)
+    }
+    // Keep window small
+    while (recentSignatures.length > 8) recentSignatures.shift()
+
     currentMessages.push({ role: 'assistant', content: assistantText, toolCalls })
 
-    // Execute each tool, collect structured results. Special tools that require
-    // user confirmation (write_file, run_command) handle their own UI flow.
+    if (loopHits.length > 0) {
+      sender.send('ai:event', {
+        id: sendId,
+        event: {
+          type: 'tool-blocked',
+          callId: loopHits[0].id,
+          name: loopHits[0].name,
+          reason: `Зацикливание: один и тот же вызов повторён 3+ раза подряд. Цикл остановлен.`
+        }
+      })
+      // Feed back a supervisor note instead of executing again
+      currentMessages.push({
+        role: 'user',
+        content: '',
+        toolResults: loopHits.map(c => ({
+          id: c.id,
+          name: c.name,
+          result: '',
+          error: 'Supervisor: вы зациклились — этот же вызов повторён несколько раз. Смените подход или сообщите пользователю что нужна помощь.'
+        }))
+      })
+      sender.send('ai:event', { id: sendId, event: { type: 'done' } })
+      return
+    }
+
     const toolResults: ToolResult[] = []
     for (const call of toolCalls) {
       if (call.name === 'write_file') {
-        toolResults.push(await handleWriteFile(sender, sendId, tools, call))
+        toolResults.push(await handleWriteFile(sender, sendId, tools, call, projectPath, recordWrite))
         continue
       }
       if (call.name === 'run_command') {
@@ -205,6 +247,16 @@ async function runApiConversation(
     }
     currentMessages.push({ role: 'user', content: '', toolResults })
   }
+  // Max turns reached — warn user and exit
+  sender.send('ai:event', {
+    id: sendId,
+    event: {
+      type: 'tool-blocked',
+      callId: 'maxturns',
+      name: 'agent-loop',
+      reason: `Достигнут лимит ${MAX_AGENT_TURNS} итераций агента. Цикл остановлен — задача может быть не завершена.`
+    }
+  })
   sender.send('ai:event', { id: sendId, event: { type: 'done' } })
 }
 
@@ -212,18 +264,21 @@ async function handleWriteFile(
   sender: Electron.WebContents,
   sendId: number,
   tools: ReturnType<typeof createFileTools>,
-  call: ToolCall
+  call: ToolCall,
+  projectPath: string,
+  recordWrite: (projectPath: string, filePath: string, before: string, after: string) => void
 ): Promise<ToolResult> {
   const path = String(call.args.path)
   const after = String(call.args.content)
   let before = ''
   try { before = await tools.execute('read_file', { path }) as string } catch { before = '' }
-  void after
   sender.send('ai:event', { id: sendId, event: { type: 'pending-write', callId: call.id, path, before, after } })
   const accepted = await new Promise<boolean>(resolve => { pendingWrites.set(call.id, { resolve }) })
   if (accepted) {
     try {
       await tools.execute('write_file', call.args)
+      // Save the before/after pair so the user can ↶ revert this write later
+      try { recordWrite(projectPath, path, before, after) } catch { /* undo storage failure shouldn't block the write */ }
       return { id: call.id, name: call.name, result: `Applied write to ${path}` }
     } catch (err) {
       return { id: call.id, name: call.name, result: '', error: err instanceof Error ? err.message : String(err) }

@@ -45,6 +45,16 @@ export function openDb(path: string): DB {
       color TEXT NOT NULL,
       last_opened_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS file_undo (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_path TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      before_content TEXT,
+      after_content TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_undo_project ON file_undo(project_path, id);
   `)
 
   return db
