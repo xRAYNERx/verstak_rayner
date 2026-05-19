@@ -10,6 +10,7 @@ export type PlanStatus = 'draft' | 'running' | 'done' | 'cancelled'
 export type StepStatus = 'pending' | 'running' | 'done' | 'skipped' | 'failed'
 export interface PlanStep { id: number; planId: number; idx: number; title: string; detail: string | null; status: StepStatus; result: string | null }
 export interface Plan { id: number; title: string; status: PlanStatus; createdAt: number; completedAt: number | null; steps: PlanStep[] }
+export interface FeedbackEntry { id: number; projectPath: string | null; providerId: string | null; rating: number | null; message: string; createdAt: number }
 export interface ProjectMeta { path: string; name: string; color: string; lastOpenedAt: number }
 export interface ToolCall { id: string; name: string; args: Record<string, unknown> }
 export interface UsageDelta {
@@ -77,6 +78,11 @@ declare global {
         count: (projectPath: string) => Promise<number>
         clear: (projectPath: string) => Promise<number>
         revert: (projectPath: string, id?: number) => Promise<{ ok: boolean; filePath?: string; reason?: string }>
+      }
+      feedback: {
+        list: (projectPath: string | null, limit?: number) => Promise<FeedbackEntry[]>
+        submit: (input: { projectPath: string | null; providerId: string | null; rating: number | null; message: string }) => Promise<FeedbackEntry>
+        remove: (id: number) => Promise<void>
       }
       plans: {
         list: (projectPath: string) => Promise<Plan[]>

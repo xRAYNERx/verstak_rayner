@@ -77,6 +77,15 @@ export function openDb(path: string): DB {
       FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_plan_steps_plan ON plan_steps(plan_id, idx);
+
+    CREATE TABLE IF NOT EXISTS feedback (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_path TEXT,
+      provider_id TEXT,
+      rating INTEGER,
+      message TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
   `)
 
   return db

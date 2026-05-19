@@ -55,6 +55,12 @@ contextBridge.exposeInMainWorld('api', {
     clear: (projectPath: string) => ipcRenderer.invoke('undo:clear', projectPath),
     revert: (projectPath: string, id?: number) => ipcRenderer.invoke('undo:revert', projectPath, id)
   },
+  feedback: {
+    list: (projectPath: string | null, limit?: number) => ipcRenderer.invoke('feedback:list', projectPath, limit),
+    submit: (input: { projectPath: string | null; providerId: string | null; rating: number | null; message: string }) =>
+      ipcRenderer.invoke('feedback:submit', input),
+    remove: (id: number) => ipcRenderer.invoke('feedback:remove', id)
+  },
   plans: {
     list: (projectPath: string) => ipcRenderer.invoke('plans:list', projectPath),
     get: (id: number) => ipcRenderer.invoke('plans:get', id),

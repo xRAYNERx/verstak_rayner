@@ -24,6 +24,8 @@ import { createUndoStack } from './storage/undo'
 import { registerUndoIpc } from './ipc/undo'
 import { createPlans } from './storage/plans'
 import { registerPlansIpc } from './ipc/plans'
+import { createFeedback } from './storage/feedback'
+import { registerFeedbackIpc } from './ipc/feedback'
 
 function createWindow(): void {
   // HERE = out/main in dev and prod
@@ -63,6 +65,7 @@ app.whenReady().then(() => {
   const projects = createProjects(db)
   const undoStack = createUndoStack(db)
   const plans = createPlans(db)
+  const feedback = createFeedback(db)
 
   registerProjectIpc(projects)
   registerFilesIpc({ getProjectRoot: getActiveProjectPath })
@@ -90,6 +93,7 @@ app.whenReady().then(() => {
   registerJournalIpc(journal)
   registerUndoIpc(undoStack)
   registerPlansIpc(plans)
+  registerFeedbackIpc(feedback)
   registerTerminalIpc()
   createWindow()
 })

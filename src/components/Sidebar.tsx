@@ -93,6 +93,11 @@ const JournalIcon = (
     <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
   </svg>
 )
+const FeedbackIcon = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 11.5a8.38 8.38 0 0 1 -8.5 8.5 8.5 8.5 0 0 1 -3.8 -0.9L3 21l1.4 -5.5a8.38 8.38 0 0 1 -0.9 -3.5 8.5 8.5 0 0 1 17 -0.5z" />
+  </svg>
+)
 
 const NAV: NavItem[] = [
   { id: 'chat',     label: 'Chat',     icon: ChatIcon },
@@ -100,7 +105,8 @@ const NAV: NavItem[] = [
   { id: 'journal',  label: 'Journal',  icon: JournalIcon },
   { id: 'plan',     label: 'Plan',     icon: PlanIcon },
   { id: 'workflow', label: 'Workflow', icon: WorkflowIcon, badge: 'soon' },
-  { id: 'calendar', label: 'Calendar', icon: CalendarIcon, badge: 'soon' }
+  { id: 'calendar', label: 'Calendar', icon: CalendarIcon, badge: 'soon' },
+  { id: 'feedback', label: 'Feedback', icon: FeedbackIcon }
 ]
 
 interface SidebarProps {
