@@ -1,32 +1,97 @@
+import { useEffect, useState } from 'react'
 import { useProject } from '../store/projectStore'
 import type { FileNode } from '../types/api'
 
 function TreeNode({ node, depth }: { node: FileNode; depth: number }) {
+  const [open, setOpen] = useState(depth < 1)
+  const isDir = node.isDirectory
   return (
-    <div>
-      <div style={{ paddingLeft: depth * 12, color: node.isDirectory ? '#ccc' : '#999', fontSize: 13 }}>
-        {node.isDirectory ? '📁' : '📄'} {node.name}
+    <>
+      <div
+        className={`gg-tree-node ${isDir ? 'is-dir' : 'is-file'}`}
+        style={{ paddingLeft: 8 + depth * 12 }}
+        onClick={() => isDir && setOpen(o => !o)}
+      >
+        <span className="gg-tree-icon">{isDir ? (open ? '▾' : '▸') : '·'}</span>
+        <span className="gg-tree-name">{node.name}</span>
       </div>
-      {node.children?.map(child => <TreeNode key={child.path} node={child} depth={depth + 1} />)}
-    </div>
+      {isDir && open && node.children?.map(child => (
+        <TreeNode key={child.path} node={child} depth={depth + 1} />
+      ))}
+    </>
   )
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  onOpenSettings: () => void
+}
+
+export function Sidebar({ onOpenSettings }: SidebarProps) {
   const { path, tree, setProject } = useProject()
+  const [provider, setProvider] = useState<'gemini-api' | 'gemini-cli'>('gemini-api')
+
+  useEffect(() => {
+    void window.api.settings.getKey('provider').then(v => {
+      setProvider(v === 'gemini-cli' ? 'gemini-cli' : 'gemini-api')
+    })
+    const interval = window.setInterval(() => {
+      void window.api.settings.getKey('provider').then(v => {
+        setProvider(v === 'gemini-cli' ? 'gemini-cli' : 'gemini-api')
+      })
+    }, 1500)
+    return () => window.clearInterval(interval)
+  }, [])
 
   async function openProject() {
     const picked = await window.api.projects.pick()
     if (picked) await setProject(picked)
   }
 
+  const shortPath = path ? path.replace(/^.*[\\/]/, '') : null
+
   return (
-    <aside style={{ width: 260, background: '#1a1a2e', color: '#ccc', padding: 12, overflow: 'auto', height: '100vh' }}>
-      <button onClick={openProject} style={{ width: '100%', padding: 8, marginBottom: 12 }}>
-        {path ? 'Сменить проект' : 'Открыть проект'}
-      </button>
-      {path && <div style={{ fontSize: 11, color: '#888', marginBottom: 8 }}>{path}</div>}
-      {tree.map(node => <TreeNode key={node.path} node={node} depth={0} />)}
+    <aside className="gg-sidebar">
+      <div className="gg-sidebar-header">
+        <div className="gg-brand">
+          <div className="gg-brand-mark">G</div>
+          <span className="gg-brand-text">GeminiGrok</span>
+        </div>
+      </div>
+
+      <div className="gg-sidebar-scroll">
+        <div className="gg-sidebar-section">
+          <div className="gg-sidebar-section-title">Проект</div>
+        </div>
+        <button
+          className={`gg-project-button ${path ? 'has-project' : ''}`}
+          onClick={openProject}
+        >
+          <span>{path ? '📁' : '＋'}</span>
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {shortPath ?? 'Открыть папку'}
+          </span>
+        </button>
+        {path && <div className="gg-project-path" title={path}>{path}</div>}
+
+        {path && (
+          <>
+            <div className="gg-sidebar-section">
+              <div className="gg-sidebar-section-title">Файлы</div>
+            </div>
+            <div className="gg-tree">
+              {tree.map(node => <TreeNode key={node.path} node={node} depth={0} />)}
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="gg-sidebar-footer">
+        <div className="gg-provider-badge">
+          <span className={`gg-provider-dot ${provider === 'gemini-cli' ? 'cli' : ''}`} />
+          <span>{provider === 'gemini-cli' ? 'CLI · подписка' : 'API · ключ'}</span>
+        </div>
+        <button className="gg-settings-trigger" onClick={onOpenSettings} title="Настройки">⚙</button>
+      </div>
     </aside>
   )
 }

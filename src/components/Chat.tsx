@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useProject } from '../store/projectStore'
+import { Markdown } from './Markdown'
 
 export function Chat() {
   const { messages, addMessage, updateLastAssistant, isStreaming, setStreaming } = useProject()
   const [input, setInput] = useState('')
+  const streamRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     const off = window.api.ai.onEvent(({ event }) => {
@@ -33,6 +36,20 @@ export function Chat() {
     return off
   }, [updateLastAssistant, setStreaming])
 
+  // Autoscroll on new content
+  useEffect(() => {
+    if (streamRef.current) streamRef.current.scrollTop = streamRef.current.scrollHeight
+  }, [messages])
+
+  // Auto-grow textarea
+  function autoGrow() {
+    const ta = textareaRef.current
+    if (!ta) return
+    ta.style.height = 'auto'
+    ta.style.height = Math.min(ta.scrollHeight, 220) + 'px'
+  }
+  useEffect(autoGrow, [input])
+
   async function send() {
     const text = input.trim()
     if (!text || isStreaming) return
@@ -46,29 +63,76 @@ export function Chat() {
     await window.api.ai.send(allMessages, path)
   }
 
+  const hasMessages = messages.length > 0
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {messages.map((m, i) => (
-          <div key={i} style={{
-            alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-            background: m.role === 'user' ? '#1a1a2e' : '#0f2027',
-            padding: '10px 14px', borderRadius: 8, maxWidth: '80%', whiteSpace: 'pre-wrap'
-          }}>
-            {m.role === 'assistant' && <div style={{ color: '#4fc3f7', fontSize: 11, marginBottom: 4 }}>✦ Gemini</div>}
-            {m.content || (m.role === 'assistant' && isStreaming ? '...' : '')}
+    <div className="gg-chat">
+      <div className="gg-chat-stream" ref={streamRef}>
+        {!hasMessages && (
+          <div className="gg-chat-empty">
+            <div className="gg-chat-empty-mark">G</div>
+            <div className="gg-chat-empty-title">Готов к работе</div>
+            <div className="gg-chat-empty-hint">
+              Открой проект слева и напиши задачу. Gemini прочитает файлы, предложит изменения и покажет diff перед применением.
+            </div>
           </div>
-        ))}
+        )}
+        {messages.map((m, i) => {
+          const isLast = i === messages.length - 1
+          const isStreamingAssistant = isLast && m.role === 'assistant' && isStreaming
+          return (
+            <div key={i} className={`gg-msg ${m.role === 'user' ? 'gg-msg-user' : 'gg-msg-assistant'}`}>
+              {m.role === 'assistant' && (
+                <div className="gg-msg-meta">
+                  <span className="gg-msg-author">Gemini</span>
+                </div>
+              )}
+              <div className="gg-msg-bubble">
+                {m.content
+                  ? (m.role === 'assistant'
+                      ? <Markdown text={m.content} />
+                      : <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span>)
+                  : isStreamingAssistant
+                    ? <div className="gg-typing"><span /><span /><span /></div>
+                    : null
+                }
+              </div>
+            </div>
+          )
+        })}
       </div>
-      <div style={{ padding: 12, borderTop: '1px solid #222' }}>
-        <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-          placeholder={isStreaming ? 'Gemini отвечает...' : 'Напиши задачу...'}
-          disabled={isStreaming}
-          style={{ width: '100%', padding: 10, background: '#1a1a1a', color: '#fff', border: '1px solid #333', borderRadius: 6 }}
-        />
+
+      <div className="gg-composer">
+        <div className="gg-composer-inner">
+          <textarea
+            ref={textareaRef}
+            className="gg-composer-textarea"
+            value={input}
+            rows={1}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault()
+                void send()
+              }
+            }}
+            placeholder={isStreaming ? 'Gemini отвечает…' : 'Опиши задачу. Enter — отправить, Shift+Enter — новая строка'}
+            disabled={isStreaming}
+          />
+          <button
+            className="gg-send-btn"
+            onClick={() => void send()}
+            disabled={isStreaming || !input.trim()}
+            title="Отправить (Enter)"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12l14 -8l-4 16l-4 -6l-6 -2z" />
+            </svg>
+          </button>
+        </div>
+        <div className="gg-composer-hint">
+          <span><span className="gg-kbd">Enter</span> отправить · <span className="gg-kbd">Shift</span>+<span className="gg-kbd">Enter</span> новая строка</span>
+        </div>
       </div>
     </div>
   )

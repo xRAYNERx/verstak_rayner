@@ -10,11 +10,22 @@ export function Terminal() {
 
   useEffect(() => {
     if (!ref.current || !path) return
-    const term = new XTerm({ fontSize: 12, theme: { background: '#0d0d0d' } })
+    const term = new XTerm({
+      fontSize: 12,
+      fontFamily: '"Geist Mono", "JetBrains Mono", "SF Mono", Menlo, monospace',
+      theme: {
+        background: '#0a0b0d',
+        foreground: '#e6e8ec',
+        cursor: '#5b8dff',
+        selectionBackground: 'rgba(91, 141, 255, 0.25)'
+      }
+    })
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.open(ref.current)
     fit.fit()
+    const onResize = () => { try { fit.fit() } catch { /* ignore */ } }
+    window.addEventListener('resize', onResize)
 
     let termId = -1
     let offData: (() => void) | null = null
@@ -27,11 +38,12 @@ export function Terminal() {
     })
 
     return () => {
+      window.removeEventListener('resize', onResize)
       offData?.()
       if (termId > 0) void window.api.term.kill(termId)
       term.dispose()
     }
   }, [path])
 
-  return <div ref={ref} style={{ height: 200, background: '#0d0d0d', borderTop: '1px solid #222' }} />
+  return <div ref={ref} style={{ height: '100%', width: '100%', background: '#0a0b0d', padding: '6px 8px' }} />
 }

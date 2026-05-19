@@ -4,16 +4,27 @@ import { Settings } from './components/Settings'
 import { Chat } from './components/Chat'
 import { DiffView } from './components/DiffView'
 import { Terminal } from './components/Terminal'
+import { useProject } from './store/projectStore'
 
 export function App() {
   const [showSettings, setShowSettings] = useState(false)
+  const { path } = useProject()
   return (
-    <div style={{ display: 'flex', height: '100vh', background: '#0d0d0d', color: '#e0e0e0', fontFamily: 'sans-serif' }}>
-      <Sidebar />
-      <main style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column' }}>
-        <button onClick={() => setShowSettings(true)} style={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }}>⚙</button>
-        <div style={{ flex: 1, overflow: 'hidden' }}><Chat /></div>
-        <Terminal />
+    <div className="gg-app">
+      <Sidebar onOpenSettings={() => setShowSettings(true)} />
+      <main className="gg-main">
+        <Chat />
+        {path && (
+          <div className="gg-terminal-wrap">
+            <div className="gg-terminal-header">
+              <span className="gg-terminal-dot" />
+              <span>Терминал</span>
+            </div>
+            <div className="gg-terminal-body">
+              <Terminal />
+            </div>
+          </div>
+        )}
       </main>
       {showSettings && <Settings onClose={() => setShowSettings(false)} />}
       <DiffView />

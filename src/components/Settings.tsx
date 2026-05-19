@@ -22,68 +22,72 @@ export function Settings({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
-      <div style={{ background: '#1a1a2e', padding: 24, borderRadius: 8, width: 540, color: '#e0e0e0' }}>
-        <h3 style={{ marginTop: 0 }}>Настройки</h3>
-
-        <label style={{ display: 'block', marginBottom: 8, fontSize: 13, color: '#aaa' }}>Как подключиться к Gemini</label>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <button
-            onClick={() => setProvider('gemini-api')}
-            style={{
-              flex: 1, padding: 10, cursor: 'pointer',
-              background: provider === 'gemini-api' ? '#0f3460' : '#0d0d0d',
-              color: provider === 'gemini-api' ? '#4fc3f7' : '#888',
-              border: provider === 'gemini-api' ? '1px solid #4fc3f7' : '1px solid #333',
-              borderRadius: 6, textAlign: 'left'
-            }}
-          >
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>🔑 API ключ</div>
-            <div style={{ fontSize: 11, opacity: 0.85 }}>Через @google/genai. С diff-подтверждением правок.</div>
-          </button>
-          <button
-            onClick={() => setProvider('gemini-cli')}
-            style={{
-              flex: 1, padding: 10, cursor: 'pointer',
-              background: provider === 'gemini-cli' ? '#1a3a1a' : '#0d0d0d',
-              color: provider === 'gemini-cli' ? '#4ec9b0' : '#888',
-              border: provider === 'gemini-cli' ? '1px solid #4ec9b0' : '1px solid #333',
-              borderRadius: 6, textAlign: 'left'
-            }}
-          >
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>📦 CLI (подписка)</div>
-            <div style={{ fontSize: 11, opacity: 0.85 }}>Через gemini-cli + твою Ultra подписку. Без API ключа.</div>
-          </button>
+    <div className="gg-modal-backdrop" onClick={onClose}>
+      <div className="gg-modal" onClick={e => e.stopPropagation()}>
+        <div className="gg-modal-header">
+          <div className="gg-modal-title">Настройки</div>
+          <button className="gg-modal-close" onClick={onClose}>×</button>
         </div>
 
-        {provider === 'gemini-api' && (
-          <>
-            <label style={{ display: 'block', marginBottom: 8, fontSize: 13 }}>Gemini API ключ</label>
-            <input
-              type="password"
-              value={key}
-              onChange={e => setKey(e.target.value)}
-              placeholder="AIzaSy..."
-              style={{ width: '100%', padding: 8, background: '#0d0d0d', color: '#fff', border: '1px solid #333', borderRadius: 4, marginBottom: 12, boxSizing: 'border-box' }}
-            />
-            <div style={{ fontSize: 11, color: '#888', marginBottom: 16 }}>
-              Получи бесплатно в Google AI Studio: aistudio.google.com → Get API key
-            </div>
-          </>
-        )}
-
-        {provider === 'gemini-cli' && (
-          <div style={{ background: '#0d1a0d', padding: 12, borderRadius: 6, marginBottom: 16, fontSize: 12, color: '#aaa', lineHeight: 1.6 }}>
-            <div style={{ color: '#4ec9b0', marginBottom: 6 }}>Что нужно для CLI режима:</div>
-            <div>1. Установлен <code style={{ color: '#fff' }}>gemini-cli</code> (у тебя уже есть, проверено)</div>
-            <div>2. Залогинен через <code style={{ color: '#fff' }}>gemini</code> один раз — открой терминал, набери <code style={{ color: '#fff' }}>gemini</code>, пройди Google OAuth твоим аккаунтом с Ultra</div>
-            <div style={{ marginTop: 8, color: '#888', fontSize: 11 }}>В этом режиме AI сам управляет файлами проекта. Diff-подтверждения нет.</div>
+        <div className="gg-modal-body">
+          <div className="gg-label">Способ подключения</div>
+          <div className="gg-provider-grid">
+            <button
+              type="button"
+              className={`gg-provider-card ${provider === 'gemini-api' ? 'active' : ''}`}
+              onClick={() => setProvider('gemini-api')}
+            >
+              <div className="gg-provider-card-label">API ключ</div>
+              <div className="gg-provider-card-desc">
+                Прямой вызов <code>@google/genai</code>. Tools, diff-подтверждение, multi-turn.
+              </div>
+            </button>
+            <button
+              type="button"
+              className={`gg-provider-card ${provider === 'gemini-cli' ? 'active' : ''}`}
+              onClick={() => setProvider('gemini-cli')}
+            >
+              <div className="gg-provider-card-label">CLI · подписка</div>
+              <div className="gg-provider-card-desc">
+                Subprocess <code>gemini</code>. Твоя Ultra-подписка, без API ключа.
+              </div>
+            </button>
           </div>
-        )}
 
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button onClick={onClose}>Закрыть</button>
-          <button onClick={save}>{saved ? 'Сохранено ✓' : 'Сохранить'}</button>
+          {provider === 'gemini-api' && (
+            <>
+              <div className="gg-label">Gemini API ключ</div>
+              <input
+                type="password"
+                className="gg-input"
+                value={key}
+                onChange={e => setKey(e.target.value)}
+                placeholder="AIzaSy…"
+                autoFocus
+              />
+              <div className="gg-text-tertiary" style={{ fontSize: 'var(--text-xs)', marginTop: 6 }}>
+                Создаётся бесплатно в <a href="https://aistudio.google.com" target="_blank" rel="noreferrer">Google AI Studio</a> → Get API key. Хранится зашифрованно через safeStorage.
+              </div>
+            </>
+          )}
+
+          {provider === 'gemini-cli' && (
+            <div className="gg-notice">
+              <div style={{ marginBottom: 6 }}><strong>Что нужно для CLI режима</strong></div>
+              <div>1. Установлен <code>gemini-cli</code> (у тебя уже есть, обнаружен в <code>%APPDATA%\npm\gemini.cmd</code>)</div>
+              <div>2. Залогинен через <code>gemini</code> — открой обычный терминал, набери <code>gemini</code>, пройди Google OAuth твоим аккаунтом с Ultra-подпиской</div>
+              <div style={{ marginTop: 8, color: 'var(--text-tertiary)', fontSize: 'var(--text-xs)' }}>
+                В CLI-режиме AI сам управляет файлами проекта — diff-подтверждение не показывается.
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="gg-modal-footer">
+          <button className="gg-btn gg-btn-ghost" onClick={onClose}>Закрыть</button>
+          <button className="gg-btn gg-btn-primary" onClick={save}>
+            {saved ? '✓ Сохранено' : 'Сохранить'}
+          </button>
         </div>
       </div>
     </div>
