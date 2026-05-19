@@ -78,6 +78,53 @@
   --shadow-glow: 0 0 24px rgba(91, 141, 255, 0.15);
 }
 
+/* ─── Light theme — applied when html[data-theme="light"] ─── */
+html[data-theme="light"] {
+  /* Surfaces — warm paper tones */
+  --bg-base: #ffffff;
+  --bg-elevated: #f7f8fa;
+  --bg-overlay: #eef0f4;
+  --bg-input: #ffffff;
+  --bg-hover: #eef0f4;
+  --bg-active: #e3e7ee;
+
+  /* Lines */
+  --border-subtle: #e8eaef;
+  --border-default: #d4d7de;
+  --border-strong: #b6bbc4;
+  --border-focus: #4f7cff;
+
+  /* Text */
+  --text-primary: #1a1d22;
+  --text-secondary: #545a64;
+  --text-tertiary: #8c93a0;
+  --text-disabled: #c0c4cc;
+  --text-on-accent: #ffffff;
+
+  /* Accent — same blue, looks crisp on white */
+  --accent: #3a6ee8;
+  --accent-hover: #5085f0;
+  --accent-muted: rgba(58, 110, 232, 0.10);
+  --accent-border: rgba(58, 110, 232, 0.35);
+
+  /* Semantic */
+  --success: #1f9d80;
+  --success-muted: rgba(31, 157, 128, 0.10);
+  --warning: #a37200;
+  --error: #d33a3d;
+  --error-muted: rgba(211, 58, 61, 0.10);
+  --diff-add: #1f9d80;
+  --diff-add-bg: rgba(31, 157, 128, 0.08);
+  --diff-remove: #d33a3d;
+  --diff-remove-bg: rgba(211, 58, 61, 0.08);
+
+  /* Shadows softer on light */
+  --shadow-sm: 0 1px 2px rgba(15, 25, 40, 0.06);
+  --shadow-md: 0 4px 16px rgba(15, 25, 40, 0.08);
+  --shadow-lg: 0 16px 48px rgba(15, 25, 40, 0.12);
+  --shadow-glow: 0 0 24px rgba(58, 110, 232, 0.10);
+}
+
 /* ─── Reset ─── */
 *, *::before, *::after { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; padding: 0; }

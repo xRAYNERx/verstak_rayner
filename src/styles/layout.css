@@ -674,6 +674,39 @@
   border: 1px solid var(--border-subtle);
 }
 
+/* ─── Theme toggle (Settings header strip) ─── */
+.gg-theme-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 22px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-base);
+}
+.gg-theme-toggle {
+  display: inline-flex;
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 2px;
+  gap: 2px;
+}
+.gg-theme-btn {
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-md) - 2px);
+  padding: 5px 12px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: all 120ms ease;
+}
+.gg-theme-btn:hover { color: var(--text-primary); }
+.gg-theme-btn.is-active {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
 /* ─── Generic panel (Tasks, Journal, Stub) ─── */
 .gg-panel {
   flex: 1; min-height: 0;

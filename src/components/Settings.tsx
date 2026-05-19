@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ProviderId } from '../hooks/useProvider'
+import { useTheme } from '../hooks/useTheme'
 
 interface ProviderConfig {
   id: ProviderId
@@ -114,6 +115,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [keys, setKeys] = useState<Record<string, string>>({})
   const [models, setModels] = useState<Record<string, string>>({})
   const [saved, setSaved] = useState(false)
+  const { theme, setTheme } = useTheme()
 
   useEffect(() => {
     void (async () => {
@@ -157,6 +159,26 @@ export function Settings({ onClose }: { onClose: () => void }) {
         <div className="gg-modal-header">
           <div className="gg-modal-title">Провайдеры AI</div>
           <button className="gg-modal-close" onClick={onClose}>×</button>
+        </div>
+
+        <div className="gg-theme-row">
+          <div className="gg-label" style={{ margin: 0 }}>Тема оформления</div>
+          <div className="gg-theme-toggle" role="group">
+            <button
+              type="button"
+              className={`gg-theme-btn ${theme === 'dark' ? 'is-active' : ''}`}
+              onClick={() => void setTheme('dark')}
+            >
+              <span aria-hidden>🌙</span> Тёмная
+            </button>
+            <button
+              type="button"
+              className={`gg-theme-btn ${theme === 'light' ? 'is-active' : ''}`}
+              onClick={() => void setTheme('light')}
+            >
+              <span aria-hidden>☀</span> Светлая
+            </button>
+          </div>
         </div>
 
         <div className="gg-modal-body" style={{ display: 'flex', gap: 18, padding: 0, minHeight: 420 }}>
