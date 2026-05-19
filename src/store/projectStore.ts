@@ -41,7 +41,7 @@ interface ProjectState {
   tree: FileNode[]
   messages: ChatMessage[]
   isStreaming: boolean
-  pendingWrite: PendingWrite | null
+  pendingWrites: PendingWrite[]
   pendingCommand: PendingCommand | null
   activity: ActivityEntry[]
   activeView: ViewId
@@ -57,7 +57,9 @@ interface ProjectState {
   addMessage: (msg: ChatMessage) => void
   updateLastAssistant: (text: string) => void
   setStreaming: (v: boolean) => void
-  setPendingWrite: (w: PendingWrite | null) => void
+  addPendingWrite: (w: PendingWrite) => void
+  resolvePendingWrite: (callId: string) => void
+  clearPendingWrites: () => void
   setPendingCommand: (c: PendingCommand | null) => void
   pushActivity: (entry: ActivityEntry) => void
   updateActivity: (id: string, patch: Partial<ActivityEntry>) => void
@@ -72,7 +74,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   tree: [],
   messages: [],
   isStreaming: false,
-  pendingWrite: null,
+  pendingWrites: [],
   pendingCommand: null,
   activity: [],
   activeView: 'chat',
@@ -88,7 +90,7 @@ export const useProject = create<ProjectState>((set, get) => ({
       path,
       tree,
       messages: history.map(m => ({ role: m.role, content: m.content })),
-      pendingWrite: null,
+      pendingWrites: [],
       pendingCommand: null,
       activity: [],
       activeView: 'chat',
@@ -101,7 +103,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     tree: [],
     messages: [],
     activity: [],
-    pendingWrite: null,
+    pendingWrites: [],
     pendingCommand: null
   }),
   refreshProjectList: async () => {
@@ -127,7 +129,9 @@ export const useProject = create<ProjectState>((set, get) => ({
     return { messages: msgs }
   }),
   setStreaming: (v) => set({ isStreaming: v }),
-  setPendingWrite: (w) => set({ pendingWrite: w }),
+  addPendingWrite: (w) => set(s => ({ pendingWrites: [...s.pendingWrites, w] })),
+  resolvePendingWrite: (callId) => set(s => ({ pendingWrites: s.pendingWrites.filter(w => w.callId !== callId) })),
+  clearPendingWrites: () => set({ pendingWrites: [] }),
   setPendingCommand: (c) => set({ pendingCommand: c }),
   pushActivity: (entry) => set(s => ({ activity: [...s.activity, entry] })),
   updateActivity: (id, patch) => set(s => ({

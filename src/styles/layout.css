@@ -1208,6 +1208,58 @@
 .gg-diff-line-remove { color: var(--diff-remove); background: var(--diff-remove-bg); }
 .gg-diff-line-context { color: var(--text-secondary); }
 
+.gg-diff-files {
+  width: 240px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-subtle);
+  background: var(--bg-base);
+  overflow-y: auto;
+  padding: 8px 6px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.gg-diff-file-row {
+  display: flex; align-items: stretch; gap: 2px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  transition: background 100ms ease;
+}
+.gg-diff-file-row:hover { background: var(--bg-elevated); }
+.gg-diff-file-row.is-active { background: var(--accent-muted); }
+.gg-diff-file-pick {
+  flex: 1; min-width: 0;
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 6px 8px;
+  cursor: pointer;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.gg-diff-file-path {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.gg-diff-file-stats {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+.gg-diff-file-actions {
+  display: flex; align-items: center; gap: 2px; padding-right: 4px;
+}
+.gg-diff-file-act {
+  width: 22px; height: 22px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text-tertiary);
+}
+.gg-diff-file-act.is-accept:hover { background: var(--success-muted); color: var(--success); }
+.gg-diff-file-act.is-reject:hover { background: var(--error-muted); color: var(--error); }
+
 /* ─── Command confirm ─── */
 .gg-cmd-box {
   background: #000;

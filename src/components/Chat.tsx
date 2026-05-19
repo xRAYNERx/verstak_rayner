@@ -97,7 +97,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
       const store = useProject.getState()
       if (event.type === 'text') updateLastAssistant(event.text)
       else if (event.type === 'pending-write') {
-        store.setPendingWrite({
+        store.addPendingWrite({
           callId: event.callId,
           path: event.path,
           before: event.before,
