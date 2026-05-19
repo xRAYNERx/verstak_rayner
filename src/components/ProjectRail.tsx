@@ -11,27 +11,13 @@ function initial(name: string): string {
 interface ProjectChipProps {
   project: ProjectMeta
   active: boolean
+  unread: boolean
+  streaming: boolean
   onClick: () => void
   onRemove: () => void
 }
 
-async function safeSwitch(targetPath: string, currentPath: string | null, setProject: (p: string) => Promise<void>, isStreaming: boolean): Promise<void> {
-  if (currentPath === targetPath) return
-  if (isStreaming) {
-    const ok = window.confirm('AI ещё отвечает в текущем проекте. Прервать и переключиться?')
-    if (!ok) return
-    // Best-effort abort: stop endpoint cancels the active send
-    try {
-      // We don't know the exact sendId here — fire stop for a sentinel. Renderer's
-      // own listeners will mark streaming=false on the next 'done'. If your local
-      // wiring keeps a ref to the active sendId you can pass it here for a precise abort.
-      useProject.getState().setStreaming(false)
-    } catch { /* noop */ }
-  }
-  await setProject(targetPath)
-}
-
-function ProjectChip({ project, active, onClick, onRemove }: ProjectChipProps) {
+function ProjectChip({ project, active, unread, streaming, onClick, onRemove }: ProjectChipProps) {
   const [hover, setHover] = useState(false)
   return (
     <div
@@ -48,6 +34,12 @@ function ProjectChip({ project, active, onClick, onRemove }: ProjectChipProps) {
       >
         {initial(project.name)}
       </button>
+      {(unread || streaming) && (
+        <span
+          className={`gg-rail-unread ${streaming ? 'is-streaming' : ''}`}
+          title={streaming ? 'AI работает в этом проекте' : 'Есть новый ответ'}
+        />
+      )}
       {hover && (
         <button
           type="button"
@@ -66,7 +58,7 @@ interface ProjectRailProps {
 }
 
 export function ProjectRail({ sidebarOpen, onToggleSidebar }: ProjectRailProps) {
-  const { path, projectList, setProject, refreshProjectList, removeProject, isStreaming } = useProject()
+  const { path, projectList, sessions, setProject, refreshProjectList, removeProject } = useProject()
   const [bootstrapped, setBootstrapped] = useState(false)
 
   useEffect(() => {
@@ -114,15 +106,20 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar }: ProjectRailProps) 
       </button>
       <div className="gg-rail-divider" />
       <div className="gg-rail-list">
-        {projectList.map(p => (
-          <ProjectChip
-            key={p.path}
-            project={p}
-            active={path === p.path}
-            onClick={() => void safeSwitch(p.path, path, setProject, isStreaming)}
-            onRemove={() => void confirmRemove(p)}
-          />
-        ))}
+        {projectList.map(p => {
+          const session = sessions[p.path]
+          return (
+            <ProjectChip
+              key={p.path}
+              project={p}
+              active={path === p.path}
+              unread={!!session?.hasUnread}
+              streaming={!!session?.isStreaming}
+              onClick={() => { if (path !== p.path) void setProject(p.path) }}
+              onRemove={() => void confirmRemove(p)}
+            />
+          )
+        })}
         <button
           type="button"
           className="gg-rail-add"
