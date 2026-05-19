@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent, type ClipboardEvent } from 'react'
 import { useProject } from '../store/projectStore'
 import { useProvider } from '../hooks/useProvider'
+import { estimateCost } from '../lib/pricing'
 import { Markdown } from './Markdown'
 import { ModelPicker } from './ModelPicker'
 import type { Attachment } from '../types/api'
@@ -534,13 +535,28 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
         <div className="gg-composer-hint">
           <span><span className="gg-kbd">Enter</span> отправить · <span className="gg-kbd">Shift</span>+<span className="gg-kbd">Enter</span> новая строка · <span className="gg-kbd">Ctrl+V</span> картинка</span>
           <div className="gg-composer-meta">
-            {(sessionUsage.inputTokens > 0 || sessionUsage.outputTokens > 0) && (
-              <span className="gg-usage-pill" title="Токены потраченные в этом проекте">
-                <span>↑{formatTokens(sessionUsage.inputTokens)}</span>
-                <span className="gg-usage-sep">·</span>
-                <span>↓{formatTokens(sessionUsage.outputTokens)}</span>
-              </span>
-            )}
+            {(sessionUsage.inputTokens > 0 || sessionUsage.outputTokens > 0) && (() => {
+              const cost = estimateCost(provider.id, provider.model, sessionUsage.inputTokens, sessionUsage.outputTokens, sessionUsage.cachedInputTokens)
+              return (
+                <span className="gg-usage-pill" title={`Токены в этом проекте\n↑ input: ${sessionUsage.inputTokens}\n↓ output: ${sessionUsage.outputTokens}\ncached: ${sessionUsage.cachedInputTokens}`}>
+                  <span>↑{formatTokens(sessionUsage.inputTokens)}</span>
+                  <span className="gg-usage-sep">·</span>
+                  <span>↓{formatTokens(sessionUsage.outputTokens)}</span>
+                  {sessionUsage.cachedInputTokens > 0 && (
+                    <>
+                      <span className="gg-usage-sep">·</span>
+                      <span title="Cached input">⟲{formatTokens(sessionUsage.cachedInputTokens)}</span>
+                    </>
+                  )}
+                  {cost.usd && (
+                    <>
+                      <span className="gg-usage-sep">·</span>
+                      <span className="gg-usage-cost">{cost.usd}</span>
+                    </>
+                  )}
+                </span>
+              )
+            })()}
             {undoCount > 0 && (
               <button
                 type="button"

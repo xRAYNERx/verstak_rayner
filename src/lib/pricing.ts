@@ -1,0 +1,71 @@
+/**
+ * Best-effort pricing table for cost estimation in the chat header.
+ *
+ * Prices are USD per million tokens (input / output). Keep this conservative
+ * and document where each number came from. CLI providers run on user's
+ * subscription so cost is reported as 0.
+ *
+ * Last updated: 2026-05 (snapshot — adjust as providers publish new pricing).
+ */
+
+import type { ProviderId } from '../hooks/useProvider'
+
+interface ModelPrice {
+  input: number   // $ per 1M input tokens
+  output: number  // $ per 1M output tokens
+  cached?: number // $ per 1M cached input tokens (when provider supports caching)
+}
+
+const PRICES: Record<string, ModelPrice> = {
+  // Anthropic — anthropic.com/pricing
+  'claude-opus-4-5-20251101':    { input: 15.0, output: 75.0,  cached: 1.5 },
+  'claude-sonnet-4-5-20251101':  { input: 3.0,  output: 15.0,  cached: 0.3 },
+  'claude-haiku-4-5-20251101':   { input: 1.0,  output: 5.0,   cached: 0.1 },
+  // Google — ai.google.dev/pricing
+  'gemini-2.5-pro':              { input: 1.25, output: 10.0 },
+  'gemini-2.5-flash':            { input: 0.30, output: 2.50 },
+  // OpenAI — openai.com/api/pricing
+  'gpt-5':                       { input: 1.25, output: 10.0 },
+  'gpt-5-mini':                  { input: 0.25, output: 2.0 },
+  'gpt-4o':                      { input: 2.5,  output: 10.0 },
+  'gpt-4o-mini':                 { input: 0.15, output: 0.60 },
+  'o1':                          { input: 15.0, output: 60.0 },
+  'o1-mini':                     { input: 3.0,  output: 12.0 },
+  // xAI — x.ai/api
+  'grok-4':                      { input: 5.0,  output: 15.0 },
+  'grok-4-fast':                 { input: 0.20, output: 0.50 },
+  'grok-3':                      { input: 3.0,  output: 15.0 }
+}
+
+const CLI_FREE: Set<ProviderId> = new Set(['gemini-cli', 'claude-cli', 'grok-cli', 'codex-cli'])
+
+export interface CostEstimate {
+  /** Total USD, formatted as a string. null when provider is CLI (covered by subscription). */
+  usd: string | null
+  /** Approximate cents value for logic checks (0 for CLI). */
+  cents: number
+}
+
+export function estimateCost(
+  providerId: ProviderId,
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+  cachedInputTokens: number
+): CostEstimate {
+  if (CLI_FREE.has(providerId)) return { usd: null, cents: 0 }
+  const price = PRICES[model]
+  if (!price) return { usd: '—', cents: 0 }
+  const billableInput = Math.max(0, inputTokens - cachedInputTokens)
+  const inputCost = (billableInput / 1_000_000) * price.input
+  const cachedCost = price.cached ? (cachedInputTokens / 1_000_000) * price.cached : 0
+  const outputCost = (outputTokens / 1_000_000) * price.output
+  const total = inputCost + cachedCost + outputCost
+  const cents = Math.round(total * 100)
+  let usd: string
+  if (total < 0.01) usd = '<$0.01'
+  else if (total < 1) usd = '$' + total.toFixed(2)
+  else if (total < 100) usd = '$' + total.toFixed(2)
+  else usd = '$' + total.toFixed(0)
+  return { usd, cents }
+}
