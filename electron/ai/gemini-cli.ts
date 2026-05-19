@@ -8,6 +8,7 @@ interface GeminiCliOptions {
   binary?: string  // override path for testing
   cwd?: string
   model?: string
+  signal?: AbortSignal
 }
 
 function findBinary(): string {
@@ -72,6 +73,13 @@ export function createGeminiCliProvider(opts: GeminiCliOptions = {}): ChatProvid
         return
       }
 
+      // Allow the caller to abort by killing the subprocess.
+      let abortListener: (() => void) | null = null
+      if (opts.signal) {
+        abortListener = () => { try { child.kill() } catch { /* noop */ } }
+        opts.signal.addEventListener('abort', abortListener, { once: true })
+      }
+
       let stdoutBuffer = ''
       let stderrBuffer = ''
       const events: ChatEvent[] = []
@@ -128,6 +136,7 @@ export function createGeminiCliProvider(opts: GeminiCliOptions = {}): ChatProvid
         wake()
       })
 
+      try {
       while (!done || events.length > 0) {
         if (events.length === 0) {
           await new Promise<void>(r => { resolve = r })
@@ -138,6 +147,11 @@ export function createGeminiCliProvider(opts: GeminiCliOptions = {}): ChatProvid
         if (ev.type === 'done' || ev.type === 'error') {
           try { child.kill() } catch { /* already exited */ }
           return
+        }
+      }
+      } finally {
+        if (opts.signal && abortListener) {
+          try { opts.signal.removeEventListener('abort', abortListener) } catch { /* noop */ }
         }
       }
     }

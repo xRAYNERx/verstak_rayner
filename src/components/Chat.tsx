@@ -52,6 +52,7 @@ export function Chat({ onOpenSettings }: ChatProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const screenshotCounter = useRef(0)
   const warningTimer = useRef<number | null>(null)
+  const currentSendIdRef = useRef<number | null>(null)
 
   function flashWarning(msg: string) {
     setWarning(msg)
@@ -239,7 +240,15 @@ export function Chat({ onOpenSettings }: ChatProps) {
     addMessage({ role: 'assistant', content: '' })
     setStreaming(true)
     const allMessages = [...useProject.getState().messages].slice(0, -1)
-    await window.api.ai.send(allMessages, path)
+    const sendId = await window.api.ai.send(allMessages, path)
+    currentSendIdRef.current = sendId
+  }
+
+  async function stop() {
+    const id = currentSendIdRef.current
+    if (id == null) return
+    await window.api.ai.stop(id)
+    setStreaming(false)
   }
 
   const hasMessages = messages.length > 0
@@ -276,6 +285,9 @@ export function Chat({ onOpenSettings }: ChatProps) {
           const isStreamingAssistant = isLast && m.role === 'assistant' && isStreaming
           // Render activity rows just before the (last) assistant message
           const showActivity = isLast && m.role === 'assistant' && activity.length > 0
+          const changedFiles = isLast && m.role === 'assistant' && !isStreaming
+            ? activity.filter(a => a.kind === 'write' && a.status === 'ok').map(a => a.detail ?? '')
+            : []
           return (
             <div key={i} className={`gg-msg ${m.role === 'user' ? 'gg-msg-user' : 'gg-msg-assistant'}`}>
               {showActivity && (
@@ -295,6 +307,14 @@ export function Chat({ onOpenSettings }: ChatProps) {
                 </div>
               )}
               <div className="gg-msg-bubble">
+                {changedFiles.length > 0 && (
+                  <div className="gg-changed-files">
+                    <div className="gg-changed-files-title">✓ Изменены файлы ({changedFiles.length})</div>
+                    {changedFiles.map((f, ci) => (
+                      <div key={ci} className="gg-changed-files-row">{f}</div>
+                    ))}
+                  </div>
+                )}
                 {m.attachments?.length ? (
                   <div className="gg-msg-attachments">
                     {m.attachments.map((a, ai) => (
@@ -338,9 +358,12 @@ export function Chat({ onOpenSettings }: ChatProps) {
                 e.preventDefault()
                 void send()
               }
+              if (e.key === 'Escape' && isStreaming) {
+                e.preventDefault()
+                void stop()
+              }
             }}
-            placeholder={isStreaming ? 'Gemini отвечает…' : 'Опиши задачу. Enter — отправить, Shift+Enter — новая строка. Ctrl+V — вставить скриншот.'}
-            disabled={isStreaming}
+            placeholder={isStreaming ? 'Gemini отвечает… (Esc — остановить)' : 'Опиши задачу. Enter — отправить, Shift+Enter — новая строка. Ctrl+V — вставить скриншот.'}
           />
           <div className="gg-composer-actions">
             <button
@@ -355,16 +378,28 @@ export function Chat({ onOpenSettings }: ChatProps) {
                 <path d="m21.44 11.05 -9.19 9.19a6 6 0 0 1 -8.49 -8.49l9.19 -9.19a4 4 0 0 1 5.66 5.66L9.41 17.41a2 2 0 0 1 -2.83 -2.83l8.49 -8.48" />
               </svg>
             </button>
-            <button
-              className="gg-send-btn"
-              onClick={() => void send()}
-              disabled={!canSend}
-              title="Отправить (Enter)"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12l14 -8l-4 16l-4 -6l-6 -2z" />
-              </svg>
-            </button>
+            {isStreaming ? (
+              <button
+                className="gg-send-btn gg-stop-btn"
+                onClick={() => void stop()}
+                title="Остановить (Esc)"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="6" width="12" height="12" rx="1.5" />
+                </svg>
+              </button>
+            ) : (
+              <button
+                className="gg-send-btn"
+                onClick={() => void send()}
+                disabled={!canSend}
+                title="Отправить (Enter)"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12l14 -8l-4 16l-4 -6l-6 -2z" />
+                </svg>
+              </button>
+            )}
           </div>
           <input
             ref={fileInputRef}

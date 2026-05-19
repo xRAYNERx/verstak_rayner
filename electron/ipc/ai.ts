@@ -12,6 +12,7 @@ interface AiDeps {
 }
 
 let currentSendId = 0
+const activeAborts = new Map<number, AbortController>()
 
 interface PendingWrite {
   resolve: (accept: boolean) => void
@@ -27,10 +28,13 @@ export function registerAiIpc(deps: AiDeps): void {
   ipcMain.handle('ai:send', async (e, messages: ChatMessage[], projectPath: string | null) => {
     const providerId = deps.getProviderId()
     const sendId = ++currentSendId
+    const ctrl = new AbortController()
+    activeAborts.set(sendId, ctrl)
+    const cleanup = () => { activeAborts.delete(sendId) }
 
     if (providerId === 'gemini-cli') {
-      const provider = createGeminiCliProvider({ cwd: projectPath ?? process.cwd() })
-      void runCliConversation(e.sender, sendId, provider, messages)
+      const provider = createGeminiCliProvider({ cwd: projectPath ?? process.cwd(), signal: ctrl.signal })
+      void runCliConversation(e.sender, sendId, provider, messages, ctrl.signal).finally(cleanup)
       return sendId
     }
 
@@ -38,12 +42,24 @@ export function registerAiIpc(deps: AiDeps): void {
     const apiKey = deps.getApiKey()
     if (!apiKey) {
       e.sender.send('ai:event', { id: 0, event: { type: 'error', message: 'API ключ Gemini не задан. Открой настройки и вставь ключ или переключись на режим CLI (подписка).' } })
+      cleanup()
       return 0
     }
     const provider = createGeminiProvider({ apiKey })
     const tools = projectPath ? createFileTools(projectPath) : null
-    void runApiConversation(e.sender, sendId, provider, tools, projectPath, messages)
+    void runApiConversation(e.sender, sendId, provider, tools, projectPath, messages, ctrl.signal).finally(cleanup)
     return sendId
+  })
+
+  ipcMain.handle('ai:stop', (_e, sendId: number) => {
+    const ctrl = activeAborts.get(sendId)
+    if (!ctrl) return false
+    ctrl.abort()
+    activeAborts.delete(sendId)
+    // Auto-resolve any pending confirmations so the waiting promises don't dangle
+    for (const [k, p] of pendingWrites) { p.resolve(false); pendingWrites.delete(k) }
+    for (const [k, p] of pendingCommands) { p.resolve(false); pendingCommands.delete(k) }
+    return true
   })
 
   ipcMain.handle('ai:resolve-write', (_e, callId: string, accept: boolean) => {
@@ -67,9 +83,14 @@ async function runCliConversation(
   sender: Electron.WebContents,
   sendId: number,
   provider: ChatProvider,
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  signal: AbortSignal
 ): Promise<void> {
   for await (const event of provider.send(messages, [])) {
+    if (signal.aborted) {
+      sender.send('ai:event', { id: sendId, event: { type: 'done' } })
+      return
+    }
     sender.send('ai:event', { id: sendId, event })
     if (event.type === 'done' || event.type === 'error') return
   }
@@ -82,14 +103,23 @@ async function runApiConversation(
   provider: ChatProvider,
   tools: ReturnType<typeof createFileTools> | null,
   projectPath: string | null,
-  initialMessages: ChatMessage[]
+  initialMessages: ChatMessage[],
+  signal: AbortSignal
 ): Promise<void> {
   const currentMessages = [...initialMessages]
   const maxTurns = 5
   for (let turn = 0; turn < maxTurns; turn++) {
+    if (signal.aborted) {
+      sender.send('ai:event', { id: sendId, event: { type: 'done' } })
+      return
+    }
     const toolCalls: ToolCall[] = []
     let assistantText = ''
     for await (const event of provider.send(currentMessages, tools ? TOOL_DEFS : [])) {
+      if (signal.aborted) {
+        sender.send('ai:event', { id: sendId, event: { type: 'done' } })
+        return
+      }
       if (event.type === 'text') {
         assistantText += event.text
         sender.send('ai:event', { id: sendId, event })

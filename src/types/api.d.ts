@@ -31,6 +31,7 @@ declare global {
         send: (messages: ChatMessage[], projectPath: string | null) => Promise<number>
         resolveWrite: (callId: string, accept: boolean) => Promise<void>
         resolveCommand: (callId: string, accept: boolean) => Promise<void>
+        stop: (sendId: number) => Promise<boolean>
         onEvent: (cb: (data: { id: number; event: ChatEvent }) => void) => () => void
       }
       chats: {
