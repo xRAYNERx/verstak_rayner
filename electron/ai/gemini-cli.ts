@@ -40,10 +40,18 @@ export function createGeminiCliProvider(opts: GeminiCliOptions = {}): ChatProvid
     models: ['auto'],
 
     async *send(messages: ChatMessage[], _tools: ToolDefinition[], _results?: ToolResult[]): AsyncIterable<ChatEvent> {
-      const userMessage = messages.filter(m => m.role === 'user').at(-1)?.content
-      if (!userMessage) {
+      const lastUser = messages.filter(m => m.role === 'user').at(-1)
+      if (!lastUser) {
         yield { type: 'error', message: 'Нет user-сообщения для отправки' }
         return
+      }
+      let userMessage = lastUser.content
+      // CLI mode can't accept inline images; mention attachments so the user knows
+      if (lastUser.attachments?.length) {
+        const note = lastUser.attachments
+          .map(a => `[прикреплён файл: ${a.name} (${a.mimeType})]`)
+          .join('\n')
+        userMessage = userMessage ? `${userMessage}\n\n${note}` : note
       }
 
       const args = ['--output-format', 'stream-json']

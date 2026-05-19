@@ -20,10 +20,21 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
     models: MODELS,
 
     async *send(messages: ChatMessage[], tools: ToolDefinition[], _toolResults?: ToolResult[]): AsyncIterable<ChatEvent> {
-      const contents = messages.map(m => ({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.content }]
-      }))
+      const contents = messages.map(m => {
+        const parts: Array<Record<string, unknown>> = []
+        if (m.content) parts.push({ text: m.content })
+        if (m.attachments?.length) {
+          for (const att of m.attachments) {
+            parts.push({ inlineData: { mimeType: att.mimeType, data: att.data } })
+          }
+        }
+        // Gemini requires at least one part per content block
+        if (parts.length === 0) parts.push({ text: '' })
+        return {
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts
+        }
+      })
 
       const config = tools.length > 0 ? {
         tools: [{ functionDeclarations: tools.map(t => ({

@@ -1,8 +1,20 @@
 export type Role = 'user' | 'assistant' | 'system'
 
+export interface Attachment {
+  /** Display name (file name or auto-generated like "Скриншот 1.png") */
+  name: string
+  /** MIME type, e.g. "image/png", "application/pdf", "text/plain" */
+  mimeType: string
+  /** Base64-encoded raw bytes (without data:URL prefix) */
+  data: string
+  /** Decoded byte size, for UI display */
+  size: number
+}
+
 export interface ChatMessage {
   role: Role
   content: string
+  attachments?: Attachment[]
 }
 
 export interface ToolCall {

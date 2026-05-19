@@ -1,5 +1,6 @@
 export interface FileNode { name: string; path: string; isDirectory: boolean; children?: FileNode[] }
-export interface ChatMessage { role: 'user' | 'assistant' | 'system'; content: string }
+export interface Attachment { name: string; mimeType: string; data: string; size: number }
+export interface ChatMessage { role: 'user' | 'assistant' | 'system'; content: string; attachments?: Attachment[] }
 export interface StoredChatMessage { id: number; role: 'user' | 'assistant' | 'system'; content: string; createdAt: number }
 export interface ToolCall { id: string; name: string; args: Record<string, unknown> }
 export type ChatEvent =
