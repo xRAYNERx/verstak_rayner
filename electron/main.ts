@@ -13,10 +13,14 @@ import { createSettings } from './storage/settings'
 import { createChats } from './storage/chats'
 
 function createWindow(): void {
+  // In dev: __dirname is out/main; in prod packaged build the path resolves the same way
+  // because we copy `resources/` next to the build output.
+  const iconPath = join(__dirname, '../../resources/icon.png')
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
     title: 'GeminiGrok',
+    icon: iconPath,
     webPreferences: {
       preload: join(__dirname, '../preload/preload.mjs'),
       sandbox: false
@@ -28,6 +32,12 @@ function createWindow(): void {
   } else {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
+}
+
+// Tell Windows this is its own application so the taskbar uses our icon
+// (and not the generic Electron / Node icon).
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.pavelfrolof.geminigrok')
 }
 
 app.whenReady().then(() => {
