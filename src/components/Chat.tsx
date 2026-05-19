@@ -93,8 +93,14 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
   }
 
   useEffect(() => {
-    const off = window.api.ai.onEvent(({ event }) => {
+    const off = window.api.ai.onEvent(({ event, projectPath }) => {
       const store = useProject.getState()
+      // Route background-project events to the snapshot store so they don't
+      // mutate the currently-visible session.
+      if (projectPath && projectPath !== store.path) {
+        store.applyEventToSession(projectPath, event as unknown as { type: string; [k: string]: unknown })
+        return
+      }
       if (event.type === 'text') updateLastAssistant(event.text)
       else if (event.type === 'pending-write') {
         store.addPendingWrite({
