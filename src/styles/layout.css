@@ -251,6 +251,88 @@
   border-radius: 999px;
 }
 
+/* Chat nav section (collapsible list of chat sessions) */
+.gg-chat-nav-head {
+  display: flex; align-items: center; gap: 2px;
+  padding: 8px 6px 2px;
+}
+.gg-chat-nav-head .gg-nav-item { flex: 1; }
+.gg-chat-nav-toggle,
+.gg-chat-nav-new {
+  width: 24px; height: 24px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.gg-chat-nav-toggle:hover,
+.gg-chat-nav-new:hover { background: var(--bg-hover); color: var(--text-primary); }
+.gg-chat-nav-new { font-size: 16px; line-height: 1; }
+.gg-chat-nav-list {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 2px 6px 6px 18px;
+}
+.gg-chat-nav-item {
+  display: flex; align-items: center; gap: 2px;
+  border-radius: var(--radius-sm);
+}
+.gg-chat-nav-item:hover { background: var(--bg-hover); }
+.gg-chat-nav-item.is-active { background: var(--bg-active); }
+.gg-chat-nav-pick {
+  flex: 1;
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+.gg-chat-nav-item.is-active .gg-chat-nav-pick { color: var(--text-primary); font-weight: 500; }
+.gg-chat-nav-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text-disabled);
+  flex-shrink: 0;
+}
+.gg-chat-nav-item.is-active .gg-chat-nav-dot { background: var(--accent); }
+.gg-chat-nav-title {
+  flex: 1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.gg-chat-nav-x {
+  width: 20px; height: 20px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-disabled);
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 120ms ease;
+}
+.gg-chat-nav-item:hover .gg-chat-nav-x { opacity: 1; }
+.gg-chat-nav-x:hover { background: var(--bg-hover); color: var(--error); }
+.gg-chat-nav-edit {
+  flex: 1;
+  margin: 3px 6px;
+  padding: 3px 6px;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  outline: none;
+}
+
 /* File tree */
 .gg-tree { padding: 0 6px; }
 

@@ -4,6 +4,115 @@ import { useProvider } from '../hooks/useProvider'
 import type { FileNode } from '../types/api'
 import iconUrl from '../assets/icon.png'
 
+function ChatNavSection() {
+  const { chatSessions, activeChatId, activeView, setActiveView, switchChatSession, newChatSession, refreshChatSessions } = useProject()
+  const [open, setOpen] = useState(true)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+
+  const isActiveSection = activeView === 'chat'
+
+  async function startEdit(id: number, currentTitle: string) {
+    setEditingId(id)
+    setEditTitle(currentTitle)
+  }
+  async function commitEdit() {
+    if (editingId == null) return
+    const t = editTitle.trim()
+    if (t) await window.api.chatSessions.rename(editingId, t)
+    setEditingId(null)
+    setEditTitle('')
+    await refreshChatSessions()
+  }
+  async function removeSession(id: number) {
+    if (!window.confirm('Удалить этот чат и все его сообщения?')) return
+    await window.api.chatSessions.remove(id)
+    await refreshChatSessions()
+    // If we deleted the active one, switch to the most recent remaining or create a new one
+    const fresh = useProject.getState().chatSessions
+    if (fresh.length > 0) {
+      await switchChatSession(fresh[0].id)
+    } else {
+      await newChatSession()
+    }
+  }
+
+  return (
+    <>
+      <div className="gg-chat-nav-head">
+        <button
+          className={`gg-nav-item ${isActiveSection ? 'is-active' : ''}`}
+          onClick={() => setActiveView('chat')}
+          style={{ flex: 1 }}
+        >
+          <span className="gg-nav-icon"><ChatIconNode /></span>
+          <span className="gg-nav-label">Chat</span>
+          <span className="gg-nav-badge" style={{ background: 'transparent', border: 'none', color: 'var(--text-tertiary)' }}>
+            {chatSessions.length}
+          </span>
+        </button>
+        <button
+          className="gg-chat-nav-toggle"
+          onClick={() => setOpen(v => !v)}
+          title={open ? 'Свернуть' : 'Развернуть'}
+        >{open ? '▾' : '▸'}</button>
+        <button
+          className="gg-chat-nav-new"
+          onClick={() => void newChatSession()}
+          title="Новый чат"
+        >+</button>
+      </div>
+      {open && (
+        <div className="gg-chat-nav-list">
+          {chatSessions.map(s => (
+            <div
+              key={s.id}
+              className={`gg-chat-nav-item ${s.id === activeChatId && isActiveSection ? 'is-active' : ''}`}
+            >
+              {editingId === s.id ? (
+                <input
+                  autoFocus
+                  className="gg-chat-nav-edit"
+                  value={editTitle}
+                  onChange={e => setEditTitle(e.target.value)}
+                  onBlur={() => void commitEdit()}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') void commitEdit()
+                    if (e.key === 'Escape') { setEditingId(null); setEditTitle('') }
+                  }}
+                />
+              ) : (
+                <button
+                  className="gg-chat-nav-pick"
+                  onClick={() => { void switchChatSession(s.id); setActiveView('chat') }}
+                  onDoubleClick={() => void startEdit(s.id, s.title)}
+                  title={s.title}
+                >
+                  <span className="gg-chat-nav-dot" />
+                  <span className="gg-chat-nav-title">{s.title}</span>
+                </button>
+              )}
+              <button
+                className="gg-chat-nav-x"
+                onClick={() => void removeSession(s.id)}
+                title="Удалить"
+              >×</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
+function ChatIconNode() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+    </svg>
+  )
+}
+
 function FilesSection({ tree }: { tree: FileNode[] }) {
   const [open, setOpen] = useState(false)
   return (
@@ -99,8 +208,9 @@ const FeedbackIcon = (
   </svg>
 )
 
+// Chat is rendered separately above the rest of the nav (expandable section
+// with its own list of chat sessions + create button).
 const NAV: NavItem[] = [
-  { id: 'chat',     label: 'Chat',     icon: ChatIcon },
   { id: 'tasks',    label: 'Tasks',    icon: TasksIcon },
   { id: 'journal',  label: 'Journal',  icon: JournalIcon },
   { id: 'plan',     label: 'Plan',     icon: PlanIcon },
@@ -150,6 +260,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
 
         {path && (
           <>
+            <ChatNavSection />
             <div className="gg-nav">
               {NAV.map(item => (
                 <button
