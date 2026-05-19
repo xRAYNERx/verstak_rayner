@@ -36,6 +36,31 @@ interface RunningPlanStep {
   title: string
 }
 
+interface SessionSnapshot {
+  messages: ChatMessage[]
+  isStreaming: boolean
+  pendingWrites: PendingWrite[]
+  pendingCommand: PendingCommand | null
+  activity: ActivityEntry[]
+  sessionUsage: SessionUsage
+  runningPlanStep: RunningPlanStep | null
+  /** True when bg session got new content since user last viewed it. */
+  hasUnread: boolean
+}
+
+function freshSnapshot(): SessionSnapshot {
+  return {
+    messages: [],
+    isStreaming: false,
+    pendingWrites: [],
+    pendingCommand: null,
+    activity: [],
+    sessionUsage: { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 },
+    runningPlanStep: null,
+    hasUnread: false
+  }
+}
+
 interface ProjectState {
   path: string | null
   tree: FileNode[]
@@ -46,9 +71,10 @@ interface ProjectState {
   activity: ActivityEntry[]
   activeView: ViewId
   sessionUsage: SessionUsage
-  /** Set while a plan step is being executed through chat; cleared on 'done'. */
   runningPlanStep: RunningPlanStep | null
   projectList: ProjectMeta[]
+  /** Per-project session snapshots for backgrounded projects. */
+  sessions: Record<string, SessionSnapshot>
   setProject: (path: string) => Promise<void>
   closeProject: () => void
   refreshProjectList: () => Promise<void>
@@ -67,6 +93,10 @@ interface ProjectState {
   addUsage: (delta: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number }) => void
   resetUsage: () => void
   setRunningPlanStep: (s: RunningPlanStep | null) => void
+  /** Apply an ai:event to a background session (used when projectPath !== current). */
+  applyEventToSession: (projectPath: string, event: { type: string; [k: string]: unknown }) => void
+  /** Mark a session as read (clear the unread badge). */
+  markSessionRead: (projectPath: string) => void
 }
 
 export const useProject = create<ProjectState>((set, get) => ({
@@ -81,21 +111,59 @@ export const useProject = create<ProjectState>((set, get) => ({
   sessionUsage: { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 },
   runningPlanStep: null,
   projectList: [],
+  sessions: {},
   setProject: async (path) => {
+    const s = get()
+    // 1) Snapshot current session before switching (so background streams keep their state)
+    let nextSessions = s.sessions
+    if (s.path && s.path !== path) {
+      nextSessions = {
+        ...s.sessions,
+        [s.path]: {
+          messages: s.messages,
+          isStreaming: s.isStreaming,
+          pendingWrites: s.pendingWrites,
+          pendingCommand: s.pendingCommand,
+          activity: s.activity,
+          sessionUsage: s.sessionUsage,
+          runningPlanStep: s.runningPlanStep,
+          hasUnread: false
+        }
+      }
+    }
+    // 2) Build the target snapshot — either restore from sessions or seed from chat history
     const tree = await window.api.files.tree(path)
-    const history = await window.api.chats.list(path)
     await window.api.projects.setCurrent(path)
     const projectList = await window.api.projects.list()
+    const existing = nextSessions[path]
+    let target: SessionSnapshot
+    if (existing) {
+      // Returning to a backgrounded session — keep its state, clear unread badge
+      target = { ...existing, hasUnread: false }
+      // Remove from sessions map since it becomes the active one
+      const { [path]: _drop, ...rest } = nextSessions
+      void _drop
+      nextSessions = rest
+    } else {
+      const history = await window.api.chats.list(path)
+      target = {
+        ...freshSnapshot(),
+        messages: history.map(m => ({ role: m.role, content: m.content }))
+      }
+    }
     set({
       path,
       tree,
-      messages: history.map(m => ({ role: m.role, content: m.content })),
-      pendingWrites: [],
-      pendingCommand: null,
-      activity: [],
+      messages: target.messages,
+      isStreaming: target.isStreaming,
+      pendingWrites: target.pendingWrites,
+      pendingCommand: target.pendingCommand,
+      activity: target.activity,
+      sessionUsage: target.sessionUsage,
+      runningPlanStep: target.runningPlanStep,
       activeView: 'chat',
       projectList,
-      sessionUsage: { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 }
+      sessions: nextSessions
     })
   },
   closeProject: () => set({
@@ -146,7 +214,54 @@ export const useProject = create<ProjectState>((set, get) => ({
     }
   })),
   resetUsage: () => set({ sessionUsage: { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 } }),
-  setRunningPlanStep: (s) => set({ runningPlanStep: s })
+  setRunningPlanStep: (s) => set({ runningPlanStep: s }),
+  applyEventToSession: (projectPath, event) => set(s => {
+    const existing = s.sessions[projectPath] ?? freshSnapshot()
+    const next = { ...existing, hasUnread: true }
+    const t = event.type
+    if (t === 'text' && typeof event.text === 'string') {
+      const msgs = [...next.messages]
+      const last = msgs[msgs.length - 1]
+      if (last?.role === 'assistant') {
+        msgs[msgs.length - 1] = { ...last, content: last.content + event.text }
+      } else {
+        msgs.push({ role: 'assistant', content: event.text })
+      }
+      next.messages = msgs
+    } else if (t === 'done' || t === 'error') {
+      next.isStreaming = false
+      if (t === 'error' && typeof event.message === 'string') {
+        const msgs = [...next.messages]
+        const last = msgs[msgs.length - 1]
+        if (last?.role === 'assistant') {
+          msgs[msgs.length - 1] = { ...last, content: last.content + `\n\n[Ошибка: ${event.message}]` }
+        }
+        next.messages = msgs
+      }
+    } else if (t === 'pending-write' && typeof event.callId === 'string') {
+      next.pendingWrites = [...next.pendingWrites, {
+        callId: event.callId,
+        path: String(event.path ?? ''),
+        before: String(event.before ?? ''),
+        after: String(event.after ?? '')
+      }]
+    } else if (t === 'pending-command' && typeof event.callId === 'string') {
+      next.pendingCommand = { callId: event.callId, command: String(event.command ?? '') }
+    } else if (t === 'usage' && event.usage && typeof event.usage === 'object') {
+      const u = event.usage as { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number }
+      next.sessionUsage = {
+        inputTokens: next.sessionUsage.inputTokens + (u.inputTokens ?? 0),
+        outputTokens: next.sessionUsage.outputTokens + (u.outputTokens ?? 0),
+        cachedInputTokens: next.sessionUsage.cachedInputTokens + (u.cachedInputTokens ?? 0)
+      }
+    }
+    return { sessions: { ...s.sessions, [projectPath]: next } }
+  }),
+  markSessionRead: (projectPath) => set(s => {
+    const existing = s.sessions[projectPath]
+    if (!existing) return {}
+    return { sessions: { ...s.sessions, [projectPath]: { ...existing, hasUnread: false } } }
+  })
 }))
 
 export type { ActivityEntry, PendingCommand }
