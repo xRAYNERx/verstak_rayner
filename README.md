@@ -1,100 +1,69 @@
-# GeminiGrok
+# GeminiGrok · GGC
 
-Desktop AI coding assistant. Chat-first interface. Bring your own Gemini API key.
+**G**emini · **G**rok · **C**laude — desktop AI coding assistant that talks to all three (plus ChatGPT/Codex) through one interface. Chat-first, project-aware, runs on your own keys or your existing subscriptions.
 
-## What this is
+## Why
 
-A simple, clean alternative to Cursor/ClawCode. You open a project folder, chat with Gemini about it, AI reads files and proposes edits with diff-review. No subscription required — uses your own Gemini API key from Google AI Studio.
+A clean alternative to Cursor / ClawCode / Antigravity. Open a project folder, pick a provider, ask. Tools (file read/write, terminal, project search) work on any of the 4 API providers. Subscription CLIs run as subprocess so you don't pay per-token if you already pay flat.
+
+## Providers (8)
+
+| Brand   | API (own key)              | CLI (your subscription)            |
+| ------- | -------------------------- | ---------------------------------- |
+| Gemini  | ✓ with tools               | ✓ Gemini Ultra (`gemini` CLI)      |
+| Claude  | ✓ with tools               | ✓ Pro / Max (`claude` CLI)         |
+| Grok    | ✓ with tools               | ✓ SuperGrok (`grok` CLI)           |
+| ChatGPT | ✓ with tools               | ✓ Plus / Pro (`codex` CLI)         |
+
+Switch in the chat composer's model picker. Each provider has its own list of models (Sonnet 4.5 / Opus 4.5, GPT-5 / o3, grok-4 / grok-code-fast-1, gemini-2.5-pro / 3-flash-preview, …).
+
+## Features
+
+- **Multi-project rail.** Sidebar holds all opened folders, click to switch. Last project auto-opens on startup.
+- **Per-project views.** Chat / Tasks / Journal / Plan (others stubbed).
+- **Plan mode.** AI generates structured plans via the `create_plan` tool; you run steps one-by-one or "▶▶ Все шаги".
+- **Tools across API providers.** read_file, list_directory, write_file (with diff confirm), run_command (with confirm + denylist), search_project (ripgrep), find_files.
+- **Multi-file diff.** When AI writes 2+ files in one turn, all confirmations land in a single modal with a file rail.
+- **Undo stack.** Every accepted write is recorded; "↶ N" button in the composer reverts the most recent.
+- **Loop detection.** Same tool+args called 3× → break with supervisor message; max 8 turns per send.
+- **Token counter.** "↑2.1k · ↓0.8k" in the composer, per project session.
+- **Project journal.** User messages, tool actions, blocked commands, plans — all logged.
+- **System layer.** Immutable agent protocols (7-step cycle, scope discipline, verification) baked into the build. User extends via `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` / `.geminigrok/RULES.md` in the project root.
+- **Dark / light theme.** Toggle in Settings.
 
 ## Setup
 
-1. Install dependencies:
-   ```bash
-   npm install --legacy-peer-deps
-   ```
+```bash
+npm install --legacy-peer-deps
+npm run electron-rebuild   # one-time: build native modules (better-sqlite3, node-pty) for Electron
+npm run dev
+```
 
-2. Rebuild native modules for Electron:
-   ```bash
-   npm run electron-rebuild
-   ```
+Then click ⚙ → pick provider → paste API key (or use a CLI provider if its binary is on your PATH and logged in).
 
-3. Run dev:
-   ```bash
-   npm run dev
-   ```
+### CLI subscription providers
 
-4. In the app: click ⚙ → paste your Gemini API key (get one free at https://aistudio.google.com → Get API key)
-
-## MVP Acceptance Criteria
-
-- [ ] Open a project folder → file tree appears in sidebar
-- [ ] Ask "describe this project" → Gemini reads files and answers
-- [ ] Ask "add Setup section to README" → diff modal → accept → file changes
-- [ ] Ask "run npm test" → command executes, AI sees the output
-- [ ] Close and re-open app → chat history is preserved per project
+- **Gemini Ultra:** `npm i -g @google/gemini-cli` → `gemini` (OAuth Google account)
+- **Claude Code:** `irm https://claude.ai/install.ps1 | iex` (or curl on macOS/Linux) → `claude` once
+- **Grok Build:** installer from grok.com/build → `grok` once
+- **Codex:** `npm i -g @openai/codex` → `codex login`
 
 ## Stack
 
-- Electron + Vite + React + TypeScript
-- better-sqlite3 — local storage (settings, chat history)
-- @google/genai — Gemini SDK
-- node-pty + xterm.js — built-in terminal
-- Zustand — state management
+Electron · Vite · React · TypeScript · better-sqlite3 · @google/genai · @anthropic-ai/sdk · openai · node-pty · xterm · highlight.js · Zustand · Geist Sans/Mono.
 
-## Architecture
+## Scripts
 
-```
-electron/
-├── main.ts           # Electron main process, window, bootstrap
-├── preload.ts        # contextBridge → window.api
-├── ai/
-│   ├── types.ts      # ChatProvider interface
-│   ├── gemini.ts     # @google/genai implementation
-│   └── tools.ts      # File tools (read/list/write/run_command)
-├── ipc/              # IPC handlers (projects/files/settings/ai/chats/terminal)
-└── storage/
-    ├── db.ts         # SQLite open
-    ├── settings.ts   # Encrypted secrets (safeStorage)
-    └── chats.ts      # Per-project message history
+| Command | Does |
+| --- | --- |
+| `npm run dev` | Auto-rebuilds native modules for Electron, starts dev (HMR) |
+| `npm run build` | Production bundle into `out/` |
+| `npm test` | Rebuilds native modules for Node, runs Vitest |
+| `npm run test:fast` | Skips rebuild — only use when bindings are correct |
+| `npm run type` | `tsc --noEmit` |
 
-src/                   # React renderer
-├── App.tsx           # Layout
-├── components/       # Sidebar, Chat, DiffView, Terminal, Settings
-├── store/            # Zustand state
-└── types/api.d.ts    # window.api types
-```
+## Status
 
-## Tests
+MVP that's daily-driven. Working: 8 providers, multi-project, full agent loop on 4 APIs, plans with execution, attachments (paste/drop/picker), terminal, theme toggle. Pending: background agents, project context indexing, multi-chat per project, packaged installer.
 
-```bash
-npm test
-```
-
-**Note:** native modules (better-sqlite3) are rebuilt for Electron after running `electron-rebuild`. To run Vitest, you need them built for plain node. If tests fail with `Error: was compiled against a different Node.js version`, run:
-
-```bash
-npm install --legacy-peer-deps  # restores node binaries
-npm test                         # passes
-npm run electron-rebuild         # rebuilds for Electron when ready to run dev
-```
-
-A cleaner future fix is to use `electron-forge` or `electron-builder` with the `nativeRebuild` step gated to packaging time.
-
-### Electron version pin
-
-The project pins Electron to `^40.x` (ABI 143). Newer Electron (42+, ABI 146) currently has no prebuilt binaries for `better-sqlite3@12.x` and won't build from source on Windows/MSVC due to a `__builtin_frame_address` mismatch in Electron's cppgc headers. Stay on Electron 40 until upstream prebuilds catch up.
-
-`node-pty` ships generic N-API prebuilds that work across Node and Electron — it does not need an electron-rebuild step.
-
-## Status — MVP v0.1
-
-- ✅ Single model: Gemini 2.5 Pro
-- ✅ Chat-first interface
-- ✅ File tools with diff confirmation
-- ✅ Built-in terminal
-- ✅ Chat history per project
-- ⏳ Multi-model (Claude, GPT) — deferred to v0.2
-- ⏳ Distributable installer — deferred to v0.2
-- ⏳ Monaco inline editor — deferred to v0.3
-
-See `docs/superpowers/specs/2026-05-19-geminigrok-design.md` for the full design.
+See `docs/dev-journal.md` for the full history.
