@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent, type ClipboardEvent } from 'react'
 import { useProject } from '../store/projectStore'
+import { useProvider } from '../hooks/useProvider'
 import { Markdown } from './Markdown'
 import { ModelPicker } from './ModelPicker'
 import type { Attachment } from '../types/api'
@@ -45,6 +46,7 @@ async function blobToAttachment(blob: Blob, fallbackName: string): Promise<Attac
 
 export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatProps) {
   const { messages, addMessage, updateLastAssistant, isStreaming, setStreaming, activity } = useProject()
+  const provider = useProvider()
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [dragOver, setDragOver] = useState(false)
@@ -322,7 +324,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
               )}
               {m.role === 'assistant' && (
                 <div className="gg-msg-meta">
-                  <span className="gg-msg-author">Gemini</span>
+                  <span className="gg-msg-author">{provider.label}</span>
                 </div>
               )}
               <div className="gg-msg-bubble">
