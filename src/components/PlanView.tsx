@@ -65,6 +65,40 @@ export function PlanView() {
     await refresh()
   }
 
+  /** Polls store until the current runningPlanStep is cleared (i.e. AI emitted 'done'). */
+  function waitForStepCompletion(stepId: number): Promise<void> {
+    return new Promise(resolve => {
+      const tick = () => {
+        const running = useProject.getState().runningPlanStep
+        const streaming = useProject.getState().isStreaming
+        if (running?.stepId !== stepId && !streaming) { resolve(); return }
+        setTimeout(tick, 400)
+      }
+      tick()
+    })
+  }
+
+  async function runAll(plan: Plan) {
+    if (!path || isStreaming) return
+    // Snapshot the pending steps in order so we don't re-pick a step that was just done
+    const queue = plan.steps.filter(s => s.status === 'pending' || s.status === 'failed').map(s => s.id)
+    for (const stepId of queue) {
+      // Re-fetch the latest plan in case user manually toggled something
+      const fresh = await window.api.plans.get(plan.id)
+      if (!fresh) break
+      const step = fresh.steps.find(s => s.id === stepId)
+      if (!step) continue
+      if (step.status !== 'pending' && step.status !== 'failed') continue
+      await runStep(fresh, step)
+      await waitForStepCompletion(stepId)
+      await refresh()
+      // Abort if user cancelled or step failed
+      const updated = await window.api.plans.get(plan.id)
+      const final = updated?.steps.find(s => s.id === stepId)
+      if (!final || final.status === 'failed') break
+    }
+  }
+
   async function runStep(plan: Plan, step: PlanStep) {
     if (!path || isStreaming) return
     // 1) DB: mark step running
@@ -161,6 +195,16 @@ ${remaining || '— нет —'}
                   <div className="gg-plan-detail-meta">
                     {doneCount} / {totalCount} шагов · {active.status}
                   </div>
+                  {active.steps.some(s => s.status === 'pending' || s.status === 'failed') && (
+                    <button
+                      className="gg-btn gg-btn-primary"
+                      onClick={() => void runAll(active)}
+                      disabled={isStreaming}
+                      title="Запустить все pending-шаги по очереди"
+                    >
+                      ▶▶ Все шаги
+                    </button>
+                  )}
                   <button className="gg-btn gg-btn-ghost gg-btn-danger" onClick={() => void removePlan(active.id)}>Удалить</button>
                 </div>
                 <div className="gg-plan-steps">
