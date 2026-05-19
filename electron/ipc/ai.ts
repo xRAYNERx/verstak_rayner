@@ -231,14 +231,18 @@ async function runApiConversation(
       return
     }
 
-    const toolResults: ToolResult[] = []
-    for (const call of toolCalls) {
+    const toolResults: ToolResult[] = new Array(toolCalls.length)
+    const writePromises: Array<{ idx: number; promise: Promise<ToolResult> }> = []
+    for (let i = 0; i < toolCalls.length; i++) {
+      const call = toolCalls[i]
       if (call.name === 'write_file') {
-        toolResults.push(await handleWriteFile(sender, sendId, tools, call, projectPath, recordWrite))
+        // Fire pending-write event immediately and queue the resolve promise.
+        // The renderer will accumulate all pending writes into one multi-file modal.
+        writePromises.push({ idx: i, promise: handleWriteFile(sender, sendId, tools, call, projectPath, recordWrite) })
         continue
       }
       if (call.name === 'run_command') {
-        toolResults.push(await handleRunCommand(sender, sendId, tools, call))
+        toolResults[i] = await handleRunCommand(sender, sendId, tools, call)
         continue
       }
       if (call.name === 'create_plan') {
@@ -255,28 +259,33 @@ async function runApiConversation(
             }))
             .filter(s => s.title.length > 0)
           if (steps.length === 0) {
-            toolResults.push({ id: call.id, name: call.name, result: '', error: 'create_plan: пустой список шагов' })
+            toolResults[i] = { id: call.id, name: call.name, result: '', error: 'create_plan: пустой список шагов' }
           } else {
             const plan = recordPlan(projectPath, title, steps)
             sender.send('ai:event', { id: sendId, event: { type: 'plan-created', planId: plan.id, title, stepCount: steps.length } })
-            toolResults.push({ id: call.id, name: call.name, result: `Plan #${plan.id} created with ${steps.length} steps. User will execute/confirm in the Plan view.` })
+            toolResults[i] = { id: call.id, name: call.name, result: `Plan #${plan.id} created with ${steps.length} steps. User will execute/confirm in the Plan view.` }
           }
         } catch (err) {
-          toolResults.push({ id: call.id, name: call.name, result: '', error: err instanceof Error ? err.message : String(err) })
+          toolResults[i] = { id: call.id, name: call.name, result: '', error: err instanceof Error ? err.message : String(err) }
         }
         continue
       }
       try {
         const result = await tools.execute(call.name, call.args)
-        toolResults.push({ id: call.id, name: call.name, result })
+        toolResults[i] = { id: call.id, name: call.name, result }
       } catch (err) {
-        toolResults.push({
+        toolResults[i] = {
           id: call.id,
           name: call.name,
           result: '',
           error: err instanceof Error ? err.message : String(err)
-        })
+        }
       }
+    }
+    // All non-write tools finished. Now wait for user to resolve every pending write
+    // (multi-file modal accumulates them on the renderer side).
+    for (const { idx, promise } of writePromises) {
+      toolResults[idx] = await promise
     }
     currentMessages.push({ role: 'user', content: '', toolResults })
   }
