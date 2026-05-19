@@ -9,9 +9,12 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "test": "vitest run",
+    "test": "npm run rebuild:node && vitest run",
+    "test:fast": "vitest run",
     "type": "tsc --noEmit",
-    "electron-rebuild": "electron-rebuild -f -o better-sqlite3"
+    "rebuild:node": "npm rebuild better-sqlite3 --runtime=node --update-binary",
+    "electron-rebuild": "electron-rebuild -f -o better-sqlite3",
+    "predev": "npm run electron-rebuild"
   },
   "keywords": [],
   "author": "",
