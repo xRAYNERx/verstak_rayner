@@ -6,6 +6,10 @@ export interface Task { id: number; text: string; done: boolean; createdAt: numb
 export type JournalKind = 'manual' | 'session' | 'tool' | 'note'
 export interface JournalEntry { id: number; kind: JournalKind; title: string; detail: string | null; createdAt: number }
 export interface UndoEntry { id: number; filePath: string; beforeContent: string | null; afterContent: string | null; createdAt: number }
+export type PlanStatus = 'draft' | 'running' | 'done' | 'cancelled'
+export type StepStatus = 'pending' | 'running' | 'done' | 'skipped' | 'failed'
+export interface PlanStep { id: number; planId: number; idx: number; title: string; detail: string | null; status: StepStatus; result: string | null }
+export interface Plan { id: number; title: string; status: PlanStatus; createdAt: number; completedAt: number | null; steps: PlanStep[] }
 export interface ProjectMeta { path: string; name: string; color: string; lastOpenedAt: number }
 export interface ToolCall { id: string; name: string; args: Record<string, unknown> }
 export interface UsageDelta {
@@ -72,6 +76,14 @@ declare global {
         count: (projectPath: string) => Promise<number>
         clear: (projectPath: string) => Promise<number>
         revert: (projectPath: string, id?: number) => Promise<{ ok: boolean; filePath?: string; reason?: string }>
+      }
+      plans: {
+        list: (projectPath: string) => Promise<Plan[]>
+        get: (id: number) => Promise<Plan | null>
+        create: (projectPath: string, title: string, steps: Array<{ title: string; detail?: string | null }>) => Promise<Plan>
+        setStatus: (id: number, status: PlanStatus) => Promise<void>
+        updateStep: (id: number, patch: { status?: StepStatus; result?: string | null }) => Promise<void>
+        remove: (id: number) => Promise<void>
       }
       term: {
         spawn: (cwd: string) => Promise<number>

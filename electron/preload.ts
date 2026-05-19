@@ -55,6 +55,16 @@ contextBridge.exposeInMainWorld('api', {
     clear: (projectPath: string) => ipcRenderer.invoke('undo:clear', projectPath),
     revert: (projectPath: string, id?: number) => ipcRenderer.invoke('undo:revert', projectPath, id)
   },
+  plans: {
+    list: (projectPath: string) => ipcRenderer.invoke('plans:list', projectPath),
+    get: (id: number) => ipcRenderer.invoke('plans:get', id),
+    create: (projectPath: string, title: string, steps: Array<{ title: string; detail?: string | null }>) =>
+      ipcRenderer.invoke('plans:create', projectPath, title, steps),
+    setStatus: (id: number, status: string) => ipcRenderer.invoke('plans:set-status', id, status),
+    updateStep: (id: number, patch: { status?: string; result?: string | null }) =>
+      ipcRenderer.invoke('plans:update-step', id, patch),
+    remove: (id: number) => ipcRenderer.invoke('plans:remove', id)
+  },
   term: {
     spawn: (cwd: string) => ipcRenderer.invoke('term:spawn', cwd) as Promise<number>,
     write: (id: number, data: string) => ipcRenderer.invoke('term:write', id, data),
