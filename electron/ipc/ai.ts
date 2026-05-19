@@ -1,6 +1,8 @@
 import { ipcMain } from 'electron'
 import { createFileTools, TOOL_DEFS } from '../ai/tools'
 import { createProvider, PROVIDERS, type ProviderId } from '../ai/registry'
+import { loadUserLayer } from '../ai/user-layer'
+import { composeSystemPrompt } from '../ai/compose-prompt'
 import type { ChatMessage, ToolCall, ToolResult, ChatProvider } from '../ai/types'
 
 export type { ProviderId } from '../ai/registry'
@@ -28,6 +30,18 @@ export function registerAiIpc(deps: AiDeps): void {
     const ctrl = new AbortController()
     activeAborts.set(sendId, ctrl)
     const cleanup = () => { activeAborts.delete(sendId) }
+
+    // Load project's user-layer (AGENTS.md / CLAUDE.md / GEMINI.md / our RULES.md)
+    // and prepend the immutable system layer + user layer as a single system message.
+    // CLI providers run their own agent inside, so we don't inject for them — the
+    // user's AGENTS.md is already picked up by Claude Code / Codex / Grok Build natively.
+    const injectSystem = descriptor.transport === 'API'
+    let messagesWithSystem = messages
+    if (injectSystem) {
+      const userLayer = await loadUserLayer(projectPath)
+      const composed = composeSystemPrompt(userLayer)
+      messagesWithSystem = [{ role: 'system', content: composed.system }, ...messages]
+    }
 
     // Resolve API key (or null for CLI)
     const apiKey = descriptor.secretKey ? deps.getSecret(descriptor.secretKey) : null
@@ -63,9 +77,9 @@ export function registerAiIpc(deps: AiDeps): void {
 
     if (descriptor.supportsTools && projectPath) {
       const tools = createFileTools(projectPath)
-      void runApiConversation(e.sender, sendId, provider, tools, projectPath, messages, ctrl.signal).finally(cleanup)
+      void runApiConversation(e.sender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal).finally(cleanup)
     } else {
-      void runPlainConversation(e.sender, sendId, provider, messages, ctrl.signal).finally(cleanup)
+      void runPlainConversation(e.sender, sendId, provider, messagesWithSystem, ctrl.signal).finally(cleanup)
     }
     return sendId
   })

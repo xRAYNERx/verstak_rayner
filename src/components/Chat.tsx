@@ -3,6 +3,7 @@ import { useProject } from '../store/projectStore'
 import { useProvider } from '../hooks/useProvider'
 import { Markdown } from './Markdown'
 import { ModelPicker } from './ModelPicker'
+import { SystemLayerBadge } from './SystemLayerBadge'
 import type { Attachment } from '../types/api'
 import iconUrl from '../assets/icon.png'
 
@@ -15,6 +16,7 @@ interface ChatProps {
   onOpenSettings: () => void
   onToggleTerminal: () => void
   terminalOpen: boolean
+  onOpenSystemLayer: () => void
 }
 
 function formatSize(bytes: number): string {
@@ -44,7 +46,7 @@ async function blobToAttachment(blob: Blob, fallbackName: string): Promise<Attac
   }
 }
 
-export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatProps) {
+export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen, onOpenSystemLayer }: ChatProps) {
   const { messages, addMessage, updateLastAssistant, isStreaming, setStreaming, activity } = useProject()
   const provider = useProvider()
   const [input, setInput] = useState('')
@@ -290,6 +292,10 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
           </div>
         </div>
       )}
+
+      <div className="gg-chat-topbar">
+        <SystemLayerBadge onOpenViewer={onOpenSystemLayer} />
+      </div>
 
       <div className="gg-chat-stream" ref={streamRef}>
         {!hasMessages && (

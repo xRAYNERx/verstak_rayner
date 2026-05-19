@@ -49,6 +49,10 @@ contextBridge.exposeInMainWorld('api', {
     remove: (id: number) => ipcRenderer.invoke('journal:remove', id),
     clear: (projectPath: string) => ipcRenderer.invoke('journal:clear', projectPath)
   },
+  systemLayer: {
+    get: () => ipcRenderer.invoke('system-layer:get'),
+    user: (projectPath: string | null) => ipcRenderer.invoke('system-layer:user', projectPath)
+  },
   term: {
     spawn: (cwd: string) => ipcRenderer.invoke('term:spawn', cwd) as Promise<number>,
     write: (id: number, data: string) => ipcRenderer.invoke('term:write', id, data),
