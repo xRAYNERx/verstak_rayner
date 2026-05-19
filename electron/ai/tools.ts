@@ -5,6 +5,7 @@ import { promisify } from 'util'
 import { existsSync } from 'fs'
 import type { ToolDefinition } from './types'
 import { classifyCommand } from './command-policy'
+import { isForbiddenPath, scanText } from './secret-scanner'
 
 const execFileAsync = promisify(execFile)
 
@@ -275,26 +276,42 @@ export function createFileTools(root: string): FileTools {
 
     async execute(name, args) {
       if (name === 'read_file') {
-        const abs = safeJoin(root, String(args.path))
+        const relPath = String(args.path)
+        if (isForbiddenPath(relPath)) {
+          throw new Error(`Доступ запрещён политикой безопасности: ${relPath} (secrets/credentials)`)
+        }
+        const abs = safeJoin(root, relPath)
         const st = await stat(abs)
         if (!st.isFile()) throw new Error(`Не файл: ${args.path}`)
         if (st.size > MAX_READ_BYTES) {
           throw new Error(`Файл слишком большой: ${st.size} байт (лимит ${MAX_READ_BYTES})`)
         }
-        return await readFile(abs, 'utf8')
+        const raw = await readFile(abs, 'utf8')
+        const scan = scanText(raw)
+        if (scan.hits.length > 0) {
+          // Add a header note so the AI knows redaction happened
+          return `[secret-scanner: redacted ${scan.hits.join(', ')}]\n${scan.redacted}`
+        }
+        return raw
       }
       if (name === 'list_directory') {
         const abs = safeJoin(root, String(args.path))
         const entries = await readdir(abs)
         const out: string[] = []
         for (const e of entries) {
+          const childRel = (String(args.path) === '.' ? e : `${args.path}/${e}`)
+          if (isForbiddenPath(childRel)) continue  // hide secret stores from directory listings
           const st = await stat(join(abs, e))
           out.push(st.isDirectory() ? `${e}/` : e)
         }
         return out
       }
       if (name === 'write_file') {
-        const abs = safeJoin(root, String(args.path))
+        const relPath = String(args.path)
+        if (isForbiddenPath(relPath)) {
+          throw new Error(`Запись запрещена политикой безопасности: ${relPath}`)
+        }
+        const abs = safeJoin(root, relPath)
         await writeFile(abs, String(args.content), 'utf8')
         return { ok: true }
       }
@@ -310,13 +327,25 @@ export function createFileTools(root: string): FileTools {
         const glob = args.glob ? String(args.glob) : undefined
         const ignoreCase = args.ignoreCase !== false
         const regex = !!args.regex
-        const hits = RIPGREP_AVAILABLE
+        const rawHits = RIPGREP_AVAILABLE
           ? await searchWithRipgrep(root, query, glob, ignoreCase, regex)
           : await searchFallback(root, query, glob, ignoreCase, regex)
+        // Drop hits from forbidden files and redact secret-looking matches
+        const safeHits: string[] = []
+        let redactionCount = 0
+        for (const line of rawHits) {
+          const idx = line.indexOf(':')
+          const file = idx >= 0 ? line.slice(0, idx) : line
+          if (isForbiddenPath(file)) continue
+          const scan = scanText(line)
+          if (scan.hits.length > 0) redactionCount++
+          safeHits.push(scan.redacted)
+        }
         return {
-          matches: hits,
-          truncated: hits.length >= MAX_SEARCH_HITS,
-          backend: RIPGREP_AVAILABLE ? 'ripgrep' : 'fallback'
+          matches: safeHits,
+          truncated: safeHits.length >= MAX_SEARCH_HITS,
+          backend: RIPGREP_AVAILABLE ? 'ripgrep' : 'fallback',
+          ...(redactionCount > 0 ? { redactions: redactionCount } : {})
         }
       }
       if (name === 'find_files') {
