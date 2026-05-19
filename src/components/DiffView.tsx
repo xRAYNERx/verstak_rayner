@@ -2,7 +2,7 @@ import { diffLines } from 'diff'
 import { useProject } from '../store/projectStore'
 
 export function DiffView() {
-  const { pendingWrite, setPendingWrite } = useProject()
+  const { pendingWrite, setPendingWrite, updateActivity } = useProject()
   if (!pendingWrite) return null
 
   const diff = diffLines(pendingWrite.before, pendingWrite.after)
@@ -17,10 +17,12 @@ export function DiffView() {
 
   async function accept() {
     await window.api.ai.resolveWrite(writeRef.callId, true)
+    updateActivity(writeRef.callId, { status: 'ok', detail: `${writeRef.path} (+${added} −${removed})` })
     setPendingWrite(null)
   }
   async function reject() {
     await window.api.ai.resolveWrite(writeRef.callId, false)
+    updateActivity(writeRef.callId, { status: 'rejected' })
     setPendingWrite(null)
   }
 

@@ -3,6 +3,7 @@ import { join } from 'path'
 import { mkdirSync } from 'fs'
 import { registerProjectIpc } from './ipc/projects'
 import { registerFilesIpc } from './ipc/files'
+import { getActiveProjectPath } from './state/project-state'
 import { registerSettingsIpc } from './ipc/settings'
 import { registerAiIpc } from './ipc/ai'
 import { registerChatsIpc } from './ipc/chats'
@@ -37,7 +38,7 @@ app.whenReady().then(() => {
   const chats = createChats(db)
 
   registerProjectIpc()
-  registerFilesIpc()
+  registerFilesIpc({ getProjectRoot: getActiveProjectPath })
   registerSettingsIpc(settings)
   registerAiIpc({
     getApiKey: () => settings.getSecret('gemini_api_key'),

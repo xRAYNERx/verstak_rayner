@@ -1,7 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('api', {
-  projects: { pick: () => ipcRenderer.invoke('projects:pick') },
+  projects: {
+    pick: () => ipcRenderer.invoke('projects:pick'),
+    setCurrent: (path: string | null) => ipcRenderer.invoke('projects:set-current', path)
+  },
   files: {
     tree: (root: string) => ipcRenderer.invoke('files:tree', root),
     read: (path: string) => ipcRenderer.invoke('files:read', path)
@@ -15,6 +18,8 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('ai:send', messages, projectPath),
     resolveWrite: (callId: string, accept: boolean) =>
       ipcRenderer.invoke('ai:resolve-write', callId, accept),
+    resolveCommand: (callId: string, accept: boolean) =>
+      ipcRenderer.invoke('ai:resolve-command', callId, accept),
     onEvent: (cb: (data: { id: number; event: unknown }) => void) => {
       const handler = (_e: unknown, data: { id: number; event: unknown }) => cb(data)
       ipcRenderer.on('ai:event', handler)

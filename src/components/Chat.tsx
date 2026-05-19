@@ -41,7 +41,7 @@ async function blobToAttachment(blob: Blob, fallbackName: string): Promise<Attac
 }
 
 export function Chat({ onOpenSettings }: ChatProps) {
-  const { messages, addMessage, updateLastAssistant, isStreaming, setStreaming } = useProject()
+  const { messages, addMessage, updateLastAssistant, isStreaming, setStreaming, activity } = useProject()
   const provider = useProvider()
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
@@ -82,18 +82,55 @@ export function Chat({ onOpenSettings }: ChatProps) {
 
   useEffect(() => {
     const off = window.api.ai.onEvent(({ event }) => {
+      const store = useProject.getState()
       if (event.type === 'text') updateLastAssistant(event.text)
       else if (event.type === 'pending-write') {
-        useProject.getState().setPendingWrite({
+        store.setPendingWrite({
           callId: event.callId,
           path: event.path,
           before: event.before,
           after: event.after
         })
+        store.pushActivity({
+          id: event.callId,
+          kind: 'write',
+          label: 'write_file',
+          detail: event.path,
+          status: 'pending',
+          timestamp: Date.now()
+        })
+      }
+      else if (event.type === 'pending-command') {
+        store.setPendingCommand({ callId: event.callId, command: event.command })
+        store.pushActivity({
+          id: event.callId,
+          kind: 'command',
+          label: 'run_command',
+          detail: event.command,
+          status: 'pending',
+          timestamp: Date.now()
+        })
+      }
+      else if (event.type === 'command-result') {
+        const status: 'ok' | 'error' | 'rejected' = event.status
+        store.updateActivity(event.callId, {
+          status,
+          detail: status === 'error' ? event.error ?? event.command : event.command
+        })
+      }
+      else if (event.type === 'tool-blocked') {
+        store.pushActivity({
+          id: event.callId,
+          kind: 'blocked',
+          label: event.name + ' заблокирован',
+          detail: `${event.command ?? ''} — ${event.reason}`,
+          status: 'blocked',
+          timestamp: Date.now()
+        })
       }
       else if (event.type === 'done') {
-        const path = useProject.getState().path
-        const msgs = useProject.getState().messages
+        const path = store.path
+        const msgs = store.messages
         const lastAssistant = msgs[msgs.length - 1]
         if (path && lastAssistant?.role === 'assistant' && lastAssistant.content) {
           void window.api.chats.append(path, 'assistant', lastAssistant.content)
@@ -188,8 +225,10 @@ export function Chat({ onOpenSettings }: ChatProps) {
     const text = input.trim()
     if (!text && attachments.length === 0) return
     if (isStreaming) return
-    const path = useProject.getState().path
+    const store = useProject.getState()
+    const path = store.path
     const userAttachments = attachments
+    store.clearActivity()
     setInput('')
     setAttachments([])
     const summary = userAttachments.length > 0
@@ -235,8 +274,21 @@ export function Chat({ onOpenSettings }: ChatProps) {
         {messages.map((m, i) => {
           const isLast = i === messages.length - 1
           const isStreamingAssistant = isLast && m.role === 'assistant' && isStreaming
+          // Render activity rows just before the (last) assistant message
+          const showActivity = isLast && m.role === 'assistant' && activity.length > 0
           return (
             <div key={i} className={`gg-msg ${m.role === 'user' ? 'gg-msg-user' : 'gg-msg-assistant'}`}>
+              {showActivity && (
+                <div className="gg-activity-list">
+                  {activity.map(a => (
+                    <div key={a.id} className={`gg-activity-row is-${a.status}`}>
+                      <span className="gg-activity-icon" />
+                      <span className="gg-activity-label">{a.label}</span>
+                      {a.detail && <span className="gg-activity-detail">{a.detail.length > 80 ? a.detail.slice(0, 80) + '…' : a.detail}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
               {m.role === 'assistant' && (
                 <div className="gg-msg-meta">
                   <span className="gg-msg-author">Gemini</span>

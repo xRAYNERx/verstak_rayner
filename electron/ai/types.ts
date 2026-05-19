@@ -38,6 +38,9 @@ export type ChatEvent =
   | { type: 'text'; text: string }
   | { type: 'tool-call'; call: ToolCall }
   | { type: 'pending-write'; callId: string; path: string; before: string; after: string }
+  | { type: 'pending-command'; callId: string; command: string }
+  | { type: 'command-result'; callId: string; command: string; status: 'ok' | 'error' | 'rejected'; exitCode?: number; stdout?: string; stderr?: string; error?: string }
+  | { type: 'tool-blocked'; callId: string; name: string; command?: string; reason: string }
   | { type: 'done' }
   | { type: 'error'; message: string }
 

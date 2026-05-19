@@ -6,13 +6,19 @@ export interface ToolCall { id: string; name: string; args: Record<string, unkno
 export type ChatEvent =
   | { type: 'text'; text: string }
   | { type: 'pending-write'; callId: string; path: string; before: string; after: string }
+  | { type: 'pending-command'; callId: string; command: string }
+  | { type: 'command-result'; callId: string; command: string; status: 'ok' | 'error' | 'rejected'; exitCode?: number; stdout?: string; stderr?: string; error?: string }
+  | { type: 'tool-blocked'; callId: string; name: string; command?: string; reason: string }
   | { type: 'done' }
   | { type: 'error'; message: string }
 
 declare global {
   interface Window {
     api: {
-      projects: { pick: () => Promise<string | null> }
+      projects: {
+        pick: () => Promise<string | null>
+        setCurrent: (path: string | null) => Promise<void>
+      }
       files: {
         tree: (root: string) => Promise<FileNode[]>
         read: (path: string) => Promise<string>
@@ -24,6 +30,7 @@ declare global {
       ai: {
         send: (messages: ChatMessage[], projectPath: string | null) => Promise<number>
         resolveWrite: (callId: string, accept: boolean) => Promise<void>
+        resolveCommand: (callId: string, accept: boolean) => Promise<void>
         onEvent: (cb: (data: { id: number; event: ChatEvent }) => void) => () => void
       }
       chats: {
