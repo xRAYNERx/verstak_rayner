@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ProjectRail } from './components/ProjectRail'
 import { Sidebar } from './components/Sidebar'
 import { Settings } from './components/Settings'
 import { Chat } from './components/Chat'
@@ -18,6 +19,7 @@ export function App() {
 
   return (
     <div className="gg-app">
+      <ProjectRail />
       <Sidebar onOpenSettings={() => setShowSettings(true)} />
       <main className="gg-main">
         {activeView === 'chat' && (

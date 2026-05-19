@@ -5,6 +5,7 @@ export interface StoredChatMessage { id: number; role: 'user' | 'assistant' | 's
 export interface Task { id: number; text: string; done: boolean; createdAt: number; doneAt: number | null }
 export type JournalKind = 'manual' | 'session' | 'tool' | 'note'
 export interface JournalEntry { id: number; kind: JournalKind; title: string; detail: string | null; createdAt: number }
+export interface ProjectMeta { path: string; name: string; color: string; lastOpenedAt: number }
 export interface ToolCall { id: string; name: string; args: Record<string, unknown> }
 export type ChatEvent =
   | { type: 'text'; text: string }
@@ -21,6 +22,9 @@ declare global {
       projects: {
         pick: () => Promise<string | null>
         setCurrent: (path: string | null) => Promise<void>
+        list: () => Promise<ProjectMeta[]>
+        rename: (path: string, name: string) => Promise<void>
+        remove: (path: string) => Promise<void>
       }
       files: {
         tree: (root: string) => Promise<FileNode[]>

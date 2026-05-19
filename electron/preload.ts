@@ -3,7 +3,10 @@ import { contextBridge, ipcRenderer } from 'electron'
 contextBridge.exposeInMainWorld('api', {
   projects: {
     pick: () => ipcRenderer.invoke('projects:pick'),
-    setCurrent: (path: string | null) => ipcRenderer.invoke('projects:set-current', path)
+    setCurrent: (path: string | null) => ipcRenderer.invoke('projects:set-current', path),
+    list: () => ipcRenderer.invoke('projects:list'),
+    rename: (path: string, name: string) => ipcRenderer.invoke('projects:rename', path, name),
+    remove: (path: string) => ipcRenderer.invoke('projects:remove', path)
   },
   files: {
     tree: (root: string) => ipcRenderer.invoke('files:tree', root),

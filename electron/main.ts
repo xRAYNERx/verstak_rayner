@@ -15,6 +15,7 @@ import { createSettings } from './storage/settings'
 import { createChats } from './storage/chats'
 import { createTasks } from './storage/tasks'
 import { createJournal } from './storage/journal'
+import { createProjects } from './storage/projects'
 
 function createWindow(): void {
   // In dev: __dirname is out/main; in prod packaged build the path resolves the same way
@@ -52,8 +53,9 @@ app.whenReady().then(() => {
   const chats = createChats(db)
   const tasks = createTasks(db)
   const journal = createJournal(db)
+  const projects = createProjects(db)
 
-  registerProjectIpc()
+  registerProjectIpc(projects)
   registerFilesIpc({ getProjectRoot: getActiveProjectPath })
   registerSettingsIpc(settings)
   registerAiIpc({

@@ -38,6 +38,13 @@ export function openDb(path: string): DB {
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_journal_project ON journal(project_path, created_at);
+
+    CREATE TABLE IF NOT EXISTS projects (
+      path TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      color TEXT NOT NULL,
+      last_opened_at INTEGER NOT NULL
+    );
   `)
 
   return db

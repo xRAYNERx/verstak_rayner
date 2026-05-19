@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { FileNode, ChatMessage } from '../types/api'
+import type { FileNode, ChatMessage, ProjectMeta } from '../types/api'
 
 interface PendingWrite {
   callId: string
@@ -33,7 +33,11 @@ interface ProjectState {
   pendingCommand: PendingCommand | null
   activity: ActivityEntry[]
   activeView: ViewId
+  projectList: ProjectMeta[]
   setProject: (path: string) => Promise<void>
+  closeProject: () => void
+  refreshProjectList: () => Promise<void>
+  removeProject: (path: string) => Promise<void>
   setActiveView: (v: ViewId) => void
   addMessage: (msg: ChatMessage) => void
   updateLastAssistant: (text: string) => void
@@ -45,7 +49,7 @@ interface ProjectState {
   clearActivity: () => void
 }
 
-export const useProject = create<ProjectState>((set) => ({
+export const useProject = create<ProjectState>((set, get) => ({
   path: null,
   tree: [],
   messages: [],
@@ -54,10 +58,12 @@ export const useProject = create<ProjectState>((set) => ({
   pendingCommand: null,
   activity: [],
   activeView: 'chat',
+  projectList: [],
   setProject: async (path) => {
     const tree = await window.api.files.tree(path)
     const history = await window.api.chats.list(path)
     await window.api.projects.setCurrent(path)
+    const projectList = await window.api.projects.list()
     set({
       path,
       tree,
@@ -65,8 +71,31 @@ export const useProject = create<ProjectState>((set) => ({
       pendingWrite: null,
       pendingCommand: null,
       activity: [],
-      activeView: 'chat'
+      activeView: 'chat',
+      projectList
     })
+  },
+  closeProject: () => set({
+    path: null,
+    tree: [],
+    messages: [],
+    activity: [],
+    pendingWrite: null,
+    pendingCommand: null
+  }),
+  refreshProjectList: async () => {
+    const projectList = await window.api.projects.list()
+    set({ projectList })
+  },
+  removeProject: async (path: string) => {
+    await window.api.projects.remove(path)
+    const projectList = await window.api.projects.list()
+    const state = get()
+    if (state.path === path) {
+      set({ path: null, tree: [], messages: [], projectList })
+    } else {
+      set({ projectList })
+    }
   },
   setActiveView: (v) => set({ activeView: v }),
   addMessage: (msg) => set(s => ({ messages: [...s.messages, msg] })),
