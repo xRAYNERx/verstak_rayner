@@ -262,6 +262,28 @@ export type { UsageDelta } from '../ai/types'
 const DEFAULT_AGENT_TURNS = 8
 const MAX_BUDGET_TURNS = 40  // hard ceiling even with continues — prevents infinite-budget abuse
 
+/** Quick verify-script detection for inline hints after accepted writes. */
+async function detectVerifyScriptsForHint(projectPath: string): Promise<string[]> {
+  const { readFile } = await import('fs/promises')
+  const { join } = await import('path')
+  const hints: string[] = []
+  try {
+    const raw = await readFile(join(projectPath, 'package.json'), 'utf8')
+    const pkg = JSON.parse(raw) as { scripts?: Record<string, string> }
+    const s = pkg.scripts ?? {}
+    if (s.test) hints.push('npm test')
+    if (s['type-check'] || s.typecheck) hints.push('npm run type-check')
+    if (s.lint) hints.push('npm run lint')
+  } catch { /* not node */ }
+  try {
+    await readFile(join(projectPath, 'tsconfig.json'), 'utf8')
+    if (!hints.some(h => h.includes('tsc') || h.includes('type-check'))) {
+      hints.push('npx tsc --noEmit')
+    }
+  } catch { /* no tsconfig */ }
+  return hints
+}
+
 function callSignature(call: ToolCall): string {
   return `${call.name}::${JSON.stringify(call.args)}`
 }
@@ -381,6 +403,10 @@ async function runApiConversation(
 
     const toolResults: ToolResult[] = new Array(toolCalls.length)
     const writePromises: Array<{ idx: number; promise: Promise<ToolResult> }> = []
+    // Parallel reads — read_file / list_directory / search_project /
+    // find_files / get_project_map / refresh_project_map are independent and
+    // safe to fire concurrently. Saves wall-time on "explore 5 files" turns.
+    const readPromises: Array<{ idx: number; promise: Promise<ToolResult> }> = []
     for (let i = 0; i < toolCalls.length; i++) {
       const call = toolCalls[i]
       if (call.name === 'write_file' || call.name === 'apply_patch') {
@@ -496,31 +522,39 @@ async function runApiConversation(
         }
         continue
       }
-      // Read-only / pure-info tools — emit an activity event so user sees what AI is doing.
-      try {
-        const result = await tools.execute(call.name, call.args)
-        const summary = summarizeToolCall(call.name, call.args, result)
-        if (summary) {
-          sender.send('ai:event', { id: sendId, event: { type: 'tool-activity', callId: call.id, name: call.name, label: summary.label, detail: summary.detail, status: 'ok' } })
-        }
-        toolResults[i] = { id: call.id, name: call.name, result }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        sender.send('ai:event', { id: sendId, event: { type: 'tool-activity', callId: call.id, name: call.name, label: call.name, detail: msg, status: 'error' } })
-        toolResults[i] = {
-          id: call.id,
-          name: call.name,
-          result: '',
-          error: msg
-        }
-      }
+      // Read-only / pure-info tools — fire them in parallel. Each call is
+      // independent (no shared mutable state in tools.execute for reads),
+      // so Promise.all gives us free wall-time savings on multi-file explore.
+      const idx = i
+      const callRef = call
+      readPromises.push({
+        idx,
+        promise: tools.execute(callRef.name, callRef.args)
+          .then((result) => {
+            const summary = summarizeToolCall(callRef.name, callRef.args, result)
+            if (summary) {
+              sender.send('ai:event', { id: sendId, event: { type: 'tool-activity', callId: callRef.id, name: callRef.name, label: summary.label, detail: summary.detail, status: 'ok' } })
+            }
+            return { id: callRef.id, name: callRef.name, result }
+          })
+          .catch((err: unknown) => {
+            const msg = err instanceof Error ? err.message : String(err)
+            sender.send('ai:event', { id: sendId, event: { type: 'tool-activity', callId: callRef.id, name: callRef.name, label: callRef.name, detail: msg, status: 'error' } })
+            return { id: callRef.id, name: callRef.name, result: '', error: msg }
+          })
+      })
     }
-    // All non-write tools finished. Now wait for user to resolve every pending write
+    // Parallel reads finish first (they don't need user confirmation)
+    for (const { idx, promise } of readPromises) {
+      toolResults[idx] = await promise
+    }
+    // Then wait for user to resolve every pending write
     // (multi-file modal accumulates them on the renderer side).
     for (const { idx, promise } of writePromises) {
       toolResults[idx] = await promise
     }
     // Tally tool usage for the end-of-session journal summary
+    let acceptedWritesThisTurn = 0
     for (let i = 0; i < toolCalls.length; i++) {
       const call = toolCalls[i]
       const result = toolResults[i]
@@ -528,12 +562,24 @@ async function runApiConversation(
       if ((call.name === 'write_file' || call.name === 'apply_patch') && !result.error) {
         const p = String(call.args.path ?? '')
         if (p) filesTouched.add(p)
+        acceptedWritesThisTurn++
       } else if (call.name === 'run_command' && !result.error) {
         const cmd = String(call.args.command ?? '')
         if (cmd) commandsRun.push(cmd)
       }
     }
-    const nextUserMsg: ChatMessage = { role: 'user', content: '', toolResults }
+    // If user just accepted writes, gently nudge the model on the next turn
+    // to verify (run tests / typecheck / lint). The context-pack already
+    // showed verify_scripts; we re-surface as an inline reminder so the model
+    // pays attention this turn specifically.
+    let verifyHint = ''
+    if (acceptedWritesThisTurn > 0) {
+      const hints = await detectVerifyScriptsForHint(projectPath)
+      if (hints.length > 0) {
+        verifyHint = `[system: пользователь принял ${acceptedWritesThisTurn} write(s). Перед "готово" запусти проверку через run_command — варианты: ${hints.slice(0, 2).join(' / ')}. Если уверен что проверка избыточна — объясни почему.]`
+      }
+    }
+    const nextUserMsg: ChatMessage = { role: 'user', content: verifyHint, toolResults }
     if (pendingAttachments.length > 0) {
       nextUserMsg.attachments = [...pendingAttachments]
       pendingAttachments.length = 0
