@@ -109,6 +109,12 @@ interface ProjectState {
   newChatSession: (title?: string) => Promise<ChatSession | null>
 }
 
+// Monotonic token used by setProject to cancel its own stale concurrent runs.
+// If the user clicks project A then project B before A's async work finishes,
+// only B's set() should land. We bump on entry, snapshot the value, and bail
+// on every await boundary if our token is no longer current.
+let setProjectToken = 0
+
 export const useProject = create<ProjectState>((set, get) => ({
   path: null,
   tree: [],
@@ -125,6 +131,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   activeChatId: null,
   sessions: {},
   setProject: async (path) => {
+    const myToken = ++setProjectToken
     const s = get()
     // 1) Snapshot current session before switching (so background streams keep their state)
     let nextSessions = s.sessions
@@ -145,8 +152,11 @@ export const useProject = create<ProjectState>((set, get) => ({
     }
     // 2) Build the target snapshot — either restore from sessions or seed from chat history
     const tree = await window.api.files.tree(path)
+    if (myToken !== setProjectToken) return  // a newer setProject took over
     await window.api.projects.setCurrent(path)
+    if (myToken !== setProjectToken) return
     const projectList = await window.api.projects.list()
+    if (myToken !== setProjectToken) return
     const existing = nextSessions[path]
     let target: SessionSnapshot
     if (existing) {
@@ -162,17 +172,21 @@ export const useProject = create<ProjectState>((set, get) => ({
 
     // Load chat sessions list. Create a default one if project has none yet.
     let chatSessions = await window.api.chatSessions.list(path)
+    if (myToken !== setProjectToken) return
     if (chatSessions.length === 0) {
       const created = await window.api.chatSessions.create(path, { title: 'Основной чат' })
+      if (myToken !== setProjectToken) return
       chatSessions = [created]
     }
     // Pick the most recent active session (top of list)
     const activeChatId = chatSessions[0]?.id ?? null
     if (activeChatId && !existing) {
       const history = await window.api.chats.list(activeChatId)
+      if (myToken !== setProjectToken) return
       target.messages = history.map(m => ({ role: m.role, content: m.content }))
     }
 
+    if (myToken !== setProjectToken) return  // final safety before commit
     set({
       path,
       tree,
@@ -289,10 +303,17 @@ export const useProject = create<ProjectState>((set, get) => ({
   switchChatSession: async (id) => {
     const s = get()
     if (!s.path) return
+    // If the previous chat had an active stream, kill it before switching —
+    // otherwise the typing indicator and event handlers would attribute
+    // incoming text to the wrong session.
+    if (s.isStreaming) {
+      try { await window.api.ai.stop(0) } catch { /* ignore */ }
+    }
     const history = await window.api.chats.list(id)
     set({
       activeChatId: id,
       messages: history.map(m => ({ role: m.role, content: m.content })),
+      isStreaming: false,
       activity: [],
       pendingWrites: [],
       pendingCommand: null,

@@ -58,11 +58,14 @@ export function App() {
     dragRef.current = { startX: e.clientX, startW: sidebarWidth }
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
+    // Track the latest value the drag computed so we can persist it on `up`
+    // without depending on React state flushing in time.
+    let latest = dragRef.current.startW
     function move(ev: MouseEvent) {
       if (!dragRef.current) return
       const dx = ev.clientX - dragRef.current.startX
-      const next = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, dragRef.current.startW + dx))
-      setSidebarWidth(next)
+      latest = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, dragRef.current.startW + dx))
+      setSidebarWidth(latest)
     }
     function up() {
       dragRef.current = null
@@ -70,9 +73,9 @@ export function App() {
       document.body.style.userSelect = ''
       window.removeEventListener('mousemove', move)
       window.removeEventListener('mouseup', up)
-      // Persist the user's choice
-      const w = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gg-sidebar-w')) || SIDEBAR_DEFAULT
-      try { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(Math.round(w))) } catch { /* private mode */ }
+      // Persist directly from the most recent move's value — no DOM read,
+      // no race with React's flush.
+      try { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(Math.round(latest))) } catch { /* private mode */ }
     }
     window.addEventListener('mousemove', move)
     window.addEventListener('mouseup', up)

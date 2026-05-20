@@ -45,12 +45,15 @@ export function DiffView() {
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
       if (e.key === 'Escape') {
         e.preventDefault()
+        e.stopPropagation()
         void rejectAll()
       } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault()
+        e.stopPropagation()
         void acceptAll()
       } else if (e.key === 'Enter') {
         e.preventDefault()
+        e.stopPropagation()
         if (active) void acceptOne(active.callId)
       } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
         if (pendingWrites.length < 2 || !active) return
