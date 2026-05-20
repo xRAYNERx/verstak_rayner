@@ -64,7 +64,7 @@ function scopedKey(sendId: number, callId: string): string {
 }
 
 export function registerAiIpc(deps: AiDeps): void {
-  ipcMain.handle('ai:send', async (e, messages: ChatMessage[], projectPath: string | null) => {
+  ipcMain.handle('ai:send', async (e, messages: ChatMessage[], projectPath: string | null, budget?: number) => {
     const providerId = deps.getProviderId()
     const descriptor = PROVIDERS[providerId]
     const sendId = ++currentSendId
@@ -132,7 +132,8 @@ export function registerAiIpc(deps: AiDeps): void {
 
     if (descriptor.supportsTools && projectPath) {
       const tools = createFileTools(projectPath, ctrl.signal)
-      void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.connectors).finally(cleanup)
+      const turnsBudget = Math.min(MAX_BUDGET_TURNS, Math.max(DEFAULT_AGENT_TURNS, budget ?? DEFAULT_AGENT_TURNS))
+      void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.connectors, turnsBudget).finally(cleanup)
     } else {
       void runPlainConversation(taggedSender, sendId, provider, messagesWithSystem, ctrl.signal).finally(cleanup)
     }
@@ -258,7 +259,8 @@ export type { UsageDelta } from '../ai/types'
  * Full agentic loop with file tools + diff confirmation + command sandbox.
  * Only providers that support function calling go through here.
  */
-const MAX_AGENT_TURNS = 8
+const DEFAULT_AGENT_TURNS = 8
+const MAX_BUDGET_TURNS = 40  // hard ceiling even with continues — prevents infinite-budget abuse
 
 function callSignature(call: ToolCall): string {
   return `${call.name}::${JSON.stringify(call.args)}`
@@ -278,7 +280,8 @@ async function runApiConversation(
   connectors: {
     list: () => Array<{ id: string; label: string; kind: string; status: string; detail?: string }>
     query: (id: string, args: Record<string, unknown>, signal: AbortSignal) => Promise<unknown>
-  }
+  },
+  turnsBudget: number = DEFAULT_AGENT_TURNS
 ): Promise<void> {
   const currentMessages = [...initialMessages]
   // Loop detection: per-signature occurrence counter across the whole agent
@@ -299,7 +302,7 @@ async function runApiConversation(
   // next user message so vision-capable providers see them.
   const pendingAttachments: import('../ai/types').Attachment[] = []
 
-  for (let turn = 0; turn < MAX_AGENT_TURNS; turn++) {
+  for (let turn = 0; turn < turnsBudget; turn++) {
     if (signal.aborted) {
       sender.send('ai:event', { id: sendId, event: { type: 'done' } })
       return
@@ -537,15 +540,19 @@ async function runApiConversation(
     }
     currentMessages.push(nextUserMsg)
   }
-  // Max turns reached — warn user and exit
+  // Budget exhausted — emit a dedicated event so the UI can offer "+N turns".
+  // The renderer re-sends the current conversation with a larger budget if the
+  // user clicks Continue.
   writeSessionJournal(recordJournal, projectPath, lastAssistantText, filesTouched, commandsRun, sessionUsage)
+  const canContinue = turnsBudget < MAX_BUDGET_TURNS
   sender.send('ai:event', {
     id: sendId,
     event: {
-      type: 'tool-blocked',
-      callId: 'maxturns',
-      name: 'agent-loop',
-      reason: `Достигнут лимит ${MAX_AGENT_TURNS} итераций агента. Цикл остановлен — задача может быть не завершена.`
+      type: 'turns-exhausted',
+      used: turnsBudget,
+      maxBudget: MAX_BUDGET_TURNS,
+      canContinue,
+      suggestedAdd: Math.min(10, MAX_BUDGET_TURNS - turnsBudget)
     }
   })
   sender.send('ai:event', { id: sendId, event: { type: 'done' } })

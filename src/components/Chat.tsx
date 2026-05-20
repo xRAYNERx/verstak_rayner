@@ -57,6 +57,8 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
   const [input, setInput] = useState('')
   /** Live token-count preview for whatever is in the composer right now. */
   const [previewTokens, setPreviewTokens] = useState<{ tokens: number; exact: boolean } | null>(null)
+  /** If the agent loop exhausted its budget on the last send, the user can click "+N turns" to extend. */
+  const [exhausted, setExhausted] = useState<{ used: number; suggestedAdd: number; maxBudget: number } | null>(null)
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [dragOver, setDragOver] = useState(false)
   const [warning, setWarning] = useState<string | null>(null)
@@ -160,6 +162,20 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
           label: event.label,
           detail: event.detail,
           status: event.status,
+          timestamp: Date.now()
+        })
+      }
+      else if (event.type === 'turns-exhausted') {
+        // Budget hit. Remember so the UI can offer a "+N turns" button.
+        if (event.canContinue) {
+          setExhausted({ used: event.used, suggestedAdd: event.suggestedAdd, maxBudget: event.maxBudget })
+        }
+        store.pushActivity({
+          id: `budget-${Date.now()}`,
+          kind: 'blocked',
+          label: `Бюджет ${event.used} ходов исчерпан`,
+          detail: event.canContinue ? `Доступно +${event.suggestedAdd} (макс ${event.maxBudget})` : 'Достигнут потолок',
+          status: 'blocked',
           timestamp: Date.now()
         })
       }
@@ -361,6 +377,22 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
     setAttachments(prev => prev.filter((_, i) => i !== idx))
   }
 
+  /**
+   * Continue an agent loop that hit the turns budget. Re-sends the current
+   * message list with a larger budget — the model picks up where it stopped.
+   */
+  async function continueWithMoreTurns() {
+    if (!exhausted || isStreaming) return
+    const store = useProject.getState()
+    const newBudget = Math.min(exhausted.maxBudget, exhausted.used + exhausted.suggestedAdd)
+    setExhausted(null)
+    addMessage({ role: 'assistant', content: '' })
+    setStreaming(true)
+    // Send everything except the empty placeholder we just pushed
+    const msgs = [...useProject.getState().messages].slice(0, -1)
+    await window.api.ai.sendWithBudget(msgs, store.path, newBudget)
+  }
+
   async function send() {
     const text = input.trim()
     if (!text && attachments.length === 0) return
@@ -369,6 +401,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
     const path = store.path
     const userAttachments = attachments
     store.clearActivity()
+    setExhausted(null)  // new send wipes any pending continue state
     setInput('')
     setAttachments([])
     const summary = userAttachments.length > 0
@@ -491,6 +524,22 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
           </div>
         )}
         {warning && <div className="gg-composer-warning">{warning}</div>}
+        {exhausted && !isStreaming && (
+          <div className="gg-budget-bar">
+            <span>⏸ Бюджет {exhausted.used} ходов исчерпан — задача не завершена.</span>
+            <div className="gg-budget-actions">
+              <button
+                className="gg-btn gg-btn-primary"
+                onClick={() => void continueWithMoreTurns()}
+                title={`Продолжить с тем же контекстом, +${exhausted.suggestedAdd} ходов`}
+              >+{exhausted.suggestedAdd} ходов</button>
+              <button
+                className="gg-btn gg-btn-ghost"
+                onClick={() => setExhausted(null)}
+              >Закрыть</button>
+            </div>
+          </div>
+        )}
         <div className="gg-composer-inner">
           <textarea
             ref={textareaRef}

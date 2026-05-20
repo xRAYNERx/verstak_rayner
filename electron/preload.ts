@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld('api', {
   ai: {
     send: (messages: unknown[], projectPath: string | null) =>
       ipcRenderer.invoke('ai:send', messages, projectPath),
+    sendWithBudget: (messages: unknown[], projectPath: string | null, budget: number) =>
+      ipcRenderer.invoke('ai:send', messages, projectPath, budget),
     resolveWrite: (callId: string, accept: boolean) =>
       ipcRenderer.invoke('ai:resolve-write', callId, accept),
     resolveCommand: (callId: string, accept: boolean) =>

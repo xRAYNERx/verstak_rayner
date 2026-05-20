@@ -27,6 +27,7 @@ export type ChatEvent =
   | { type: 'pending-command'; callId: string; command: string }
   | { type: 'command-result'; callId: string; command: string; status: 'ok' | 'error' | 'rejected'; exitCode?: number; stdout?: string; stderr?: string; error?: string }
   | { type: 'tool-blocked'; callId: string; name: string; command?: string; reason: string }
+  | { type: 'turns-exhausted'; used: number; maxBudget: number; canContinue: boolean; suggestedAdd: number }
   | { type: 'tool-activity'; callId: string; name: string; label: string; detail: string; status: 'ok' | 'error' }
   | { type: 'plan-created'; planId: number; title: string; stepCount: number }
   | { type: 'usage'; usage: UsageDelta }
@@ -53,6 +54,7 @@ declare global {
       }
       ai: {
         send: (messages: ChatMessage[], projectPath: string | null) => Promise<number>
+        sendWithBudget: (messages: ChatMessage[], projectPath: string | null, budget: number) => Promise<number>
         resolveWrite: (callId: string, accept: boolean) => Promise<void>
         resolveCommand: (callId: string, accept: boolean) => Promise<void>
         stop: (sendId: number) => Promise<boolean>

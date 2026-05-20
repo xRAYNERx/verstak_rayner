@@ -376,6 +376,22 @@
   color: var(--text-tertiary);
 }
 
+/* Continue-budget bar shown above the composer when agent hits turn limit */
+.gg-budget-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  background: var(--accent-muted);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  width: 100%; max-width: 920px;
+}
+.gg-budget-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.gg-budget-bar .gg-btn { padding: 4px 12px; font-size: var(--text-xs); }
+
 /* Settings tabs */
 .gg-settings-tabs {
   display: flex;
