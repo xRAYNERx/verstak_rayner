@@ -595,34 +595,31 @@ async function handleProposeEdits(
 
 async function handleBrowserTool(sender: TaggedSender, call: ToolCall): Promise<ToolResult> {
   try {
-    // Build a JS snippet that calls the renderer-side BrowserView dispatcher
-    // and returns a JSON-encoded result. executeJavaScript awaits any returned
-    // Promise automatically, so we can use an async IIFE.
-    const argsJson = JSON.stringify(call.args ?? {})
-    let snippet = ''
+    // SECURITY: never interpolate LLM-controlled values into a JS code string.
+    // We serialize the args as a JSON string literal (double JSON.stringify):
+    // - outer stringify produces a valid JS string literal containing escaped JSON
+    // - JSON.parse(...) inside the snippet recovers the object at runtime
+    // This is provably safe: a JS string literal cannot escape its own quotes
+    // when produced by JSON.stringify, so no LLM payload can run as code.
+    // The fixed code skeleton below uses ONLY hard-coded JS — the only
+    // dynamic piece is the args string literal which is parsed, not executed.
+    const argsLiteral = JSON.stringify(JSON.stringify(call.args ?? {}))
+    let action: string
     if (call.name === 'browser_navigate') {
-      snippet = `(async () => {
-        const api = window.geminigrokBrowser;
-        if (!api) return { __err: 'Вкладка Browser не открыта — попроси пользователя открыть её' };
-        const a = ${argsJson};
-        return await api.navigate(String(a.url ?? ''));
-      })()`
+      action = `return await api.navigate(String(a.url ?? ''));`
     } else if (call.name === 'browser_read_page') {
-      snippet = `(async () => {
-        const api = window.geminigrokBrowser;
-        if (!api) return { __err: 'Вкладка Browser не открыта — попроси пользователя открыть её' };
-        const a = ${argsJson};
-        const text = await api.readPage(a.selector ? String(a.selector) : undefined);
-        return { url: api.getURL(), title: api.getTitle(), text };
-      })()`
+      action = `const text = await api.readPage(a.selector ? String(a.selector) : undefined);
+               return { url: api.getURL(), title: api.getTitle(), text };`
     } else {
-      snippet = `(async () => {
-        const api = window.geminigrokBrowser;
-        if (!api) return { __err: 'Вкладка Browser не открыта — попроси пользователя открыть её' };
-        const dataUrl = await api.screenshot();
-        return { url: api.getURL(), dataUrl };
-      })()`
+      action = `const dataUrl = await api.screenshot();
+                return { url: api.getURL(), dataUrl };`
     }
+    const snippet = `(async () => {
+      const api = window.geminigrokBrowser;
+      if (!api) return { __err: 'Вкладка Browser не открыта — попроси пользователя открыть её' };
+      const a = JSON.parse(${argsLiteral});
+      ${action}
+    })()`
     const result = await sender.exec(snippet)
     if (result && typeof result === 'object' && '__err' in result) {
       return { id: call.id, name: call.name, result: '', error: String((result as { __err: unknown }).__err) }
