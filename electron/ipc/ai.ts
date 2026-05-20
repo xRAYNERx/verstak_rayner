@@ -86,9 +86,11 @@ export function registerAiIpc(deps: AiDeps): void {
       let contextPack = ''
       if (projectPath) {
         try {
+          const lastUser = messages.filter(m => m.role === 'user').at(-1)
           contextPack = await buildContextPack({
             projectPath,
-            recentWrites: deps.recentWrites(projectPath, 8)
+            recentWrites: deps.recentWrites(projectPath, 8),
+            latestUserMessage: lastUser?.content ?? ''
           })
         } catch { /* never block the send if context pack fails */ }
       }

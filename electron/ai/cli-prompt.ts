@@ -72,10 +72,16 @@ ${trimmedUser}
     sections.push(`${SYSTEM_LAYER_PROMPT}${userBlock}`)
   }
 
-  // 2. Context Pack — git/recent writes/project map/verify scripts
+  // 2. Context Pack — git/recent writes/project map/verify scripts +
+  //    cross-project path warning if the user mentioned absolute paths
+  //    outside this project.
   if (projectPath) {
     try {
-      const pack = await buildContextPack({ projectPath, recentWrites: recentWrites ?? [] })
+      const pack = await buildContextPack({
+        projectPath,
+        recentWrites: recentWrites ?? [],
+        latestUserMessage: lastUser.content
+      })
       if (pack) sections.push(pack)
     } catch { /* never block CLI send if context pack fails */ }
   }

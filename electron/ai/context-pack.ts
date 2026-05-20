@@ -25,6 +25,8 @@ export interface ContextPackInput {
   projectPath: string
   /** Recently accepted file writes (most recent first). Up to ~10 entries. */
   recentWrites?: Array<{ filePath: string; createdAt: number }>
+  /** Latest user message — scanned for absolute paths outside the active project. */
+  latestUserMessage?: string
 }
 
 /**
@@ -35,6 +37,14 @@ export interface ContextPackInput {
 export async function buildContextPack(input: ContextPackInput): Promise<string> {
   const { projectPath } = input
   const parts: string[] = []
+
+  // 0. Cross-project path warning — if user mentioned an absolute path that
+  //    isn't inside this project, the AI can't access it. We surface this so
+  //    it tells the user instead of silently reading the wrong project's files.
+  const crossProject = detectCrossProjectPaths(input.latestUserMessage ?? '', projectPath)
+  if (crossProject.length > 0) {
+    parts.push(`⚠ cross_project_paths: пользователь упомянул пути вне активного проекта (${projectPath}): ${crossProject.join('; ')}. Активный проект — другой. Сначала сообщи пользователю и предложи переключить проект в сайдбаре, либо переформулировать задачу.`)
+  }
 
   // 1. Git status (branch + dirty file list). Skipped silently if not a git repo.
   const git = await readGitStatus(projectPath)
@@ -154,4 +164,40 @@ function compactProjectMap(fullText: string): string {
 
 function escapeAttr(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/**
+ * Find absolute paths in user text that AREN'T inside the active project root.
+ * Returns deduplicated list of such "outside" paths. Supports:
+ *  - Windows: C:\Users\..., D:/foo, \\server\share
+ *  - POSIX: /Users/..., /home/..., /opt/...
+ * Skips backtick-fenced code blocks because those are usually examples.
+ */
+export function detectCrossProjectPaths(userText: string, projectPath: string): string[] {
+  if (!userText || !projectPath) return []
+  // Strip code fences so example paths inside ``` ``` don't trip us up.
+  const stripped = userText.replace(/```[\s\S]*?```/g, '')
+  // Match Windows drive paths (C:\... or C:/...), UNC, and POSIX absolute paths.
+  const re = /(?:[A-Za-z]:[\\/][^\s"'`]+|\\\\[^\s"'`\\]+\\[^\s"'`]+|\/(?:Users|home|opt|var|etc|tmp)\/[^\s"'`]+)/g
+  const matches = stripped.match(re) ?? []
+  const projNorm = normalizePathForCompare(projectPath)
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of matches) {
+    const trimmed = raw.replace(/[)\].,;:]+$/, '')  // strip trailing punctuation
+    const norm = normalizePathForCompare(trimmed)
+    if (norm.startsWith(projNorm)) continue  // inside active project — fine
+    if (seen.has(norm)) continue
+    seen.add(norm)
+    out.push(trimmed)
+    if (out.length >= 5) break
+  }
+  return out
+}
+
+/** Normalize for prefix comparison: lowercase + forward slashes + trim trailing slash. */
+function normalizePathForCompare(p: string): string {
+  let n = p.replace(/\\/g, '/').toLowerCase()
+  if (n.endsWith('/')) n = n.slice(0, -1)
+  return n
 }
