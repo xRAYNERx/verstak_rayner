@@ -3,6 +3,7 @@ import { platform } from 'os'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import type { ChatProvider, ChatMessage, ChatEvent, ToolDefinition, ToolResult } from './types'
+import { buildCliPrompt } from './cli-prompt'
 
 interface GeminiCliOptions {
   binary?: string  // override path for testing
@@ -71,18 +72,16 @@ export function createGeminiCliProvider(opts: GeminiCliOptions = {}): ChatProvid
     models: GEMINI_CLI_MODELS,
 
     async *send(messages: ChatMessage[], _tools: ToolDefinition[], _results?: ToolResult[]): AsyncIterable<ChatEvent> {
-      const lastUser = messages.filter(m => m.role === 'user').at(-1)
-      if (!lastUser) {
-        yield { type: 'error', message: 'Нет user-сообщения для отправки' }
+      let userMessage: string
+      try {
+        userMessage = await buildCliPrompt({
+          providerId: 'gemini-cli',
+          projectPath: opts.cwd ?? null,
+          messages
+        })
+      } catch (err) {
+        yield { type: 'error', message: err instanceof Error ? err.message : String(err) }
         return
-      }
-      let userMessage = lastUser.content
-      // CLI mode can't accept inline images; mention attachments so the user knows
-      if (lastUser.attachments?.length) {
-        const note = lastUser.attachments
-          .map(a => `[прикреплён файл: ${a.name} (${a.mimeType})]`)
-          .join('\n')
-        userMessage = userMessage ? `${userMessage}\n\n${note}` : note
       }
 
       const args = ['--output-format', 'stream-json']

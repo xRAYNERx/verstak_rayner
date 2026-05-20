@@ -3,6 +3,7 @@ import { platform } from 'os'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import type { ChatProvider, ChatMessage, ChatEvent, ToolDefinition, ToolResult } from './types'
+import { buildCliPrompt } from './cli-prompt'
 
 interface GrokCliOptions {
   binary?: string
@@ -60,17 +61,29 @@ export function createGrokCliProvider(opts: GrokCliOptions = {}): ChatProvider {
     models: GROK_CLI_MODELS,
 
     async *send(messages: ChatMessage[], _tools: ToolDefinition[], _results?: ToolResult[]): AsyncIterable<ChatEvent> {
-      const lastUser = messages.filter(m => m.role === 'user').at(-1)
-      if (!lastUser?.content) {
-        yield { type: 'error', message: 'Нет user-сообщения для отправки' }
+      let payload: string
+      try {
+        payload = await buildCliPrompt({
+          providerId: 'grok-cli',
+          projectPath: cwd ?? null,
+          messages
+        })
+      } catch (err) {
+        yield { type: 'error', message: err instanceof Error ? err.message : String(err) }
         return
       }
 
       const args = ['--output-format', 'streaming-json', '--no-alt-screen']
       if (opts.model && opts.model !== 'auto') args.push('-m', opts.model)
-      // Pass the prompt via --prompt-file=- (stdin) so quotes/unicode/newlines survive.
-      // Older versions accept stdin when -p is omitted; we use --single via stdin trick.
-      args.push('-p', lastUser.content)
+      // Note: grok CLI takes prompt via -p argv. Argv has a 32KB cap on Windows
+      // (CreateProcess limit). Truncate payload if it exceeds 28KB — keep the
+      // head (system + context) and the tail (most recent user message).
+      const ARGV_CAP = 28_000
+      if (payload.length > ARGV_CAP) {
+        const tail = payload.slice(-ARGV_CAP * 0.4)
+        payload = payload.slice(0, ARGV_CAP * 0.6) + '\n\n[...history truncated for CLI argv limit...]\n\n' + tail
+      }
+      args.push('-p', payload)
 
       const child = spawn(binary, args, {
         cwd,

@@ -3,6 +3,7 @@ import { platform } from 'os'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import type { ChatProvider, ChatMessage, ChatEvent, ToolDefinition, ToolResult } from './types'
+import { buildCliPrompt } from './cli-prompt'
 
 interface CodexCliOptions {
   binary?: string
@@ -53,9 +54,15 @@ export function createCodexCliProvider(opts: CodexCliOptions = {}): ChatProvider
     models: CODEX_CLI_MODELS,
 
     async *send(messages: ChatMessage[], _tools: ToolDefinition[], _results?: ToolResult[]): AsyncIterable<ChatEvent> {
-      const lastUser = messages.filter(m => m.role === 'user').at(-1)
-      if (!lastUser?.content) {
-        yield { type: 'error', message: 'Нет user-сообщения для отправки' }
+      let payload: string
+      try {
+        payload = await buildCliPrompt({
+          providerId: 'codex-cli',
+          projectPath: cwd ?? null,
+          messages
+        })
+      } catch (err) {
+        yield { type: 'error', message: err instanceof Error ? err.message : String(err) }
         return
       }
 
@@ -71,7 +78,7 @@ export function createCodexCliProvider(opts: CodexCliOptions = {}): ChatProvider
       })
 
       try {
-        child.stdin.write(lastUser.content)
+        child.stdin.write(payload)
         child.stdin.end()
       } catch (err) {
         yield { type: 'error', message: `Codex CLI stdin error: ${err instanceof Error ? err.message : String(err)}` }

@@ -3,6 +3,7 @@ import { platform } from 'os'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import type { ChatProvider, ChatMessage, ChatEvent, ToolDefinition, ToolResult } from './types'
+import { buildCliPrompt } from './cli-prompt'
 
 interface ClaudeCliOptions {
   binary?: string
@@ -53,9 +54,15 @@ export function createClaudeCliProvider(opts: ClaudeCliOptions = {}): ChatProvid
     models: CLAUDE_CLI_MODELS,
 
     async *send(messages: ChatMessage[], _tools: ToolDefinition[], _results?: ToolResult[]): AsyncIterable<ChatEvent> {
-      const lastUser = messages.filter(m => m.role === 'user').at(-1)
-      if (!lastUser?.content) {
-        yield { type: 'error', message: 'Нет user-сообщения для отправки' }
+      let payload: string
+      try {
+        payload = await buildCliPrompt({
+          providerId: 'claude-cli',
+          projectPath: cwd ?? null,
+          messages
+        })
+      } catch (err) {
+        yield { type: 'error', message: err instanceof Error ? err.message : String(err) }
         return
       }
 
@@ -71,7 +78,7 @@ export function createClaudeCliProvider(opts: ClaudeCliOptions = {}): ChatProvid
       })
 
       try {
-        child.stdin.write(lastUser.content)
+        child.stdin.write(payload)
         child.stdin.end()
       } catch (err) {
         yield { type: 'error', message: `Claude CLI stdin error: ${err instanceof Error ? err.message : String(err)}` }
