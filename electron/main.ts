@@ -40,8 +40,14 @@ function createWindow(): void {
     icon: iconPath,
     webPreferences: {
       preload: join(HERE, '../preload/preload.mjs'),
-      // sandbox stays default (true) — preload uses contextBridge so no Node
-      // access needed in renderer. contextIsolation is on by default.
+      // sandbox: false is REQUIRED because our preload is an ESM (.mjs) file.
+      // Electron's renderer sandbox is incompatible with ESM preloads — with
+      // sandbox enabled, the preload silently fails to execute and window.api
+      // is undefined (black screen). The remaining defence-in-depth: strict
+      // contextIsolation + nodeIntegration:false (renderer still cannot reach
+      // Node APIs except those we explicitly expose via contextBridge), plus
+      // CSP in production.
+      sandbox: false,
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: true  // Allow <webview> for the in-app browser
