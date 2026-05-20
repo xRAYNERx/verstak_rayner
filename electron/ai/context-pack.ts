@@ -27,6 +27,9 @@ export interface ContextPackInput {
   recentWrites?: Array<{ filePath: string; createdAt: number }>
   /** Latest user message — scanned for absolute paths outside the active project. */
   latestUserMessage?: string
+  /** True when this is the first user message in the chat session. We nudge
+   *  the model to call get_project_map BEFORE reading individual files. */
+  isFirstTurn?: boolean
 }
 
 /**
@@ -37,6 +40,13 @@ export interface ContextPackInput {
 export async function buildContextPack(input: ContextPackInput): Promise<string> {
   const { projectPath } = input
   const parts: string[] = []
+
+  // -1. First-turn nudge: AI tends to dive into read_file before understanding
+  //     the project shape. When this is the first user message, suggest
+  //     get_project_map first for structure/architecture questions.
+  if (input.isFirstTurn) {
+    parts.push(`first_turn: true — для вопросов про архитектуру/структуру/стек проекта СНАЧАЛА вызови get_project_map (это дешевле чем несколько read_file). Для конкретных задач — действуй как обычно.`)
+  }
 
   // 0. Cross-project path warning — if user mentioned an absolute path that
   //    isn't inside this project, the AI can't access it. We surface this so

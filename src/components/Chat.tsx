@@ -52,7 +52,9 @@ async function blobToAttachment(blob: Blob, fallbackName: string): Promise<Attac
 }
 
 export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatProps) {
-  const { messages, addMessage, updateLastAssistant, isStreaming, setStreaming, activity, sessionUsage } = useProject()
+  const { messages, addMessage, updateLastAssistant, isStreaming, setStreaming, activity, sessionUsage, path: activePath, chatSessions, activeChatId } = useProject()
+  const projectName = activePath ? activePath.replace(/^.*[\\/]/, '') : null
+  const activeChatTitle = chatSessions.find(s => s.id === activeChatId)?.title ?? null
   const provider = useProvider()
   const [input, setInput] = useState('')
   /** Live token-count preview for whatever is in the composer right now. */
@@ -446,6 +448,19 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
             <div className="gg-drop-icon">📎</div>
             <div>Брось файлы сюда — изображения, PDF, текст</div>
           </div>
+        </div>
+      )}
+
+      {projectName && (
+        <div className="gg-chat-project-bar" title={activePath ?? ''}>
+          <span className="gg-chat-project-icon">📁</span>
+          <span className="gg-chat-project-name">{projectName}</span>
+          {activeChatTitle && (
+            <>
+              <span className="gg-chat-project-sep">·</span>
+              <span className="gg-chat-project-chat">{activeChatTitle}</span>
+            </>
+          )}
         </div>
       )}
 

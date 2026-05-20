@@ -87,10 +87,13 @@ export function registerAiIpc(deps: AiDeps): void {
       if (projectPath) {
         try {
           const lastUser = messages.filter(m => m.role === 'user').at(-1)
+          // First turn = no prior assistant message in the conversation
+          const isFirstTurn = !messages.some(m => m.role === 'assistant')
           contextPack = await buildContextPack({
             projectPath,
             recentWrites: deps.recentWrites(projectPath, 8),
-            latestUserMessage: lastUser?.content ?? ''
+            latestUserMessage: lastUser?.content ?? '',
+            isFirstTurn
           })
         } catch { /* never block the send if context pack fails */ }
       }

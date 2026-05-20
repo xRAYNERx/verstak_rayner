@@ -664,6 +664,21 @@
   min-height: 0;
 }
 
+/* Active-project badge — visible header so user always knows which project AI sees */
+.gg-chat-project-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 24px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+.gg-chat-project-icon { font-size: 14px; opacity: 0.85; }
+.gg-chat-project-name { font-weight: 600; color: var(--text-primary); }
+.gg-chat-project-sep { color: var(--text-disabled); }
+.gg-chat-project-chat { color: var(--text-tertiary); }
+
 /* ─── Chat ─── */
 .gg-chat {
   display: flex; flex-direction: column;

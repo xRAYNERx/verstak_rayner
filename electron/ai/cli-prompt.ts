@@ -77,10 +77,12 @@ ${trimmedUser}
   //    outside this project.
   if (projectPath) {
     try {
+      const isFirstTurn = !messages.some(m => m.role === 'assistant')
       const pack = await buildContextPack({
         projectPath,
         recentWrites: recentWrites ?? [],
-        latestUserMessage: lastUser.content
+        latestUserMessage: lastUser.content,
+        isFirstTurn
       })
       if (pack) sections.push(pack)
     } catch { /* never block CLI send if context pack fails */ }
