@@ -101,6 +101,9 @@ declare global {
         updateStep: (id: number, patch: { status?: StepStatus; result?: string | null }) => Promise<void>
         remove: (id: number) => Promise<void>
       }
+      verify: {
+        exec: (command: string) => Promise<{ exitCode: number; stdout: string; stderr: string }>
+      }
       term: {
         spawn: (cwd: string) => Promise<number>
         write: (id: number, data: string) => Promise<void>

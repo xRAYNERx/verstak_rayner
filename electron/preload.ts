@@ -80,6 +80,9 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('plans:update-step', id, patch),
     remove: (id: number) => ipcRenderer.invoke('plans:remove', id)
   },
+  verify: {
+    exec: (command: string) => ipcRenderer.invoke('verify:exec', command) as Promise<{ exitCode: number; stdout: string; stderr: string }>
+  },
   term: {
     spawn: (cwd: string) => ipcRenderer.invoke('term:spawn', cwd) as Promise<number>,
     write: (id: number, data: string) => ipcRenderer.invoke('term:write', id, data),

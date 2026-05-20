@@ -23,6 +23,8 @@ export function PlanView() {
   const [plans, setPlans] = useState<Plan[]>([])
   const [activeId, setActiveId] = useState<number | null>(null)
   const [composer, setComposer] = useState<{ title: string; rawSteps: string }>({ title: '', rawSteps: '' })
+  const [autopilot, setAutopilot] = useState({ enabled: false, maxSteps: 5, verifyCmd: '' })
+  const [autopilotLog, setAutopilotLog] = useState<string[]>([])
 
   async function refresh() {
     if (!path) return
@@ -82,21 +84,60 @@ export function PlanView() {
     if (!path || isStreaming) return
     // Snapshot the pending steps in order so we don't re-pick a step that was just done
     const queue = plan.steps.filter(s => s.status === 'pending' || s.status === 'failed').map(s => s.id)
+    const limit = autopilot.enabled ? Math.max(1, Math.min(20, autopilot.maxSteps)) : queue.length
+    setAutopilotLog([])
+    let ran = 0
     for (const stepId of queue) {
+      if (ran >= limit) {
+        setAutopilotLog(l => [...l, `⏸ Лимит автопилота ${limit} шагов достигнут — пауза.`])
+        break
+      }
       // Re-fetch the latest plan in case user manually toggled something
       const fresh = await window.api.plans.get(plan.id)
       if (!fresh) break
       const step = fresh.steps.find(s => s.id === stepId)
       if (!step) continue
       if (step.status !== 'pending' && step.status !== 'failed') continue
+      setAutopilotLog(l => [...l, `▶ ${step.title}`])
       await runStep(fresh, step)
       await waitForStepCompletion(stepId)
       await refresh()
+      ran++
       // Abort if user cancelled or step failed
       const updated = await window.api.plans.get(plan.id)
       const final = updated?.steps.find(s => s.id === stepId)
-      if (!final || final.status === 'failed') break
+      if (!final || final.status === 'failed') {
+        setAutopilotLog(l => [...l, `✗ Шаг провалился — стоп.`])
+        break
+      }
+      // Autopilot verification: run a shell command after each step. If it
+      // exits non-zero, mark step as failed and stop the pipeline.
+      if (autopilot.enabled && autopilot.verifyCmd.trim()) {
+        const cmd = autopilot.verifyCmd.trim()
+        setAutopilotLog(l => [...l, `⚙ verify: ${cmd}`])
+        try {
+          const res = await runVerifyCommand(cmd, path!)
+          if (res.exitCode === 0) {
+            setAutopilotLog(l => [...l, `✓ verify ok`])
+          } else {
+            setAutopilotLog(l => [...l, `✗ verify failed (exit ${res.exitCode}): ${res.stderr.slice(0, 200)}`])
+            await window.api.plans.updateStep(stepId, { status: 'failed', result: `verify failed: ${res.stderr.slice(0, 500)}` })
+            await refresh()
+            break
+          }
+        } catch (err) {
+          setAutopilotLog(l => [...l, `✗ verify crash: ${err instanceof Error ? err.message : String(err)}`])
+          break
+        }
+      }
     }
+    setAutopilotLog(l => [...l, `— Автопилот завершён, выполнено ${ran} шагов.`])
+  }
+
+  /** Run a verify command (bypasses AI confirmation — user typed it in autopilot settings). */
+  async function runVerifyCommand(cmd: string, _cwd: string): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+    void _cwd  // verify:exec uses the active project root in main
+    return await window.api.verify.exec(cmd)
   }
 
   async function runStep(plan: Plan, step: PlanStep) {
@@ -201,13 +242,54 @@ ${remaining || '— нет —'}
                       className="gg-btn gg-btn-primary"
                       onClick={() => void runAll(active)}
                       disabled={isStreaming}
-                      title="Запустить все pending-шаги по очереди"
+                      title={autopilot.enabled
+                        ? `Автопилот: до ${autopilot.maxSteps} шагов${autopilot.verifyCmd ? ', verify: ' + autopilot.verifyCmd : ''}`
+                        : 'Запустить все pending-шаги по очереди'}
                     >
-                      ▶▶ Все шаги
+                      {autopilot.enabled ? '🤖' : '▶▶'} {autopilot.enabled ? 'Автопилот' : 'Все шаги'}
                     </button>
                   )}
                   <button className="gg-btn gg-btn-ghost gg-btn-danger" onClick={() => void removePlan(active.id)}>Удалить</button>
                 </div>
+                <div className="gg-autopilot-panel">
+                  <label className="gg-autopilot-toggle">
+                    <input
+                      type="checkbox"
+                      checked={autopilot.enabled}
+                      onChange={e => setAutopilot(a => ({ ...a, enabled: e.target.checked }))}
+                    />
+                    <span>🤖 Автопилот</span>
+                  </label>
+                  {autopilot.enabled && (
+                    <>
+                      <label className="gg-autopilot-field">
+                        макс. шагов
+                        <input
+                          type="number"
+                          min={1}
+                          max={20}
+                          value={autopilot.maxSteps}
+                          onChange={e => setAutopilot(a => ({ ...a, maxSteps: parseInt(e.target.value) || 5 }))}
+                        />
+                      </label>
+                      <label className="gg-autopilot-field gg-autopilot-field-wide">
+                        verify:
+                        <input
+                          type="text"
+                          placeholder='напр. "npm test" или "npx tsc --noEmit"'
+                          value={autopilot.verifyCmd}
+                          onChange={e => setAutopilot(a => ({ ...a, verifyCmd: e.target.value }))}
+                          spellCheck={false}
+                        />
+                      </label>
+                    </>
+                  )}
+                </div>
+                {autopilotLog.length > 0 && (
+                  <div className="gg-autopilot-log">
+                    {autopilotLog.map((l, i) => <div key={i}>{l}</div>)}
+                  </div>
+                )}
                 <div className="gg-plan-steps">
                   {active.steps.map(step => {
                     const isRunningThisOne = runningPlanStep?.stepId === step.id

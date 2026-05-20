@@ -27,6 +27,7 @@ import { createPlans } from './storage/plans'
 import { registerPlansIpc } from './ipc/plans'
 import { createFeedback } from './storage/feedback'
 import { registerFeedbackIpc } from './ipc/feedback'
+import { registerVerifyIpc } from './ipc/verify'
 import { createConnectorRegistry } from './connectors/registry'
 
 function createWindow(): void {
@@ -109,6 +110,7 @@ app.whenReady().then(() => {
   registerUndoIpc(undoStack)
   registerPlansIpc(plans)
   registerFeedbackIpc(feedback)
+  registerVerifyIpc(getActiveProjectPath)
   registerTerminalIpc()
   createWindow()
 })
