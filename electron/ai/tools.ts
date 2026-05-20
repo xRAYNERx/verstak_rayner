@@ -6,6 +6,7 @@ import { existsSync } from 'fs'
 import type { ToolDefinition } from './types'
 import { classifyCommand } from './command-policy'
 import { isForbiddenPath, scanText } from './secret-scanner'
+import { getProjectMap, invalidateProjectMap, projectMapToText } from './project-map'
 
 const execFileAsync = promisify(execFile)
 
@@ -77,6 +78,26 @@ export const TOOL_DEFS: ToolDefinition[] = [
         pattern: { type: 'string', description: 'Glob, например "**/*.test.ts" или "src/**/Chat.tsx".' }
       },
       required: ['pattern']
+    }
+  },
+  {
+    name: 'get_project_map',
+    description: 'Получить структуру проекта одной командой: дерево директорий + top-level символы (functions, classes, components, types, exports) для каждого *.ts/*.tsx/*.js/*.jsx файла + количество строк. Используй ВПЕРВЫЕ при незнакомом проекте — экономит десятки read_file/list_directory вызовов. Карта кэшируется; для обновления вызови refresh_project_map.',
+    parameters: {
+      type: 'object',
+      properties: {
+        format: { type: 'string', description: '"text" (default, компактный markdown) или "json" (структура).' }
+      }
+    }
+  },
+  {
+    name: 'refresh_project_map',
+    description: 'Принудительно пересканировать проект и обновить project map. Вызывай после крупных изменений структуры (новые файлы, переименования). Возвращает свежую карту.',
+    parameters: {
+      type: 'object',
+      properties: {
+        format: { type: 'string', description: '"text" или "json".' }
+      }
     }
   },
   {
@@ -383,6 +404,8 @@ export function createFileTools(root: string): FileTools {
         }
         const abs = safeJoin(root, relPath)
         await writeFile(abs, String(args.content), 'utf8')
+        // Invalidate project map cache so the next get_project_map sees this file
+        invalidateProjectMap(root)
         return { ok: true }
       }
       if (name === 'run_command') {
@@ -423,6 +446,17 @@ export function createFileTools(root: string): FileTools {
         if (!pattern) throw new Error('find_files: пустой pattern')
         const files = await findFiles(root, pattern)
         return { files, truncated: files.length >= 200 }
+      }
+      if (name === 'get_project_map') {
+        const map = await getProjectMap(root, false)
+        const fmt = String(args.format ?? 'text')
+        return fmt === 'json' ? map : projectMapToText(map)
+      }
+      if (name === 'refresh_project_map') {
+        invalidateProjectMap(root)
+        const map = await getProjectMap(root, true)
+        const fmt = String(args.format ?? 'text')
+        return fmt === 'json' ? map : projectMapToText(map)
       }
       throw new Error(`Неизвестный tool: ${name}`)
     }
