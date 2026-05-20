@@ -26,7 +26,7 @@ const PROVIDER_META: Record<ProviderId, Omit<ProviderInfo, 'model' | 'id'>> = {
   'gemini-cli': {
     label: 'Gemini Ultra',
     transport: 'CLI',
-    models: ['auto', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-3-pro-preview', 'gemini-3-flash-preview'],
+    models: ['auto', 'gemini-3-pro', 'gemini-3.5-flash', 'gemini-3-flash', 'gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'],
     supportsTools: false
   },
   claude: {

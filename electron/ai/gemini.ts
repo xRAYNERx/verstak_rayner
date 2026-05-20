@@ -8,7 +8,7 @@ interface GeminiOptions {
   sdk?: { models: { generateContentStream: (opts: unknown) => Promise<AsyncIterable<unknown>> } }
 }
 
-const MODELS = ['gemini-2.5-pro', 'gemini-2.5-flash']
+const MODELS = ['gemini-3.5-flash', 'gemini-3-pro', 'gemini-3-flash', 'gemini-2.5-pro', 'gemini-2.5-flash']
 
 function partsForMessage(m: ChatMessage): Array<Record<string, unknown>> {
   const parts: Array<Record<string, unknown>> = []
@@ -42,7 +42,7 @@ function partsForMessage(m: ChatMessage): Array<Record<string, unknown>> {
 }
 
 export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
-  const model = opts.model ?? 'gemini-2.5-pro'
+  const model = opts.model ?? 'gemini-3.5-flash'
   const client = opts.sdk ?? new GoogleGenAI({ apiKey: opts.apiKey })
 
   return {
