@@ -281,6 +281,12 @@ async function runApiConversation(
         writePromises.push({ idx: i, promise: handleWriteFile(sender, sendId, tools, call, projectPath, recordWrite) })
         continue
       }
+      if (call.name === 'propose_edits') {
+        // Fan out into one synthetic write_file per edit. All hit the same
+        // multi-file diff modal, so the user gets one accept-all click.
+        writePromises.push({ idx: i, promise: handleProposeEdits(sender, sendId, tools, call, projectPath, recordWrite) })
+        continue
+      }
       if (call.name === 'run_command') {
         toolResults[i] = await handleRunCommand(sender, sendId, tools, call)
         continue
@@ -490,6 +496,65 @@ function summarizeToolCall(name: string, args: Record<string, unknown>, result: 
     return { label: `browser_read_page`, detail: args.selector ? String(args.selector) : '(вся страница)' }
   }
   return null
+}
+
+/**
+ * Atomic multi-file edit. Splits the batch into individual pending-write
+ * events that share the existing diff-confirmation modal. Each child write is
+ * tracked separately for accept/reject; the parent tool result aggregates.
+ */
+async function handleProposeEdits(
+  sender: TaggedSender,
+  sendId: number,
+  tools: ReturnType<typeof createFileTools>,
+  call: ToolCall,
+  projectPath: string,
+  recordWrite: (projectPath: string, filePath: string, before: string, after: string) => void
+): Promise<ToolResult> {
+  const rawEdits = Array.isArray(call.args.edits) ? call.args.edits : []
+  const summary = typeof call.args.summary === 'string' ? call.args.summary : ''
+  const edits = rawEdits
+    .filter((e: unknown): e is Record<string, unknown> => typeof e === 'object' && e !== null)
+    .map(e => ({
+      path: String((e as Record<string, unknown>).path ?? ''),
+      content: String((e as Record<string, unknown>).content ?? ''),
+      reason: (e as Record<string, unknown>).reason != null ? String((e as Record<string, unknown>).reason) : null
+    }))
+    .filter(e => e.path.length > 0)
+
+  if (edits.length === 0) {
+    return { id: call.id, name: call.name, result: '', error: 'propose_edits: пустой список edits' }
+  }
+  if (edits.length > 20) {
+    return { id: call.id, name: call.name, result: '', error: 'propose_edits: максимум 20 правок за раз' }
+  }
+
+  // Fan out into synthetic write_file calls — each gets its own callId so
+  // the renderer can ack them independently in the multi-file modal.
+  const childPromises = edits.map((edit, idx) => {
+    const childCall: ToolCall = {
+      id: `${call.id}-${idx}`,
+      name: 'write_file',
+      args: { path: edit.path, content: edit.content }
+    }
+    return handleWriteFile(sender, sendId, tools, childCall, projectPath, recordWrite)
+      .then(r => ({ edit, result: r }))
+  })
+
+  const results = await Promise.all(childPromises)
+  const accepted = results.filter(r => !r.result.error).length
+  const rejected = results.length - accepted
+  const detail = [
+    summary || `Пакет правок (${edits.length})`,
+    ...results.map(r => `${r.result.error ? '✗' : '✓'} ${r.edit.path}${r.edit.reason ? ` — ${r.edit.reason}` : ''}`)
+  ].join('\n')
+
+  return {
+    id: call.id,
+    name: call.name,
+    result: `propose_edits: принято ${accepted} / ${edits.length}, отклонено ${rejected}\n${detail}`,
+    ...(accepted === 0 ? { error: 'Все правки отклонены пользователем' } : {})
+  }
 }
 
 async function handleBrowserTool(sender: TaggedSender, call: ToolCall): Promise<ToolResult> {

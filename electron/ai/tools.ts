@@ -80,6 +80,30 @@ export const TOOL_DEFS: ToolDefinition[] = [
     }
   },
   {
+    name: 'propose_edits',
+    description: 'Атомарно предложить пакет изменений нескольких файлов сразу. Пользователь увидит все диффы в одной модалке с вкладками и сможет принять все одной кнопкой. Используй для рефакторингов, переименований, синхронных правок в нескольких местах — вместо последовательной серии write_file. Каждый элемент edits — это {path, content, reason}: reason кратко объясняет зачем эта правка.',
+    parameters: {
+      type: 'object',
+      properties: {
+        edits: {
+          type: 'array',
+          description: 'Список правок (1..20).',
+          items: {
+            type: 'object',
+            properties: {
+              path: { type: 'string', description: 'Относительный путь от корня проекта.' },
+              content: { type: 'string', description: 'Полное новое содержимое файла.' },
+              reason: { type: 'string', description: 'Краткое обоснование правки (1 строка).' }
+            },
+            required: ['path', 'content']
+          }
+        },
+        summary: { type: 'string', description: 'Общий заголовок пакета правок, 1 строка.' }
+      },
+      required: ['edits']
+    }
+  },
+  {
     name: 'list_connectors',
     description: 'Перечислить внешние коннекторы (1С OData и т.п.) — что подключено, готово ли к работе. Возвращает массив { id, label, kind, status, detail }.',
     parameters: { type: 'object', properties: {} }
