@@ -24,6 +24,8 @@ contextBridge.exposeInMainWorld('api', {
     resolveCommand: (callId: string, accept: boolean) =>
       ipcRenderer.invoke('ai:resolve-command', callId, accept),
     stop: (sendId: number) => ipcRenderer.invoke('ai:stop', sendId),
+    countTokens: (text: string, projectPath: string | null) =>
+      ipcRenderer.invoke('ai:count-tokens', text, projectPath) as Promise<{ tokens: number; exact: boolean; providerId: string }>,
     onEvent: (cb: (data: { id: number; event: unknown }) => void) => {
       const handler = (_e: unknown, data: { id: number; event: unknown }) => cb(data)
       ipcRenderer.on('ai:event', handler)

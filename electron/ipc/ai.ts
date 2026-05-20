@@ -159,6 +159,46 @@ export function registerAiIpc(deps: AiDeps): void {
     }
   })
 
+  /**
+   * Count tokens for an outgoing prompt before send. Lets the renderer show a
+   * "≈ N tokens, ~$X" preview in the composer. Only implemented for providers
+   * that expose a real countTokens API — others get a rough estimate.
+   */
+  ipcMain.handle('ai:count-tokens', async (_e, text: string, projectPath: string | null) => {
+    const providerId = deps.getProviderId()
+    const descriptor = PROVIDERS[providerId]
+    const apiKey = descriptor.secretKey ? deps.getSecret(descriptor.secretKey) : null
+    // No API key or CLI provider — fall back to a rough heuristic (~4 chars/token)
+    if (!apiKey || descriptor.transport !== 'API') {
+      const rough = Math.ceil((text?.length ?? 0) / 4)
+      return { tokens: rough, exact: false, providerId }
+    }
+    try {
+      // Currently we have a true countTokens path only for Gemini API. Others
+      // use the heuristic — extend as we add adapters.
+      if (providerId === 'gemini-api') {
+        const { GoogleGenAI } = await import('@google/genai')
+        const client = new GoogleGenAI({ apiKey })
+        const model = deps.getProviderModel(providerId) ?? descriptor.defaultModel
+        const userLayer = await loadUserLayer(projectPath)
+        const composed = composeSystemPrompt(userLayer)
+        // Cheap approximation of the full context size: system + user text.
+        const res = await (client.models as unknown as {
+          countTokens: (opts: { model: string; contents: Array<{ role: string; parts: Array<{ text: string }> }> }) => Promise<{ totalTokens?: number }>
+        }).countTokens({
+          model,
+          contents: [
+            { role: 'user', parts: [{ text: composed.system + '\n\n' + (text ?? '') }] }
+          ]
+        })
+        return { tokens: res.totalTokens ?? 0, exact: true, providerId }
+      }
+    } catch (err) {
+      console.error('[count-tokens]', err instanceof Error ? err.message : err)
+    }
+    return { tokens: Math.ceil((text?.length ?? 0) / 4), exact: false, providerId }
+  })
+
   ipcMain.handle('ai:resolve-command', (_e, callId: string, accept: boolean) => {
     for (const [k, p] of pendingCommands) {
       if (k.endsWith('::' + callId)) {

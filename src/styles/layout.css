@@ -959,6 +959,11 @@
   font-family: var(--font-mono);
   font-size: 10.5px;
 }
+.gg-usage-pill.is-preview {
+  border-color: var(--accent-border);
+  background: var(--accent-muted);
+  color: var(--text-secondary);
+}
 .gg-usage-sep { color: var(--text-disabled); }
 .gg-usage-cost { color: var(--accent); font-weight: 500; }
 .gg-terminal-toggle {

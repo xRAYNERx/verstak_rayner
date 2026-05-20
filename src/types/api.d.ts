@@ -56,6 +56,7 @@ declare global {
         resolveWrite: (callId: string, accept: boolean) => Promise<void>
         resolveCommand: (callId: string, accept: boolean) => Promise<void>
         stop: (sendId: number) => Promise<boolean>
+        countTokens: (text: string, projectPath: string | null) => Promise<{ tokens: number; exact: boolean; providerId: string }>
         onEvent: (cb: (data: { id: number; event: ChatEvent; projectPath: string | null }) => void) => () => void
       }
       chatSessions: {

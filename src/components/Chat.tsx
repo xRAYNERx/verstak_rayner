@@ -55,6 +55,8 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
   const { messages, addMessage, updateLastAssistant, isStreaming, setStreaming, activity, sessionUsage } = useProject()
   const provider = useProvider()
   const [input, setInput] = useState('')
+  /** Live token-count preview for whatever is in the composer right now. */
+  const [previewTokens, setPreviewTokens] = useState<{ tokens: number; exact: boolean } | null>(null)
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [dragOver, setDragOver] = useState(false)
   const [warning, setWarning] = useState<string | null>(null)
@@ -277,6 +279,22 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
 
   // Cleanup warning timer on unmount
   useEffect(() => () => { if (warningTimer.current) window.clearTimeout(warningTimer.current) }, [])
+
+  // Live token preview: debounce text changes (400ms) and ask the main process
+  // to count tokens for the current draft. Gemini API gives an exact count;
+  // CLI / other providers get a rough 4-chars-per-token estimate.
+  useEffect(() => {
+    const text = input.trim()
+    if (!text) { setPreviewTokens(null); return }
+    const timer = window.setTimeout(async () => {
+      try {
+        const projectPath = useProject.getState().path
+        const res = await window.api.ai.countTokens(text, projectPath)
+        setPreviewTokens({ tokens: res.tokens, exact: res.exact })
+      } catch { /* silent: it's only a preview */ }
+    }, 400)
+    return () => window.clearTimeout(timer)
+  }, [input])
 
   function onPaste(e: ClipboardEvent<HTMLTextAreaElement>) {
     const items = e.clipboardData?.items
@@ -535,6 +553,26 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
         <div className="gg-composer-hint">
           <span><span className="gg-kbd">Enter</span> отправить · <span className="gg-kbd">Shift</span>+<span className="gg-kbd">Enter</span> новая строка · <span className="gg-kbd">Ctrl+V</span> картинка</span>
           <div className="gg-composer-meta">
+            {previewTokens && previewTokens.tokens > 0 && (() => {
+              const cost = estimateCost(provider.id, provider.model, previewTokens.tokens, 0, 0)
+              const exactBadge = previewTokens.exact ? '' : '≈'
+              return (
+                <span
+                  className="gg-usage-pill is-preview"
+                  title={previewTokens.exact
+                    ? `Точная оценка от ${provider.label}: ${previewTokens.tokens} токенов на следующий запрос${cost.usd ? `, ~${cost.usd} (только input)` : ''}`
+                    : `Грубая оценка (4 символа = 1 токен): ${previewTokens.tokens} токенов`}
+                >
+                  <span>📝 {exactBadge}{formatTokens(previewTokens.tokens)}</span>
+                  {cost.usd && previewTokens.exact && (
+                    <>
+                      <span className="gg-usage-sep">·</span>
+                      <span className="gg-usage-cost">~{cost.usd}</span>
+                    </>
+                  )}
+                </span>
+              )
+            })()}
             {(sessionUsage.inputTokens > 0 || sessionUsage.outputTokens > 0) && (() => {
               const cost = estimateCost(provider.id, provider.model, sessionUsage.inputTokens, sessionUsage.outputTokens, sessionUsage.cachedInputTokens)
               return (
