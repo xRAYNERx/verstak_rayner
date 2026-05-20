@@ -144,6 +144,10 @@ app.whenReady().then(() => {
     recordWrite: (projectPath, filePath, before, after) => {
       undoStack.push(projectPath, filePath, before, after)
     },
+    recentWrites: (projectPath, limit) => {
+      const list = undoStack.list(projectPath)
+      return list.slice(0, limit).map(e => ({ filePath: e.filePath, createdAt: e.createdAt }))
+    },
     recordPlan: (projectPath, title, steps) => {
       const plan = plans.create(projectPath, title, steps)
       return { id: plan.id }

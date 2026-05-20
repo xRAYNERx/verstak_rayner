@@ -3,6 +3,7 @@ import { createFileTools, TOOL_DEFS } from '../ai/tools'
 import { createProvider, PROVIDERS, type ProviderId } from '../ai/registry'
 import { loadUserLayer } from '../ai/user-layer'
 import { composeSystemPrompt } from '../ai/compose-prompt'
+import { buildContextPack } from '../ai/context-pack'
 import type { ChatMessage, ToolCall, ToolResult, ChatProvider } from '../ai/types'
 
 export type { ProviderId } from '../ai/registry'
@@ -13,6 +14,8 @@ interface AiDeps {
   getProviderModel: (id: ProviderId) => string | null
   /** Persist a write so the user can ↶ revert it later. */
   recordWrite: (projectPath: string, filePath: string, before: string, after: string) => void
+  /** Fetch the N most recent accepted writes for the Context Pack. */
+  recentWrites: (projectPath: string, limit: number) => Array<{ filePath: string; createdAt: number }>
   /** Persist a plan emitted by the AI. */
   recordPlan: (projectPath: string, title: string, steps: Array<{ title: string; detail?: string | null }>) => { id: number }
   /** Auto-append a brief entry to the dev journal (file write, command, plan, session summary). */
@@ -77,7 +80,19 @@ export function registerAiIpc(deps: AiDeps): void {
     let messagesWithSystem = messages
     if (injectSystem) {
       const userLayer = await loadUserLayer(projectPath)
-      const composed = composeSystemPrompt(userLayer)
+      // Context Pack — automatic snapshot of git state, recent writes, project
+      // map, verify scripts. Built every send so the model always sees fresh
+      // repo state without spending tool-calls to discover it.
+      let contextPack = ''
+      if (projectPath) {
+        try {
+          contextPack = await buildContextPack({
+            projectPath,
+            recentWrites: deps.recentWrites(projectPath, 8)
+          })
+        } catch { /* never block the send if context pack fails */ }
+      }
+      const composed = composeSystemPrompt(userLayer, contextPack)
       messagesWithSystem = [{ role: 'system', content: composed.system }, ...messages]
     }
 
@@ -181,7 +196,11 @@ export function registerAiIpc(deps: AiDeps): void {
         const client = new GoogleGenAI({ apiKey })
         const model = deps.getProviderModel(providerId) ?? descriptor.defaultModel
         const userLayer = await loadUserLayer(projectPath)
-        const composed = composeSystemPrompt(userLayer)
+        let pack = ''
+        if (projectPath) {
+          try { pack = await buildContextPack({ projectPath, recentWrites: deps.recentWrites(projectPath, 8) }) } catch { /* ignore */ }
+        }
+        const composed = composeSystemPrompt(userLayer, pack)
         // Cheap approximation of the full context size: system + user text.
         const res = await (client.models as unknown as {
           countTokens: (opts: { model: string; contents: Array<{ role: string; parts: Array<{ text: string }> }> }) => Promise<{ totalTokens?: number }>
