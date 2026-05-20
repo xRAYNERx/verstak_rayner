@@ -181,6 +181,43 @@ Goal: сделать продукт лучше Antigravity 2.0 за ночь. Ц
 
 ---
 
+## 2026-05-20 — пост-аудит (4 коммита, Gemini 3.5 wave)
+
+После выхода Gemini 3.5 Flash и аудита от пользователя — закрыты 4 из 5
+приоритетов аудита (multi-chat threads оставлены deferred).
+
+11. **Gemini 3.5 Flash integration** (`3c6fa1f`) — `gemini-3.5-flash`,
+    `gemini-3-pro`, `gemini-3-flash` в списке моделей; 3.5 Flash —
+    дефолт для нового provider. Pricing обновлён.
+12. **Project Map** (`1c2105d`) — `electron/ai/project-map.ts` сканирует
+    проект, извлекает символы из *.ts/.tsx/.js/.jsx через regex.
+    AI tools `get_project_map` (cached) + `refresh_project_map`. Cache
+    инвалидируется при каждом write_file. С 1M контекстом Gemini 3.5
+    можно скармливать всю карту целиком и не тратить десятки
+    list_directory вызовов. 3 теста.
+13. **Plan Autopilot** (`a6d25ad`) — `electron/ipc/verify.ts` (новый
+    IPC `verify:exec`, обходит per-call confirmation, command-policy
+    всё равно работает). PlanView получил 🤖 Автопилот toggle с
+    maxSteps + verifyCmd. После каждого шага автопилот запускает
+    verify (например `npm test` или `npx tsc --noEmit`); non-zero
+    exit помечает шаг failed и стопит pipeline. Live log событий.
+14. **Vision: browser_screenshot** (`4a49138`) — новый AI tool. Делает
+    `webview.capturePage()`, парсит data URL в `Attachment`, кладёт в
+    `pendingAttachments`. После turn'а агентского loop'а attachments
+    флэшаются на следующий user message; Gemini-провайдер уже
+    поддерживает `inlineData` parts. Vision-модели (Gemini 3.5,
+    GPT-4o) видят скриншот и анализируют его. Heavy dataUrl
+    срезается из текстового tool-result чтобы не платить дважды.
+
+### Deferred из аудита
+
+- **Threaded chats** (древовидная структура бесед) — отложено.
+  Текущая Sidebar Chat-секция со списком сессий покрывает
+  use case "разные модели на разные задачи", полные threads
+  требуют рефакторинга чат-стора и UI.
+
+---
+
 ## Следующие шаги (черновик)
 
 1. **Multi-provider (v0.2).** Claude API + Claude Code CLI + GPT API + Codex CLI. Дизайн уже описан в брейнсторме (Settings → список провайдеров + переключатель в чате).
