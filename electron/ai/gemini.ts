@@ -86,37 +86,51 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
           hasConfig ? { model, contents, config } : { model, contents }
         )
         let lastUsage: { prompt?: number; output?: number; cached?: number } = {}
-        let textEmitted = false
+        let totalText = ''  // accumulate all text characters that we actually emitted
         let toolEmitted = false
         let lastFinishReason: string | undefined
         let lastBlockReason: string | undefined
-        let chunkIdx = 0
+        let chunkCount = 0
+        // Track raw chunk shapes so we can show a diagnostic if everything stays empty
+        const sampleChunks: string[] = []
         for await (const chunk of stream) {
-          // Debug — dump first few chunks to the main-process console so we can
-          // see what Gemini actually sends back. Remove once stable.
-          if (chunkIdx < 5) {
+          chunkCount++
+          if (sampleChunks.length < 3) {
             try {
               const dump = JSON.stringify(chunk, (_k, v) => typeof v === 'function' ? '[fn]' : v)
-              console.error(`[gemini chunk ${chunkIdx}]`, dump.slice(0, 1500))
+              sampleChunks.push(dump.slice(0, 400))
+              console.error(`[gemini chunk ${chunkCount - 1}]`, dump.slice(0, 1500))
             } catch { /* ignore */ }
-            chunkIdx++
           }
           const c = chunk as {
             text?: string
             functionCalls?: Array<{ name: string; args: Record<string, unknown> }>
             usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; cachedContentTokenCount?: number }
-            candidates?: Array<{ finishReason?: string; finishMessage?: string; content?: { parts?: Array<{ text?: string; functionCall?: { name: string; args: Record<string, unknown> } }> } }>
+            candidates?: Array<{
+              finishReason?: string
+              finishMessage?: string
+              content?: { parts?: Array<{ text?: string; functionCall?: { name: string; args: Record<string, unknown> } }> }
+            }>
             promptFeedback?: { blockReason?: string; blockReasonMessage?: string }
           }
-          // Primary path: SDK exposes chunk.text as a getter on the candidate's first text part
-          if (c.text) { yield { type: 'text', text: c.text }; textEmitted = true }
-          // Fallback: walk candidates[0].content.parts manually in case the
-          // getter is missing or undefined for this build of @google/genai.
-          else if (c.candidates?.[0]?.content?.parts) {
+
+          // 1. Try the SDK convenience getter (may throw or return undefined depending on SDK build)
+          let topText: string | undefined
+          try { topText = c.text } catch { topText = undefined }
+          if (topText) {
+            yield { type: 'text', text: topText }
+            totalText += topText
+          }
+
+          // 2. Always also walk candidates[].content.parts — picks up text the getter missed
+          //    AND function calls that live inside the candidate (Gemini 3 puts them here).
+          //    Skipped only if we already got the same content via the getter above —
+          //    we de-duplicate by checking if `topText` already accounts for parts text.
+          if (c.candidates?.[0]?.content?.parts) {
             for (const part of c.candidates[0].content.parts) {
-              if (part.text) {
+              if (part.text && !topText) {  // avoid double-emit if getter already gave us this text
                 yield { type: 'text', text: part.text }
-                textEmitted = true
+                totalText += part.text
               }
               if (part.functionCall) {
                 yield { type: 'tool-call', call: { id: randomUUID(), name: part.functionCall.name, args: part.functionCall.args } }
@@ -124,12 +138,15 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
               }
             }
           }
+
+          // 3. Top-level functionCalls (SDK convenience)
           if (c.functionCalls) {
             for (const fc of c.functionCalls) {
               yield { type: 'tool-call', call: { id: randomUUID(), name: fc.name, args: fc.args } }
               toolEmitted = true
             }
           }
+
           if (c.usageMetadata) {
             lastUsage = {
               prompt: c.usageMetadata.promptTokenCount,
@@ -140,15 +157,15 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
           if (c.candidates?.[0]?.finishReason) lastFinishReason = c.candidates[0].finishReason
           if (c.promptFeedback?.blockReason) lastBlockReason = c.promptFeedback.blockReason
         }
-        // If the response was empty (no text, no tool calls), surface why.
-        // Gemini's safety filter / recitation block / max-tokens-empty are all
-        // silent in the data stream — only `finishReason` / `blockReason` say.
-        if (!textEmitted && !toolEmitted) {
+
+        // If the visible response is empty (no actual characters, no tool calls), surface why.
+        // Whitespace-only counts as empty for UI purposes — user would see nothing.
+        if (!totalText.trim() && !toolEmitted) {
           let reason = ''
           if (lastBlockReason) {
             reason = `⚠ Запрос заблокирован Gemini: ${lastBlockReason}. Перефразируй и попробуй ещё раз.`
           } else if (lastFinishReason === 'SAFETY') {
-            reason = '⚠ Ответ заблокирован safety-фильтром Gemini. Попробуй перефразировать запрос.'
+            reason = '⚠ Ответ заблокирован safety-фильтром Gemini. Попробуй перефразировать запрос (избегай opечаток в слэнге).'
           } else if (lastFinishReason === 'RECITATION') {
             reason = '⚠ Ответ заблокирован recitation-фильтром (Gemini считает что вывод копирует обучающие данные).'
           } else if (lastFinishReason === 'MAX_TOKENS') {
@@ -156,7 +173,9 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
           } else if (lastFinishReason && lastFinishReason !== 'STOP') {
             reason = `⚠ Gemini завершил ответ без текста, finishReason=${lastFinishReason}.`
           } else {
-            reason = '⚠ Gemini вернул пустой ответ. Возможно сработал фильтр или модель не справилась — попробуй перефразировать.'
+            // No clear reason — include diagnostic so we can debug what came back
+            const sample = sampleChunks[0] ?? '(нет данных)'
+            reason = `⚠ Gemini вернул пустой ответ (${chunkCount} chunks, output_tokens=${lastUsage.output ?? '?'}, finishReason=${lastFinishReason ?? '?'}). Первый chunk: ${sample.slice(0, 200)}`
           }
           yield { type: 'text', text: reason }
         }
