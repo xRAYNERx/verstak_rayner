@@ -134,6 +134,33 @@ export function createHttpConnector(): Connector {
         if (qs) url += (url.includes('?') ? '&' : '?') + qs
       }
 
+      // SECURITY: prevent SSRF / host pivoting via path traversal or @-tricks.
+      // Parse the constructed URL and verify its hostname AND protocol still
+      // match the configured base. If the AI smuggled "/../other-host" or
+      // "//evil.example.com" into path, the URL parser will reveal the shift.
+      let finalUrl: URL
+      let baseParsed: URL
+      try {
+        finalUrl = new URL(url)
+        baseParsed = new URL(baseUrl)
+      } catch {
+        return { error: 'bad-args', message: `Не удалось разобрать URL: ${url}` }
+      }
+      if (finalUrl.protocol !== baseParsed.protocol || finalUrl.host !== baseParsed.host) {
+        return {
+          error: 'ssrf-blocked',
+          message: `Запрещено: путь "${path}" уводит запрос с ${baseParsed.host} на ${finalUrl.host}.`
+        }
+      }
+      // Also block requests to loopback / link-local / private metadata services
+      // EVEN if the user configured them as base (defence in depth — a user
+      // misconfig shouldn't auto-grant the AI access to 169.254.169.254 etc.)
+      const host = finalUrl.hostname.toLowerCase()
+      if (host === 'metadata.google.internal' || host === '169.254.169.254' || host === '100.100.100.200') {
+        return { error: 'ssrf-blocked', message: `Запрещено: метаданные облака.` }
+      }
+      url = finalUrl.toString()
+
       // Headers: user-supplied first, then auth header from config (auth wins).
       const headers: Record<string, string> = { 'Accept': 'application/json, text/*;q=0.9, */*;q=0.5' }
       if (args.headers && typeof args.headers === 'object' && !Array.isArray(args.headers)) {

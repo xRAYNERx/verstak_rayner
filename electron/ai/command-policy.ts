@@ -29,7 +29,10 @@ interface DenyRule {
 }
 
 const DENY_RULES: DenyRule[] = [
-  { pattern: /\brm\s+(-[a-z]*r[a-z]*f?|-rf|-fr)\s+(\/|~|\$HOME|\.\.)/i, reason: 'Запрещено: rm -rf за пределами проекта или на корень' },
+  // rm catch-all: any rm invocation with -r AND -f flags (combined or split) targeting root/home/parent
+  { pattern: /\brm\b(?=[^\n]*\b-[a-z]*r[a-z]*\b|[^\n]*-r\b)(?=[^\n]*-[a-z]*f|[^\n]*-f\b)[^\n]*\s+(\/|~|\$HOME|\.\.)/i, reason: 'Запрещено: rm -r -f за пределами проекта или на корень' },
+  // Also block plain rm -rf on root regardless of flag order (legacy/simpler)
+  { pattern: /\brm\s+(-[a-z]*r[a-z]*f?|-rf|-fr|-r\s+-f|-f\s+-r)\s+(\/|~|\$HOME|\.\.)/i, reason: 'Запрещено: rm -rf за пределами проекта или на корень' },
   { pattern: /\b(format|mkfs|fdisk|diskpart)\b/i,                       reason: 'Запрещено: операции над дисками / файловой системой' },
   { pattern: /\bdd\s+if=.*of=\/dev\b/i,                                  reason: 'Запрещено: запись на сырой блочный девайс через dd' },
   { pattern: /:\s*\(\s*\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:/,           reason: 'Запрещено: fork-bomb' },
@@ -39,11 +42,25 @@ const DENY_RULES: DenyRule[] = [
   { pattern: /\bsudo\s+rm\b/i,                                           reason: 'Запрещено: sudo rm' },
   { pattern: /\bgit\s+push\s+.*--force\b/i,                              reason: 'Запрещено: git push --force (фиксить вручную при необходимости)' },
   { pattern: /\bgit\s+(reset\s+--hard\s+HEAD~|clean\s+-fdx|filter-(repo|branch))/i, reason: 'Запрещено: разрушающие git операции' },
-  { pattern: /\.ssh|id_rsa|id_ed25519|\.aws\/credentials|\.npmrc/i,      reason: 'Запрещено: чтение/копирование ключей и токенов' }
+  { pattern: /\.ssh|id_rsa|id_ed25519|\.aws\/credentials|\.npmrc/i,      reason: 'Запрещено: чтение/копирование ключей и токенов' },
+  // PowerShell EncodedCommand bypass: payload is base64, denylist can't inspect contents
+  { pattern: /\bpowershell(\.exe)?\b[^\n]*\s-[eE](?:nc(?:oded(?:command)?)?)?\b/i, reason: 'Запрещено: powershell -EncodedCommand (запутанная команда)' },
+  // cmd /c with variable expansion is a common obfuscation pattern
+  { pattern: /\bcmd(\.exe)?\s+\/[cC]\b[^\n]*(%[^%\s]+%|![\w]+!)/i,        reason: 'Запрещено: cmd /c с переменными расширения — попытка обфускации' },
+  // Invoke-Expression (PowerShell eval) is RCE-by-design
+  { pattern: /\b(iex|invoke-expression)\b/i,                              reason: 'Запрещено: PowerShell Invoke-Expression / iex' }
 ]
 
+/**
+ * Normalize a command before checking — collapses whitespace runs so patterns
+ * that match `\s+` don't trip on multi-space obfuscation.
+ */
+function normalize(s: string): string {
+  return s.replace(/[\t ]+/g, ' ').trim()
+}
+
 export function classifyCommand(command: string): CommandClassification {
-  const trimmed = command.trim()
+  const trimmed = normalize(command)
   if (!trimmed) return { allowed: false, reason: 'Пустая команда' }
   for (const rule of DENY_RULES) {
     if (rule.pattern.test(trimmed)) {

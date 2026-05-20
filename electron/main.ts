@@ -1,4 +1,4 @@
-import { app, BrowserWindow, safeStorage } from 'electron'
+import { app, BrowserWindow, safeStorage, session } from 'electron'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { mkdirSync } from 'fs'
@@ -40,7 +40,10 @@ function createWindow(): void {
     icon: iconPath,
     webPreferences: {
       preload: join(HERE, '../preload/preload.mjs'),
-      sandbox: false,
+      // sandbox stays default (true) — preload uses contextBridge so no Node
+      // access needed in renderer. contextIsolation is on by default.
+      contextIsolation: true,
+      nodeIntegration: false,
       webviewTag: true  // Allow <webview> for the in-app browser
     }
   })
@@ -52,6 +55,34 @@ function createWindow(): void {
   }
 }
 
+/**
+ * Install a Content-Security-Policy header for the renderer to defence-in-depth
+ * against XSS. The renderer is fully local; we allow self + data: (icons) only.
+ * webview content runs in its own session and is NOT affected by this CSP.
+ */
+function installCSP(): void {
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",  // Vite/React inline styles
+    "font-src 'self' data:",
+    "img-src 'self' data: blob:",
+    "connect-src 'self' ws: wss: https:",
+    "frame-src 'none'",
+    "object-src 'none'",
+    "base-uri 'self'"
+  ].join('; ')
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    // Only inject for main renderer (file:// or local dev), not for <webview>
+    if (details.resourceType === 'mainFrame' || details.resourceType === 'subFrame' || details.resourceType === 'stylesheet' || details.resourceType === 'script') {
+      const headers = { ...details.responseHeaders, 'Content-Security-Policy': [csp] }
+      callback({ responseHeaders: headers })
+      return
+    }
+    callback({ responseHeaders: details.responseHeaders })
+  })
+}
+
 // Tell Windows this is its own application so the taskbar uses our icon
 // (and not the generic Electron / Node icon).
 if (process.platform === 'win32') {
@@ -59,6 +90,7 @@ if (process.platform === 'win32') {
 }
 
 app.whenReady().then(() => {
+  installCSP()
   const dir = join(app.getPath('userData'), 'storage')
   mkdirSync(dir, { recursive: true })
   const db = openDb(join(dir, 'geminigrok.db'))

@@ -28,7 +28,8 @@ const FORBIDDEN_BASENAMES = new Set([
   'authorized_keys',
   'known_hosts',
   'credentials',
-  'config.json',  // covered by name+context check below
+  // 'config.json' removed — too broad, hits many legitimate project configs.
+  // Specific cloud configs are covered by FORBIDDEN_DIRS (.aws, .config/gcloud).
   'cookies.json',
   'hh_cookies.json'
 ])

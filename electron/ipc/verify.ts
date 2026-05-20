@@ -12,7 +12,13 @@ const execFileAsync = promisify(execFile)
  * the per-call confirmation. Command policy (denylist) still applies.
  */
 export function registerVerifyIpc(getProjectRoot: () => string | null): void {
-  ipcMain.handle('verify:exec', async (_e, command: string) => {
+  ipcMain.handle('verify:exec', async (e, command: string) => {
+    // SECURITY: reject calls from anything that isn't the top-level main frame.
+    // <webview> tags and out-of-process frames have a non-top sender — we must
+    // not let untrusted web content reach this no-confirmation shell exec.
+    if (!e.sender || e.senderFrame?.parent != null) {
+      return { exitCode: 1, stdout: '', stderr: 'Запрещено: verify:exec доступен только основному окну' }
+    }
     const cwd = getProjectRoot()
     if (!cwd) return { exitCode: 1, stdout: '', stderr: 'Проект не открыт' }
     const verdict = classifyCommand(command)

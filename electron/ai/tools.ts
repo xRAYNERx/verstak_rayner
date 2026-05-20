@@ -1,8 +1,8 @@
-import { readFile, readdir, stat, writeFile } from 'fs/promises'
+import { readFile, readdir, stat, writeFile, realpath } from 'fs/promises'
 import { join, resolve, relative, sep } from 'path'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
-import { existsSync } from 'fs'
+import { existsSync, realpathSync } from 'fs'
 import type { ToolDefinition } from './types'
 import { classifyCommand } from './command-policy'
 import { isForbiddenPath, scanText } from './secret-scanner'
@@ -216,6 +216,32 @@ function safeJoin(root: string, rel: string): string {
   return abs
 }
 
+/**
+ * Resolve symlinks and verify the final real path still lives inside the
+ * project root. Prevents symlink escapes (e.g. `link -> /home/user/.ssh`).
+ * Falls back to safeJoin if realpath throws (file doesn't exist yet — fine,
+ * we're about to create it).
+ */
+async function safeRealJoin(root: string, rel: string): Promise<string> {
+  const abs = safeJoin(root, rel)
+  try {
+    const realAbs = await realpath(abs)
+    let realRoot: string
+    try { realRoot = await realpath(root) } catch { realRoot = root }
+    const r = relative(realRoot, realAbs)
+    if (r.startsWith('..') || r.includes('..' + sep) || r === '..') {
+      throw new Error(`Запрещён выход за пределы проекта через symlink: ${rel}`)
+    }
+    return abs
+  } catch (err) {
+    // ENOENT — file doesn't exist; that's fine, we'll create it inside root.
+    // Anything else (EACCES on the link itself, etc.) — rethrow.
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return abs
+    throw err
+  }
+}
+void realpathSync  // tslint silencer — kept for sync fallbacks if needed later
+
 function isRipgrepAvailable(): boolean {
   // Cheap probe — bare check if `rg` resolves. PATH lookup is sync via `where`/`which`
   try {
@@ -376,7 +402,7 @@ export function createFileTools(root: string): FileTools {
         if (isForbiddenPath(relPath)) {
           throw new Error(`Доступ запрещён политикой безопасности: ${relPath} (secrets/credentials)`)
         }
-        const abs = safeJoin(root, relPath)
+        const abs = await safeRealJoin(root, relPath)
         const st = await stat(abs)
         if (!st.isFile()) throw new Error(`Не файл: ${args.path}`)
         if (st.size > MAX_READ_BYTES) {
@@ -391,7 +417,7 @@ export function createFileTools(root: string): FileTools {
         return raw
       }
       if (name === 'list_directory') {
-        const abs = safeJoin(root, String(args.path))
+        const abs = await safeRealJoin(root, String(args.path))
         const entries = await readdir(abs)
         const out: string[] = []
         for (const e of entries) {
@@ -407,7 +433,7 @@ export function createFileTools(root: string): FileTools {
         if (isForbiddenPath(relPath)) {
           throw new Error(`Запись запрещена политикой безопасности: ${relPath}`)
         }
-        const abs = safeJoin(root, relPath)
+        const abs = await safeRealJoin(root, relPath)
         await writeFile(abs, String(args.content), 'utf8')
         // Invalidate project map cache so the next get_project_map sees this file
         invalidateProjectMap(root)
