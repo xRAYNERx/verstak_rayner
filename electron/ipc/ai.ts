@@ -46,11 +46,19 @@ function tagSender(sender: Electron.WebContents, projectPath: string | null): Ta
   }
 }
 
-interface PendingWrite { resolve: (accept: boolean) => void }
+// Keyed by `${sendId}::${callId}` so concurrent ai:send invocations cannot
+// resolve each other's pending confirmations. The renderer still identifies
+// modals by callId (it doesn't know about sendId), so we look up by callId
+// suffix when resolving — but isolation is enforced when CLEARING (ai:stop).
+interface PendingWrite { sendId: number; resolve: (accept: boolean) => void }
 const pendingWrites = new Map<string, PendingWrite>()
 
-interface PendingCommand { resolve: (accept: boolean) => void }
+interface PendingCommand { sendId: number; resolve: (accept: boolean) => void }
 const pendingCommands = new Map<string, PendingCommand>()
+
+function scopedKey(sendId: number, callId: string): string {
+  return `${sendId}::${callId}`
+}
 
 export function registerAiIpc(deps: AiDeps): void {
   ipcMain.handle('ai:send', async (e, messages: ChatMessage[], projectPath: string | null) => {
@@ -129,19 +137,36 @@ export function registerAiIpc(deps: AiDeps): void {
     if (!ctrl) return false
     ctrl.abort()
     activeAborts.delete(sendId)
-    for (const [k, p] of pendingWrites) { p.resolve(false); pendingWrites.delete(k) }
-    for (const [k, p] of pendingCommands) { p.resolve(false); pendingCommands.delete(k) }
+    // Reject ONLY this session's pending confirmations — other concurrent
+    // ai:send streams (background sessions) keep theirs intact.
+    for (const [k, p] of pendingWrites) {
+      if (p.sendId === sendId) { p.resolve(false); pendingWrites.delete(k) }
+    }
+    for (const [k, p] of pendingCommands) {
+      if (p.sendId === sendId) { p.resolve(false); pendingCommands.delete(k) }
+    }
     return true
   })
 
   ipcMain.handle('ai:resolve-write', (_e, callId: string, accept: boolean) => {
-    const p = pendingWrites.get(callId)
-    if (p) { p.resolve(accept); pendingWrites.delete(callId) }
+    // Renderer doesn't know about sendId — look up by callId suffix.
+    for (const [k, p] of pendingWrites) {
+      if (k.endsWith('::' + callId)) {
+        p.resolve(accept)
+        pendingWrites.delete(k)
+        return
+      }
+    }
   })
 
   ipcMain.handle('ai:resolve-command', (_e, callId: string, accept: boolean) => {
-    const p = pendingCommands.get(callId)
-    if (p) { p.resolve(accept); pendingCommands.delete(callId) }
+    for (const [k, p] of pendingCommands) {
+      if (k.endsWith('::' + callId)) {
+        p.resolve(accept)
+        pendingCommands.delete(k)
+        return
+      }
+    }
   })
 }
 
@@ -480,7 +505,9 @@ async function handleWriteFile(
   let before = ''
   try { before = await tools.execute('read_file', { path }) as string } catch { before = '' }
   sender.send('ai:event', { id: sendId, event: { type: 'pending-write', callId: call.id, path, before, after } })
-  const accepted = await new Promise<boolean>(resolve => { pendingWrites.set(call.id, { resolve }) })
+  const accepted = await new Promise<boolean>(resolve => {
+    pendingWrites.set(scopedKey(sendId, call.id), { sendId, resolve })
+  })
   if (accepted) {
     try {
       await tools.execute('write_file', call.args)
@@ -652,7 +679,9 @@ async function handleRunCommand(
   }
 
   sender.send('ai:event', { id: sendId, event: { type: 'pending-command', callId: call.id, command } })
-  const accepted = await new Promise<boolean>(resolve => { pendingCommands.set(call.id, { resolve }) })
+  const accepted = await new Promise<boolean>(resolve => {
+    pendingCommands.set(scopedKey(sendId, call.id), { sendId, resolve })
+  })
   if (!accepted) {
     sender.send('ai:event', {
       id: sendId,
