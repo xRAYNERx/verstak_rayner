@@ -209,6 +209,48 @@ Goal: сделать продукт лучше Antigravity 2.0 за ночь. Ц
     GPT-4o) видят скриншот и анализируют его. Heavy dataUrl
     срезается из текстового tool-result чтобы не платить дважды.
 
+### 2026-05-20 · Спринт «не хуже Cursor» (parity, не compliance)
+
+Решили: 152-ФЗ и compliance — moat второго порядка. Сначала нужно быть **не
+хуже Cursor** на ежедневных задачах разработки. Compliance продаст продукт
+только тем, кто уже его использует.
+
+Сделано (7 коммитов):
+
+- `97c9ef3` **Context Pack** — авто-инжект git status + recent_writes
+  (из undoStack) + project_map (компактная версия) + verify_scripts
+  (из package.json/tsconfig) в system prompt перед каждым `ai:send`.
+  Модель сразу знает что в репо, без расхода ходов на discovery.
+- `d2ec16b` **apply_patch tool** — SEARCH/REPLACE блоки вместо
+  full-file writes. `write_file` остаётся только для новых файлов.
+  Идёт через тот же diff-confirm flow. Экономия ~10× токенов на
+  правках больших файлов, меньше риск «AI переписал лишнее».
+  7 unit-тестов.
+- `7abf027` **Continue budget** — на 8-м ходу не done, а событие
+  `turns-exhausted` → UI показывает плашку «+10 ходов». Hard
+  ceiling 40. Новое `ai.sendWithBudget(messages, path, N)` для
+  расширения.
+- `25ba2d1` **Parallel reads + verify nudge** —
+  read_file/list_directory/search_project/find_files/get_project_map
+  стартуют через `Promise.all` в одном turn'е. Плюс после accepted
+  writes в next user-message подмешивается `[system: запусти
+  npm test перед готово]` если в проекте есть verify-scripts.
+- `36f206f` **Agent bench** — `tests/agent-bench/bench.test.ts` —
+  10 детерминированных регрессий (apply_patch блоки, context-pack
+  scripts, project-map exports, secret-scanner редакция,
+  command-policy bypass-check). Запуск:
+  `npx vitest run tests/agent-bench`.
+- `d129e2e` **CLI parity (light)** — `electron/ai/cli-prompt.ts`
+  единый builder. Все 4 CLI (claude/gemini/grok/codex) теперь
+  получают system_layer + user_layer + context_pack + сжатую
+  историю последних 10 turns. Поправка к ТЗ Cursor: для claude-cli
+  НЕ дублируем SYSTEM_LAYER_PROMPT (у Claude Code свой развёрнутый
+  system, двойной регламент = шум). grok-cli argv-cap 28KB. Tools
+  всё ещё API-only — это ограничение one-shot stream-json режима
+  у вендоров.
+
+Agent mode = API only. CLI = shared brain, no tools.
+
 ### Deferred из аудита
 
 - **Threaded chats** (древовидная структура бесед) — отложено.
