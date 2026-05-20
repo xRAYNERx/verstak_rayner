@@ -33,7 +33,7 @@ const PROVIDERS: ProviderConfig[] = [
     name: 'Gemini CLI',
     transport: 'CLI',
     description: 'Твоя Gemini Ultra подписка через gemini-cli. Без API ключа.',
-    models: ['auto', 'gemini-3-pro', 'gemini-3.5-flash', 'gemini-3-flash', 'gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'],
+    models: ['auto', 'gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'],
     defaultModel: 'auto',
     secretKey: null,
     keyHint: '',
@@ -136,7 +136,13 @@ export function Settings({ onClose }: { onClose: () => void }) {
           const v = await window.api.settings.getKey(p.secretKey)
           if (v) keyVals[p.secretKey] = v
         }
-        const m = await window.api.settings.getKey(`model_${p.id}`)
+        let m = await window.api.settings.getKey(`model_${p.id}`)
+        // Migration: drop saved model values that aren't in the current list
+        // (e.g. gemini-3.5-flash for gemini-cli — alias only works for API)
+        if (m && !p.models.includes(m)) {
+          await window.api.settings.setKey(`model_${p.id}`, p.defaultModel)
+          m = p.defaultModel
+        }
         modelVals[p.id] = m ?? p.defaultModel
       }
       setKeys(keyVals)

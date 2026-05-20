@@ -11,11 +11,13 @@ interface GeminiCliOptions {
   signal?: AbortSignal
 }
 
+// CLI distinguishes between alias names it actually knows and what we expose
+// in the model picker. Alias `gemini-3.5-flash` in the API maps to the same
+// underlying model the CLI calls `gemini-3-flash-preview` (per Google docs as
+// of 2026-05). Keep aliases that real CLI builds accept; the auth shell
+// returns status=error if -m gets an unknown alias.
 export const GEMINI_CLI_MODELS = [
   'auto',
-  'gemini-3-pro',
-  'gemini-3.5-flash',
-  'gemini-3-flash',
   'gemini-3-pro-preview',
   'gemini-3-flash-preview',
   'gemini-2.5-pro',
@@ -115,7 +117,14 @@ export function createGeminiCliProvider(opts: GeminiCliOptions = {}): ChatProvid
           if (ev.status === 'success') {
             events.push({ type: 'done' })
           } else {
-            events.push({ type: 'error', message: `CLI завершился со статусом: ${ev.status ?? 'unknown'}` })
+            const hint = opts.model && opts.model !== 'auto'
+              ? ` Возможно модель "${opts.model}" не поддерживается CLI — попробуй "auto" или 2.5-pro/flash.`
+              : ''
+            const tail = stderrBuffer.trim().slice(-400)
+            events.push({
+              type: 'error',
+              message: `CLI завершился со статусом: ${ev.status ?? 'unknown'}.${hint}${tail ? ` stderr: ${tail}` : ''}`
+            })
           }
           wake()
         }
