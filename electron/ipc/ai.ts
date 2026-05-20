@@ -117,6 +117,14 @@ export function registerAiIpc(deps: AiDeps): void {
   })
 
   ipcMain.handle('ai:stop', (_e, sendId: number) => {
+    // sendId <= 0 → emergency abort: stop EVERY active stream + reject all pending
+    // confirmations. Used by Shift+Esc when the UI feels stuck.
+    if (sendId <= 0) {
+      for (const [k, c] of activeAborts) { c.abort(); activeAborts.delete(k) }
+      for (const [k, p] of pendingWrites) { p.resolve(false); pendingWrites.delete(k) }
+      for (const [k, p] of pendingCommands) { p.resolve(false); pendingCommands.delete(k) }
+      return true
+    }
     const ctrl = activeAborts.get(sendId)
     if (!ctrl) return false
     ctrl.abort()

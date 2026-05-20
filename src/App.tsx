@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ProjectRail } from './components/ProjectRail'
 import { Sidebar } from './components/Sidebar'
 import { Settings } from './components/Settings'
@@ -14,24 +14,75 @@ import { CommandConfirm } from './components/CommandConfirm'
 import { Terminal } from './components/Terminal'
 import { useProject } from './store/projectStore'
 
+const SIDEBAR_MIN = 200
+const SIDEBAR_MAX = 480
+const SIDEBAR_DEFAULT = 260
+const SIDEBAR_WIDTH_KEY = 'gg.sidebarWidth'
+
 export function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showTerminal, setShowTerminal] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const { path, activeView } = useProject()
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    const stored = parseInt(localStorage.getItem(SIDEBAR_WIDTH_KEY) || '0', 10)
+    return stored >= SIDEBAR_MIN && stored <= SIDEBAR_MAX ? stored : SIDEBAR_DEFAULT
+  })
+  const dragRef = useRef<{ startX: number; startW: number } | null>(null)
+  const { path, activeView, isStreaming, setStreaming, clearPendingWrites, setPendingCommand } = useProject()
   const canShowTerminal = path && showTerminal
 
-  // Ctrl/Cmd+B toggles the project sidebar (standard pattern)
+  // Ctrl/Cmd+B toggles the project sidebar; Esc cancels active stream (safety
+  // net — if the UI ever feels stuck during a long agentic loop, Esc kills it).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'b' && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
         e.preventDefault()
         setSidebarOpen(v => !v)
+      } else if (e.key === 'Escape' && e.shiftKey) {
+        // Shift+Esc = emergency abort. Tell main to kill every active stream
+        // and clear any pending confirmations, then reset renderer state so
+        // the UI never sticks in a stuck-streaming state.
+        e.preventDefault()
+        void window.api.ai.stop(0).catch(() => {})
+        setStreaming(false)
+        clearPendingWrites()
+        setPendingCommand(null)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [isStreaming, setStreaming, clearPendingWrites, setPendingCommand])
+
+  // Mouse-drag resize handle on the sidebar's right edge.
+  function startDrag(e: React.MouseEvent) {
+    dragRef.current = { startX: e.clientX, startW: sidebarWidth }
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    function move(ev: MouseEvent) {
+      if (!dragRef.current) return
+      const dx = ev.clientX - dragRef.current.startX
+      const next = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, dragRef.current.startW + dx))
+      setSidebarWidth(next)
+    }
+    function up() {
+      dragRef.current = null
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
+      // Persist the user's choice
+      const w = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gg-sidebar-w')) || SIDEBAR_DEFAULT
+      try { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(Math.round(w))) } catch { /* private mode */ }
+    }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+  }
+
+  // Push width to CSS via custom property so the grid recomputes.
+  useEffect(() => {
+    document.documentElement.style.setProperty('--gg-sidebar-w', `${sidebarWidth}px`)
+    try { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth)) } catch { /* ignore */ }
+  }, [sidebarWidth])
 
   return (
     <div className={`gg-app ${sidebarOpen ? '' : 'is-sidebar-collapsed'}`}>
@@ -39,7 +90,16 @@ export function App() {
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(v => !v)}
       />
-      {sidebarOpen && <Sidebar onOpenSettings={() => setShowSettings(true)} />}
+      {sidebarOpen && (
+        <>
+          <Sidebar onOpenSettings={() => setShowSettings(true)} />
+          <div
+            className="gg-sidebar-resize"
+            onMouseDown={startDrag}
+            title="Перетащи чтобы изменить ширину"
+          />
+        </>
+      )}
       <main className="gg-main">
         {activeView === 'chat' && (
           <Chat
@@ -75,6 +135,21 @@ export function App() {
       {showSettings && <Settings onClose={() => setShowSettings(false)} />}
       <DiffView />
       <CommandConfirm />
+      {isStreaming && (
+        <button
+          className="gg-emergency-stop"
+          title="Прервать стрим (Shift+Esc)"
+          onClick={() => {
+            void window.api.ai.stop(0).catch(() => {})
+            setStreaming(false)
+            clearPendingWrites()
+            setPendingCommand(null)
+          }}
+        >
+          ⏹ Стоп
+          <span className="gg-emergency-stop-kbd">Shift+Esc</span>
+        </button>
+      )}
     </div>
   )
 }
