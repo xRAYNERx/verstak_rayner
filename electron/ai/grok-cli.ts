@@ -75,16 +75,10 @@ export function createGrokCliProvider(opts: GrokCliOptions = {}): ChatProvider {
 
       const args = ['--output-format', 'streaming-json', '--no-alt-screen']
       if (opts.model && opts.model !== 'auto') args.push('-m', opts.model)
-      // Note: grok CLI takes prompt via -p argv. Argv has a 32KB cap on Windows
-      // (CreateProcess limit). Truncate payload if it exceeds 28KB — keep the
-      // head (system + context) and the tail (most recent user message).
-      const ARGV_CAP = 28_000
-      if (payload.length > ARGV_CAP) {
-        const tail = payload.slice(-ARGV_CAP * 0.4)
-        payload = payload.slice(0, ARGV_CAP * 0.6) + '\n\n[...history truncated for CLI argv limit...]\n\n' + tail
-      }
-      args.push('-p', payload)
-
+      // Use stdin instead of -p argv. Big payloads (system_layer + context_pack
+      // + history) via argv have been crashing grok CLI on Windows
+      // (STATUS_ACCESS_VIOLATION 0xC0000005). stdin is safer: no CreateProcess
+      // arglen limit, no shell parsing of quotes/newlines/unicode.
       const child = spawn(binary, args, {
         cwd,
         shell: binary.endsWith('.cmd') || binary.endsWith('.ps1'),
@@ -92,7 +86,14 @@ export function createGrokCliProvider(opts: GrokCliOptions = {}): ChatProvider {
         stdio: ['pipe', 'pipe', 'pipe']
       })
 
-      try { child.stdin.end() } catch { /* noop */ }
+      try {
+        child.stdin.write(payload)
+        child.stdin.end()
+      } catch (err) {
+        yield { type: 'error', message: `Grok CLI stdin error: ${err instanceof Error ? err.message : String(err)}` }
+        try { child.kill() } catch { /* noop */ }
+        return
+      }
 
       let abortListener: (() => void) | null = null
       if (opts.signal) {
@@ -150,7 +151,15 @@ export function createGrokCliProvider(opts: GrokCliOptions = {}): ChatProvider {
       child.on('close', (code) => {
         if (stdoutBuffer.length > 0) processLine(stdoutBuffer)
         if (code !== 0 && !queue.some(e => e.type === 'done')) {
-          queue.push({ type: 'error', message: `Grok CLI exit ${code}. ${stderrBuffer.slice(0, 400)}` })
+          // 0xC0000005 (3221225477) = Windows STATUS_ACCESS_VIOLATION.
+          // Grok CLI sometimes crashes on large prompts or odd Unicode.
+          // Give the user a hint instead of just the raw exit code.
+          let hint = ''
+          if (code === 3221225477 || code === -1073741819) {
+            hint = ' Похоже, grok CLI сам упал (Windows ACCESS_VIOLATION). Попробуй обновить CLI: ' +
+                   '`irm https://grok.com/install.ps1 | iex` или переключись на Grok API в Settings.'
+          }
+          queue.push({ type: 'error', message: `Grok CLI exit ${code}.${hint}${stderrBuffer ? ' ' + stderrBuffer.slice(0, 400) : ''}` })
         }
         done = true; wake()
       })
