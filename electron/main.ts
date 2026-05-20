@@ -122,7 +122,17 @@ app.whenReady().then(() => {
   registerFilesIpc({ getProjectRoot: getActiveProjectPath })
   registerSettingsIpc(settings)
   registerAiIpc({
-    getSecret: (key: string) => settings.getSecret(key),
+    getSecret: (key: string) => {
+      const stored = settings.getSecret(key)
+      if (stored) return stored
+      const envMap: Record<string, string> = {
+        gemini_api_key: 'GEMINI_API_KEY',
+        anthropic_api_key: 'ANTHROPIC_API_KEY',
+        openai_api_key: 'OPENAI_API_KEY',
+        xai_api_key: 'XAI_API_KEY',
+      }
+      return process.env[envMap[key] ?? ''] ?? null
+    },
     getProviderId: () => {
       const v = settings.getSecret('provider')
       if (v === 'gemini-cli' || v === 'claude' || v === 'claude-cli'

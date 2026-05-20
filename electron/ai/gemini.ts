@@ -86,16 +86,23 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
           hasConfig ? { model, contents, config } : { model, contents }
         )
         let lastUsage: { prompt?: number; output?: number; cached?: number } = {}
+        let textEmitted = false
+        let toolEmitted = false
+        let lastFinishReason: string | undefined
+        let lastBlockReason: string | undefined
         for await (const chunk of stream) {
           const c = chunk as {
             text?: string
             functionCalls?: Array<{ name: string; args: Record<string, unknown> }>
             usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; cachedContentTokenCount?: number }
+            candidates?: Array<{ finishReason?: string; finishMessage?: string }>
+            promptFeedback?: { blockReason?: string; blockReasonMessage?: string }
           }
-          if (c.text) yield { type: 'text', text: c.text }
+          if (c.text) { yield { type: 'text', text: c.text }; textEmitted = true }
           if (c.functionCalls) {
             for (const fc of c.functionCalls) {
               yield { type: 'tool-call', call: { id: randomUUID(), name: fc.name, args: fc.args } }
+              toolEmitted = true
             }
           }
           if (c.usageMetadata) {
@@ -105,6 +112,28 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
               cached: c.usageMetadata.cachedContentTokenCount
             }
           }
+          if (c.candidates?.[0]?.finishReason) lastFinishReason = c.candidates[0].finishReason
+          if (c.promptFeedback?.blockReason) lastBlockReason = c.promptFeedback.blockReason
+        }
+        // If the response was empty (no text, no tool calls), surface why.
+        // Gemini's safety filter / recitation block / max-tokens-empty are all
+        // silent in the data stream — only `finishReason` / `blockReason` say.
+        if (!textEmitted && !toolEmitted) {
+          let reason = ''
+          if (lastBlockReason) {
+            reason = `⚠ Запрос заблокирован Gemini: ${lastBlockReason}. Перефразируй и попробуй ещё раз.`
+          } else if (lastFinishReason === 'SAFETY') {
+            reason = '⚠ Ответ заблокирован safety-фильтром Gemini. Попробуй перефразировать запрос.'
+          } else if (lastFinishReason === 'RECITATION') {
+            reason = '⚠ Ответ заблокирован recitation-фильтром (Gemini считает что вывод копирует обучающие данные).'
+          } else if (lastFinishReason === 'MAX_TOKENS') {
+            reason = '⚠ Лимит токенов исчерпан до того как модель что-либо написала.'
+          } else if (lastFinishReason && lastFinishReason !== 'STOP') {
+            reason = `⚠ Gemini завершил ответ без текста, finishReason=${lastFinishReason}.`
+          } else {
+            reason = '⚠ Gemini вернул пустой ответ. Возможно сработал фильтр или модель не справилась — попробуй перефразировать.'
+          }
+          yield { type: 'text', text: reason }
         }
         if (lastUsage.prompt !== undefined || lastUsage.output !== undefined) {
           yield {
