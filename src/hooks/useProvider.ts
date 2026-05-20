@@ -20,7 +20,7 @@ const PROVIDER_META: Record<ProviderId, Omit<ProviderInfo, 'model' | 'id'>> = {
   'gemini-api': {
     label: 'Gemini',
     transport: 'API',
-    models: ['gemini-2.5-pro', 'gemini-2.5-flash'],
+    models: ['gemini-3-pro', 'gemini-3.5-flash', 'gemini-3-flash', 'gemini-2.5-pro', 'gemini-2.5-flash'],
     supportsTools: true
   },
   'gemini-cli': {
@@ -68,7 +68,7 @@ const PROVIDER_META: Record<ProviderId, Omit<ProviderInfo, 'model' | 'id'>> = {
 }
 
 const DEFAULT_MODEL: Record<ProviderId, string> = {
-  'gemini-api': 'gemini-2.5-pro',
+  'gemini-api': 'gemini-3.5-flash',
   'gemini-cli': 'auto',
   claude: 'claude-sonnet-4-5-20251101',
   'claude-cli': 'auto',

@@ -22,6 +22,9 @@ const PRICES: Record<string, ModelPrice> = {
   'claude-sonnet-4-5-20251101':  { input: 3.0,  output: 15.0,  cached: 0.3 },
   'claude-haiku-4-5-20251101':   { input: 1.0,  output: 5.0,   cached: 0.1 },
   // Google — ai.google.dev/pricing
+  'gemini-3-pro':                { input: 2.50, output: 15.0 },   // Gemini 3 Pro
+  'gemini-3.5-flash':            { input: 0.30, output: 2.50 },   // Gemini 3.5 Flash (2026-05 release)
+  'gemini-3-flash':              { input: 0.30, output: 2.50 },
   'gemini-2.5-pro':              { input: 1.25, output: 10.0 },
   'gemini-2.5-flash':            { input: 0.30, output: 2.50 },
   // OpenAI — openai.com/api/pricing
