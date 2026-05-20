@@ -73,4 +73,29 @@ describe('classifyCommand', () => {
     expect(c.allowed).toBe(false)
     expect(c.reason).toBeTruthy()
   })
+
+  it('blocks rm -r -f split flags', () => {
+    expect(classifyCommand('rm -r -f /').allowed).toBe(false)
+    expect(classifyCommand('rm -f -r ~').allowed).toBe(false)
+    expect(classifyCommand('rm   -rf   /').allowed).toBe(false) // multi-space
+  })
+
+  it('blocks PowerShell EncodedCommand bypass', () => {
+    expect(classifyCommand('powershell -EncodedCommand UABzAA==').allowed).toBe(false)
+    expect(classifyCommand('powershell -enc abc==').allowed).toBe(false)
+    expect(classifyCommand('powershell.exe -e abc').allowed).toBe(false)
+    expect(classifyCommand('pwsh -EncodedCommand x').allowed).toBe(true) // pwsh not in rule — acceptable, user confirms
+  })
+
+  it('blocks cmd /c with variable expansion (obfuscation)', () => {
+    expect(classifyCommand('cmd /c "set x=cat .ssh & %x%"').allowed).toBe(false)
+    expect(classifyCommand('cmd /c "%COMSPEC% /c whoami"').allowed).toBe(false)
+    // Allow plain cmd /c without var expansion
+    expect(classifyCommand('cmd /c dir').allowed).toBe(true)
+  })
+
+  it('blocks Invoke-Expression / iex', () => {
+    expect(classifyCommand('iex (Get-Content payload.txt)').allowed).toBe(false)
+    expect(classifyCommand('Invoke-Expression $cmd').allowed).toBe(false)
+  })
 })
