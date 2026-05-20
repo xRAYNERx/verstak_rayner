@@ -369,7 +369,7 @@ function globToRegExp(glob: string): RegExp {
   return new RegExp(pattern)
 }
 
-export function createFileTools(root: string): FileTools {
+export function createFileTools(root: string, signal?: AbortSignal): FileTools {
   async function runCommand(command: string) {
     // Spawn the shell ourselves rather than using execSync: we want a hard
     // timeout, captured stderr, and no parent-process hijack.
@@ -381,11 +381,18 @@ export function createFileTools(root: string): FileTools {
         cwd: root,
         timeout: 60_000,
         maxBuffer: 4 * 1024 * 1024,
-        windowsHide: true
+        windowsHide: true,
+        // Propagate the outer agent's abort so Stop / Shift+Esc actually
+        // kills the child process instead of waiting out the 60s timeout.
+        signal
       })
       return { stdout: String(stdout ?? ''), stderr: String(stderr ?? ''), exitCode: 0 }
     } catch (err) {
-      const e = err as { stdout?: string; stderr?: string; code?: number; killed?: boolean; signal?: string; message?: string }
+      const e = err as { stdout?: string; stderr?: string; code?: number; killed?: boolean; signal?: string; message?: string; name?: string }
+      // Abort signal surfaces as AbortError — report cleanly
+      if (e.name === 'AbortError') {
+        return { stdout: String(e.stdout ?? ''), stderr: 'Команда прервана пользователем', exitCode: 130 }
+      }
       const exitCode = typeof e.code === 'number' ? e.code : 1
       const stderr = String(e.stderr ?? e.message ?? '')
       return { stdout: String(e.stdout ?? ''), stderr, exitCode }

@@ -116,7 +116,7 @@ export function registerAiIpc(deps: AiDeps): void {
     }
 
     if (descriptor.supportsTools && projectPath) {
-      const tools = createFileTools(projectPath)
+      const tools = createFileTools(projectPath, ctrl.signal)
       void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.connectors).finally(cleanup)
     } else {
       void runPlainConversation(taggedSender, sendId, provider, messagesWithSystem, ctrl.signal).finally(cleanup)
@@ -222,8 +222,12 @@ async function runApiConversation(
   }
 ): Promise<void> {
   const currentMessages = [...initialMessages]
-  // Loop detection — same tool+args appearing 2+ times in a row is a bad sign.
-  const recentSignatures: string[] = []
+  // Loop detection: per-signature occurrence counter across the whole agent
+  // loop. We block when a single tool+args combination has been called 3 times
+  // (the threshold the UI tells the user). Tracking via Map avoids the
+  // sliding-window eviction problem of the previous flat-array approach.
+  const signatureCounts = new Map<string, number>()
+  const LOOP_THRESHOLD = 3
   // Tally tool activity over the whole session so we can write one journal summary at the end.
   const filesTouched = new Set<string>()
   const commandsRun: string[] = []
@@ -269,16 +273,15 @@ async function runApiConversation(
       return
     }
 
-    // Loop detection — check if AI repeated the same tool call this turn
+    // Loop detection — increment counter per signature; block when any tool
+    // call has been issued LOOP_THRESHOLD (3) times across the whole loop.
     const loopHits: ToolCall[] = []
     for (const c of toolCalls) {
       const sig = callSignature(c)
-      const seen = recentSignatures.filter(s => s === sig).length
-      if (seen >= 2) loopHits.push(c)
-      recentSignatures.push(sig)
+      const next = (signatureCounts.get(sig) ?? 0) + 1
+      signatureCounts.set(sig, next)
+      if (next >= LOOP_THRESHOLD) loopHits.push(c)
     }
-    // Keep window small
-    while (recentSignatures.length > 8) recentSignatures.shift()
 
     currentMessages.push({ role: 'assistant', content: assistantText, toolCalls })
 

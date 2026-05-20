@@ -87,7 +87,10 @@ interface SecretPattern {
 
 const PATTERNS: SecretPattern[] = [
   { name: 'aws-access-key', re: /\bAKIA[0-9A-Z]{16}\b/g },
-  { name: 'aws-secret', re: /\b[A-Za-z0-9/+=]{40}\b(?=\s|$)/g },  // looser; only when isolated
+  // AWS secret access key: 40 base64-ish chars. Require a contextual hint
+  // (key=, secret=, aws_, AWS_) to avoid false-positives on SHA-1 hashes,
+  // base64 blobs, content-hashes, etc. that share the character set.
+  { name: 'aws-secret', re: /(?:aws[_-]?secret|secret[_-]?access[_-]?key|aws[_-]?secret[_-]?access[_-]?key)\s*[:=]\s*["']?([A-Za-z0-9/+=]{40})\b/gi },
   { name: 'github-token', re: /\bghp_[A-Za-z0-9]{36,}\b/g },
   { name: 'github-pat', re: /\bgithub_pat_[A-Za-z0-9_]{20,}\b/g },
   { name: 'gitlab-token', re: /\bglpat-[A-Za-z0-9_-]{20,}\b/g },

@@ -51,22 +51,39 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
     models: MODELS,
 
     async *send(messages: ChatMessage[], tools: ToolDefinition[], _toolResults?: ToolResult[]): AsyncIterable<ChatEvent> {
-      const contents = messages.map(m => ({
+      // Extract system messages — Gemini wants them in `config.systemInstruction`,
+      // not as a user turn. Mixing system content into user turns wastes the
+      // prompt cache and confuses multi-turn role alternation.
+      const systemTexts: string[] = []
+      const nonSystem: ChatMessage[] = []
+      for (const m of messages) {
+        if (m.role === 'system') {
+          if (m.content) systemTexts.push(m.content)
+        } else {
+          nonSystem.push(m)
+        }
+      }
+      const contents = nonSystem.map(m => ({
         role: m.role === 'assistant' ? 'model' : 'user',
         parts: partsForMessage(m)
       }))
 
-      const config = tools.length > 0 ? {
-        tools: [{ functionDeclarations: tools.map(t => ({
+      const config: Record<string, unknown> = {}
+      if (tools.length > 0) {
+        config.tools = [{ functionDeclarations: tools.map(t => ({
           name: t.name,
           description: t.description,
           parameters: t.parameters as Record<string, unknown>
         })) }]
-      } : undefined
+      }
+      if (systemTexts.length > 0) {
+        config.systemInstruction = { parts: [{ text: systemTexts.join('\n\n') }] }
+      }
+      const hasConfig = Object.keys(config).length > 0
 
       try {
         const stream = await client.models.generateContentStream(
-          config ? { model, contents, config } : { model, contents }
+          hasConfig ? { model, contents, config } : { model, contents }
         )
         let lastUsage: { prompt?: number; output?: number; cached?: number } = {}
         for await (const chunk of stream) {
@@ -89,7 +106,7 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
             }
           }
         }
-        if (lastUsage.prompt || lastUsage.output) {
+        if (lastUsage.prompt !== undefined || lastUsage.output !== undefined) {
           yield {
             type: 'usage',
             usage: { inputTokens: lastUsage.prompt, outputTokens: lastUsage.output, cachedInputTokens: lastUsage.cached, model }
