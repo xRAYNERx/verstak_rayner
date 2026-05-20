@@ -138,21 +138,6 @@ export function App() {
       {showSettings && <Settings onClose={() => setShowSettings(false)} />}
       <DiffView />
       <CommandConfirm />
-      {isStreaming && (
-        <button
-          className="gg-emergency-stop"
-          title="Прервать стрим (Shift+Esc)"
-          onClick={() => {
-            void window.api.ai.stop(0).catch(() => {})
-            setStreaming(false)
-            clearPendingWrites()
-            setPendingCommand(null)
-          }}
-        >
-          ⏹ Стоп
-          <span className="gg-emergency-stop-kbd">Shift+Esc</span>
-        </button>
-      )}
     </div>
   )
 }

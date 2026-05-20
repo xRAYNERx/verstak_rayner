@@ -18,10 +18,15 @@ function partsForMessage(m: ChatMessage): Array<Record<string, unknown>> {
       parts.push({ inlineData: { mimeType: att.mimeType, data: att.data } })
     }
   }
-  // Assistant message that includes tool calls — pack each as functionCall part
+  // Assistant message that includes tool calls — pack each as functionCall part.
+  // Gemini 3+ requires the thoughtSignature we captured during streaming to be
+  // round-tripped on the same part, otherwise the API rejects with
+  // "Function call is missing a thought_signature in functionCall parts".
   if (m.toolCalls?.length) {
     for (const call of m.toolCalls) {
-      parts.push({ functionCall: { name: call.name, args: call.args } })
+      const part: Record<string, unknown> = { functionCall: { name: call.name, args: call.args } }
+      if (call.thoughtSignature) part.thoughtSignature = call.thoughtSignature
+      parts.push(part)
     }
   }
   // User message carrying tool results — pack each as functionResponse part
@@ -104,12 +109,16 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
           }
           const c = chunk as {
             text?: string
-            functionCalls?: Array<{ name: string; args: Record<string, unknown> }>
+            functionCalls?: Array<{ name: string; args: Record<string, unknown>; thoughtSignature?: string }>
             usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; cachedContentTokenCount?: number }
             candidates?: Array<{
               finishReason?: string
               finishMessage?: string
-              content?: { parts?: Array<{ text?: string; functionCall?: { name: string; args: Record<string, unknown> } }> }
+              content?: { parts?: Array<{
+                text?: string
+                functionCall?: { name: string; args: Record<string, unknown> }
+                thoughtSignature?: string
+              }> }
             }>
             promptFeedback?: { blockReason?: string; blockReasonMessage?: string }
           }
@@ -126,6 +135,8 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
           //    AND function calls that live inside the candidate (Gemini 3 puts them here).
           //    Skipped only if we already got the same content via the getter above —
           //    we de-duplicate by checking if `topText` already accounts for parts text.
+          //    Gemini 3 packs `thoughtSignature` on the same part as `functionCall`
+          //    (or on a separate "thought" part). We capture and round-trip it.
           if (c.candidates?.[0]?.content?.parts) {
             for (const part of c.candidates[0].content.parts) {
               if (part.text && !topText) {  // avoid double-emit if getter already gave us this text
@@ -133,16 +144,33 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
                 totalText += part.text
               }
               if (part.functionCall) {
-                yield { type: 'tool-call', call: { id: randomUUID(), name: part.functionCall.name, args: part.functionCall.args } }
+                yield {
+                  type: 'tool-call',
+                  call: {
+                    id: randomUUID(),
+                    name: part.functionCall.name,
+                    args: part.functionCall.args,
+                    thoughtSignature: part.thoughtSignature
+                  }
+                }
                 toolEmitted = true
               }
             }
           }
 
-          // 3. Top-level functionCalls (SDK convenience)
+          // 3. Top-level functionCalls (SDK convenience). thoughtSignature may
+          //    live on these too in newer SDK builds.
           if (c.functionCalls) {
             for (const fc of c.functionCalls) {
-              yield { type: 'tool-call', call: { id: randomUUID(), name: fc.name, args: fc.args } }
+              yield {
+                type: 'tool-call',
+                call: {
+                  id: randomUUID(),
+                  name: fc.name,
+                  args: fc.args,
+                  thoughtSignature: fc.thoughtSignature
+                }
+              }
               toolEmitted = true
             }
           }

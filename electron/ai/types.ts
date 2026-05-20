@@ -26,6 +26,13 @@ export interface ToolCall {
   id: string
   name: string
   args: Record<string, unknown>
+  /**
+   * Provider-specific opaque token that some models (Gemini 3+) require to be
+   * sent back unchanged on the next turn so they can correlate the tool result
+   * with their internal "thought" reasoning. We treat it as opaque and just
+   * round-trip it.
+   */
+  thoughtSignature?: string
 }
 
 export interface ToolResult {
