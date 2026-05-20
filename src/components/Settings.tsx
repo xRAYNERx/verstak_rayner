@@ -110,7 +110,10 @@ const PROVIDERS: ProviderConfig[] = [
   }
 ]
 
+type Tab = 'models' | 'connectors' | 'appearance'
+
 export function Settings({ onClose }: { onClose: () => void }) {
+  const [tab, setTab] = useState<Tab>('models')
   const [activeProvider, setActiveProvider] = useState<ProviderId>('gemini-api')
   const [keys, setKeys] = useState<Record<string, string>>({})
   const [models, setModels] = useState<Record<string, string>>({})
@@ -188,30 +191,29 @@ export function Settings({ onClose }: { onClose: () => void }) {
     <div className="gg-modal-backdrop" onClick={onClose}>
       <div className="gg-modal gg-modal-large" onClick={e => e.stopPropagation()}>
         <div className="gg-modal-header">
-          <div className="gg-modal-title">Провайдеры AI</div>
+          <div className="gg-modal-title">Настройки</div>
           <button className="gg-modal-close" onClick={onClose}>×</button>
         </div>
 
-        <div className="gg-theme-row">
-          <div className="gg-label" style={{ margin: 0 }}>Тема оформления</div>
-          <div className="gg-theme-toggle" role="group">
-            <button
-              type="button"
-              className={`gg-theme-btn ${theme === 'dark' ? 'is-active' : ''}`}
-              onClick={() => void setTheme('dark')}
-            >
-              <span aria-hidden>🌙</span> Тёмная
-            </button>
-            <button
-              type="button"
-              className={`gg-theme-btn ${theme === 'light' ? 'is-active' : ''}`}
-              onClick={() => void setTheme('light')}
-            >
-              <span aria-hidden>☀</span> Светлая
-            </button>
-          </div>
+        <div className="gg-settings-tabs" role="tablist">
+          <button
+            type="button"
+            className={`gg-settings-tab ${tab === 'models' ? 'is-active' : ''}`}
+            onClick={() => setTab('models')}
+          >Модели</button>
+          <button
+            type="button"
+            className={`gg-settings-tab ${tab === 'connectors' ? 'is-active' : ''}`}
+            onClick={() => setTab('connectors')}
+          >Коннекторы</button>
+          <button
+            type="button"
+            className={`gg-settings-tab ${tab === 'appearance' ? 'is-active' : ''}`}
+            onClick={() => setTab('appearance')}
+          >Внешний вид</button>
         </div>
 
+        {tab === 'models' && (
         <div className="gg-modal-body" style={{ display: 'flex', gap: 18, padding: 0, minHeight: 420 }}>
           <div className="gg-provider-list">
             {PROVIDERS.map(p => (
@@ -303,9 +305,11 @@ export function Settings({ onClose }: { onClose: () => void }) {
             )}
           </div>
         </div>
+        )}
 
+        {tab === 'connectors' && (
         <div className="gg-settings-extra">
-          <div className="gg-settings-section-title">Коннекторы</div>
+          <div className="gg-settings-section-title">1С OData</div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">1С OData base URL</label>
             <input
@@ -379,6 +383,32 @@ export function Settings({ onClose }: { onClose: () => void }) {
             Allow-paths ограничивает к каким путям эндпоинта можно обращаться.
           </div>
         </div>
+        )}
+
+        {tab === 'appearance' && (
+        <div className="gg-settings-extra">
+          <div className="gg-settings-section-title">Тема оформления</div>
+          <div className="gg-theme-toggle" role="group" style={{ marginBottom: 12 }}>
+            <button
+              type="button"
+              className={`gg-theme-btn ${theme === 'dark' ? 'is-active' : ''}`}
+              onClick={() => void setTheme('dark')}
+            >
+              <span aria-hidden>🌙</span> Тёмная
+            </button>
+            <button
+              type="button"
+              className={`gg-theme-btn ${theme === 'light' ? 'is-active' : ''}`}
+              onClick={() => void setTheme('light')}
+            >
+              <span aria-hidden>☀</span> Светлая
+            </button>
+          </div>
+          <div className="gg-settings-hint">
+            Тема применяется мгновенно. Ширина боковой панели запоминается автоматически — потяни за её правый край.
+          </div>
+        </div>
+        )}
 
         <div className="gg-modal-footer">
           <button className="gg-btn gg-btn-ghost" onClick={onClose}>Закрыть</button>

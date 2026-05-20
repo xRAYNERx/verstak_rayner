@@ -376,6 +376,31 @@
   color: var(--text-tertiary);
 }
 
+/* Settings tabs */
+.gg-settings-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.gg-settings-tab {
+  background: transparent;
+  border: none;
+  padding: 10px 18px;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.gg-settings-tab:hover { color: var(--text-secondary); }
+.gg-settings-tab.is-active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}
+
 /* Settings extra section (connectors etc.) */
 .gg-settings-extra {
   padding: 14px 22px 4px;
