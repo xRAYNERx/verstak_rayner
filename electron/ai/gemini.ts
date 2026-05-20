@@ -90,15 +90,40 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
         let toolEmitted = false
         let lastFinishReason: string | undefined
         let lastBlockReason: string | undefined
+        let chunkIdx = 0
         for await (const chunk of stream) {
+          // Debug — dump first few chunks to the main-process console so we can
+          // see what Gemini actually sends back. Remove once stable.
+          if (chunkIdx < 5) {
+            try {
+              const dump = JSON.stringify(chunk, (_k, v) => typeof v === 'function' ? '[fn]' : v)
+              console.error(`[gemini chunk ${chunkIdx}]`, dump.slice(0, 1500))
+            } catch { /* ignore */ }
+            chunkIdx++
+          }
           const c = chunk as {
             text?: string
             functionCalls?: Array<{ name: string; args: Record<string, unknown> }>
             usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; cachedContentTokenCount?: number }
-            candidates?: Array<{ finishReason?: string; finishMessage?: string }>
+            candidates?: Array<{ finishReason?: string; finishMessage?: string; content?: { parts?: Array<{ text?: string; functionCall?: { name: string; args: Record<string, unknown> } }> } }>
             promptFeedback?: { blockReason?: string; blockReasonMessage?: string }
           }
+          // Primary path: SDK exposes chunk.text as a getter on the candidate's first text part
           if (c.text) { yield { type: 'text', text: c.text }; textEmitted = true }
+          // Fallback: walk candidates[0].content.parts manually in case the
+          // getter is missing or undefined for this build of @google/genai.
+          else if (c.candidates?.[0]?.content?.parts) {
+            for (const part of c.candidates[0].content.parts) {
+              if (part.text) {
+                yield { type: 'text', text: part.text }
+                textEmitted = true
+              }
+              if (part.functionCall) {
+                yield { type: 'tool-call', call: { id: randomUUID(), name: part.functionCall.name, args: part.functionCall.args } }
+                toolEmitted = true
+              }
+            }
+          }
           if (c.functionCalls) {
             for (const fc of c.functionCalls) {
               yield { type: 'tool-call', call: { id: randomUUID(), name: fc.name, args: fc.args } }
