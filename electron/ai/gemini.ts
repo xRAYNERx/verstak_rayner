@@ -158,24 +158,64 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
           if (c.promptFeedback?.blockReason) lastBlockReason = c.promptFeedback.blockReason
         }
 
-        // If the visible response is empty (no actual characters, no tool calls), surface why.
-        // Whitespace-only counts as empty for UI purposes — user would see nothing.
+        // MALFORMED_FUNCTION_CALL fallback. Gemini sometimes decides to use a
+        // tool, builds the function-call args incorrectly (esp. with Cyrillic),
+        // and returns 0 text + MALFORMED_FUNCTION_CALL. The user sees an empty
+        // bubble. Recover by silently retrying the SAME conversation WITHOUT
+        // tools — the model falls back to a plain chat reply.
+        if (lastFinishReason === 'MALFORMED_FUNCTION_CALL' && !totalText.trim() && !toolEmitted && tools.length > 0) {
+          console.error('[gemini] MALFORMED_FUNCTION_CALL → retrying without tools')
+          const noToolsConfig: Record<string, unknown> = {}
+          if (systemTexts.length > 0) {
+            noToolsConfig.systemInstruction = { parts: [{ text: systemTexts.join('\n\n') }] }
+          }
+          try {
+            const retryStream = await client.models.generateContentStream(
+              Object.keys(noToolsConfig).length > 0
+                ? { model, contents, config: noToolsConfig }
+                : { model, contents }
+            )
+            for await (const chunk of retryStream) {
+              const c = chunk as { text?: string; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; cachedContentTokenCount?: number }; candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }
+              let t: string | undefined
+              try { t = c.text } catch { t = undefined }
+              if (t) { yield { type: 'text', text: t }; totalText += t }
+              else if (c.candidates?.[0]?.content?.parts) {
+                for (const p of c.candidates[0].content.parts) {
+                  if (p.text) { yield { type: 'text', text: p.text }; totalText += p.text }
+                }
+              }
+              if (c.usageMetadata) {
+                lastUsage = {
+                  prompt: (lastUsage.prompt ?? 0) + (c.usageMetadata.promptTokenCount ?? 0),
+                  output: (lastUsage.output ?? 0) + (c.usageMetadata.candidatesTokenCount ?? 0),
+                  cached: (lastUsage.cached ?? 0) + (c.usageMetadata.cachedContentTokenCount ?? 0)
+                }
+              }
+            }
+          } catch (err) {
+            console.error('[gemini] retry failed:', err instanceof Error ? err.message : String(err))
+          }
+        }
+
+        // If after all attempts the response is still empty, surface why.
         if (!totalText.trim() && !toolEmitted) {
           let reason = ''
           if (lastBlockReason) {
             reason = `⚠ Запрос заблокирован Gemini: ${lastBlockReason}. Перефразируй и попробуй ещё раз.`
           } else if (lastFinishReason === 'SAFETY') {
-            reason = '⚠ Ответ заблокирован safety-фильтром Gemini. Попробуй перефразировать запрос (избегай opечаток в слэнге).'
+            reason = '⚠ Ответ заблокирован safety-фильтром Gemini. Попробуй перефразировать запрос.'
           } else if (lastFinishReason === 'RECITATION') {
             reason = '⚠ Ответ заблокирован recitation-фильтром (Gemini считает что вывод копирует обучающие данные).'
           } else if (lastFinishReason === 'MAX_TOKENS') {
             reason = '⚠ Лимит токенов исчерпан до того как модель что-либо написала.'
+          } else if (lastFinishReason === 'MALFORMED_FUNCTION_CALL') {
+            reason = '⚠ Gemini пыталась вызвать инструмент с битыми аргументами и без-tool retry тоже не помог. Перефразируй запрос конкретнее.'
           } else if (lastFinishReason && lastFinishReason !== 'STOP') {
             reason = `⚠ Gemini завершил ответ без текста, finishReason=${lastFinishReason}.`
           } else {
-            // No clear reason — include diagnostic so we can debug what came back
             const sample = sampleChunks[0] ?? '(нет данных)'
-            reason = `⚠ Gemini вернул пустой ответ (${chunkCount} chunks, output_tokens=${lastUsage.output ?? '?'}, finishReason=${lastFinishReason ?? '?'}). Первый chunk: ${sample.slice(0, 200)}`
+            reason = `⚠ Gemini вернул пустой ответ (${chunkCount} chunks, output_tokens=${lastUsage.output ?? '?'}). Первый chunk: ${sample.slice(0, 200)}`
           }
           yield { type: 'text', text: reason }
         }
