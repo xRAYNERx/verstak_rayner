@@ -20,15 +20,23 @@ Switch in the chat composer's model picker. Each provider has its own list of mo
 ## Features
 
 - **Multi-project rail.** Sidebar holds all opened folders, click to switch. Last project auto-opens on startup.
-- **Per-project views.** Chat / Tasks / Journal / Plan (others stubbed).
-- **Plan mode.** AI generates structured plans via the `create_plan` tool; you run steps one-by-one or "▶▶ Все шаги".
-- **Tools across API providers.** read_file, list_directory, write_file (with diff confirm), run_command (with confirm + denylist), search_project (ripgrep), find_files.
-- **Multi-file diff.** When AI writes 2+ files in one turn, all confirmations land in a single modal with a file rail.
+- **Per-project views.** Chat / Tasks / Journal / Plan / Browser / Feedback.
+- **Multi-chat per project.** Chat as collapsible section in sidebar with multiple sessions; rename on double-click, delete with ×. Background sessions keep streaming when you switch projects.
+- **Plan mode + Autopilot.** AI generates structured plans via `create_plan`; run steps one-by-one or enable **Autopilot** (limit N steps, optional verify command like `npm test` / `npx tsc --noEmit` between steps — fails → pause).
+- **Project map.** `get_project_map` AI tool — one call returns directory tree + top-level symbols (functions, classes, components, types, exports) for every code file. Cache auto-invalidates on write_file.
+- **In-app browser.** Native Electron `<webview>` tab with URL bar / back-forward / reload. AI tools `browser_navigate`, `browser_read_page`, `browser_screenshot`.
+- **Vision.** `browser_screenshot` data URL is attached as `inlineData` to the next user message; Gemini 3.5 Flash / 3 Pro see it and can analyse UI visually.
+- **Connectors.** Pluggable adapters for external systems. Built-in: 1С OData (standard.odata + HTTP Basic), generic HTTP. Credentials in encrypted `safeStorage`, never in the prompt. AI tools `list_connectors`, `connector_query`.
+- **Secret scanner + path policy.** `.env`, `.ssh`, `.aws`, `*.key`, `*.pem`, `credentials`, `cookies` blocked at read/write/list. Output of every read_file / search_project / connector response goes through regex pass redacting API keys (OpenAI, Anthropic, GitHub, AWS, JWT, private-key blocks, basic-auth in URLs) as `[REDACTED:type]`.
+- **Tools across API providers.** read_file, list_directory, write_file (with diff confirm), run_command (with confirm + denylist), search_project (ripgrep), find_files, get_project_map, browser_*, connector_*.
+- **Multi-file diff.** When AI writes 2+ files in one turn, all confirmations land in a single modal with a file rail. Keyboard: Enter / Esc / Ctrl+Enter / ←→.
 - **Undo stack.** Every accepted write is recorded; "↶ N" button in the composer reverts the most recent.
 - **Loop detection.** Same tool+args called 3× → break with supervisor message; max 8 turns per send.
-- **Token counter.** "↑2.1k · ↓0.8k" in the composer, per project session.
-- **Project journal.** User messages, tool actions, blocked commands, plans — all logged.
-- **System layer.** Immutable agent protocols (7-step cycle, scope discipline, verification) baked into the build. User extends via `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` / `.geminigrok/RULES.md` in the project root.
+- **Cost estimator.** `↑2.1k · ↓0.8k · $0.014` in the composer — pricing for Anthropic/Google/OpenAI/xAI with cached-input discount; CLI providers show `—`.
+- **Emergency stop.** Floating red pill while streaming + Shift+Esc kills every active stream and clears pending confirmations.
+- **Resizable sidebar.** Drag right edge to resize (200..480px), width persisted to localStorage.
+- **Auto-summary journal.** Every AI session writes a brief entry (touched files, commands run, last reply); plans get their own entry.
+- **System layer.** Immutable agent protocols (7-step cycle, scope discipline, verification, secret-scanner policy) baked into the build. User extends via `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` / `.geminigrok/RULES.md` in the project root (auto-init on first project open).
 - **Dark / light theme.** Toggle in Settings.
 
 ## Setup
