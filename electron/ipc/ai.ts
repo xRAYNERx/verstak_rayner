@@ -195,6 +195,9 @@ async function runApiConversation(
   const filesTouched = new Set<string>()
   const commandsRun: string[] = []
   let lastAssistantText = ''
+  // Attachments collected from browser_screenshot etc. — flushed into the
+  // next user message so vision-capable providers see them.
+  const pendingAttachments: import('../ai/types').Attachment[] = []
 
   for (let turn = 0; turn < MAX_AGENT_TURNS; turn++) {
     if (signal.aborted) {
@@ -293,6 +296,26 @@ async function runApiConversation(
       }
       if (call.name === 'browser_navigate' || call.name === 'browser_read_page' || call.name === 'browser_screenshot') {
         toolResults[i] = await handleBrowserTool(sender, call)
+        // If a screenshot tool returned a data URL, queue it as an attachment
+        // on the next user message so vision-capable providers receive it.
+        if (call.name === 'browser_screenshot' && !toolResults[i].error) {
+          const r = toolResults[i].result as { dataUrl?: string; url?: string } | string
+          const dataUrl = typeof r === 'object' && r ? r.dataUrl : undefined
+          if (dataUrl && dataUrl.startsWith('data:image/')) {
+            const m = /^data:(image\/[\w+-]+);base64,(.+)$/.exec(dataUrl)
+            if (m) {
+              pendingAttachments.push({
+                name: `screenshot-${Date.now()}.png`,
+                mimeType: m[1],
+                data: m[2],
+                size: Math.floor(m[2].length * 0.75)
+              })
+              // Strip the heavy dataUrl from the tool result so it doesn't
+              // bloat the JSON-stringified payload going back to the model.
+              toolResults[i].result = { url: typeof r === 'object' ? r.url : null, attached: true }
+            }
+          }
+        }
         const s = summarizeToolCall(call.name, call.args, undefined)
         if (s) sender.send('ai:event', { id: sendId, event: { type: 'tool-activity', callId: call.id, name: call.name, label: s.label, detail: s.detail, status: toolResults[i].error ? 'error' : 'ok' } })
         continue
@@ -387,7 +410,12 @@ async function runApiConversation(
         if (cmd) commandsRun.push(cmd)
       }
     }
-    currentMessages.push({ role: 'user', content: '', toolResults })
+    const nextUserMsg: ChatMessage = { role: 'user', content: '', toolResults }
+    if (pendingAttachments.length > 0) {
+      nextUserMsg.attachments = [...pendingAttachments]
+      pendingAttachments.length = 0
+    }
+    currentMessages.push(nextUserMsg)
   }
   // Max turns reached — warn user and exit
   writeSessionJournal(recordJournal, projectPath, lastAssistantText, filesTouched, commandsRun)
