@@ -61,24 +61,48 @@ export function createGrokCliProvider(opts: GrokCliOptions = {}): ChatProvider {
     models: GROK_CLI_MODELS,
 
     async *send(messages: ChatMessage[], _tools: ToolDefinition[], _results?: ToolResult[]): AsyncIterable<ChatEvent> {
-      let payload: string
-      try {
-        payload = await buildCliPrompt({
-          providerId: 'grok-cli',
-          projectPath: cwd ?? null,
-          messages
-        })
-      } catch (err) {
-        yield { type: 'error', message: err instanceof Error ? err.message : String(err) }
+      // GROK CLI is unstable with large prompts AND with stdin through .cmd
+      // shell wrappers — exit 0xC0000005 ACCESS_VIOLATION reported on both.
+      // For grok specifically we fall back to MINIMAL payload (just the user
+      // message, no system layer, no context pack) and use stdin without
+      // shell when binary is a direct .exe / unix executable.
+      const lastUser = messages.filter(m => m.role === 'user').at(-1)
+      if (!lastUser?.content) {
+        yield { type: 'error', message: 'Нет user-сообщения для отправки' }
         return
+      }
+      const minimalMode = true  // toggle if grok stabilizes for larger payloads
+      let payload: string
+      if (minimalMode) {
+        payload = lastUser.content
+        if (lastUser.attachments?.length) {
+          payload += '\n\n' + lastUser.attachments.map(a => `[файл: ${a.name}]`).join('\n')
+        }
+      } else {
+        try {
+          payload = await buildCliPrompt({
+            providerId: 'grok-cli',
+            projectPath: cwd ?? null,
+            messages
+          })
+        } catch (err) {
+          yield { type: 'error', message: err instanceof Error ? err.message : String(err) }
+          return
+        }
       }
 
       const args = ['--output-format', 'streaming-json', '--no-alt-screen']
       if (opts.model && opts.model !== 'auto') args.push('-m', opts.model)
-      // Use stdin instead of -p argv. Big payloads (system_layer + context_pack
-      // + history) via argv have been crashing grok CLI on Windows
-      // (STATUS_ACCESS_VIOLATION 0xC0000005). stdin is safer: no CreateProcess
-      // arglen limit, no shell parsing of quotes/newlines/unicode.
+      // Back to -p argv (this is what worked before parity changes). stdin
+      // through cmd.exe wrapper on Windows turned out to be even more unstable.
+      // Soft cap to 8KB so we never trip CreateProcess limits or grok's own
+      // internal buffers.
+      const ARGV_CAP = 8000
+      if (payload.length > ARGV_CAP) {
+        payload = payload.slice(0, ARGV_CAP) + '\n[truncated]'
+      }
+      args.push('-p', payload)
+
       const child = spawn(binary, args, {
         cwd,
         shell: binary.endsWith('.cmd') || binary.endsWith('.ps1'),
@@ -86,14 +110,7 @@ export function createGrokCliProvider(opts: GrokCliOptions = {}): ChatProvider {
         stdio: ['pipe', 'pipe', 'pipe']
       })
 
-      try {
-        child.stdin.write(payload)
-        child.stdin.end()
-      } catch (err) {
-        yield { type: 'error', message: `Grok CLI stdin error: ${err instanceof Error ? err.message : String(err)}` }
-        try { child.kill() } catch { /* noop */ }
-        return
-      }
+      try { child.stdin.end() } catch { /* noop */ }
 
       let abortListener: (() => void) | null = null
       if (opts.signal) {
