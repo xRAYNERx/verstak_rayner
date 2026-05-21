@@ -2093,6 +2093,44 @@
 }
 
 /* ======================================================================
+   Per-message hover toolbar (copy / etc). Hidden by default, faded in
+   when the user hovers the message. Pavel feedback 2026-05-21.
+   ====================================================================== */
+.gg-msg-actions {
+  display: flex; gap: 4px;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 120ms ease, transform 120ms ease;
+  pointer-events: none;
+}
+.gg-msg:hover .gg-msg-actions,
+.gg-msg-actions:focus-within {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.gg-msg-user .gg-msg-actions { align-self: flex-end; }
+.gg-msg-assistant .gg-msg-actions { align-self: flex-start; }
+.gg-msg-action {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.gg-msg-action:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-default);
+}
+.gg-msg-action svg { display: block; }
+
+/* ======================================================================
    Empty-state mode discovery hint.
    Source: brainstorm 2026-05-21, idea D.
    ====================================================================== */

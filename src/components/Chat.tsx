@@ -663,6 +663,9 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
                     : null
                 }
               </div>
+              {m.content && !isStreamingAssistant && (
+                <MessageActions text={m.content} />
+              )}
             </div>
           )
         })}
@@ -833,6 +836,50 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Hover toolbar shown under every message — copy-to-clipboard for now.
+ * Hidden by default; fades in on .gg-msg:hover (см. layout.css). Pavel
+ * фидбек 2026-05-21: "при наведении должно появляться как у тебя функция
+ * копировать".
+ */
+function MessageActions({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1400)
+    } catch { /* clipboard может быть запрещён — молча игнорим */ }
+  }
+  return (
+    <div className="gg-msg-actions">
+      <button
+        type="button"
+        className="gg-msg-action"
+        onClick={() => void copy()}
+        title="Скопировать текст сообщения"
+      >
+        {copied ? (
+          <>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            <span>скопировано</span>
+          </>
+        ) : (
+          <>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+            <span>копировать</span>
+          </>
+        )}
+      </button>
     </div>
   )
 }
