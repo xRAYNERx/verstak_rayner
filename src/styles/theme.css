@@ -46,6 +46,14 @@
   --diff-remove: #f47174;
   --diff-remove-bg: rgba(244, 113, 116, 0.08);
 
+  /* Inline-code chips (markdown `backticks`). Needs distinct text/bg in BOTH
+   * themes — on dark we want a soft blue tint, on light a deep purple-ink so
+   * chips on white surfaces stay readable. Light variant defined in the
+   * html[data-theme="light"] block below. */
+  --bg-code: rgba(91, 141, 255, 0.08);
+  --text-code: #b8c8ff;
+  --border-code: rgba(91, 141, 255, 0.18);
+
   /* Typography */
   --font-sans: 'Geist Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-mono: 'Geist Mono', 'JetBrains Mono', 'SF Mono', Menlo, monospace;
@@ -123,6 +131,13 @@ html[data-theme="light"] {
   --shadow-md: 0 4px 16px rgba(15, 25, 40, 0.08);
   --shadow-lg: 0 16px 48px rgba(15, 25, 40, 0.12);
   --shadow-glow: 0 0 24px rgba(58, 110, 232, 0.10);
+
+  /* Inline-code chips on light — deep purple-ink on a pale lavender wash so
+   * the chip is legible AND visually distinct from running prose. The dark-
+   * theme defaults sit on a near-white background and become invisible. */
+  --bg-code: #eef1ff;
+  --text-code: #3d3996;
+  --border-code: #c9d0f5;
 }
 
 /* ─── Reset ─── */

@@ -35,15 +35,18 @@
 .gg-md a { color: var(--accent); }
 .gg-md a:hover { color: var(--accent-hover); text-decoration: underline; }
 
-/* Inline code */
+/* Inline code — theme-aware. Hard-coded color was invisible on light theme
+ * (Pavel feedback 2026-05-21: "в белой надо ссылки и прочее в другом дизайне,
+ * а то не видно"). Now uses --text-code / --bg-code / --border-code defined
+ * per theme in theme.css. */
 .gg-md :not(pre) > code {
   font-family: var(--font-mono);
   font-size: 0.9em;
-  background: var(--bg-input);
-  border: 1px solid var(--border-subtle);
+  background: var(--bg-code);
+  border: 1px solid var(--border-code);
   border-radius: 4px;
   padding: 1px 5px;
-  color: #d3deff;
+  color: var(--text-code);
 }
 
 /* Code blocks (we render these with the CodeBlock component) */
