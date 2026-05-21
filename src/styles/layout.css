@@ -744,14 +744,22 @@
   display: flex; flex-direction: column;
   flex: 1; min-height: 0;
 }
+/*
+ * Scroll container takes the FULL panel width so the scrollbar lives at the
+ * physical right edge of the chat panel (Pavel feedback 2026-05-21: бегунок
+ * висел в воздухе между текстом и краем, теперь прижат). Content stays
+ * narrow via .gg-chat-stream-inner — same 980px max-width as the composer.
+ */
 .gg-chat-stream {
   flex: 1; overflow-y: auto;
-  padding: 24px 28px 12px;
+  width: 100%;
+}
+.gg-chat-stream-inner {
   display: flex; flex-direction: column; gap: 16px;
-  /* Match composer width: keep messages centered on wide displays */
   width: 100%;
   max-width: 980px;
   margin: 0 auto;
+  padding: 24px 28px 12px;
 }
 .gg-chat-empty {
   flex: 1; display: flex; flex-direction: column;

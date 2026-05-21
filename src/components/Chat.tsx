@@ -544,6 +544,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
       )}
 
       <div className="gg-chat-stream" ref={streamRef}>
+        <div className="gg-chat-stream-inner">
         {!hasMessages && (
           <div className="gg-chat-empty">
             <img src={iconUrl} alt="GeminiGrok" className="gg-chat-empty-mark-img" />
@@ -669,6 +670,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
             </div>
           )
         })}
+        </div>
       </div>
 
       <TimelineBar />
