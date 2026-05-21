@@ -26,6 +26,7 @@
 import { randomUUID } from 'crypto'
 import type { Attachment, ToolCall, ToolResult } from '../ai/types'
 import { applySearchReplaceBlocks, type FileTools } from '../ai/tools'
+import { decide, blockReason, type AgentMode } from '../ai/mode-policy'
 
 // ============================================================================
 // Types
@@ -63,6 +64,8 @@ export interface ToolContext {
   pendingWrites: Map<string, { sendId: SendId; resolve: (accept: boolean) => void }>
   pendingCommands: Map<string, { sendId: SendId; resolve: (accept: boolean) => void }>
   scopedKey: (sendId: SendId, callId: string) => string
+  /** Active agent mode — controls auto-accept / confirm / block per tool. */
+  agentMode: AgentMode
 }
 
 export type ToolMode = 'parallel-read' | 'sequential' | 'confirm-write'
@@ -154,10 +157,25 @@ const readHandler: ToolHandler = {
 // ============================================================================
 
 async function diffConfirmWrite(call: ToolCall, ctx: ToolContext, path: string, before: string, after: string): Promise<ToolResult> {
-  ctx.sender.send('ai:event', { id: ctx.sendId, event: { type: 'pending-write', callId: call.id, path, before, after } })
-  const accepted = await new Promise<boolean>(resolve => {
-    ctx.pendingWrites.set(ctx.scopedKey(ctx.sendId, call.id), { sendId: ctx.sendId, resolve })
-  })
+  const decision = decide(call.name, ctx.agentMode)
+  if (decision === 'block') {
+    return { id: call.id, name: call.name, result: '', error: blockReason(call.name, ctx.agentMode) }
+  }
+  let accepted: boolean
+  if (decision === 'auto-accept') {
+    // Skip user prompt — still surface the diff via tool-activity for visibility
+    ctx.sender.send('ai:event', {
+      id: ctx.sendId,
+      event: { type: 'tool-activity', callId: call.id, name: call.name, label: `${call.name} (авто)`, detail: path, status: 'ok' }
+    })
+    accepted = true
+  } else {
+    // 'confirm' — show diff modal and wait
+    ctx.sender.send('ai:event', { id: ctx.sendId, event: { type: 'pending-write', callId: call.id, path, before, after } })
+    accepted = await new Promise<boolean>(resolve => {
+      ctx.pendingWrites.set(ctx.scopedKey(ctx.sendId, call.id), { sendId: ctx.sendId, resolve })
+    })
+  }
   if (!accepted) {
     return { id: call.id, name: call.name, result: `User rejected write to ${path}`, error: 'User rejected' }
   }
@@ -271,10 +289,29 @@ const runCommandHandler: ToolHandler = {
         error: `Blocked by safety policy: ${verdict.reason ?? 'denylist'}`
       }
     }
-    ctx.sender.send('ai:event', { id: ctx.sendId, event: { type: 'pending-command', callId: call.id, command } })
-    const accepted = await new Promise<boolean>(resolve => {
-      ctx.pendingCommands.set(ctx.scopedKey(ctx.sendId, call.id), { sendId: ctx.sendId, resolve })
-    })
+    // Mode policy: plan blocks, ask confirms, auto/bypass auto-accept,
+    // accept-edits still confirms commands (only edits auto-pass).
+    const decision = decide('run_command', ctx.agentMode)
+    if (decision === 'block') {
+      ctx.sender.send('ai:event', {
+        id: ctx.sendId,
+        event: { type: 'tool-blocked', callId: call.id, name: 'run_command', command, reason: blockReason('run_command', ctx.agentMode) }
+      })
+      return { id: call.id, name: call.name, result: '', error: blockReason('run_command', ctx.agentMode) }
+    }
+    let accepted: boolean
+    if (decision === 'auto-accept') {
+      ctx.sender.send('ai:event', {
+        id: ctx.sendId,
+        event: { type: 'tool-activity', callId: call.id, name: 'run_command', label: 'run_command (авто)', detail: command, status: 'ok' }
+      })
+      accepted = true
+    } else {
+      ctx.sender.send('ai:event', { id: ctx.sendId, event: { type: 'pending-command', callId: call.id, command } })
+      accepted = await new Promise<boolean>(resolve => {
+        ctx.pendingCommands.set(ctx.scopedKey(ctx.sendId, call.id), { sendId: ctx.sendId, resolve })
+      })
+    }
     if (!accepted) {
       ctx.sender.send('ai:event', { id: ctx.sendId, event: { type: 'command-result', callId: call.id, command, status: 'rejected' } })
       return { id: call.id, name: call.name, result: `Command: ${command}`, error: 'User rejected' }

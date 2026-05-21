@@ -167,6 +167,11 @@ app.whenReady().then(() => {
         getSecret: (k) => settings.getSecret(k),
         signal
       })
+    },
+    getAgentMode: () => {
+      const v = settings.getSecret('agent_mode')
+      if (v === 'ask' || v === 'accept-edits' || v === 'plan' || v === 'auto' || v === 'bypass') return v
+      return 'ask'
     }
   })
   registerChatsIpc(chats, chatSessions)

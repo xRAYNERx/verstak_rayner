@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { createFileTools, TOOL_DEFS } from '../ai/tools'
 import { createProvider, PROVIDERS, type ProviderId } from '../ai/registry'
 import { prepareSystemContext } from '../ai/compose-system'
+import type { AgentMode } from '../ai/mode-policy'
 import type { ChatMessage, ToolCall, ToolResult, ChatProvider, Attachment } from '../ai/types'
 import { lookupHandler, type ToolContext, type TaggedSender as HandlerTaggedSender } from './tool-handlers'
 
@@ -26,6 +27,8 @@ interface AiDeps {
     list: () => Array<{ id: string; label: string; kind: string; status: string; detail?: string }>
     query: (id: string, args: Record<string, unknown>, signal: AbortSignal) => Promise<unknown>
   }
+  /** Active agent mode — auto-accept / confirm / block per tool category. */
+  getAgentMode: () => AgentMode
 }
 
 let currentSendId = 0
@@ -123,7 +126,7 @@ export function registerAiIpc(deps: AiDeps): void {
     if (descriptor.supportsTools && projectPath) {
       const tools = createFileTools(projectPath, ctrl.signal)
       const turnsBudget = Math.min(MAX_BUDGET_TURNS, Math.max(DEFAULT_AGENT_TURNS, budget ?? DEFAULT_AGENT_TURNS))
-      void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.readJournal, deps.connectors, turnsBudget).finally(cleanup)
+      void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.readJournal, deps.connectors, deps.getAgentMode(), turnsBudget).finally(cleanup)
     } else {
       void runPlainConversation(taggedSender, sendId, provider, messagesWithSystem, ctrl.signal).finally(cleanup)
     }
@@ -295,6 +298,7 @@ async function runApiConversation(
     list: () => Array<{ id: string; label: string; kind: string; status: string; detail?: string }>
     query: (id: string, args: Record<string, unknown>, signal: AbortSignal) => Promise<unknown>
   },
+  agentMode: AgentMode,
   turnsBudget: number = DEFAULT_AGENT_TURNS
 ): Promise<void> {
   const currentMessages = [...initialMessages]
@@ -423,7 +427,8 @@ async function runApiConversation(
     const ctx: ToolContext = {
       sender, sendId, signal, projectPath, tools,
       recordWrite, recordPlan, recordJournal, readJournal, connectors,
-      pendingAttachments, pendingWrites, pendingCommands, scopedKey
+      pendingAttachments, pendingWrites, pendingCommands, scopedKey,
+      agentMode
     }
     const writePromises: Array<{ idx: number; promise: Promise<ToolResult> }> = []
     const readPromises: Array<{ idx: number; promise: Promise<ToolResult> }> = []

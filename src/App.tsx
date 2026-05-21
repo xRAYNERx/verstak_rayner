@@ -38,6 +38,17 @@ export function App() {
       if (e.key === 'b' && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
         e.preventDefault()
         setSidebarOpen(v => !v)
+      } else if (e.key === 'Tab' && e.shiftKey && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
+        // Shift+Tab — cycle через agent mode (как в Claude Code). Игнорируем
+        // когда фокус в input/textarea (там Shift+Tab — обычная навигация).
+        e.preventDefault()
+        const modes: Array<'ask' | 'accept-edits' | 'plan' | 'auto' | 'bypass'> = ['ask', 'accept-edits', 'plan', 'auto', 'bypass']
+        void (async () => {
+          const current = (await window.api.settings.getKey('agent_mode')) as typeof modes[number] | null
+          const idx = modes.indexOf(current ?? 'ask')
+          const next = modes[(idx + 1) % modes.length]
+          await window.api.settings.setKey('agent_mode', next)
+        })()
       } else if (e.key === 'Escape' && e.shiftKey) {
         // Shift+Esc = emergency abort. Tell main to kill every active stream
         // and clear any pending confirmations, then reset renderer state so

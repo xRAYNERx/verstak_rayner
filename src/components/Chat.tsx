@@ -4,6 +4,8 @@ import { useProvider } from '../hooks/useProvider'
 import { estimateCost } from '../lib/pricing'
 import { Markdown } from './Markdown'
 import { ModelPicker } from './ModelPicker'
+import { ModePicker } from './ModePicker'
+import { useAgentMode } from '../hooks/useAgentMode'
 import type { Attachment } from '../types/api'
 import iconUrl from '../assets/icon.png'
 
@@ -72,6 +74,7 @@ Out of scope: общие best practices, рефакторинги ради кр�
 
 export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatProps) {
   const { messages, addMessage, updateLastAssistant, isStreaming, setStreaming, activity, sessionUsage, path: activePath, chatSessions, activeChatId } = useProject()
+  const { mode: agentMode, setMode: setAgentMode } = useAgentMode()
   const projectName = activePath ? activePath.replace(/^.*[\\/]/, '') : null
   const activeChatTitle = chatSessions.find(s => s.id === activeChatId)?.title ?? null
   const provider = useProvider()
@@ -783,6 +786,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
                 <line x1="12" y1="19" x2="20" y2="19" />
               </svg>
             </button>
+            <ModePicker mode={agentMode} onChange={setAgentMode} />
             <ModelPicker onOpenSettings={onOpenSettings} />
           </div>
         </div>
