@@ -340,6 +340,15 @@
   flex-shrink: 0;
 }
 .gg-chat-nav-item.is-active .gg-chat-nav-dot { background: var(--accent); }
+.gg-chat-nav-dot.is-unread { background: var(--accent); }
+.gg-chat-nav-dot.is-streaming {
+  background: var(--accent);
+  animation: gg-pulse 1.4s ease-in-out infinite;
+}
+@keyframes gg-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
 .gg-chat-nav-title {
   flex: 1;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

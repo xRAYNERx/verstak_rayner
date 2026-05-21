@@ -100,12 +100,19 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
   }
 
   useEffect(() => {
-    const off = window.api.ai.onEvent(({ event, projectPath }) => {
+    const off = window.api.ai.onEvent(({ id, event, projectPath }) => {
       const store = useProject.getState()
       // Route background-project events to the snapshot store so they don't
       // mutate the currently-visible session.
       if (projectPath && projectPath !== store.path) {
         store.applyEventToSession(projectPath, event as unknown as { type: string; [k: string]: unknown })
+        return
+      }
+      // Route background-chat events (same project, different chat) to the
+      // chat snapshot so the user's stream survives chat-switching.
+      const owningChatId = store.sendIdToChatId[id]
+      if (owningChatId != null && owningChatId !== store.activeChatId) {
+        store.applyEventToChat(owningChatId, event as unknown as { type: string; [k: string]: unknown })
         return
       }
       if (event.type === 'text') updateLastAssistant(event.text)
@@ -393,7 +400,10 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
     setStreaming(true)
     // Send everything except the empty placeholder we just pushed
     const msgs = [...useProject.getState().messages].slice(0, -1)
-    await window.api.ai.sendWithBudget(msgs, store.path, newBudget)
+    const sendId = await window.api.ai.sendWithBudget(msgs, store.path, newBudget)
+    if (activeChatId != null) {
+      useProject.getState().registerSend(sendId, activeChatId)
+    }
   }
 
   async function send() {
@@ -424,6 +434,12 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
     const allMessages = [...useProject.getState().messages].slice(0, -1)
     const sendId = await window.api.ai.send(allMessages, path)
     currentSendIdRef.current = sendId
+    // Bind this send to the chat that initiated it — if user switches to
+    // another chat mid-stream, the event handler will route events into
+    // chatSnapshots[activeChatId] rather than corrupting the new active chat.
+    if (activeChatId != null) {
+      useProject.getState().registerSend(sendId, activeChatId)
+    }
   }
 
   async function stop() {

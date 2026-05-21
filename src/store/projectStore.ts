@@ -100,6 +100,12 @@ interface ProjectState {
   activeChatId: number | null
   /** Per-project session snapshots for backgrounded projects. */
   sessions: Record<string, SessionSnapshot>
+  /** Per-chat snapshots within active project — preserve state when switching
+   *  between chats so a backgrounded chat's stream isn't lost. */
+  chatSnapshots: Record<number, SessionSnapshot>
+  /** Map of in-flight sendId → chatSessionId that initiated it. Used to route
+   *  ai:event for backgrounded chats into the correct snapshot. */
+  sendIdToChatId: Record<number, number>
   setProject: (path: string) => Promise<void>
   closeProject: () => void
   refreshProjectList: () => Promise<void>
@@ -125,6 +131,11 @@ interface ProjectState {
   applyEventToSession: (projectPath: string, event: { type: string; [k: string]: unknown }) => void
   /** Mark a session as read (clear the unread badge). */
   markSessionRead: (projectPath: string) => void
+  /** Bind an in-flight send (sendId) to the chat session that started it. */
+  registerSend: (sendId: number, chatId: number) => void
+  /** Apply an ai:event to a background CHAT snapshot (within active project,
+   *  but not the active chat). */
+  applyEventToChat: (chatId: number, event: { type: string; [k: string]: unknown }) => void
   /** Switch to a different chat session within the active project. */
   switchChatSession: (id: number) => Promise<void>
   /** Refresh the chat sessions list (after create/rename/delete). */
@@ -154,6 +165,8 @@ export const useProject = create<ProjectState>((set, get) => ({
   chatSessions: [],
   activeChatId: null,
   sessions: {},
+  chatSnapshots: {},
+  sendIdToChatId: {},
   setProject: async (path) => {
     const myToken = ++setProjectToken
     const s = get()
@@ -335,13 +348,45 @@ export const useProject = create<ProjectState>((set, get) => ({
   switchChatSession: async (id) => {
     const s = get()
     if (!s.path) return
-    // If the previous chat had an active stream, kill it before switching —
-    // otherwise the typing indicator and event handlers would attribute
-    // incoming text to the wrong session.
-    if (s.isStreaming) {
-      try { await window.api.ai.stop(0) } catch { /* ignore */ }
+    // 1) Snapshot CURRENT chat state so its in-flight stream survives the
+    //    switch. Do NOT call ai.stop — events for the old sendId will be
+    //    routed into chatSnapshots[oldChatId] by Chat.tsx event handler.
+    const nextSnapshots = { ...s.chatSnapshots }
+    if (s.activeChatId != null && s.activeChatId !== id) {
+      nextSnapshots[s.activeChatId] = {
+        messages: s.messages,
+        isStreaming: s.isStreaming,
+        pendingWrites: s.pendingWrites,
+        pendingCommand: s.pendingCommand,
+        activity: s.activity,
+        sessionUsage: s.sessionUsage,
+        runningPlanStep: s.runningPlanStep,
+        hasUnread: false
+      }
     }
-    const history = await window.api.chats.list(id)
+    // 2) Restore target — from snapshot if it has one (chat was backgrounded
+    //    earlier in this session), otherwise load history from DB.
+    const restored = nextSnapshots[id]
+    let messages: ChatMessage[]
+    let isStreaming = false
+    let pendingWrites: PendingWrite[] = []
+    let pendingCommand: PendingCommand | null = null
+    let activity: ActivityEntry[] = []
+    let sessionUsage: SessionUsage = { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 }
+    let runningPlanStep: RunningPlanStep | null = null
+    if (restored) {
+      messages = restored.messages
+      isStreaming = restored.isStreaming
+      pendingWrites = restored.pendingWrites
+      pendingCommand = restored.pendingCommand
+      activity = restored.activity
+      sessionUsage = restored.sessionUsage
+      runningPlanStep = restored.runningPlanStep
+      delete nextSnapshots[id]  // it becomes active, no need to keep snapshot
+    } else {
+      const history = await window.api.chats.list(id)
+      messages = history.map(m => ({ role: m.role, content: m.content }))
+    }
     // Per-chat provider: if the session has providerId / model saved, apply
     // them to the global settings so the next ai:send uses that provider.
     // Sanity check: if stored (providerId, model) pair is invalid (e.g. older
@@ -362,14 +407,64 @@ export const useProject = create<ProjectState>((set, get) => ({
     }
     set({
       activeChatId: id,
-      messages: history.map(m => ({ role: m.role, content: m.content })),
-      isStreaming: false,
-      activity: [],
-      pendingWrites: [],
-      pendingCommand: null,
-      runningPlanStep: null
+      messages,
+      isStreaming,
+      pendingWrites,
+      pendingCommand,
+      activity,
+      sessionUsage,
+      runningPlanStep,
+      chatSnapshots: nextSnapshots
     })
   },
+  registerSend: (sendId, chatId) => set(s => ({
+    sendIdToChatId: { ...s.sendIdToChatId, [sendId]: chatId }
+  })),
+  applyEventToChat: (chatId, event) => set(s => {
+    const existing = s.chatSnapshots[chatId] ?? freshSnapshot()
+    const next = { ...existing, hasUnread: true }
+    const t = event.type
+    if (t === 'text' && typeof event.text === 'string') {
+      const msgs = [...next.messages]
+      const last = msgs[msgs.length - 1]
+      if (last?.role === 'assistant') {
+        msgs[msgs.length - 1] = { ...last, content: last.content + event.text }
+      } else {
+        msgs.push({ role: 'assistant', content: event.text })
+      }
+      next.messages = msgs
+    } else if (t === 'thought' && typeof event.text === 'string') {
+      const msgs = [...next.messages]
+      const last = msgs[msgs.length - 1]
+      if (last?.role === 'assistant') {
+        msgs[msgs.length - 1] = { ...last, thinking: (last.thinking ?? '') + event.text }
+      }
+      next.messages = msgs
+    } else if (t === 'done' || t === 'error') {
+      next.isStreaming = false
+      if (t === 'error' && typeof event.message === 'string') {
+        const msgs = [...next.messages]
+        const last = msgs[msgs.length - 1]
+        if (last?.role === 'assistant') {
+          msgs[msgs.length - 1] = { ...last, content: last.content + `\n\n[Ошибка: ${event.message}]` }
+        }
+        next.messages = msgs
+      }
+      // Persist the completed assistant message to DB so it survives reload
+      const lastMsg = next.messages[next.messages.length - 1]
+      if (lastMsg?.role === 'assistant' && lastMsg.content && s.path) {
+        void window.api.chats.append(chatId, s.path, 'assistant', lastMsg.content).catch(() => {})
+      }
+    } else if (t === 'usage' && event.usage && typeof event.usage === 'object') {
+      const u = event.usage as { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number }
+      next.sessionUsage = {
+        inputTokens: next.sessionUsage.inputTokens + (u.inputTokens ?? 0),
+        outputTokens: next.sessionUsage.outputTokens + (u.outputTokens ?? 0),
+        cachedInputTokens: next.sessionUsage.cachedInputTokens + (u.cachedInputTokens ?? 0)
+      }
+    }
+    return { chatSnapshots: { ...s.chatSnapshots, [chatId]: next } }
+  }),
   refreshChatSessions: async () => {
     const s = get()
     if (!s.path) return

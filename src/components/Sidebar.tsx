@@ -5,7 +5,7 @@ import type { FileNode } from '../types/api'
 import iconUrl from '../assets/icon.png'
 
 function ChatNavSection() {
-  const { chatSessions, activeChatId, activeView, setActiveView, switchChatSession, newChatSession, refreshChatSessions } = useProject()
+  const { chatSessions, activeChatId, activeView, setActiveView, switchChatSession, newChatSession, refreshChatSessions, chatSnapshots } = useProject()
   const [open, setOpen] = useState(true)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editTitle, setEditTitle] = useState('')
@@ -88,7 +88,7 @@ function ChatNavSection() {
                   onDoubleClick={() => void startEdit(s.id, s.title)}
                   title={s.title}
                 >
-                  <span className="gg-chat-nav-dot" />
+                  <span className={`gg-chat-nav-dot ${chatSnapshots[s.id]?.isStreaming ? 'is-streaming' : chatSnapshots[s.id]?.hasUnread ? 'is-unread' : ''}`} />
                   <span className="gg-chat-nav-title">{s.title}</span>
                   {s.providerId && (
                     <span className="gg-chat-nav-provider" title={`${s.providerId}${s.model ? ' · ' + s.model : ''}`}>
