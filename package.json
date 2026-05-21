@@ -1,11 +1,8 @@
 {
   "name": "geminigrok",
   "version": "1.0.0",
-  "description": "",
+  "description": "Desktop AI coding agent: 8 providers (API + CLI subscriptions), tools, journal, connectors",
   "main": "out/main/main.mjs",
-  "directories": {
-    "doc": "docs"
-  },
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
@@ -14,7 +11,75 @@
     "type": "tsc --noEmit",
     "rebuild:node": "npm rebuild better-sqlite3 --runtime=node --update-binary",
     "electron-rebuild": "electron-rebuild -f -o better-sqlite3",
-    "predev": "npm run electron-rebuild"
+    "predev": "npm run electron-rebuild",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "com.pavelfrolof.geminigrok",
+    "productName": "GeminiGrok",
+    "copyright": "Copyright © 2026 Pavel Frolov",
+    "directories": {
+      "output": "release",
+      "buildResources": "resources"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "npmRebuild": false,
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*",
+      "node_modules/@homebridge/node-pty-prebuilt-multiarch/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "GeminiGrok",
+      "artifactName": "GeminiGrok-Setup-${version}-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "GeminiGrok-Portable-${version}-${arch}.${ext}"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "resources/icon.png",
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "resources/icon.png",
+      "category": "Development"
+    }
   },
   "keywords": [],
   "author": "",
@@ -29,6 +94,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
     "electron": "^40.10.0",
+    "electron-builder": "^26.8.1",
     "electron-vite": "^5.0.0",
     "png-to-ico": "^3.0.1",
     "sharp": "^0.34.5",
@@ -42,10 +108,10 @@
     "@fontsource/geist-sans": "^5.2.5",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@google/genai": "^2.4.0",
+    "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",
     "better-sqlite3": "^12.10.0",
     "diff": "^9.0.0",
     "highlight.js": "^11.11.1",
-    "node-pty": "^1.1.0",
     "openai": "^6.38.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

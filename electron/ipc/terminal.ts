@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow } from 'electron'
-import * as pty from 'node-pty'
+import * as pty from '@homebridge/node-pty-prebuilt-multiarch'
 
 const sessions = new Map<number, pty.IPty>()
 

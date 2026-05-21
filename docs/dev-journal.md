@@ -298,3 +298,35 @@ index.html / chats/ как legacy (это runtime/entry, не мусор).
 3. **Multi-chat per project.** Сейчас один линейный чат на проект. Хорошо бы — список бесед, как в ChatGPT/Claude.
 4. **Inline edit для AI.** Когда AI правит файл — открывать прямо в Monaco-editor вместо отдельной модалки. Удобнее для серий правок.
 5. **Distributable installer.** electron-builder → `.exe` с подписью.
+
+### 2026-05-21 · GGC-010 · electron-builder → .exe для пилотов
+
+Закрыл «Это не продукт, это dev-сборка» из Grok audit.
+
+- package.json: build config для electron-builder
+  * appId com.pavelfrolof.geminigrok, productName GeminiGrok
+  * Targets: NSIS installer + portable .exe (x64)
+  * asarUnpack для better-sqlite3 + node-pty (native modules)
+  * npmRebuild: false (используем уже собранные за predev бинарники
+    Electron; node-gyp на Windows без VS Build Tools не работает)
+  * signAndEditExecutable: false, CSC_IDENTITY_AUTO_DISCOVERY=false —
+    unsigned dist (для signed нужен сертификат Authenticode ~$200/год)
+  * scripts: dist / dist:win
+
+- Замена node-pty → @homebridge/node-pty-prebuilt-multiarch
+  Старая node-pty падала на winpty/GetCommitHash.bat при @electron/rebuild.
+  Prebuilt-multiarch имеет binarys для Windows/Mac/Linux out of the box.
+
+- Артефакты в release/:
+  * GeminiGrok-Setup-1.0.0-x64.exe — NSIS installer (с user choice
+    install path, desktop shortcut, start menu entry)
+  * GeminiGrok-Portable-1.0.0-x64.exe — standalone, без установки
+
+- release/ добавлен в .gitignore
+
+Известные ограничения:
+- Unsigned: Windows SmartScreen покажет «Unknown publisher» при первом
+  запуске. Для пилотов с инсайдерами ок; для широкого распространения
+  нужен Authenticode сертификат.
+- ~109 MB размер — Electron + Chromium + наш bundle. Стандартно для
+  Electron приложений.
