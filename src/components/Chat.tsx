@@ -51,6 +51,25 @@ async function blobToAttachment(blob: Blob, fallbackName: string): Promise<Attac
   }
 }
 
+/**
+ * Goal-cycle prompt: композит из read_journal + project_map + create_plan.
+ * Это конкретный "AI-Lab/Ideas cycle" внутри продукта — AI сам читает свою
+ * историю, синтезирует идеи, предлагает план. Запускается кнопкой
+ * "💡 Что улучшить" в пустом чате.
+ */
+const GOAL_CYCLE_PROMPT = `Запусти цикл self-improvement по этому проекту:
+
+1. Вызови read_journal с limit=50 без фильтра — прочитай последние сессии, действия, ошибки
+2. Вызови read_journal с limit=20, kind="note" — собери AI-ошибки и заметки отдельно
+3. Вызови get_project_map с format=text — посмотри текущую структуру
+4. На основе истории + структуры + git status (он уже в context_pack) сформулируй ровно 3 конкретных улучшения. Каждое:
+   - что именно сделать (file:line если применимо)
+   - почему это важно сейчас (с привязкой к найденному в журнале)
+   - оценка усилия (small/medium/large)
+5. Спроси какое из 3 запустить — я выберу одно, и ты создашь по нему create_plan.
+
+Out of scope: общие best practices, рефакторинги ради красоты, изменения без обоснования в журнале.`
+
 export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatProps) {
   const { messages, addMessage, updateLastAssistant, isStreaming, setStreaming, activity, sessionUsage, path: activePath, chatSessions, activeChatId } = useProject()
   const projectName = activePath ? activePath.replace(/^.*[\\/]/, '') : null
@@ -503,6 +522,31 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
             <div className="gg-chat-empty-hint">
               Открой проект слева и напиши задачу. Можно прикрепить файл, бросить скриншот через Ctrl+V или drag-and-drop.
             </div>
+            {activePath && (
+              <div className="gg-chat-empty-quick">
+                <button
+                  className="gg-quick-action"
+                  onClick={() => setInput(GOAL_CYCLE_PROMPT)}
+                  title="AI прочитает журнал работы, карту проекта и предложит 3 конкретных улучшения с планом"
+                >
+                  💡 Что улучшить в проекте?
+                </button>
+                <button
+                  className="gg-quick-action"
+                  onClick={() => setInput('Сделай аудит последних изменений за вчера-сегодня: вызови read_journal с kind="session" на 10 записей, выдели риски и регрессии. Используй get_project_map если нужен контекст.')}
+                  title="AI прочитает свежие сессии и поищет регрессии"
+                >
+                  🔍 Аудит последних изменений
+                </button>
+                <button
+                  className="gg-quick-action"
+                  onClick={() => setInput('Покажи карту проекта: вызови get_project_map с format=text и кратко опиши главные каталоги + стек.')}
+                  title="Быстрый обзор структуры проекта"
+                >
+                  🗺 Карта проекта
+                </button>
+              </div>
+            )}
           </div>
         )}
         {messages.map((m, i) => {

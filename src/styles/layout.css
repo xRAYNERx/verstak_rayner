@@ -779,6 +779,28 @@
 }
 .gg-chat-empty-title { font-size: 18px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.015em; }
 .gg-chat-empty-hint { font-size: var(--text-sm); max-width: 380px; line-height: 1.6; }
+.gg-chat-empty-quick {
+  display: flex; flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 8px;
+  max-width: 540px;
+}
+.gg-quick-action {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.gg-quick-action:hover {
+  background: var(--accent-muted);
+  border-color: var(--accent-border);
+  color: var(--text-primary);
+}
 
 .gg-msg { display: flex; flex-direction: column; gap: 6px; animation: gg-fade-in 220ms ease-out; }
 .gg-msg-user { align-items: flex-end; }
