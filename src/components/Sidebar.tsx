@@ -2,7 +2,6 @@ import { useState, type ReactElement } from 'react'
 import { useProject, type ViewId } from '../store/projectStore'
 import { useProvider } from '../hooks/useProvider'
 import type { FileNode } from '../types/api'
-import iconUrl from '../assets/icon.png'
 
 function ChatNavSection() {
   const { chatSessions, activeChatId, activeView, setActiveView, switchChatSession, newChatSession, refreshChatSessions, chatSnapshots } = useProject()
@@ -279,13 +278,6 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
 
   return (
     <aside className="gg-sidebar">
-      <div className="gg-sidebar-header">
-        <div className="gg-brand">
-          <img src={iconUrl} alt="GeminiGrok" className="gg-brand-img" />
-          <span className="gg-brand-text">GeminiGrok</span>
-        </div>
-      </div>
-
       <div className="gg-sidebar-scroll">
         <div className="gg-sidebar-section">
           <div className="gg-sidebar-section-title">Проект</div>
