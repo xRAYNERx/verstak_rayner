@@ -251,6 +251,37 @@ Goal: сделать продукт лучше Antigravity 2.0 за ночь. Ц
 
 Agent mode = API only. CLI = shared brain, no tools.
 
+### 2026-05-21 · GGC-009 · Agent grounding
+
+Cursor предложил ТЗ предполагая что studio_server.py / studio.html
+ещё есть и AI их подсасывает в описание стека. На момент написания
+ТЗ — файлы уже удалены (предыдущая сессия), `index.html` в корне
+это Vite entry point (НЕ legacy), а `grok_chat/` не было галлюцинации
+(Pavel был в проекте grok-chat в момент скриншота).
+
+Из ТЗ оставлено только полезное, остальное отрезано:
+
+- **product_stack в context-pack** — одна строка на пакет. Читает
+  package.json и собирает summary типа `electron + react + vite +
+  better-sqlite3 + typescript (geminigrok)`. Fallback на pyproject /
+  requirements.txt для Python проектов. Цена ~50 байт; экономит
+  модели read_file package.json на первом turn.
+- **system-layer v1.2.0 · блок GROUNDING** — явные правила: стек
+  определять ТОЛЬКО из package.json / product_stack; ENOENT на
+  read_file → не повторять путь, звать list_directory; соседние
+  проекты недоступны; для архитектурных вопросов — get_project_map
+  СНАЧАЛА.
+- **tools.read_file ENOENT** — вместо raw ENOENT возвращает
+  «Файл "X" не существует в активном проекте (Y). Вызови
+  list_directory или get_project_map». Это убирает повторный
+  read_file того же пути (модель раньше повторяла трижды до loop
+  detection).
+- **+2 bench-теста** (#11 electron+react из package.json, #12
+  Python+fastapi из requirements.txt) — теперь 12/12 в agent-bench.
+
+Отказался от: `legacy_ignore` (нечего игнорировать), пометки
+index.html / chats/ как legacy (это runtime/entry, не мусор).
+
 ### Deferred из аудита
 
 - **Threaded chats** (древовидная структура бесед) — отложено.

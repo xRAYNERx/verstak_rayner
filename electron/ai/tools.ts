@@ -470,7 +470,17 @@ export function createFileTools(root: string, signal?: AbortSignal): FileTools {
           throw new Error(`Доступ запрещён политикой безопасности: ${relPath} (secrets/credentials)`)
         }
         const abs = await safeRealJoin(root, relPath)
-        const st = await stat(abs)
+        let st
+        try {
+          st = await stat(abs)
+        } catch (err) {
+          const e = err as NodeJS.ErrnoException
+          if (e.code === 'ENOENT') {
+            // Clearer guidance — model otherwise tends to retry the same path 3×
+            throw new Error(`Файл "${relPath}" не существует в активном проекте (${root}). Вызови list_directory или get_project_map чтобы увидеть реальную структуру.`)
+          }
+          throw err
+        }
         if (!st.isFile()) throw new Error(`Не файл: ${args.path}`)
         if (st.size > MAX_READ_BYTES) {
           throw new Error(`Файл слишком большой: ${st.size} байт (лимит ${MAX_READ_BYTES})`)

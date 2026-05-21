@@ -71,6 +71,13 @@ export async function buildContextPack(input: ContextPackInput): Promise<string>
   const verifyHints = await detectVerifyScripts(projectPath)
   if (verifyHints.length > 0) parts.push(`verify_scripts: ${verifyHints.join(', ')}`)
 
+  // 3b. Product stack — quick summary of what kind of project this is,
+  //     derived from package.json (name + key dependencies). Cheap, but
+  //     lets the model NAME the stack correctly on first turn without
+  //     guessing or re-reading package.json itself.
+  const stack = await detectProductStack(projectPath)
+  if (stack) parts.push(`product_stack: ${stack}`)
+
   // 4. Project map (compact). Use cached version — if it's stale, the
   //    write_file tool invalidates the cache anyway.
   let mapBlock = ''
@@ -143,6 +150,55 @@ async function detectVerifyScripts(projectPath: string): Promise<string[]> {
     }
   } catch { /* no tsconfig */ }
   return hints.slice(0, 4)  // cap to keep it short
+}
+
+/**
+ * Quick read of package.json to surface "what kind of project is this".
+ * Returns a one-line summary suitable for the context_pack, e.g.
+ *   "electron + react + vite (geminigrok)"
+ *   "fastapi + python (grok-chat)" — when package.json absent we try pyproject/requirements
+ *   "" — for unknown projects (model will infer from project_map)
+ */
+async function detectProductStack(projectPath: string): Promise<string> {
+  try {
+    const raw = await readFile(join(projectPath, 'package.json'), 'utf8')
+    const pkg = JSON.parse(raw) as {
+      name?: string
+      type?: string
+      main?: string
+      dependencies?: Record<string, string>
+      devDependencies?: Record<string, string>
+    }
+    const deps: Record<string, string> = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) }
+    const hints: string[] = []
+    if (deps['electron']) hints.push('electron')
+    if (deps['next']) hints.push('next.js')
+    else if (deps['react']) hints.push('react')
+    if (deps['vue']) hints.push('vue')
+    if (deps['svelte']) hints.push('svelte')
+    if (deps['vite'] || deps['electron-vite']) hints.push('vite')
+    if (deps['typescript']) hints.push('typescript')
+    if (deps['better-sqlite3']) hints.push('better-sqlite3')
+    if (deps['express']) hints.push('express')
+    if (deps['fastify']) hints.push('fastify')
+    const stack = hints.length > 0 ? hints.join(' + ') : 'node'
+    const name = pkg.name ? ` (${pkg.name})` : ''
+    return `${stack}${name}`
+  } catch { /* not a node project */ }
+  // Try Python fallback
+  try {
+    await readFile(join(projectPath, 'pyproject.toml'), 'utf8')
+    return 'python (pyproject.toml)'
+  } catch { /* none */ }
+  try {
+    const raw = await readFile(join(projectPath, 'requirements.txt'), 'utf8')
+    const hints: string[] = ['python']
+    if (/fastapi/i.test(raw)) hints.push('fastapi')
+    else if (/flask/i.test(raw)) hints.push('flask')
+    else if (/django/i.test(raw)) hints.push('django')
+    return hints.join(' + ')
+  } catch { /* none */ }
+  return ''
 }
 
 /**

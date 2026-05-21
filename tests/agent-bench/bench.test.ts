@@ -104,4 +104,29 @@ export const Widget = () => null
     expect(classifyCommand('powershell -EncodedCommand UABzAA==').allowed).toBe(false)
     expect(classifyCommand('powershell.exe -e abc').allowed).toBe(false)
   })
+
+  // 11. context-pack: product_stack узнаёт electron + react + vite по package.json
+  it('[11] context-pack определяет stack из package.json (electron+react)', async () => {
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({
+      name: 'geminigrok',
+      dependencies: { electron: '^32', react: '^19', vite: '^7', 'better-sqlite3': '^11' }
+    }))
+    const pack = await buildContextPack({ projectPath: dir, recentWrites: [] })
+    expect(pack).toContain('product_stack:')
+    expect(pack).toMatch(/electron/)
+    expect(pack).toMatch(/react/)
+    expect(pack).toMatch(/geminigrok/)
+  })
+
+  // 12. context-pack: product_stack для Python проекта по requirements.txt
+  it('[12] context-pack определяет stack из requirements.txt (fastapi)', async () => {
+    // Fixture creates package.json in beforeEach — remove it so we hit the
+    // Python fallback path of detectProductStack.
+    rmSync(join(dir, 'package.json'))
+    writeFileSync(join(dir, 'requirements.txt'), 'fastapi==0.110\nuvicorn==0.27\n')
+    const pack = await buildContextPack({ projectPath: dir, recentWrites: [] })
+    expect(pack).toContain('product_stack:')
+    expect(pack).toMatch(/python/)
+    expect(pack).toMatch(/fastapi/)
+  })
 })
