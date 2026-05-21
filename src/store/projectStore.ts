@@ -683,6 +683,13 @@ export const useProject = create<ProjectState>((set, get) => ({
         }
       }
     }))
+    // 2b. Логируем старт ревью в журнал проекта — это аудит-trail, чтобы
+    //     потом можно было посмотреть когда / какой провайдер / каким был
+    //     payload. Detail обрезаем до разумного размера.
+    void window.api.journal.append(s.path, 'note',
+      `🔍 Запущено ревью: ${providerId}`,
+      payload.length > 500 ? payload.slice(0, 500) + '…' : payload
+    ).catch(() => {})
     // 3. Стартуем ai:send с override провайдером + флагом useReviewerPrompt.
     //    Сам текст REVIEWER_SYSTEM_PROMPT живёт в electron/ai/ — renderer не
     //    может его импортнуть, поэтому шлём флаг, main process подставляет
