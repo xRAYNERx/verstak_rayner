@@ -79,7 +79,7 @@ export function ReviewPanel() {
   const activeChatId = useProject(s => s.activeChatId)
   const isStreaming = useProject(s => s.isStreaming)
   const setStreaming = useProject(s => s.setStreaming)
-  const registerSend = useProject(s => s.registerSend)
+  const registerSendOwner = useProject(s => s.registerSendOwner)
 
   if (openedReviewId == null) return null
   const review = reviews[openedReviewId]
@@ -113,7 +113,7 @@ export function ReviewPanel() {
     setStreaming(true)
     const allMessages = [...useProject.getState().messages].slice(0, -1)
     const sendId = await window.api.ai.send(allMessages, path)
-    registerSend(sendId, activeChatId)
+    registerSendOwner(sendId, { kind: 'chat', chatId: activeChatId })
     toggleReviewPanel(null)
   }
 

@@ -129,18 +129,24 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
   useEffect(() => {
     const off = window.api.ai.onEvent(({ id, event, projectPath }) => {
       const store = useProject.getState()
-      // ПЕРВЫМ делом проверяем: это review-стрим? Если да — отдельный путь.
-      // Review-события не должны попадать в основной чат и не должны
-      // менять messages / isStreaming основного чата.
-      const reviewChatId = store.sendIdToReviewChatId[id]
-      if (reviewChatId != null) {
+      // Routing через единый sendOwners реестр (был двойной мап:
+      // sendIdToChatId + sendIdToReviewChatId — давало race-баги).
+      // Owner определяет КУДА события идут:
+      //  - 'review' → reviews state, не трогает main чат
+      //  - 'chat' → если не активный, в chatSnapshots; если активный, в
+      //             основное состояние ниже по логике
+      const owner = store.lookupSendOwner(id)
+      if (owner?.kind === 'review') {
+        const reviewChatId = owner.reviewChatId
         if (event.type === 'text' && typeof (event as { text?: string }).text === 'string') {
           store.appendReviewContent(reviewChatId, (event as { text: string }).text)
         } else if (event.type === 'done') {
           store.finalizeReview(reviewChatId)
+          store.forgetSendOwner(id)
         } else if (event.type === 'error') {
           const msg = (event as { message?: string }).message ?? 'review failed'
           store.failReview(reviewChatId, msg)
+          store.forgetSendOwner(id)
         }
         // Игнорируем все остальные event types для ревью (thought / usage /
         // tool-* — ревьюер работает в plain mode, тулзов не должно быть, а
@@ -155,9 +161,9 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
       }
       // Route background-chat events (same project, different chat) to the
       // chat snapshot so the user's stream survives chat-switching.
-      const owningChatId = store.sendIdToChatId[id]
-      if (owningChatId != null && owningChatId !== store.activeChatId) {
-        store.applyEventToChat(owningChatId, event as unknown as { type: string; [k: string]: unknown })
+      if (owner?.kind === 'chat' && owner.chatId !== store.activeChatId) {
+        store.applyEventToChat(owner.chatId, event as unknown as { type: string; [k: string]: unknown })
+        if (event.type === 'done' || event.type === 'error') store.forgetSendOwner(id)
         return
       }
       if (event.type === 'text') updateLastAssistant(event.text)
@@ -325,6 +331,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
           store.setRunningPlanStep(null)
         }
         setStreaming(false)
+        store.forgetSendOwner(id)
       }
       else if (event.type === 'error') {
         // If a plan step was running, mark it failed
@@ -344,6 +351,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
             ('message' in event ? event.message : '').slice(0, 600))
         }
         setStreaming(false)
+        store.forgetSendOwner(id)
       }
     })
     return off
@@ -484,7 +492,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
     const msgs = [...useProject.getState().messages].slice(0, -1)
     const sendId = await window.api.ai.sendWithBudget(msgs, store.path, newBudget)
     if (activeChatId != null) {
-      useProject.getState().registerSend(sendId, activeChatId)
+      useProject.getState().registerSendOwner(sendId, { kind: 'chat', chatId: activeChatId })
     }
   }
 
@@ -520,7 +528,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
     // another chat mid-stream, the event handler will route events into
     // chatSnapshots[activeChatId] rather than corrupting the new active chat.
     if (activeChatId != null) {
-      useProject.getState().registerSend(sendId, activeChatId)
+      useProject.getState().registerSendOwner(sendId, { kind: 'chat', chatId: activeChatId })
     }
   }
 

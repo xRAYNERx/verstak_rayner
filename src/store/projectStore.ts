@@ -96,6 +96,18 @@ function freshSnapshot(): SessionSnapshot {
 }
 
 /**
+ * Owner для in-flight sendId. Заменил собой 2 параллельных мапа
+ * (sendIdToChatId + sendIdToReviewChatId). Единый источник правды снимает
+ * класс race-багов: события из main роутятся через ОДИН lookup, не два.
+ *
+ * - 'chat': обычная переписка в main-чате. ownerId = chat_sessions.id.
+ * - 'review': sub-chat ревьюера. parentChatId — какой main-чат он ревьюит.
+ */
+export type SendOwner =
+  | { kind: 'chat'; chatId: number }
+  | { kind: 'review'; reviewChatId: number; parentChatId: number }
+
+/**
  * In-flight or completed Review для main-чата. Хранится в store пока активен
  * проект — при переключении проекта/чата подгружается из БД заново через
  * refreshReviewsFor(mainChatId).
@@ -146,15 +158,16 @@ interface ProjectState {
   /** Per-chat snapshots within active project — preserve state when switching
    *  between chats so a backgrounded chat's stream isn't lost. */
   chatSnapshots: Record<number, SessionSnapshot>
-  /** Map of in-flight sendId → chatSessionId that initiated it. Used to route
-   *  ai:event for backgrounded chats into the correct snapshot. */
-  sendIdToChatId: Record<number, number>
+  /** Единый реестр in-flight sendId. Раньше было 2 параллельных мапа
+   *  (sendIdToChatId + sendIdToReviewChatId), каждый со своим жизненным
+   *  циклом — это давало race-баги в роутинге событий. Теперь один источник
+   *  правды: каждый sendId привязан к owner'у с известным kind.
+   *
+   *  See SendOwner type для возможных видов владельцев. */
+  sendOwners: Record<number, SendOwner>
   /** Review state, keyed by reviewChatId. Pre-loaded on chat switch via
    *  refreshReviewsFor() and updated live during streaming. */
   reviews: Record<number, ReviewState>
-  /** Map sendId → reviewChatId. Когда событие приходит для review-стрима,
-   *  диспетчер апдейтит reviews[id], а не основной чат. */
-  sendIdToReviewChatId: Record<number, number>
   /** Текущий раскрытый review panel (или null если все свёрнуты). Хранится
    *  в store чтобы pills и панель могли быть в разных компонентах. */
   openedReviewId: number | null
@@ -190,8 +203,14 @@ interface ProjectState {
   applyEventToSession: (projectPath: string, event: { type: string; [k: string]: unknown }) => void
   /** Mark a session as read (clear the unread badge). */
   markSessionRead: (projectPath: string) => void
-  /** Bind an in-flight send (sendId) to the chat session that started it. */
-  registerSend: (sendId: number, chatId: number) => void
+  /** Зарегистрировать in-flight sendId с его владельцем (chat / review).
+   *  Единая точка регистрации — все ai:event поступают сюда через lookup. */
+  registerSendOwner: (sendId: number, owner: SendOwner) => void
+  /** Найти владельца sendId. Используется в Chat.tsx event handler для
+   *  роутинга событий (text/done/error в нужный snapshot). */
+  lookupSendOwner: (sendId: number) => SendOwner | null
+  /** Убрать sendId из реестра — обычно при done/error event. */
+  forgetSendOwner: (sendId: number) => void
   /** Apply an ai:event to a background CHAT snapshot (within active project,
    *  but not the active chat). */
   applyEventToChat: (chatId: number, event: { type: string; [k: string]: unknown }) => void
@@ -218,8 +237,6 @@ interface ProjectState {
   finalizeReview: (reviewChatId: number) => void
   /** Помечает ревью как failed. */
   failReview: (reviewChatId: number, message: string) => void
-  /** Зарегистрировать связь sendId ↔ reviewChatId. */
-  registerReviewSend: (sendId: number, reviewChatId: number) => void
   /** Раскрыть/свернуть review panel. */
   toggleReviewPanel: (reviewChatId: number | null) => void
   /** Очистить in-memory review state для удалённого main-чата. */
@@ -250,9 +267,8 @@ export const useProject = create<ProjectState>((set, get) => ({
   activeChatId: null,
   sessions: {},
   chatSnapshots: {},
-  sendIdToChatId: {},
+  sendOwners: {},
   reviews: {},
-  sendIdToReviewChatId: {},
   openedReviewId: null,
   setProject: async (path) => {
     const myToken = ++setProjectToken
@@ -530,9 +546,16 @@ export const useProject = create<ProjectState>((set, get) => ({
     // появятся когда подгрузятся; основная навигация не блокируется).
     void get().refreshReviewsFor(id)
   },
-  registerSend: (sendId, chatId) => set(s => ({
-    sendIdToChatId: { ...s.sendIdToChatId, [sendId]: chatId }
+  registerSendOwner: (sendId, owner) => set(s => ({
+    sendOwners: { ...s.sendOwners, [sendId]: owner }
   })),
+  lookupSendOwner: (sendId) => get().sendOwners[sendId] ?? null,
+  forgetSendOwner: (sendId) => set(s => {
+    if (!(sendId in s.sendOwners)) return {}
+    const next = { ...s.sendOwners }
+    delete next[sendId]
+    return { sendOwners: next }
+  }),
   applyEventToChat: (chatId, event) => set(s => {
     const existing = s.chatSnapshots[chatId] ?? freshSnapshot()
     const next = { ...existing, hasUnread: true }
@@ -726,7 +749,7 @@ export const useProject = create<ProjectState>((set, get) => ({
           `Провайдер «${providerId}» недоступен (нет ключа, не установлен CLI, или другая ошибка инициализации). Проверь Settings.`)
         return reviewChat.id
       }
-      get().registerReviewSend(sendId, reviewChat.id)
+      get().registerSendOwner(sendId, { kind: 'review', reviewChatId: reviewChat.id, parentChatId })
       return reviewChat.id
     } catch (err) {
       console.error('[store] startReview sendWithOverrides failed:', err)
@@ -753,14 +776,11 @@ export const useProject = create<ProjectState>((set, get) => ({
     if (!r) return {}
     return { reviews: { ...s.reviews, [reviewChatId]: { ...r, status: 'error', errorMessage: message } } }
   }),
-  registerReviewSend: (sendId, reviewChatId) => set(s => ({
-    sendIdToReviewChatId: { ...s.sendIdToReviewChatId, [sendId]: reviewChatId }
-  })),
   toggleReviewPanel: (reviewChatId) => set(s => ({
     openedReviewId: s.openedReviewId === reviewChatId ? null : reviewChatId
   })),
   cleanupReviewsFor: (parentChatId) => set(s => {
-    // Удаляем review entries этого main-чата + связанные sendId mappings.
+    // Удаляем review entries этого main-чата + связанные sendOwners.
     // Закрываем openedReviewId если он был из этого чата.
     const nextReviews: typeof s.reviews = {}
     const removedIds = new Set<number>()
@@ -771,13 +791,18 @@ export const useProject = create<ProjectState>((set, get) => ({
         nextReviews[r.reviewChatId] = r
       }
     }
-    const nextSendMap: typeof s.sendIdToReviewChatId = {}
-    for (const [sid, rcid] of Object.entries(s.sendIdToReviewChatId)) {
-      if (!removedIds.has(rcid)) nextSendMap[Number(sid)] = rcid
+    // Drain sendOwners: убираем review-owner'ы удалённых чатов + chat-owner
+    // самого parentChatId (если main чат удалён, его in-flight sendId
+    // больше некуда роутить).
+    const nextOwners: typeof s.sendOwners = {}
+    for (const [sid, owner] of Object.entries(s.sendOwners)) {
+      if (owner.kind === 'review' && removedIds.has(owner.reviewChatId)) continue
+      if (owner.kind === 'chat' && owner.chatId === parentChatId) continue
+      nextOwners[Number(sid)] = owner
     }
     return {
       reviews: nextReviews,
-      sendIdToReviewChatId: nextSendMap,
+      sendOwners: nextOwners,
       openedReviewId: (s.openedReviewId != null && removedIds.has(s.openedReviewId)) ? null : s.openedReviewId
     }
   })
