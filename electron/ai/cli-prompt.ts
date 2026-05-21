@@ -56,6 +56,9 @@ interface BuildCliPromptOpts {
   messages: ChatMessage[]
   /** Optional override — caller may inject recent writes for context-pack. */
   recentWrites?: Array<{ filePath: string; createdAt: number }>
+  /** Promt из Project Settings (см. compose-system.ts). Передаётся вниз в
+   *  prepareParts, дописывается к user_layer. */
+  projectSystemPrompt?: string | null
 }
 
 /**
@@ -63,7 +66,7 @@ interface BuildCliPromptOpts {
  * string that should be written to the subprocess's stdin.
  */
 export async function buildCliPrompt(opts: BuildCliPromptOpts): Promise<string> {
-  const { providerId, projectPath, messages, recentWrites } = opts
+  const { providerId, projectPath, messages, recentWrites, projectSystemPrompt } = opts
 
   const lastUser = messages.filter(m => m.role === 'user').at(-1)
   if (!lastUser) throw new Error('CLI prompt: нет user-сообщения')
@@ -75,7 +78,8 @@ export async function buildCliPrompt(opts: BuildCliPromptOpts): Promise<string> 
   const { userLayer, contextPack } = await prepareParts({
     projectPath,
     messages,
-    recentWrites: recentWrites ?? []
+    recentWrites: recentWrites ?? [],
+    projectSystemPrompt
   })
   const trimmedUser = userLayer.content.trim()
   // Skip re-injecting user_layer when the CLI is known to read this exact file

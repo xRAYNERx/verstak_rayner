@@ -131,10 +131,15 @@ export function registerAiIpc(deps: AiDeps): void {
       messagesWithSystem = [{ role: 'system', content: effectiveSystemPrompt }, ...messages]
     } else if (descriptor.transport === 'API') {
       // Same assembly path as CLI providers — see ai/compose-system.ts.
+      // projectSystemPrompt — пользовательский промпт из Project Settings
+      // (UI шестерёнки в Project Rail). Хранится в settings ключом
+      // `system_prompt_${path}`. Если пусто — игнорируется.
+      const projectSystemPrompt = projectPath ? deps.getSecret(`system_prompt_${projectPath}`) : null
       const composed = await prepareSystemContext({
         projectPath,
         messages,
-        recentWrites: projectPath ? deps.recentWrites(projectPath, 8) : []
+        recentWrites: projectPath ? deps.recentWrites(projectPath, 8) : [],
+        projectSystemPrompt
       })
       messagesWithSystem = [{ role: 'system', content: composed.system }, ...messages]
     }
@@ -156,13 +161,21 @@ export function registerAiIpc(deps: AiDeps): void {
     }
 
     const model = (overrides?.model ?? deps.getProviderModel(providerId)) ?? descriptor.defaultModel
+    // Project Settings system prompt — нужен и для API (через
+    // prepareSystemContext выше), и для CLI (через createCliProvider →
+    // buildCliPrompt). Читаем один раз. Не пробрасываем при reviewer override —
+    // ревьюер работает в изоляции, не должен подхватывать project-prompt.
+    const projectSystemPromptForProvider = (overrides?.useReviewerPrompt || overrides?.systemPrompt)
+      ? null
+      : (projectPath ? deps.getSecret(`system_prompt_${projectPath}`) : null)
     let provider: ChatProvider
     try {
       provider = createProvider(providerId, {
         apiKey,
         model,
         cwd: projectPath ?? process.cwd(),
-        signal: ctrl.signal
+        signal: ctrl.signal,
+        projectSystemPrompt: projectSystemPromptForProvider
       })
     } catch (err) {
       taggedSender.send('ai:event', {

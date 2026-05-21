@@ -10,7 +10,8 @@ contextBridge.exposeInMainWorld('api', {
   },
   files: {
     tree: (root: string) => ipcRenderer.invoke('files:tree', root),
-    read: (path: string) => ipcRenderer.invoke('files:read', path)
+    read: (path: string) => ipcRenderer.invoke('files:read', path),
+    revealInExplorer: (path: string) => ipcRenderer.invoke('files:reveal', path)
   },
   settings: {
     getKey: (key: string) => ipcRenderer.invoke('settings:get-key', key),

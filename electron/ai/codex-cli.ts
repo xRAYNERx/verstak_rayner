@@ -11,6 +11,7 @@ interface CodexCliOptions {
   cwd?: string
   signal?: AbortSignal
   model?: string
+  projectSystemPrompt?: string | null
 }
 
 export const CODEX_CLI_MODELS = [
@@ -77,7 +78,8 @@ export function createCodexCliProvider(opts: CodexCliOptions = {}): ChatProvider
         payload = await buildCliPrompt({
           providerId: 'codex-cli',
           projectPath: cwd ?? null,
-          messages
+          messages,
+          projectSystemPrompt: opts.projectSystemPrompt
         })
       } catch (err) {
         yield { type: 'error', message: err instanceof Error ? err.message : String(err) }

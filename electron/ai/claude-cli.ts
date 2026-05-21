@@ -11,6 +11,9 @@ interface ClaudeCliOptions {
   cwd?: string
   signal?: AbortSignal
   model?: string
+  /** Project-specific prompt (Project Settings → «Системный промпт проекта»).
+   *  Пробрасывается в buildCliPrompt, дописывается к user_layer. */
+  projectSystemPrompt?: string | null
 }
 
 export const CLAUDE_CLI_MODELS = [
@@ -79,7 +82,8 @@ export function createClaudeCliProvider(opts: ClaudeCliOptions = {}): ChatProvid
         payload = await buildCliPrompt({
           providerId: 'claude-cli',
           projectPath: cwd ?? null,
-          messages
+          messages,
+          projectSystemPrompt: opts.projectSystemPrompt
         })
       } catch (err) {
         yield { type: 'error', message: err instanceof Error ? err.message : String(err) }

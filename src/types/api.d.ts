@@ -59,6 +59,8 @@ declare global {
       files: {
         tree: (root: string) => Promise<FileNode[]>
         read: (path: string) => Promise<string>
+        /** Открыть папку в системном проводнике через electron.shell.openPath. */
+        revealInExplorer: (path: string) => Promise<{ ok: boolean; error: string | null }>
       }
       settings: {
         getKey: (key: string) => Promise<string | null>

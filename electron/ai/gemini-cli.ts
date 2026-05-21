@@ -11,6 +11,7 @@ interface GeminiCliOptions {
   cwd?: string
   model?: string
   signal?: AbortSignal
+  projectSystemPrompt?: string | null
 }
 
 // CLI distinguishes between alias names it actually knows and what we expose
@@ -78,7 +79,8 @@ export function createGeminiCliProvider(opts: GeminiCliOptions = {}): ChatProvid
         userMessage = await buildCliPrompt({
           providerId: 'gemini-cli',
           projectPath: opts.cwd ?? null,
-          messages
+          messages,
+          projectSystemPrompt: opts.projectSystemPrompt
         })
       } catch (err) {
         yield { type: 'error', message: err instanceof Error ? err.message : String(err) }

@@ -11,6 +11,7 @@ interface GrokCliOptions {
   cwd?: string
   signal?: AbortSignal
   model?: string
+  projectSystemPrompt?: string | null
 }
 
 export const GROK_CLI_MODELS = [
@@ -84,7 +85,8 @@ export function createGrokCliProvider(opts: GrokCliOptions = {}): ChatProvider {
           payload = await buildCliPrompt({
             providerId: 'grok-cli',
             projectPath: cwd ?? null,
-            messages
+            messages,
+            projectSystemPrompt: opts.projectSystemPrompt
           })
         } catch (err) {
           yield { type: 'error', message: err instanceof Error ? err.message : String(err) }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useProject } from '../store/projectStore'
 import type { ProjectMeta } from '../types/api'
 import iconUrl from '../assets/icon.png'
+import { ProjectSettings } from './ProjectSettings'
 
 function initial(name: string): string {
   const trimmed = name.trim()
@@ -14,10 +15,10 @@ interface ProjectChipProps {
   unread: boolean
   streaming: boolean
   onClick: () => void
-  onRemove: () => void
+  onSettings: () => void
 }
 
-function ProjectChip({ project, active, unread, streaming, onClick, onRemove }: ProjectChipProps) {
+function ProjectChip({ project, active, unread, streaming, onClick, onSettings }: ProjectChipProps) {
   const [hover, setHover] = useState(false)
   return (
     <div
@@ -43,10 +44,10 @@ function ProjectChip({ project, active, unread, streaming, onClick, onRemove }: 
       {hover && (
         <button
           type="button"
-          className="gg-rail-close"
-          onClick={e => { e.stopPropagation(); onRemove() }}
-          title="Убрать из списка"
-        >×</button>
+          className="gg-rail-settings"
+          onClick={e => { e.stopPropagation(); onSettings() }}
+          title="Настройки проекта"
+        >⚙</button>
       )}
     </div>
   )
@@ -58,8 +59,9 @@ interface ProjectRailProps {
 }
 
 export function ProjectRail({ sidebarOpen, onToggleSidebar }: ProjectRailProps) {
-  const { path, projectList, sessions, setProject, refreshProjectList, removeProject } = useProject()
+  const { path, projectList, sessions, setProject, refreshProjectList } = useProject()
   const [bootstrapped, setBootstrapped] = useState(false)
+  const [settingsProject, setSettingsProject] = useState<ProjectMeta | null>(null)
 
   useEffect(() => {
     void (async () => {
@@ -78,55 +80,59 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar }: ProjectRailProps) 
     if (picked) await setProject(picked)
   }
 
-  async function confirmRemove(p: ProjectMeta) {
-    const ok = window.confirm(`Убрать «${p.name}» из списка?\nФайлы проекта не тронем — только запись в GeminiGrok.`)
-    if (ok) await removeProject(p.path)
-  }
-
   return (
-    <div className="gg-rail">
-      <button
-        type="button"
-        className="gg-rail-home"
-        onClick={() => useProject.getState().closeProject()}
-        title="Главная"
-      >
-        <img src={iconUrl} alt="GeminiGrok" />
-      </button>
-      <button
-        type="button"
-        className={`gg-rail-toggle ${sidebarOpen ? 'is-open' : ''}`}
-        onClick={onToggleSidebar}
-        title={sidebarOpen ? 'Скрыть боковую панель (Ctrl+B)' : 'Показать боковую панель (Ctrl+B)'}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="4" width="18" height="16" rx="2" />
-          <line x1="9" y1="4" x2="9" y2="20" />
-        </svg>
-      </button>
-      <div className="gg-rail-divider" />
-      <div className="gg-rail-list">
-        {projectList.map(p => {
-          const session = sessions[p.path]
-          return (
-            <ProjectChip
-              key={p.path}
-              project={p}
-              active={path === p.path}
-              unread={!!session?.hasUnread}
-              streaming={!!session?.isStreaming}
-              onClick={() => { if (path !== p.path) void setProject(p.path) }}
-              onRemove={() => void confirmRemove(p)}
-            />
-          )
-        })}
+    <>
+      <div className="gg-rail">
         <button
           type="button"
-          className="gg-rail-add"
-          onClick={() => void addProject()}
-          title="Открыть проект"
-        >+</button>
+          className="gg-rail-home"
+          onClick={() => useProject.getState().closeProject()}
+          title="Главная"
+        >
+          <img src={iconUrl} alt="GeminiGrok" />
+        </button>
+        <button
+          type="button"
+          className={`gg-rail-toggle ${sidebarOpen ? 'is-open' : ''}`}
+          onClick={onToggleSidebar}
+          title={sidebarOpen ? 'Скрыть боковую панель (Ctrl+B)' : 'Показать боковую панель (Ctrl+B)'}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <line x1="9" y1="4" x2="9" y2="20" />
+          </svg>
+        </button>
+        <div className="gg-rail-divider" />
+        <div className="gg-rail-list">
+          {projectList.map(p => {
+            const session = sessions[p.path]
+            return (
+              <ProjectChip
+                key={p.path}
+                project={p}
+                active={path === p.path}
+                unread={!!session?.hasUnread}
+                streaming={!!session?.isStreaming}
+                onClick={() => { if (path !== p.path) void setProject(p.path) }}
+                onSettings={() => setSettingsProject(p)}
+              />
+            )
+          })}
+          <button
+            type="button"
+            className="gg-rail-add"
+            onClick={() => void addProject()}
+            title="Открыть проект"
+          >+</button>
+        </div>
       </div>
-    </div>
+
+      {settingsProject && (
+        <ProjectSettings
+          project={settingsProject}
+          onClose={() => setSettingsProject(null)}
+        />
+      )}
+    </>
   )
 }

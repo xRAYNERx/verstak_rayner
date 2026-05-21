@@ -27,6 +27,10 @@ export interface PrepareSystemInput {
   /** Recent file writes from undoStack (provided by main; the renderer/IPC
    *  shouldn't reach into storage directly). Pass [] if not available. */
   recentWrites: Array<{ filePath: string; createdAt: number }>
+  /** Project-specific system prompt set in Project Settings (UI shows it in
+   *  "Системный промпт проекта" section). When non-empty, appended to the
+   *  user_layer content so the agent treats it as additional project rules. */
+  projectSystemPrompt?: string | null
 }
 
 export interface PreparedParts {
@@ -53,8 +57,21 @@ export async function prepareSystemContext(input: PrepareSystemInput): Promise<C
  * developed system prompt — we don't want to layer ours on top.
  */
 export async function prepareParts(input: PrepareSystemInput): Promise<PreparedParts> {
-  const { projectPath, messages, recentWrites } = input
-  const userLayer = projectPath ? await loadUserLayer(projectPath) : { path: null, content: '' }
+  const { projectPath, messages, recentWrites, projectSystemPrompt } = input
+  let userLayer = projectPath ? await loadUserLayer(projectPath) : { path: null, content: '' }
+
+  // Project Settings — пользователь может задать промпт через UI шестерёнки
+  // в Project Rail. Он сохраняется в settings ключом `system_prompt_${path}`.
+  // Дописываем его к userLayer.content с явным маркером источника, чтобы в
+  // отладке было видно откуда правило пришло (файл / UI).
+  const trimmedProjectPrompt = projectSystemPrompt?.trim()
+  if (trimmedProjectPrompt) {
+    const sep = userLayer.content ? '\n\n' : ''
+    userLayer = {
+      path: userLayer.path,
+      content: `${userLayer.content}${sep}<!-- project_settings_prompt -->\n${trimmedProjectPrompt}`
+    }
+  }
 
   let contextPack = ''
   if (projectPath) {

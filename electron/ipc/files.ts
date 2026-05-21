@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { ipcMain, shell } from 'electron'
 import { readdir, stat, readFile } from 'fs/promises'
 import { join } from 'path'
 import { safeRealJoin } from '../ai/path-policy'
@@ -46,6 +46,17 @@ export function registerFilesIpc(deps: FilesIpcDeps): void {
   ipcMain.handle('files:tree', async (_e, root: string) => {
     // listTree is bounded by the root itself + IGNORE list + depth — already safe.
     return listTree(root, 0)
+  })
+
+  /**
+   * Открывает папку проекта в системном проводнике (Explorer / Finder /
+   * Nautilus). Используется кнопкой «↗» в Project Settings. Использует
+   * electron.shell.openPath — это безопасный встроенный API, не shell exec.
+   */
+  ipcMain.handle('files:reveal', async (_e, path: string) => {
+    // shell.openPath возвращает '' при успехе, или текст ошибки.
+    const err = await shell.openPath(path)
+    return { ok: err === '', error: err || null }
   })
 
   ipcMain.handle('files:read', async (_e, path: string) => {

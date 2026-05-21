@@ -114,6 +114,10 @@ export interface CreateOptions {
   model?: string
   cwd?: string
   signal?: AbortSignal
+  /** Промпт из Project Settings UI — пробрасывается до buildCliPrompt чтобы
+   *  попасть в payload CLI-провайдеров. Для API-провайдеров не нужен (там
+   *  ipc/ai.ts напрямую вызывает prepareSystemContext с этим полем). */
+  projectSystemPrompt?: string | null
 }
 
 export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvider {
@@ -123,24 +127,24 @@ export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvide
       return createGeminiProvider({ apiKey: opts.apiKey, model: opts.model })
     }
     case 'gemini-cli':
-      return createGeminiCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model })
+      return createGeminiCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model, projectSystemPrompt: opts.projectSystemPrompt })
     case 'claude': {
       if (!opts.apiKey) throw new Error('Anthropic API key not set')
       return createClaudeProvider({ apiKey: opts.apiKey, model: opts.model })
     }
     case 'claude-cli':
-      return createClaudeCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model })
+      return createClaudeCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model, projectSystemPrompt: opts.projectSystemPrompt })
     case 'grok': {
       if (!opts.apiKey) throw new Error('xAI (Grok) API key not set')
       return createGrokProvider({ apiKey: opts.apiKey, model: opts.model })
     }
     case 'grok-cli':
-      return createGrokCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model })
+      return createGrokCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model, projectSystemPrompt: opts.projectSystemPrompt })
     case 'openai': {
       if (!opts.apiKey) throw new Error('OpenAI API key not set')
       return createOpenAiProvider({ apiKey: opts.apiKey, model: opts.model })
     }
     case 'codex-cli':
-      return createCodexCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model })
+      return createCodexCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model, projectSystemPrompt: opts.projectSystemPrompt })
   }
 }
