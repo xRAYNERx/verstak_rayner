@@ -1,10 +1,11 @@
 import { ipcMain } from 'electron'
-import { createFileTools, TOOL_DEFS, applySearchReplaceBlocks } from '../ai/tools'
+import { createFileTools, TOOL_DEFS } from '../ai/tools'
 import { createProvider, PROVIDERS, type ProviderId } from '../ai/registry'
 import { loadUserLayer } from '../ai/user-layer'
 import { composeSystemPrompt } from '../ai/compose-prompt'
 import { buildContextPack } from '../ai/context-pack'
-import type { ChatMessage, ToolCall, ToolResult, ChatProvider } from '../ai/types'
+import type { ChatMessage, ToolCall, ToolResult, ChatProvider, Attachment } from '../ai/types'
+import { lookupHandler, type ToolContext, type TaggedSender as HandlerTaggedSender } from './tool-handlers'
 
 export type { ProviderId } from '../ai/registry'
 
@@ -30,11 +31,8 @@ interface AiDeps {
 let currentSendId = 0
 const activeAborts = new Map<number, AbortController>()
 
-type TaggedSender = {
-  send: (channel: string, payload: { id: number; event: unknown }) => void
-  /** Run JS in the renderer and get its result (used to invoke browser tools). */
-  exec: (code: string) => Promise<unknown>
-}
+// Local TaggedSender alias — shape-compatible with tool-handlers.TaggedSender.
+type TaggedSender = HandlerTaggedSender
 
 /**
  * Tag every ai:event with the project it belongs to so the renderer can route
@@ -327,7 +325,7 @@ async function runApiConversation(
   let lastAssistantText = ''
   // Attachments collected from browser_screenshot etc. — flushed into the
   // next user message so vision-capable providers see them.
-  const pendingAttachments: import('../ai/types').Attachment[] = []
+  const pendingAttachments: Attachment[] = []
 
   for (let turn = 0; turn < turnsBudget; turn++) {
     if (signal.aborted) {
@@ -407,154 +405,36 @@ async function runApiConversation(
     }
 
     const toolResults: ToolResult[] = new Array(toolCalls.length)
+
+    // Dispatch via tool-handlers registry. Each handler knows its own scheduling
+    // mode (parallel-read / sequential / confirm-write); the loop honours it.
+    const ctx: ToolContext = {
+      sender, sendId, signal, projectPath, tools,
+      recordWrite, recordPlan, recordJournal, connectors,
+      pendingAttachments, pendingWrites, pendingCommands, scopedKey
+    }
     const writePromises: Array<{ idx: number; promise: Promise<ToolResult> }> = []
-    // Parallel reads — read_file / list_directory / search_project /
-    // find_files / get_project_map / refresh_project_map are independent and
-    // safe to fire concurrently. Saves wall-time on "explore 5 files" turns.
     const readPromises: Array<{ idx: number; promise: Promise<ToolResult> }> = []
     for (let i = 0; i < toolCalls.length; i++) {
       const call = toolCalls[i]
-      if (call.name === 'write_file' || call.name === 'apply_patch') {
-        // Both go through the same diff-confirm flow. apply_patch is converted
-        // to write_file semantics inside handleWriteFile (it computes the
-        // after-state by running search/replace blocks against current file).
-        writePromises.push({ idx: i, promise: handleWriteFile(sender, sendId, tools, call, projectPath, recordWrite) })
-        continue
+      const handler = lookupHandler(call.name)
+      if (handler.mode === 'parallel-read') {
+        readPromises.push({ idx: i, promise: handler.handle(call, ctx) })
+      } else if (handler.mode === 'confirm-write') {
+        // confirm-write tools all hit the same multi-file diff modal; they run
+        // concurrently from this side and the user accepts/rejects together.
+        writePromises.push({ idx: i, promise: handler.handle(call, ctx) })
+      } else {
+        // sequential — must finish before next tool (run_command, browser_*,
+        // connectors, create_plan all have ordered UI side effects)
+        toolResults[i] = await handler.handle(call, ctx)
       }
-      if (call.name === 'propose_edits') {
-        // Fan out into one synthetic write_file per edit. All hit the same
-        // multi-file diff modal, so the user gets one accept-all click.
-        writePromises.push({ idx: i, promise: handleProposeEdits(sender, sendId, tools, call, projectPath, recordWrite) })
-        continue
-      }
-      if (call.name === 'run_command') {
-        toolResults[i] = await handleRunCommand(sender, sendId, tools, call)
-        continue
-      }
-      if (call.name === 'browser_navigate' || call.name === 'browser_read_page' || call.name === 'browser_screenshot') {
-        toolResults[i] = await handleBrowserTool(sender, call)
-        // Journal browser actions — useful audit trail of what AI looked at on the web
-        try {
-          if (!toolResults[i].error) {
-            const url = String(call.args.url ?? '')
-            const label = call.name === 'browser_navigate' ? `Браузер → ${url}`
-                        : call.name === 'browser_read_page' ? `Браузер: прочитан текст`
-                        : `Браузер: скриншот`
-            recordJournal(projectPath, 'tool', label, null)
-          }
-        } catch { /* journal not critical */ }
-        // If a screenshot tool returned a data URL, queue it as an attachment
-        // on the next user message so vision-capable providers receive it.
-        if (call.name === 'browser_screenshot' && !toolResults[i].error) {
-          const r = toolResults[i].result as { dataUrl?: string; url?: string } | string
-          const dataUrl = typeof r === 'object' && r ? r.dataUrl : undefined
-          if (dataUrl && dataUrl.startsWith('data:image/')) {
-            const m = /^data:(image\/[\w+-]+);base64,(.+)$/.exec(dataUrl)
-            if (m) {
-              pendingAttachments.push({
-                name: `screenshot-${Date.now()}.png`,
-                mimeType: m[1],
-                data: m[2],
-                size: Math.floor(m[2].length * 0.75)
-              })
-              // Strip the heavy dataUrl from the tool result so it doesn't
-              // bloat the JSON-stringified payload going back to the model.
-              toolResults[i].result = { url: typeof r === 'object' ? r.url : null, attached: true }
-            }
-          }
-        }
-        const s = summarizeToolCall(call.name, call.args, undefined)
-        if (s) sender.send('ai:event', { id: sendId, event: { type: 'tool-activity', callId: call.id, name: call.name, label: s.label, detail: s.detail, status: toolResults[i].error ? 'error' : 'ok' } })
-        continue
-      }
-      if (call.name === 'list_connectors') {
-        const list = connectors.list()
-        toolResults[i] = { id: call.id, name: call.name, result: JSON.stringify(list) }
-        const s = summarizeToolCall(call.name, call.args, JSON.stringify(list))
-        if (s) sender.send('ai:event', { id: sendId, event: { type: 'tool-activity', callId: call.id, name: call.name, label: s.label, detail: s.detail, status: 'ok' } })
-        continue
-      }
-      if (call.name === 'connector_query') {
-        try {
-          const cid = String(call.args.id ?? '')
-          if (!cid) {
-            toolResults[i] = { id: call.id, name: call.name, result: '', error: 'connector_query: id обязателен' }
-            continue
-          }
-          const { id: _omit, ...rest } = call.args as Record<string, unknown> & { id?: unknown }
-          void _omit
-          const result = await connectors.query(cid, rest, signal)
-          toolResults[i] = { id: call.id, name: call.name, result: typeof result === 'string' ? result : JSON.stringify(result) }
-          const s = summarizeToolCall(call.name, call.args, undefined)
-          if (s) sender.send('ai:event', { id: sendId, event: { type: 'tool-activity', callId: call.id, name: call.name, label: s.label, detail: s.detail, status: 'ok' } })
-          // Journal connector queries — what external service was hit, what entity
-          try {
-            const entity = call.args.entity ? ` · ${call.args.entity}` : ''
-            const path = call.args.path ? ` · ${call.args.path}` : ''
-            recordJournal(projectPath, 'tool', `Коннектор ${cid}${entity}${path}`, null)
-          } catch { /* journal not critical */ }
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err)
-          toolResults[i] = { id: call.id, name: call.name, result: '', error: msg }
-          sender.send('ai:event', { id: sendId, event: { type: 'tool-activity', callId: call.id, name: call.name, label: call.name, detail: msg, status: 'error' } })
-          try { recordJournal(projectPath, 'tool', `Коннектор упал: ${String(call.args.id ?? '?')}`, msg) } catch { /* journal not critical */ }
-        }
-        continue
-      }
-      if (call.name === 'create_plan') {
-        try {
-          const title = String(call.args.title ?? 'План без названия')
-          const rawSteps = Array.isArray(call.args.steps) ? call.args.steps : []
-          const steps = rawSteps
-            .filter((s: unknown): s is Record<string, unknown> => typeof s === 'object' && s !== null)
-            .map((s) => ({
-              title: String((s as Record<string, unknown>).title ?? ''),
-              detail: (s as Record<string, unknown>).detail != null
-                ? String((s as Record<string, unknown>).detail)
-                : null
-            }))
-            .filter(s => s.title.length > 0)
-          if (steps.length === 0) {
-            toolResults[i] = { id: call.id, name: call.name, result: '', error: 'create_plan: пустой список шагов' }
-          } else {
-            const plan = recordPlan(projectPath, title, steps)
-            try { recordJournal(projectPath, 'note', `План: ${title}`, `${steps.length} шагов`) } catch { /* journal not critical */ }
-            sender.send('ai:event', { id: sendId, event: { type: 'plan-created', planId: plan.id, title, stepCount: steps.length } })
-            toolResults[i] = { id: call.id, name: call.name, result: `Plan #${plan.id} created with ${steps.length} steps. User will execute/confirm in the Plan view.` }
-          }
-        } catch (err) {
-          toolResults[i] = { id: call.id, name: call.name, result: '', error: err instanceof Error ? err.message : String(err) }
-        }
-        continue
-      }
-      // Read-only / pure-info tools — fire them in parallel. Each call is
-      // independent (no shared mutable state in tools.execute for reads),
-      // so Promise.all gives us free wall-time savings on multi-file explore.
-      const idx = i
-      const callRef = call
-      readPromises.push({
-        idx,
-        promise: tools.execute(callRef.name, callRef.args)
-          .then((result) => {
-            const summary = summarizeToolCall(callRef.name, callRef.args, result)
-            if (summary) {
-              sender.send('ai:event', { id: sendId, event: { type: 'tool-activity', callId: callRef.id, name: callRef.name, label: summary.label, detail: summary.detail, status: 'ok' } })
-            }
-            return { id: callRef.id, name: callRef.name, result }
-          })
-          .catch((err: unknown) => {
-            const msg = err instanceof Error ? err.message : String(err)
-            sender.send('ai:event', { id: sendId, event: { type: 'tool-activity', callId: callRef.id, name: callRef.name, label: callRef.name, detail: msg, status: 'error' } })
-            return { id: callRef.id, name: callRef.name, result: '', error: msg }
-          })
-      })
     }
-    // Parallel reads finish first (they don't need user confirmation)
+    // Parallel reads finish without user input
     for (const { idx, promise } of readPromises) {
       toolResults[idx] = await promise
     }
     // Then wait for user to resolve every pending write
-    // (multi-file modal accumulates them on the renderer side).
     for (const { idx, promise } of writePromises) {
       toolResults[idx] = await promise
     }
@@ -643,239 +523,4 @@ function writeSessionJournal(
     if (rest) detailLines.push(rest.slice(0, 600))
   }
   try { recordJournal(projectPath, 'session', title, detailLines.join('\n') || null) } catch { /* journal not critical */ }
-}
-
-async function handleWriteFile(
-  sender: TaggedSender,
-  sendId: number,
-  tools: ReturnType<typeof createFileTools>,
-  call: ToolCall,
-  projectPath: string,
-  recordWrite: (projectPath: string, filePath: string, before: string, after: string) => void
-): Promise<ToolResult> {
-  const path = String(call.args.path)
-  let before = ''
-  try { before = await tools.execute('read_file', { path }) as string } catch { before = '' }
-  // Strip the secret-scanner header line we add to read_file output before
-  // computing the patch — it isn't actually in the file.
-  if (before.startsWith('[secret-scanner: redacted')) {
-    const nl = before.indexOf('\n')
-    if (nl >= 0) before = before.slice(nl + 1)
-  }
-
-  let after: string
-  if (call.name === 'apply_patch') {
-    // Compute the after-state by applying SEARCH/REPLACE blocks. Errors here
-    // bubble back to the model as a tool error so it can correct the patch.
-    try {
-      after = applySearchReplaceBlocks(before, String(call.args.diff ?? ''))
-    } catch (err) {
-      return { id: call.id, name: call.name, result: '', error: err instanceof Error ? err.message : String(err) }
-    }
-  } else {
-    after = String(call.args.content)
-  }
-
-  sender.send('ai:event', { id: sendId, event: { type: 'pending-write', callId: call.id, path, before, after } })
-  const accepted = await new Promise<boolean>(resolve => {
-    pendingWrites.set(scopedKey(sendId, call.id), { sendId, resolve })
-  })
-  if (accepted) {
-    try {
-      // We already computed `after`, so write it directly via the underlying
-      // write_file (skip apply_patch re-execution).
-      await tools.execute('write_file', { path, content: after })
-      try { recordWrite(projectPath, path, before, after) } catch { /* undo storage failure shouldn't block the write */ }
-      return { id: call.id, name: call.name, result: `Applied ${call.name === 'apply_patch' ? 'patch' : 'write'} to ${path}` }
-    } catch (err) {
-      return { id: call.id, name: call.name, result: '', error: err instanceof Error ? err.message : String(err) }
-    }
-  }
-  return { id: call.id, name: call.name, result: `User rejected write to ${path}`, error: 'User rejected' }
-}
-
-/** Short human-readable summary of a read-only tool call for the activity stream. */
-function summarizeToolCall(name: string, args: Record<string, unknown>, result: unknown): { label: string; detail: string } | null {
-  if (name === 'read_file') {
-    const p = String(args.path ?? '')
-    const len = typeof result === 'string' ? result.length : 0
-    return { label: `read_file`, detail: `${p} · ${len} символов` }
-  }
-  if (name === 'list_directory') {
-    const p = String(args.path ?? '.')
-    const count = Array.isArray(result) ? result.length : 0
-    return { label: `list_directory`, detail: `${p} · ${count} элементов` }
-  }
-  if (name === 'search_project') {
-    const q = String(args.query ?? '')
-    const r = result as { matches?: unknown[] } | undefined
-    const hits = Array.isArray(r?.matches) ? r!.matches!.length : 0
-    return { label: `search_project`, detail: `"${q}" · ${hits} совпадений` }
-  }
-  if (name === 'find_files') {
-    const pattern = String(args.pattern ?? '')
-    const r = result as { files?: unknown[] } | undefined
-    const hits = Array.isArray(r?.files) ? r!.files!.length : 0
-    return { label: `find_files`, detail: `${pattern} · ${hits} файлов` }
-  }
-  if (name === 'list_connectors') {
-    const arr = typeof result === 'string' ? JSON.parse(result) as Array<{ label?: string }> : []
-    return { label: `list_connectors`, detail: `${arr.length} коннекторов` }
-  }
-  if (name === 'connector_query') {
-    return { label: `connector_query`, detail: `${String(args.id ?? '?')}${args.entity ? ` · ${args.entity}` : ''}` }
-  }
-  if (name === 'browser_navigate') {
-    return { label: `browser_navigate`, detail: String(args.url ?? '') }
-  }
-  if (name === 'browser_read_page') {
-    return { label: `browser_read_page`, detail: args.selector ? String(args.selector) : '(вся страница)' }
-  }
-  return null
-}
-
-/**
- * Atomic multi-file edit. Splits the batch into individual pending-write
- * events that share the existing diff-confirmation modal. Each child write is
- * tracked separately for accept/reject; the parent tool result aggregates.
- */
-async function handleProposeEdits(
-  sender: TaggedSender,
-  sendId: number,
-  tools: ReturnType<typeof createFileTools>,
-  call: ToolCall,
-  projectPath: string,
-  recordWrite: (projectPath: string, filePath: string, before: string, after: string) => void
-): Promise<ToolResult> {
-  const rawEdits = Array.isArray(call.args.edits) ? call.args.edits : []
-  const summary = typeof call.args.summary === 'string' ? call.args.summary : ''
-  const edits = rawEdits
-    .filter((e: unknown): e is Record<string, unknown> => typeof e === 'object' && e !== null)
-    .map(e => ({
-      path: String((e as Record<string, unknown>).path ?? ''),
-      content: String((e as Record<string, unknown>).content ?? ''),
-      reason: (e as Record<string, unknown>).reason != null ? String((e as Record<string, unknown>).reason) : null
-    }))
-    .filter(e => e.path.length > 0)
-
-  if (edits.length === 0) {
-    return { id: call.id, name: call.name, result: '', error: 'propose_edits: пустой список edits' }
-  }
-  if (edits.length > 20) {
-    return { id: call.id, name: call.name, result: '', error: 'propose_edits: максимум 20 правок за раз' }
-  }
-
-  // Fan out into synthetic write_file calls — each gets its own callId so
-  // the renderer can ack them independently in the multi-file modal.
-  const childPromises = edits.map((edit, idx) => {
-    const childCall: ToolCall = {
-      id: `${call.id}-${idx}`,
-      name: 'write_file',
-      args: { path: edit.path, content: edit.content }
-    }
-    return handleWriteFile(sender, sendId, tools, childCall, projectPath, recordWrite)
-      .then(r => ({ edit, result: r }))
-  })
-
-  const results = await Promise.all(childPromises)
-  const accepted = results.filter(r => !r.result.error).length
-  const rejected = results.length - accepted
-  const detail = [
-    summary || `Пакет правок (${edits.length})`,
-    ...results.map(r => `${r.result.error ? '✗' : '✓'} ${r.edit.path}${r.edit.reason ? ` — ${r.edit.reason}` : ''}`)
-  ].join('\n')
-
-  return {
-    id: call.id,
-    name: call.name,
-    result: `propose_edits: принято ${accepted} / ${edits.length}, отклонено ${rejected}\n${detail}`,
-    ...(accepted === 0 ? { error: 'Все правки отклонены пользователем' } : {})
-  }
-}
-
-async function handleBrowserTool(sender: TaggedSender, call: ToolCall): Promise<ToolResult> {
-  try {
-    // SECURITY: never interpolate LLM-controlled values into a JS code string.
-    // We serialize the args as a JSON string literal (double JSON.stringify):
-    // - outer stringify produces a valid JS string literal containing escaped JSON
-    // - JSON.parse(...) inside the snippet recovers the object at runtime
-    // This is provably safe: a JS string literal cannot escape its own quotes
-    // when produced by JSON.stringify, so no LLM payload can run as code.
-    // The fixed code skeleton below uses ONLY hard-coded JS — the only
-    // dynamic piece is the args string literal which is parsed, not executed.
-    const argsLiteral = JSON.stringify(JSON.stringify(call.args ?? {}))
-    let action: string
-    if (call.name === 'browser_navigate') {
-      action = `return await api.navigate(String(a.url ?? ''));`
-    } else if (call.name === 'browser_read_page') {
-      action = `const text = await api.readPage(a.selector ? String(a.selector) : undefined);
-               return { url: api.getURL(), title: api.getTitle(), text };`
-    } else {
-      action = `const dataUrl = await api.screenshot();
-                return { url: api.getURL(), dataUrl };`
-    }
-    const snippet = `(async () => {
-      const api = window.geminigrokBrowser;
-      if (!api) return { __err: 'Вкладка Browser не открыта — попроси пользователя открыть её' };
-      const a = JSON.parse(${argsLiteral});
-      ${action}
-    })()`
-    const result = await sender.exec(snippet)
-    if (result && typeof result === 'object' && '__err' in result) {
-      return { id: call.id, name: call.name, result: '', error: String((result as { __err: unknown }).__err) }
-    }
-    return { id: call.id, name: call.name, result: result ?? '' }
-  } catch (err) {
-    return { id: call.id, name: call.name, result: '', error: err instanceof Error ? err.message : String(err) }
-  }
-}
-
-async function handleRunCommand(
-  sender: TaggedSender,
-  sendId: number,
-  tools: ReturnType<typeof createFileTools>,
-  call: ToolCall
-): Promise<ToolResult> {
-  const command = String(call.args.command ?? '')
-  const verdict = tools.classifyCommand(command)
-  if (!verdict.allowed) {
-    sender.send('ai:event', {
-      id: sendId,
-      event: { type: 'tool-blocked', callId: call.id, name: 'run_command', command, reason: verdict.reason ?? 'denylist' }
-    })
-    return {
-      id: call.id,
-      name: call.name,
-      result: `Command: ${command}`,
-      error: `Blocked by safety policy: ${verdict.reason ?? 'denylist'}`
-    }
-  }
-
-  sender.send('ai:event', { id: sendId, event: { type: 'pending-command', callId: call.id, command } })
-  const accepted = await new Promise<boolean>(resolve => {
-    pendingCommands.set(scopedKey(sendId, call.id), { sendId, resolve })
-  })
-  if (!accepted) {
-    sender.send('ai:event', {
-      id: sendId,
-      event: { type: 'command-result', callId: call.id, command, status: 'rejected' }
-    })
-    return { id: call.id, name: call.name, result: `Command: ${command}`, error: 'User rejected' }
-  }
-
-  try {
-    const result = await tools.runCommand(command)
-    sender.send('ai:event', {
-      id: sendId,
-      event: { type: 'command-result', callId: call.id, command, status: 'ok', exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr }
-    })
-    return { id: call.id, name: call.name, result }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    sender.send('ai:event', {
-      id: sendId,
-      event: { type: 'command-result', callId: call.id, command, status: 'error', error: msg }
-    })
-    return { id: call.id, name: call.name, result: '', error: msg }
-  }
 }
