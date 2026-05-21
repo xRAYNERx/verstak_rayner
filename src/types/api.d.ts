@@ -116,7 +116,21 @@ declare global {
         onData: (cb: (data: { id: number; data: string }) => void) => () => void
         onExit: (cb: (data: { id: number }) => void) => () => void
       }
+      autonomous: {
+        status: () => Promise<AutonomousStatus>
+        runOnce: () => Promise<AutonomousStatus>
+        start: (intervalMin: number) => Promise<AutonomousStatus>
+        stop: () => Promise<AutonomousStatus>
+      }
     }
   }
+}
+export interface AutonomousStatus {
+  enabled: boolean
+  intervalMin: number
+  lastRunAt: number | null
+  lastRunSuggestions: number
+  lastRunError: string | null
+  nextRunAt: number | null
 }
 export {}

@@ -28,6 +28,7 @@ import { registerPlansIpc } from './ipc/plans'
 import { createFeedback } from './storage/feedback'
 import { registerFeedbackIpc } from './ipc/feedback'
 import { registerVerifyIpc } from './ipc/verify'
+import { registerAutonomousIpc } from './ipc/autonomous'
 import { createConnectorRegistry } from './connectors/registry'
 
 function createWindow(): void {
@@ -175,6 +176,39 @@ app.whenReady().then(() => {
   registerPlansIpc(plans)
   registerFeedbackIpc(feedback)
   registerVerifyIpc(getActiveProjectPath)
+  registerAutonomousIpc({
+    getSecret: (key) => {
+      const stored = settings.getSecret(key)
+      if (stored) return stored
+      const envMap: Record<string, string> = {
+        gemini_api_key: 'GEMINI_API_KEY',
+        anthropic_api_key: 'ANTHROPIC_API_KEY',
+        openai_api_key: 'OPENAI_API_KEY',
+        xai_api_key: 'XAI_API_KEY'
+      }
+      return process.env[envMap[key] ?? ''] ?? null
+    },
+    getProviderId: () => {
+      const v = settings.getSecret('provider')
+      if (v === 'gemini-cli' || v === 'claude' || v === 'claude-cli'
+        || v === 'grok' || v === 'grok-cli'
+        || v === 'openai' || v === 'codex-cli') return v
+      return 'gemini-api'
+    },
+    getProviderModel: (id) => settings.getSecret(`model_${id}`),
+    recordJournal: (projectPath, kind, title, detail) => {
+      journal.append(projectPath, kind, title, detail ?? null)
+    },
+    readJournal: (projectPath, limit) => {
+      return journal.list(projectPath, limit).map(e => ({
+        kind: e.kind, title: e.title, detail: e.detail, createdAt: e.createdAt
+      }))
+    },
+    recentWrites: (projectPath, limit) => {
+      return undoStack.list(projectPath).slice(0, limit).map(e => ({ filePath: e.filePath, createdAt: e.createdAt }))
+    },
+    getActiveProject: () => getActiveProjectPath()
+  })
   registerTerminalIpc()
   createWindow()
 })

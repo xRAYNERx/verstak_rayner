@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ProviderId } from '../hooks/useProvider'
 import { useTheme } from '../hooks/useTheme'
+import type { AutonomousStatus } from '../types/api'
 
 interface ProviderConfig {
   id: ProviderId
@@ -110,7 +111,7 @@ const PROVIDERS: ProviderConfig[] = [
   }
 ]
 
-type Tab = 'models' | 'connectors' | 'appearance'
+type Tab = 'models' | 'connectors' | 'autonomous' | 'appearance'
 
 export function Settings({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<Tab>('models')
@@ -119,6 +120,9 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [models, setModels] = useState<Record<string, string>>({})
   const [saved, setSaved] = useState(false)
   const [onec, setOneC] = useState({ url: '', user: '', pass: '' })
+  const [autonomous, setAutonomousState] = useState<AutonomousStatus>({
+    enabled: false, intervalMin: 30, lastRunAt: null, lastRunSuggestions: 0, lastRunError: null, nextRunAt: null
+  })
   const [httpEndpoints, setHttpEndpoints] = useState<Array<{ name: string; base: string; auth: string; paths: string }>>(
     [{ name: '', base: '', auth: '', paths: '' }, { name: '', base: '', auth: '', paths: '' }, { name: '', base: '', auth: '', paths: '' }, { name: '', base: '', auth: '', paths: '' }]
   )
@@ -163,6 +167,11 @@ export function Settings({ onClose }: { onClose: () => void }) {
         })
       }
       setHttpEndpoints(eps)
+      // Autonomous loop status
+      try {
+        const st = await window.api.autonomous.status()
+        setAutonomousState(st)
+      } catch { /* ignore */ }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -212,6 +221,11 @@ export function Settings({ onClose }: { onClose: () => void }) {
             className={`gg-settings-tab ${tab === 'connectors' ? 'is-active' : ''}`}
             onClick={() => setTab('connectors')}
           >Коннекторы</button>
+          <button
+            type="button"
+            className={`gg-settings-tab ${tab === 'autonomous' ? 'is-active' : ''}`}
+            onClick={() => setTab('autonomous')}
+          >🌙 Ночной режим</button>
           <button
             type="button"
             className={`gg-settings-tab ${tab === 'appearance' ? 'is-active' : ''}`}
@@ -389,6 +403,95 @@ export function Settings({ onClose }: { onClose: () => void }) {
             <code>endpoint=&lt;имя&gt;</code> и path/method/query/body/headers.
             Auth-заголовок подставляется из настроек, AI его не видит.
             Allow-paths ограничивает к каким путям эндпоинта можно обращаться.
+          </div>
+        </div>
+        )}
+
+        {tab === 'autonomous' && (
+        <div className="gg-settings-extra">
+          <div className="gg-settings-section-title">🌙 Ночной режим — autonomous improvement loop</div>
+          <div className="gg-settings-hint" style={{ marginBottom: 14 }}>
+            Фоновый цикл который без участия пользователя читает журнал и project_map активного проекта, отправляет AI задачу «предложи 3 улучшения с обоснованием из истории», парсит ответ и пишет предложения в Journal как заметки. Утром открываешь Journal → видишь N предложений за ночь. <strong>Не делает write_file / run_command автоматически</strong> — только генерирует идеи.
+          </div>
+
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Статус</label>
+            <div style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)' }}>
+              {autonomous.enabled
+                ? <span style={{ color: 'var(--success, #4ade80)' }}>● Активен · каждые {autonomous.intervalMin} мин</span>
+                : <span style={{ color: 'var(--text-tertiary)' }}>○ Остановлен</span>}
+            </div>
+          </div>
+
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Интервал (мин)</label>
+            <input
+              className="gg-input"
+              type="number"
+              min={5}
+              max={240}
+              value={autonomous.intervalMin}
+              onChange={e => setAutonomousState(s => ({ ...s, intervalMin: parseInt(e.target.value, 10) || 30 }))}
+              style={{ maxWidth: 100 }}
+            />
+          </div>
+
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Управление</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {!autonomous.enabled ? (
+                <button
+                  className="gg-btn gg-btn-primary"
+                  onClick={async () => {
+                    const st = await window.api.autonomous.start(autonomous.intervalMin)
+                    setAutonomousState(st)
+                  }}
+                >▶ Запустить</button>
+              ) : (
+                <button
+                  className="gg-btn gg-btn-danger"
+                  onClick={async () => {
+                    const st = await window.api.autonomous.stop()
+                    setAutonomousState(st)
+                  }}
+                >■ Остановить</button>
+              )}
+              <button
+                className="gg-btn gg-btn-ghost"
+                onClick={async () => {
+                  const st = await window.api.autonomous.runOnce()
+                  setAutonomousState(st)
+                }}
+              >Запустить цикл прямо сейчас</button>
+            </div>
+          </div>
+
+          {autonomous.lastRunAt && (
+            <div className="gg-settings-row">
+              <label className="gg-settings-label">Последний запуск</label>
+              <div style={{ flex: 1, fontSize: 'var(--text-sm)' }}>
+                {new Date(autonomous.lastRunAt).toLocaleString()}
+                {' · '}
+                {autonomous.lastRunError
+                  ? <span style={{ color: 'var(--error)' }}>ошибка: {autonomous.lastRunError}</span>
+                  : <span>предложений: {autonomous.lastRunSuggestions}</span>}
+              </div>
+            </div>
+          )}
+
+          {autonomous.nextRunAt && autonomous.enabled && (
+            <div className="gg-settings-row">
+              <label className="gg-settings-label">Следующий</label>
+              <div style={{ flex: 1, fontSize: 'var(--text-sm)' }}>
+                {new Date(autonomous.nextRunAt).toLocaleString()}
+              </div>
+            </div>
+          )}
+
+          <div className="gg-settings-hint" style={{ marginTop: 14 }}>
+            <strong>Требования:</strong> провайдер должен быть API-типа с ключом (Gemini / Claude / Grok / ChatGPT API).
+            CLI-провайдеры (Claude Code, Codex и т.д.) не годятся — нет неинтерактивного канала.
+            Активный проект должен быть открыт.
           </div>
         </div>
         )}
