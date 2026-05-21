@@ -502,18 +502,27 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
                 </div>
               )}
               <div className="gg-msg-bubble">
-                {m.role === 'assistant' && m.thinking && (
-                  <details className="gg-thinking">
-                    <summary className="gg-thinking-summary">
-                      <span>💭</span>
-                      <span>Размышление модели</span>
-                      <span className="gg-thinking-len">{m.thinking.length} симв.</span>
-                    </summary>
-                    <div className="gg-thinking-body">
-                      <Markdown text={m.thinking} />
-                    </div>
-                  </details>
-                )}
+                {m.role === 'assistant' && m.thinking && (() => {
+                  // Edge case: модель эмитнула ТОЛЬКО thinking без видимого
+                  // ответа (короткий запрос → длинное рассуждение → done без
+                  // финального текста). Чтобы пузырь не казался пустым —
+                  // автоматически разворачиваем блок и показываем подпись.
+                  const hasVisibleAnswer = !!(m.content && m.content.trim())
+                  const isFinal = !isStreamingAssistant
+                  const onlyThinking = !hasVisibleAnswer && isFinal
+                  return (
+                    <details className="gg-thinking" open={onlyThinking || undefined}>
+                      <summary className="gg-thinking-summary">
+                        <span>💭</span>
+                        <span>{onlyThinking ? 'Только размышление, без видимого ответа' : 'Размышление модели'}</span>
+                        <span className="gg-thinking-len">{m.thinking.length} симв.</span>
+                      </summary>
+                      <div className="gg-thinking-body">
+                        <Markdown text={m.thinking} />
+                      </div>
+                    </details>
+                  )
+                })()}
                 {changedFiles.length > 0 && (
                   <div className="gg-changed-files">
                     <div className="gg-changed-files-title">✓ Изменены файлы ({changedFiles.length})</div>

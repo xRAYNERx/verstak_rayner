@@ -125,34 +125,26 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
             promptFeedback?: { blockReason?: string; blockReasonMessage?: string }
           }
 
-          // 1. Try the SDK convenience getter (may throw or return undefined depending on SDK build)
-          let topText: string | undefined
-          try { topText = c.text } catch { topText = undefined }
-          if (topText) {
-            yield { type: 'text', text: topText }
-            totalText += topText
-          }
-
-          // 2. Walk candidates[].content.parts for text + functionCalls.
-          //    IMPORTANT: c.functionCalls (top-level) is a SDK CONVENIENCE GETTER
-          //    that internally reads candidates[].content.parts[].functionCall.
-          //    Если использовать ОБА источника — каждый tool call эмитится
-          //    ДВАЖДЫ (мы наблюдали это в логе: read_file db.ts × 2, search ×
-          //    2, etc). Поэтому используем candidates[].content.parts как
-          //    primary path и top-level c.functionCalls ТОЛЬКО как fallback
-          //    когда candidates пустые.
-          let foundFunctionCallInParts = false
+          // Single-source extraction: walk candidates[].content.parts.
+          //
+          // Previously we ALSO read c.text (SDK getter) and c.functionCalls
+          // (another SDK getter). Both internally read from candidates.parts.
+          // Using both = silent text loss OR doubled tool calls — both happened.
+          //
+          // Now: parts is the ONLY primary path. The top-level getters are
+          // touched only as fallback when candidates[].content.parts is empty
+          // (defensive — older SDK builds may not populate parts).
+          let foundAnythingInParts = false
           if (c.candidates?.[0]?.content?.parts) {
             for (const part of c.candidates[0].content.parts) {
               if (part.text) {
                 if (part.thought) {
-                  // Chain-of-thought — separate event so renderer collapses it
                   yield { type: 'thought', text: part.text }
-                } else if (!topText) {
-                  // Visible answer text (skip if the getter already gave us this)
+                } else {
                   yield { type: 'text', text: part.text }
                   totalText += part.text
                 }
+                foundAnythingInParts = true
               }
               if (part.functionCall) {
                 yield {
@@ -165,27 +157,33 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
                   }
                 }
                 toolEmitted = true
-                foundFunctionCallInParts = true
+                foundAnythingInParts = true
               }
             }
           }
 
-          // 3. Top-level functionCalls — fallback path для SDK сборок где
-          //    candidates[].content.parts может быть пустым (старые версии).
-          //    Не запускаем если уже извлекли function call из parts —
-          //    избегаем дублирования вызовов.
-          if (c.functionCalls && !foundFunctionCallInParts) {
-            for (const fc of c.functionCalls) {
-              yield {
-                type: 'tool-call',
-                call: {
-                  id: randomUUID(),
-                  name: fc.name,
-                  args: fc.args,
-                  thoughtSignature: fc.thoughtSignature
+          // Fallback path для SDK сборок где parts пуст — используем top-level
+          // getters. Активируется ТОЛЬКО когда из parts ничего не извлекли.
+          if (!foundAnythingInParts) {
+            let topText: string | undefined
+            try { topText = c.text } catch { topText = undefined }
+            if (topText) {
+              yield { type: 'text', text: topText }
+              totalText += topText
+            }
+            if (c.functionCalls) {
+              for (const fc of c.functionCalls) {
+                yield {
+                  type: 'tool-call',
+                  call: {
+                    id: randomUUID(),
+                    name: fc.name,
+                    args: fc.args,
+                    thoughtSignature: fc.thoughtSignature
+                  }
                 }
+                toolEmitted = true
               }
-              toolEmitted = true
             }
           }
 
