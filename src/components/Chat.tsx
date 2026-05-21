@@ -127,6 +127,24 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
   useEffect(() => {
     const off = window.api.ai.onEvent(({ id, event, projectPath }) => {
       const store = useProject.getState()
+      // ПЕРВЫМ делом проверяем: это review-стрим? Если да — отдельный путь.
+      // Review-события не должны попадать в основной чат и не должны
+      // менять messages / isStreaming основного чата.
+      const reviewChatId = store.sendIdToReviewChatId[id]
+      if (reviewChatId != null) {
+        if (event.type === 'text' && typeof (event as { text?: string }).text === 'string') {
+          store.appendReviewContent(reviewChatId, (event as { text: string }).text)
+        } else if (event.type === 'done') {
+          store.finalizeReview(reviewChatId)
+        } else if (event.type === 'error') {
+          const msg = (event as { message?: string }).message ?? 'review failed'
+          store.failReview(reviewChatId, msg)
+        }
+        // Игнорируем все остальные event types для ревью (thought / usage /
+        // tool-* — ревьюер работает в plain mode, тулзов не должно быть, а
+        // thoughts нам в pill не нужны).
+        return
+      }
       // Route background-project events to the snapshot store so they don't
       // mutate the currently-visible session.
       if (projectPath && projectPath !== store.path) {

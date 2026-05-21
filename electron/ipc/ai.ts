@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { createFileTools, TOOL_DEFS } from '../ai/tools'
 import { createProvider, PROVIDERS, type ProviderId } from '../ai/registry'
 import { prepareSystemContext } from '../ai/compose-system'
+import { REVIEWER_SYSTEM_PROMPT } from '../ai/review-prompt'
 import type { AgentMode } from '../ai/mode-policy'
 import type { ChatMessage, ToolCall, ToolResult, ChatProvider, Attachment } from '../ai/types'
 import { lookupHandler, type ToolContext, type TaggedSender as HandlerTaggedSender } from './tool-handlers'
@@ -80,6 +81,10 @@ export function registerAiIpc(deps: AiDeps): void {
     /** Replace assembled system prompt entirely. When set, project's user-layer
      *  / context-pack is NOT prepended — caller owns the full system message. */
     systemPrompt?: string
+    /** Use built-in REVIEWER_SYSTEM_PROMPT. Renderer can't import from electron/,
+     *  so it sends this flag instead of the full string. Takes precedence over
+     *  systemPrompt if both are set. */
+    useReviewerPrompt?: boolean
   }
 
   ipcMain.handle('ai:send', async (e, messages: ChatMessage[], projectPath: string | null, budget?: number, overrides?: AiSendOverrides) => {
@@ -119,8 +124,11 @@ export function registerAiIpc(deps: AiDeps): void {
     // (REVIEWER_SYSTEM_PROMPT) and we don't want to also inject the project's
     // user_layer — reviewer prompt is self-contained.
     let messagesWithSystem = messages
-    if (overrides?.systemPrompt) {
-      messagesWithSystem = [{ role: 'system', content: overrides.systemPrompt }, ...messages]
+    const effectiveSystemPrompt = overrides?.useReviewerPrompt
+      ? REVIEWER_SYSTEM_PROMPT
+      : overrides?.systemPrompt
+    if (effectiveSystemPrompt) {
+      messagesWithSystem = [{ role: 'system', content: effectiveSystemPrompt }, ...messages]
     } else if (descriptor.transport === 'API') {
       // Same assembly path as CLI providers — see ai/compose-system.ts.
       const composed = await prepareSystemContext({

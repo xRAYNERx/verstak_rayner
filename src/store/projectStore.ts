@@ -95,6 +95,28 @@ function freshSnapshot(): SessionSnapshot {
   }
 }
 
+/**
+ * In-flight or completed Review для main-чата. Хранится в store пока активен
+ * проект — при переключении проекта/чата подгружается из БД заново через
+ * refreshReviewsFor(mainChatId).
+ */
+export interface ReviewState {
+  /** chat_sessions.id review sub-чата. */
+  reviewChatId: number
+  /** К какому main-чату относится. */
+  parentChatId: number
+  /** Провайдер, который выдавал ревью. */
+  providerId: string
+  model: string | null
+  /** Текст ревью, накапливаемый по text events. */
+  content: string
+  status: 'streaming' | 'done' | 'error'
+  errorMessage?: string
+  createdAt: number
+  /** Парсится из первой строки «ЗАМЕЧАНИЙ: N». -1 пока стримится. */
+  noteCount: number
+}
+
 interface ProjectState {
   path: string | null
   tree: FileNode[]
@@ -127,6 +149,12 @@ interface ProjectState {
   /** Map of in-flight sendId → chatSessionId that initiated it. Used to route
    *  ai:event for backgrounded chats into the correct snapshot. */
   sendIdToChatId: Record<number, number>
+  /** Review state, keyed by reviewChatId. Pre-loaded on chat switch via
+   *  refreshReviewsFor() and updated live during streaming. */
+  reviews: Record<number, ReviewState>
+  /** Map sendId → reviewChatId. Когда событие приходит для review-стрима,
+   *  диспетчер апдейтит reviews[id], а не основной чат. */
+  sendIdToReviewChatId: Record<number, number>
   setProject: (path: string) => Promise<void>
   closeProject: () => void
   refreshProjectList: () => Promise<void>
@@ -173,6 +201,22 @@ interface ProjectState {
   patchChatSession: (id: number, patch: Partial<ChatSession>) => void
   /** Create a new chat session in the active project and switch to it. */
   newChatSession: (title?: string) => Promise<ChatSession | null>
+  /** Подгрузить review sub-chats для указанного main-чата из БД. */
+  refreshReviewsFor: (parentChatId: number) => Promise<void>
+  /** Начать новое ревью текущего main-чата. Возвращает reviewChatId. */
+  startReview: (opts: {
+    providerId: string
+    model: string | null
+    payload: string  // готовый сериализованный last turn
+  }) => Promise<number | null>
+  /** Обновить накопленный текст ревью (text event). */
+  appendReviewContent: (reviewChatId: number, text: string) => void
+  /** Финализировать ревью: парсит noteCount, status='done'. */
+  finalizeReview: (reviewChatId: number) => void
+  /** Помечает ревью как failed. */
+  failReview: (reviewChatId: number, message: string) => void
+  /** Зарегистрировать связь sendId ↔ reviewChatId. */
+  registerReviewSend: (sendId: number, reviewChatId: number) => void
 }
 
 // Monotonic token used by setProject to cancel its own stale concurrent runs.
@@ -200,6 +244,8 @@ export const useProject = create<ProjectState>((set, get) => ({
   sessions: {},
   chatSnapshots: {},
   sendIdToChatId: {},
+  reviews: {},
+  sendIdToReviewChatId: {},
   setProject: async (path) => {
     const myToken = ++setProjectToken
     const s = get()
@@ -554,7 +600,118 @@ export const useProject = create<ProjectState>((set, get) => ({
       checkpointId: null
     })
     return created
-  }
+  },
+  refreshReviewsFor: async (parentChatId) => {
+    try {
+      const list = await window.api.chatSessions.listReviews(parentChatId)
+      // Подгружаем сохранённый текст ревью из chats table (если он там есть).
+      // V1: текст ревью НЕ сохраняем в chats — он живёт только в памяти до
+      // перезапуска. Это явное упрощение, фиксируется в Definition of Done.
+      // При перезапуске review pills исчезают, но сам факт ревью (запись в
+      // chat_sessions с kind='review') остаётся для аудита.
+      set(s => {
+        const next = { ...s.reviews }
+        for (const r of list) {
+          if (!next[r.id]) {
+            next[r.id] = {
+              reviewChatId: r.id,
+              parentChatId,
+              providerId: r.providerId ?? 'unknown',
+              model: r.model,
+              content: '',
+              status: 'done',  // restored from DB — assume completed
+              createdAt: r.createdAt,
+              noteCount: -1   // unknown, content was not persisted in V1
+            }
+          }
+        }
+        return { reviews: next }
+      })
+    } catch (err) {
+      console.error('[store] refreshReviewsFor failed:', err)
+    }
+  },
+  startReview: async ({ providerId, model, payload }) => {
+    const s = get()
+    if (!s.path || s.activeChatId == null) return null
+    const parentChatId = s.activeChatId
+    const reviewerLabel = providerId
+    // 1. Создаём sub-chat в БД с kind='review' и привязкой к parent.
+    let reviewChat
+    try {
+      reviewChat = await window.api.chatSessions.create(s.path, {
+        title: `Review: ${reviewerLabel}`,
+        providerId,
+        model,
+        kind: 'review',
+        parentChatId
+      })
+    } catch (err) {
+      console.error('[store] startReview create failed:', err)
+      return null
+    }
+    // 2. Регистрируем ревью в локальном state СРАЗУ — pill в Timeline
+    //    появится в статусе streaming.
+    set(state => ({
+      reviews: {
+        ...state.reviews,
+        [reviewChat.id]: {
+          reviewChatId: reviewChat.id,
+          parentChatId,
+          providerId,
+          model,
+          content: '',
+          status: 'streaming' as const,
+          createdAt: Date.now(),
+          noteCount: -1
+        }
+      }
+    }))
+    // 3. Стартуем ai:send с override провайдером + флагом useReviewerPrompt.
+    //    Сам текст REVIEWER_SYSTEM_PROMPT живёт в electron/ai/ — renderer не
+    //    может его импортнуть, поэтому шлём флаг, main process подставляет
+    //    промпт сам (см. ipc/ai.ts).
+    try {
+      const sendId = await window.api.ai.sendWithOverrides(
+        [{ role: 'user', content: payload }],
+        s.path,
+        {
+          providerId,
+          model,
+          noTools: true,
+          useReviewerPrompt: true
+        }
+      )
+      get().registerReviewSend(sendId, reviewChat.id)
+      return reviewChat.id
+    } catch (err) {
+      console.error('[store] startReview sendWithOverrides failed:', err)
+      get().failReview(reviewChat.id, err instanceof Error ? err.message : String(err))
+      return reviewChat.id
+    }
+  },
+  appendReviewContent: (reviewChatId, text) => set(s => {
+    const r = s.reviews[reviewChatId]
+    if (!r) return {}
+    return { reviews: { ...s.reviews, [reviewChatId]: { ...r, content: r.content + text } } }
+  }),
+  finalizeReview: (reviewChatId) => set(s => {
+    const r = s.reviews[reviewChatId]
+    if (!r) return {}
+    // Парсим «ЗАМЕЧАНИЙ: N» из первой строки.
+    const firstLine = r.content.split('\n', 1)[0] ?? ''
+    const m = firstLine.match(/ЗАМЕЧАНИЙ:\s*(\d+)/i)
+    const noteCount = m ? parseInt(m[1], 10) : -1
+    return { reviews: { ...s.reviews, [reviewChatId]: { ...r, status: 'done', noteCount } } }
+  }),
+  failReview: (reviewChatId, message) => set(s => {
+    const r = s.reviews[reviewChatId]
+    if (!r) return {}
+    return { reviews: { ...s.reviews, [reviewChatId]: { ...r, status: 'error', errorMessage: message } } }
+  }),
+  registerReviewSend: (sendId, reviewChatId) => set(s => ({
+    sendIdToReviewChatId: { ...s.sendIdToReviewChatId, [sendId]: reviewChatId }
+  }))
 }))
 
 export type { ActivityEntry, PendingCommand }

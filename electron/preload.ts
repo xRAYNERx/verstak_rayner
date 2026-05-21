@@ -26,7 +26,7 @@ contextBridge.exposeInMainWorld('api', {
     sendWithOverrides: (
       messages: unknown[],
       projectPath: string | null,
-      overrides: { providerId?: string; model?: string | null; noTools?: boolean; systemPrompt?: string }
+      overrides: { providerId?: string; model?: string | null; noTools?: boolean; systemPrompt?: string; useReviewerPrompt?: boolean }
     ) => ipcRenderer.invoke('ai:send', messages, projectPath, undefined, overrides),
     resolveWrite: (callId: string, accept: boolean, sendId?: number) =>
       ipcRenderer.invoke('ai:resolve-write', callId, accept, sendId),
