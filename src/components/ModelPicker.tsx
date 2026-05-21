@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useProvider, type ProviderId } from '../hooks/useProvider'
+import { useProject } from '../store/projectStore'
 
 interface ProviderOption {
   id: ProviderId
@@ -24,8 +25,19 @@ interface Props {
 
 export function ModelPicker({ onOpenSettings }: Props) {
   const provider = useProvider()
+  const activeChatId = useProject(s => s.activeChatId)
+  const refreshChatSessions = useProject(s => s.refreshChatSessions)
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
+
+  // Persist provider/model on the current chat session so it sticks per-chat
+  async function persistOnSession(providerId: ProviderId, model: string) {
+    if (!activeChatId) return
+    try {
+      await window.api.chatSessions.setModel(activeChatId, providerId, model)
+      await refreshChatSessions()
+    } catch { /* don't block UX if persistence fails */ }
+  }
 
   useEffect(() => {
     if (!open) return
@@ -59,7 +71,10 @@ export function ModelPicker({ onOpenSettings }: Props) {
                 key={p.id}
                 type="button"
                 className={`gg-mp-row ${provider.id === p.id ? 'is-active' : ''}`}
-                onClick={() => void provider.setProviderId(p.id).then(() => setOpen(false))}
+                onClick={() => void provider.setProviderId(p.id).then(async () => {
+                  await persistOnSession(p.id, provider.model)
+                  setOpen(false)
+                })}
               >
                 <span className="gg-mp-row-label">{p.label}</span>
                 <span className="gg-mp-row-meta">{p.description}</span>
@@ -75,7 +90,10 @@ export function ModelPicker({ onOpenSettings }: Props) {
                   key={m}
                   type="button"
                   className={`gg-mp-row ${provider.model === m ? 'is-active' : ''}`}
-                  onClick={() => void provider.setModel(m).then(() => setOpen(false))}
+                  onClick={() => void provider.setModel(m).then(async () => {
+                    await persistOnSession(provider.id, m)
+                    setOpen(false)
+                  })}
                 >
                   <span className="gg-mp-row-label">{m}</span>
                   {provider.model === m && <span className="gg-mp-row-meta">✓</span>}

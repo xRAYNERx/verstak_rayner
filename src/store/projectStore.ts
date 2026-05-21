@@ -310,6 +310,17 @@ export const useProject = create<ProjectState>((set, get) => ({
       try { await window.api.ai.stop(0) } catch { /* ignore */ }
     }
     const history = await window.api.chats.list(id)
+    // Per-chat provider: if the session has providerId / model saved, apply
+    // them to the global settings so the next ai:send uses that provider.
+    const session = s.chatSessions.find(c => c.id === id)
+    if (session?.providerId) {
+      try {
+        await window.api.settings.setKey('provider', session.providerId)
+        if (session.model) {
+          await window.api.settings.setKey(`model_${session.providerId}`, session.model)
+        }
+      } catch { /* settings write failure shouldn't block chat switch */ }
+    }
     set({
       activeChatId: id,
       messages: history.map(m => ({ role: m.role, content: m.content })),
@@ -329,7 +340,16 @@ export const useProject = create<ProjectState>((set, get) => ({
   newChatSession: async (title) => {
     const s = get()
     if (!s.path) return null
-    const created = await window.api.chatSessions.create(s.path, { title })
+    // Inherit the currently-selected provider/model so a new chat doesn't
+    // reset back to gemini-api when user is e.g. in the middle of working
+    // with Claude.
+    const currentProvider = await window.api.settings.getKey('provider')
+    const currentModel = currentProvider ? await window.api.settings.getKey(`model_${currentProvider}`) : null
+    const created = await window.api.chatSessions.create(s.path, {
+      title,
+      providerId: currentProvider ?? null,
+      model: currentModel ?? null
+    })
     const list = await window.api.chatSessions.list(s.path)
     set({
       chatSessions: list,
@@ -338,7 +358,8 @@ export const useProject = create<ProjectState>((set, get) => ({
       activity: [],
       pendingWrites: [],
       pendingCommand: null,
-      runningPlanStep: null
+      runningPlanStep: null,
+      isStreaming: false
     })
     return created
   }

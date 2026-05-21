@@ -90,6 +90,11 @@ function ChatNavSection() {
                 >
                   <span className="gg-chat-nav-dot" />
                   <span className="gg-chat-nav-title">{s.title}</span>
+                  {s.providerId && (
+                    <span className="gg-chat-nav-provider" title={`${s.providerId}${s.model ? ' · ' + s.model : ''}`}>
+                      {shortProviderTag(s.providerId)}
+                    </span>
+                  )}
                 </button>
               )}
               <button
@@ -103,6 +108,19 @@ function ChatNavSection() {
       )}
     </>
   )
+}
+
+/** 2-3 letter tag shown next to chat session name when it has a saved provider. */
+function shortProviderTag(id: string): string {
+  if (id === 'gemini-api') return 'GMN'
+  if (id === 'gemini-cli') return 'ULT'
+  if (id === 'claude') return 'CLD'
+  if (id === 'claude-cli') return 'CC'
+  if (id === 'grok') return 'GRK'
+  if (id === 'grok-cli') return 'GB'
+  if (id === 'openai') return 'GPT'
+  if (id === 'codex-cli') return 'CDX'
+  return id.slice(0, 3).toUpperCase()
 }
 
 function ChatIconNode() {
