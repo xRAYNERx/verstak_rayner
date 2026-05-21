@@ -109,6 +109,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
         return
       }
       if (event.type === 'text') updateLastAssistant(event.text)
+      else if (event.type === 'thought') store.appendLastAssistantThinking(event.text)
       else if (event.type === 'pending-write') {
         store.addPendingWrite({
           callId: event.callId,
@@ -501,6 +502,18 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
                 </div>
               )}
               <div className="gg-msg-bubble">
+                {m.role === 'assistant' && m.thinking && (
+                  <details className="gg-thinking">
+                    <summary className="gg-thinking-summary">
+                      <span>💭</span>
+                      <span>Размышление модели</span>
+                      <span className="gg-thinking-len">{m.thinking.length} симв.</span>
+                    </summary>
+                    <div className="gg-thinking-body">
+                      <Markdown text={m.thinking} />
+                    </div>
+                  </details>
+                )}
                 {changedFiles.length > 0 && (
                   <div className="gg-changed-files">
                     <div className="gg-changed-files-title">✓ Изменены файлы ({changedFiles.length})</div>

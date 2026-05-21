@@ -387,6 +387,46 @@
   color: var(--text-tertiary);
 }
 
+/* Collapsible chain-of-thought block at top of assistant message */
+.gg-thinking {
+  margin: 0 0 10px;
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-overlay);
+  font-size: var(--text-sm);
+}
+.gg-thinking-summary {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  user-select: none;
+  list-style: none;
+}
+.gg-thinking-summary::-webkit-details-marker { display: none; }
+.gg-thinking-summary::before {
+  content: '▸';
+  font-size: 10px;
+  width: 10px;
+  display: inline-block;
+  transition: transform 120ms ease;
+}
+.gg-thinking[open] .gg-thinking-summary::before { transform: rotate(90deg); }
+.gg-thinking-summary:hover { color: var(--text-secondary); }
+.gg-thinking-len {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-disabled);
+}
+.gg-thinking-body {
+  padding: 0 14px 10px;
+  color: var(--text-secondary);
+  font-style: italic;
+  border-top: 1px dashed var(--border-subtle);
+}
+.gg-thinking-body p { margin: 8px 0; }
+
 /* Continue-budget bar shown above the composer when agent hits turn limit */
 .gg-budget-bar {
   display: flex; align-items: center; justify-content: space-between;

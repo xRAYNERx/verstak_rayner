@@ -116,6 +116,8 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
               finishMessage?: string
               content?: { parts?: Array<{
                 text?: string
+                /** Gemini 3 marks chain-of-thought parts with thought:true. */
+                thought?: boolean
                 functionCall?: { name: string; args: Record<string, unknown> }
                 thoughtSignature?: string
               }> }
@@ -142,9 +144,15 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
           let foundFunctionCallInParts = false
           if (c.candidates?.[0]?.content?.parts) {
             for (const part of c.candidates[0].content.parts) {
-              if (part.text && !topText) {  // avoid double-emit if getter already gave us this text
-                yield { type: 'text', text: part.text }
-                totalText += part.text
+              if (part.text) {
+                if (part.thought) {
+                  // Chain-of-thought — separate event so renderer collapses it
+                  yield { type: 'thought', text: part.text }
+                } else if (!topText) {
+                  // Visible answer text (skip if the getter already gave us this)
+                  yield { type: 'text', text: part.text }
+                  totalText += part.text
+                }
               }
               if (part.functionCall) {
                 yield {

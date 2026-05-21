@@ -20,6 +20,10 @@ export interface ChatMessage {
   /** Tool results being fed back to the assistant (only set on user messages
    *  that exist to carry these results — content may be empty). */
   toolResults?: ToolResult[]
+  /** Model's internal reasoning / chain-of-thought (Gemini 3 thought parts,
+   *  Claude extended thinking, OpenAI o1 reasoning). Rendered as a
+   *  collapsible block in the chat, not part of the visible answer. */
+  thinking?: string
 }
 
 export interface ToolCall {
@@ -64,6 +68,9 @@ export interface UsageDelta {
 
 export type ChatEvent =
   | { type: 'text'; text: string }
+  /** Model's internal reasoning. Streamed separately from text so the UI
+   *  can render it as a collapsible block. */
+  | { type: 'thought'; text: string }
   | { type: 'tool-call'; call: ToolCall }
   | { type: 'pending-write'; callId: string; path: string; before: string; after: string }
   | { type: 'pending-command'; callId: string; command: string }

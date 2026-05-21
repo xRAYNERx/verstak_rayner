@@ -86,6 +86,9 @@ interface ProjectState {
   setActiveView: (v: ViewId) => void
   addMessage: (msg: ChatMessage) => void
   updateLastAssistant: (text: string) => void
+  /** Append chain-of-thought text to the last assistant message. Rendered as
+   *  a collapsible block, not as part of the visible answer. */
+  appendLastAssistantThinking: (text: string) => void
   setStreaming: (v: boolean) => void
   addPendingWrite: (w: PendingWrite) => void
   resolvePendingWrite: (callId: string) => void
@@ -232,6 +235,14 @@ export const useProject = create<ProjectState>((set, get) => ({
     const msgs = [...s.messages]
     const last = msgs[msgs.length - 1]
     if (last?.role === 'assistant') msgs[msgs.length - 1] = { ...last, content: last.content + text }
+    return { messages: msgs }
+  }),
+  appendLastAssistantThinking: (text) => set(s => {
+    const msgs = [...s.messages]
+    const last = msgs[msgs.length - 1]
+    if (last?.role === 'assistant') {
+      msgs[msgs.length - 1] = { ...last, thinking: (last.thinking ?? '') + text }
+    }
     return { messages: msgs }
   }),
   setStreaming: (v) => set({ isStreaming: v }),

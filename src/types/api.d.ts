@@ -1,6 +1,6 @@
 export interface FileNode { name: string; path: string; isDirectory: boolean; children?: FileNode[] }
 export interface Attachment { name: string; mimeType: string; data: string; size: number }
-export interface ChatMessage { role: 'user' | 'assistant' | 'system'; content: string; attachments?: Attachment[] }
+export interface ChatMessage { role: 'user' | 'assistant' | 'system'; content: string; attachments?: Attachment[]; thinking?: string }
 export interface StoredChatMessage { id: number; role: 'user' | 'assistant' | 'system'; content: string; createdAt: number }
 export interface ChatSession { id: number; projectPath: string; title: string; providerId: string | null; model: string | null; createdAt: number; lastMessageAt: number }
 export interface Task { id: number; text: string; done: boolean; createdAt: number; doneAt: number | null }
@@ -23,6 +23,7 @@ export interface UsageDelta {
 
 export type ChatEvent =
   | { type: 'text'; text: string }
+  | { type: 'thought'; text: string }
   | { type: 'pending-write'; callId: string; path: string; before: string; after: string }
   | { type: 'pending-command'; callId: string; command: string }
   | { type: 'command-result'; callId: string; command: string; status: 'ok' | 'error' | 'rejected'; exitCode?: number; stdout?: string; stderr?: string; error?: string }

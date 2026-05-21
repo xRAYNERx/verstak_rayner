@@ -329,6 +329,10 @@ async function runApiConversation(
         assistantText += event.text
         lastAssistantText = assistantText
         sender.send('ai:event', { id: sendId, event })
+      } else if (event.type === 'thought') {
+        // Forward chain-of-thought verbatim — renderer accumulates into the
+        // assistant message's `thinking` field for collapsed display.
+        sender.send('ai:event', { id: sendId, event })
       } else if (event.type === 'tool-call') {
         toolCalls.push(event.call)
       } else if (event.type === 'usage') {
