@@ -19,6 +19,8 @@ interface AiDeps {
   recordPlan: (projectPath: string, title: string, steps: Array<{ title: string; detail?: string | null }>) => { id: number }
   /** Auto-append a brief entry to the dev journal (file write, command, plan, session summary). */
   recordJournal: (projectPath: string, kind: 'tool' | 'session' | 'note', title: string, detail?: string | null) => void
+  /** Read recent journal entries — exposed to the AI as the read_journal tool. */
+  readJournal: (projectPath: string, limit: number) => Array<{ kind: string; title: string; detail: string | null; createdAt: number }>
   /** Connector registry (list / query external services like 1C). */
   connectors: {
     list: () => Array<{ id: string; label: string; kind: string; status: string; detail?: string }>
@@ -121,7 +123,7 @@ export function registerAiIpc(deps: AiDeps): void {
     if (descriptor.supportsTools && projectPath) {
       const tools = createFileTools(projectPath, ctrl.signal)
       const turnsBudget = Math.min(MAX_BUDGET_TURNS, Math.max(DEFAULT_AGENT_TURNS, budget ?? DEFAULT_AGENT_TURNS))
-      void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.connectors, turnsBudget).finally(cleanup)
+      void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.readJournal, deps.connectors, turnsBudget).finally(cleanup)
     } else {
       void runPlainConversation(taggedSender, sendId, provider, messagesWithSystem, ctrl.signal).finally(cleanup)
     }
@@ -288,6 +290,7 @@ async function runApiConversation(
   recordWrite: (projectPath: string, filePath: string, before: string, after: string) => void,
   recordPlan: (projectPath: string, title: string, steps: Array<{ title: string; detail?: string | null }>) => { id: number },
   recordJournal: (projectPath: string, kind: 'tool' | 'session' | 'note', title: string, detail?: string | null) => void,
+  readJournal: (projectPath: string, limit: number) => Array<{ kind: string; title: string; detail: string | null; createdAt: number }>,
   connectors: {
     list: () => Array<{ id: string; label: string; kind: string; status: string; detail?: string }>
     query: (id: string, args: Record<string, unknown>, signal: AbortSignal) => Promise<unknown>
@@ -419,7 +422,7 @@ async function runApiConversation(
     // mode (parallel-read / sequential / confirm-write); the loop honours it.
     const ctx: ToolContext = {
       sender, sendId, signal, projectPath, tools,
-      recordWrite, recordPlan, recordJournal, connectors,
+      recordWrite, recordPlan, recordJournal, readJournal, connectors,
       pendingAttachments, pendingWrites, pendingCommands, scopedKey
     }
     const writePromises: Array<{ idx: number; promise: Promise<ToolResult> }> = []

@@ -155,6 +155,11 @@ app.whenReady().then(() => {
     recordJournal: (projectPath, kind, title, detail) => {
       journal.append(projectPath, kind, title, detail ?? null)
     },
+    readJournal: (projectPath, limit) => {
+      return journal.list(projectPath, limit).map(e => ({
+        kind: e.kind, title: e.title, detail: e.detail, createdAt: e.createdAt
+      }))
+    },
     connectors: {
       list: () => connectorRegistry.list().map(c => ({ ...c })),
       query: (id, args, signal) => connectorRegistry.query(id, args, {
