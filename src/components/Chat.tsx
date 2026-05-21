@@ -157,6 +157,10 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
       // mutate the currently-visible session.
       if (projectPath && projectPath !== store.path) {
         store.applyEventToSession(projectPath, event as unknown as { type: string; [k: string]: unknown })
+        // sendOwners leak fix: stream завершается → удаляем owner, иначе
+        // мапа растёт при каждом переключении проекта во время активного
+        // стрима в фоне.
+        if (event.type === 'done' || event.type === 'error') store.forgetSendOwner(id)
         return
       }
       // Route background-chat events (same project, different chat) to the
@@ -537,6 +541,11 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
     if (id == null) return
     await window.api.ai.stop(id)
     setStreaming(false)
+    // sendOwners cleanup: stop() = главное место где renderer знает, что
+    // больше событий по этому sendId не придёт. Без этого owner повисал бы
+    // в мапе, потому что done event на abort иногда теряется.
+    useProject.getState().forgetSendOwner(id)
+    currentSendIdRef.current = null
   }
 
   const hasMessages = messages.length > 0
