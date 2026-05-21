@@ -18,6 +18,10 @@ import { promisify } from 'util'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { getProjectMap, projectMapToText } from './project-map'
+import { detectCrossProjectPaths } from './grounding'
+
+// Re-export for backward compatibility — tests still import from here.
+export { detectCrossProjectPaths }
 
 const execFileAsync = promisify(execFile)
 
@@ -66,27 +70,24 @@ export async function buildContextPack(input: ContextPackInput): Promise<string>
     parts.push(`recent_writes (${input.recentWrites.length}): ${list}`)
   }
 
-  // 3. Verify scripts auto-detected from package.json — hints to the model
-  //    what command to run after edits.
-  const verifyHints = await detectVerifyScripts(projectPath)
+  // Read package.json ONCE per buildContextPack — multiple detectors
+  // (verify scripts, product stack, possibly more) share the parsed view.
+  const pkg = await readPackageJson(projectPath)
+
+  // 3. Verify scripts — hints to the model what command to run after edits.
+  const verifyHints = await detectVerifyScripts(projectPath, pkg)
   if (verifyHints.length > 0) parts.push(`verify_scripts: ${verifyHints.join(', ')}`)
 
-  // 3b. Product stack — quick summary of what kind of project this is,
-  //     derived from package.json (name + key dependencies). Cheap, but
-  //     lets the model NAME the stack correctly on first turn without
-  //     guessing or re-reading package.json itself.
-  const stack = await detectProductStack(projectPath)
+  // 3b. Product stack — derived from the same parsed package.json.
+  const stack = await detectProductStack(projectPath, pkg)
   if (stack) parts.push(`product_stack: ${stack}`)
 
-  // 4. Project map (compact). Use cached version — if it's stale, the
-  //    write_file tool invalidates the cache anyway.
+  // 4. Project map (compact mode — the formatter knows the budget, no
+  //    text re-parsing here). Cache is auto-invalidated on write_file.
   let mapBlock = ''
   try {
     const map = await getProjectMap(projectPath, false)
-    const fullText = projectMapToText(map)
-    // Keep just the directory headers — file-level detail blows up the budget.
-    const compact = compactProjectMap(fullText)
-    if (compact) mapBlock = compact
+    mapBlock = projectMapToText(map, { mode: 'compact', maxChars: 1500 })
   } catch {
     /* map build failed — skip silently */
   }
@@ -126,21 +127,38 @@ async function readGitStatus(projectPath: string): Promise<string | null> {
 }
 
 /**
+ * Shared parsed view of package.json. Cached per buildContextPack invocation
+ * so multiple detectors (verify scripts, product stack, future stack hints)
+ * don't re-read & re-parse the same file. Falls back to null if not present
+ * or unparseable — every caller must tolerate missing data.
+ */
+interface ParsedPkg {
+  name?: string
+  type?: string
+  main?: string
+  scripts?: Record<string, string>
+  dependencies?: Record<string, string>
+  devDependencies?: Record<string, string>
+}
+async function readPackageJson(projectPath: string): Promise<ParsedPkg | null> {
+  try {
+    const raw = await readFile(join(projectPath, 'package.json'), 'utf8')
+    return JSON.parse(raw) as ParsedPkg
+  } catch { return null }
+}
+
+/**
  * Look at package.json scripts (and existence of tsconfig / php files) to
  * suggest what verify command to run after edits.
  */
-async function detectVerifyScripts(projectPath: string): Promise<string[]> {
+async function detectVerifyScripts(projectPath: string, pkg: ParsedPkg | null): Promise<string[]> {
   const hints: string[] = []
-  try {
-    const pkgRaw = await readFile(join(projectPath, 'package.json'), 'utf8')
-    const pkg = JSON.parse(pkgRaw) as { scripts?: Record<string, string> }
+  if (pkg) {
     const scripts = pkg.scripts ?? {}
     if (scripts.test) hints.push('npm test')
     if (scripts['type-check'] || scripts.typecheck) hints.push('npm run type-check')
     if (scripts.lint) hints.push('npm run lint')
     if (scripts.build) hints.push('npm run build')
-  } catch {
-    /* not a node project, skip */
   }
   // tsconfig present → tsc --noEmit is a reasonable verify
   try {
@@ -153,22 +171,11 @@ async function detectVerifyScripts(projectPath: string): Promise<string[]> {
 }
 
 /**
- * Quick read of package.json to surface "what kind of project is this".
- * Returns a one-line summary suitable for the context_pack, e.g.
- *   "electron + react + vite (geminigrok)"
- *   "fastapi + python (grok-chat)" — when package.json absent we try pyproject/requirements
- *   "" — for unknown projects (model will infer from project_map)
+ * Quick summary of "what kind of project is this", derived from the shared
+ * ParsedPkg + Python fallbacks.
  */
-async function detectProductStack(projectPath: string): Promise<string> {
-  try {
-    const raw = await readFile(join(projectPath, 'package.json'), 'utf8')
-    const pkg = JSON.parse(raw) as {
-      name?: string
-      type?: string
-      main?: string
-      dependencies?: Record<string, string>
-      devDependencies?: Record<string, string>
-    }
+async function detectProductStack(projectPath: string, pkg: ParsedPkg | null): Promise<string> {
+  if (pkg) {
     const deps: Record<string, string> = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) }
     const hints: string[] = []
     if (deps['electron']) hints.push('electron')
@@ -184,7 +191,7 @@ async function detectProductStack(projectPath: string): Promise<string> {
     const stack = hints.length > 0 ? hints.join(' + ') : 'node'
     const name = pkg.name ? ` (${pkg.name})` : ''
     return `${stack}${name}`
-  } catch { /* not a node project */ }
+  }
   // Try Python fallback
   try {
     await readFile(join(projectPath, 'pyproject.toml'), 'utf8')
@@ -201,69 +208,8 @@ async function detectProductStack(projectPath: string): Promise<string> {
   return ''
 }
 
-/**
- * Take the full `projectMapToText` output and shorten to fit in the system
- * prompt without blowing the budget. Strategy: keep top-level directories
- * with file counts, drop the per-file symbol lists.
- */
-function compactProjectMap(fullText: string): string {
-  const lines = fullText.split('\n')
-  const out: string[] = []
-  let charBudget = 1500
-  for (const line of lines) {
-    if (line.startsWith('# ') || line.startsWith('Files:') || line.startsWith('## ')) {
-      out.push(line)
-      charBudget -= line.length
-    } else if (line.startsWith('- ') && charBudget > 0) {
-      // Strip symbol detail; keep just file path
-      const cleaned = line.split('  ')[0]  // first segment before symbol block
-      out.push(cleaned)
-      charBudget -= cleaned.length
-    }
-    if (charBudget <= 0) {
-      out.push('…(truncated)')
-      break
-    }
-  }
-  return out.join('\n')
-}
-
 function escapeAttr(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-/**
- * Find absolute paths in user text that AREN'T inside the active project root.
- * Returns deduplicated list of such "outside" paths. Supports:
- *  - Windows: C:\Users\..., D:/foo, \\server\share
- *  - POSIX: /Users/..., /home/..., /opt/...
- * Skips backtick-fenced code blocks because those are usually examples.
- */
-export function detectCrossProjectPaths(userText: string, projectPath: string): string[] {
-  if (!userText || !projectPath) return []
-  // Strip code fences so example paths inside ``` ``` don't trip us up.
-  const stripped = userText.replace(/```[\s\S]*?```/g, '')
-  // Match Windows drive paths (C:\... or C:/...), UNC, and POSIX absolute paths.
-  const re = /(?:[A-Za-z]:[\\/][^\s"'`]+|\\\\[^\s"'`\\]+\\[^\s"'`]+|\/(?:Users|home|opt|var|etc|tmp)\/[^\s"'`]+)/g
-  const matches = stripped.match(re) ?? []
-  const projNorm = normalizePathForCompare(projectPath)
-  const seen = new Set<string>()
-  const out: string[] = []
-  for (const raw of matches) {
-    const trimmed = raw.replace(/[)\].,;:]+$/, '')  // strip trailing punctuation
-    const norm = normalizePathForCompare(trimmed)
-    if (norm.startsWith(projNorm)) continue  // inside active project — fine
-    if (seen.has(norm)) continue
-    seen.add(norm)
-    out.push(trimmed)
-    if (out.length >= 5) break
-  }
-  return out
-}
-
-/** Normalize for prefix comparison: lowercase + forward slashes + trim trailing slash. */
-function normalizePathForCompare(p: string): string {
-  let n = p.replace(/\\/g, '/').toLowerCase()
-  if (n.endsWith('/')) n = n.slice(0, -1)
-  return n
-}
+// detectCrossProjectPaths moved to ./grounding.ts

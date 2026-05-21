@@ -143,8 +143,25 @@ export async function buildProjectMap(root: string): Promise<ProjectMap> {
   }
 }
 
-/** Compact textual representation for the AI (cheaper than full JSON). */
-export function projectMapToText(map: ProjectMap): string {
+export interface ProjectMapTextOptions {
+  /**
+   * 'compact': directory headers + file paths only, no per-file symbols,
+   * with a soft byte budget. Used by Context Pack to fit the map into the
+   * system prompt without re-parsing the full output.
+   * 'full' (default): everything including symbols.
+   */
+  mode?: 'full' | 'compact'
+  /** Soft cap on output chars in compact mode (default 1500). */
+  maxChars?: number
+}
+
+/** Textual representation for the AI. Default 'full' for `get_project_map`
+ *  tool; Context Pack passes mode='compact' to fit budget. */
+export function projectMapToText(map: ProjectMap, opts: ProjectMapTextOptions = {}): string {
+  const mode = opts.mode ?? 'full'
+  const maxChars = opts.maxChars ?? 1500
+  const compact = mode === 'compact'
+
   const lines: string[] = []
   lines.push(`# Project Map`)
   lines.push(`Generated: ${new Date(map.generatedAt).toISOString()}`)
@@ -157,15 +174,24 @@ export function projectMapToText(map: ProjectMap): string {
     if (!groups.has(top)) groups.set(top, [])
     groups.get(top)!.push(f)
   }
-  for (const [top, fs] of groups) {
-    lines.push(`## ${top}/ (${fs.length} files)`)
+  let budget = compact ? maxChars : Number.POSITIVE_INFINITY
+  outer: for (const [top, fs] of groups) {
+    const head = `## ${top}/ (${fs.length} files)`
+    lines.push(head)
+    budget -= head.length
     for (const f of fs) {
-      const sym = f.symbols.length > 0
+      if (budget <= 0) {
+        lines.push('…(truncated)')
+        break outer
+      }
+      const sym = !compact && f.symbols.length > 0
         ? '  ' + f.symbols.map(s => `${s.kind}:${s.name}`).join(', ')
         : ''
-      lines.push(`- ${f.path}${f.lines ? ` (${f.lines}L)` : ''}${sym}`)
+      const line = `- ${f.path}${f.lines ? ` (${f.lines}L)` : ''}${sym}`
+      lines.push(line)
+      budget -= line.length
     }
-    lines.push('')
+    if (!compact) lines.push('')
   }
   return lines.join('\n')
 }
