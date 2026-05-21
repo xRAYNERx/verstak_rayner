@@ -137,6 +137,25 @@ const MIGRATIONS: Array<{ version: number; description: string; run: (db: DB) =>
       }
       db.exec('CREATE INDEX IF NOT EXISTS idx_chats_session ON chats(session_id, created_at)')
     }
+  },
+  {
+    version: 2,
+    description: 'Chat sessions → typed (main/review) с привязкой review-чатов к родительскому через parent_chat_id',
+    run: (db) => {
+      const cols = (db.prepare("PRAGMA table_info(chat_sessions)").all() as Array<{ name: string }>).map(c => c.name)
+      if (!cols.includes('kind')) {
+        // Используем DEFAULT 'main' чтобы все существующие чаты автоматически
+        // получили правильный kind без бэкфилла. NOT NULL гарантирует, что
+        // забыть kind при создании нового чата нельзя.
+        db.exec("ALTER TABLE chat_sessions ADD COLUMN kind TEXT NOT NULL DEFAULT 'main'")
+      }
+      if (!cols.includes('parent_chat_id')) {
+        // NULL для main-чатов (у них нет родителя). Заполняется только для
+        // review sub-chats — указывает, какой чат они ревьюят.
+        db.exec("ALTER TABLE chat_sessions ADD COLUMN parent_chat_id INTEGER")
+      }
+      db.exec('CREATE INDEX IF NOT EXISTS idx_chat_sessions_parent ON chat_sessions(parent_chat_id) WHERE parent_chat_id IS NOT NULL')
+    }
   }
 ]
 
