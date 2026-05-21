@@ -174,6 +174,20 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
           status: event.status,
           timestamp: Date.now()
         })
+        // Persist read-only tool calls to Journal too — это превращает
+        // Journal в реальный audit trail 'что AI делал у меня в проекте'.
+        // Безопасник/тимлид может выгрузить и посмотреть.
+        // НЕ журналим browser_screenshot (data URL раздует журнал) и
+        // успешные get_project_map/refresh_project_map (структура проекта
+        // не интересна как individual event — она в session summary).
+        if (store.path
+            && event.status === 'ok'
+            && event.name !== 'browser_screenshot'
+            && event.name !== 'get_project_map'
+            && event.name !== 'refresh_project_map') {
+          void window.api.journal.append(store.path, 'tool', event.label,
+            event.detail ? event.detail.slice(0, 300) : null)
+        }
       }
       else if (event.type === 'turns-exhausted') {
         // Budget hit. Remember so the UI can offer a "+N turns" button.
