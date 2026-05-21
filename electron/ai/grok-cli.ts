@@ -173,8 +173,7 @@ export function createGrokCliProvider(opts: GrokCliOptions = {}): ChatProvider {
           // Give the user a hint instead of just the raw exit code.
           let hint = ''
           if (code === 3221225477 || code === -1073741819) {
-            hint = ' Похоже, grok CLI сам упал (Windows ACCESS_VIOLATION). Попробуй обновить CLI: ' +
-                   '`irm https://grok.com/install.ps1 | iex` или переключись на Grok API в Settings.'
+            hint = ' Похоже, grok CLI сам упал (Windows ACCESS_VIOLATION). Попробуй обновить CLI (см. x.ai) или переключись на Grok (API) в Settings.'
           }
           queue.push({ type: 'error', message: `Grok CLI exit ${code}.${hint}${stderrBuffer ? ' ' + stderrBuffer.slice(0, 400) : ''}` })
         }

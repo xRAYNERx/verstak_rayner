@@ -283,8 +283,10 @@ export function Settings({ onClose }: { onClose: () => void }) {
             )}
             {activeCfg.id === 'grok-cli' && (
               <div className="gg-notice" style={{ marginTop: 12 }}>
-                Нужен <code>grok</code> CLI (Grok Build) из <code>~/.grok/bin/grok</code> — обычно ставится автоматически через установщик с <a href="https://grok.com/build" target="_blank" rel="noreferrer">grok.com/build</a>.
-                Залогинься через <code>grok</code> своей SuperGrok / x.com подпиской — после этого работает у нас.
+                Нужен <code>grok</code> CLI (Grok Build) из <code>~/.grok/bin/grok</code>. Установка / релизы — на сайте xAI (<a href="https://x.ai" target="_blank" rel="noreferrer">x.ai</a>). Залогинься через <code>grok</code> своей SuperGrok / x.com подпиской — после этого работает у нас.
+                <br /><br />
+                <strong>Известный баг:</strong> grok CLI на Windows иногда падает с
+                <code>exit 3221225477</code> (ACCESS_VIOLATION) на больших промптах. Мы шлём минимизированный payload для grok-cli как обход. Если падает и так — обнови CLI или переключись на <strong>Grok (API)</strong>.
               </div>
             )}
 
