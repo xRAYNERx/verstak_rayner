@@ -4,7 +4,7 @@ import { useProvider } from '../hooks/useProvider'
 import type { FileNode } from '../types/api'
 
 function ChatNavSection() {
-  const { chatSessions, activeChatId, activeView, setActiveView, switchChatSession, newChatSession, refreshChatSessions, chatSnapshots, patchChatSession } = useProject()
+  const { chatSessions, activeChatId, activeView, setActiveView, switchChatSession, newChatSession, refreshChatSessions, chatSnapshots, patchChatSession, cleanupReviewsFor } = useProject()
   const [open, setOpen] = useState(true)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editTitle, setEditTitle] = useState('')
@@ -38,6 +38,10 @@ function ChatNavSection() {
   async function removeSession(id: number) {
     if (!window.confirm('Удалить этот чат и все его сообщения?')) return
     await window.api.chatSessions.remove(id)
+    // Grok audit fix: каскадное удаление review-чатов в БД работало, но в
+    // store оставались stale entries и openedReviewId мог указывать на
+    // удалённый ревью. Чистим in-memory state синхронно.
+    cleanupReviewsFor(id)
     await refreshChatSessions()
     // If we deleted the active one, switch to the most recent remaining or create a new one
     const fresh = useProject.getState().chatSessions

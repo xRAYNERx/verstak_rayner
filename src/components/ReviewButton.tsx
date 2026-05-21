@@ -76,7 +76,23 @@ export function ReviewButton() {
   }
 
   async function onClick() {
+    // Grok audit fix: default reviewer мог быть удалён из списка (например
+    // пользователь стёр API key). Не запускаем ревью с провайдером, для
+    // которого нет ключа — открываем picker, пусть выберет действующий.
+    // Простая эвристика: если API-провайдер, нужен ключ; CLI-провайдер
+    // считаем доступным всегда (CLI сам ругнётся если бинарь не установлен —
+    // мы это обработаем через sendId=0 в startReview).
     if (defaultReviewer) {
+      const needsKey = defaultReviewer.endsWith('-api') ||
+                       ['claude', 'grok', 'openai'].includes(defaultReviewer)
+      if (needsKey) {
+        const keyName = `${defaultReviewer.replace('-api', '')}_api_key`
+        const key = await window.api.settings.getKey(keyName)
+        if (!key) {
+          setPickerOpen(true)
+          return
+        }
+      }
       await runReview(defaultReviewer)
     } else {
       setPickerOpen(true)

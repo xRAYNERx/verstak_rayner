@@ -77,6 +77,7 @@ export function ReviewPanel() {
   const addMessage = useProject(s => s.addMessage)
   const path = useProject(s => s.path)
   const activeChatId = useProject(s => s.activeChatId)
+  const isStreaming = useProject(s => s.isStreaming)
   const setStreaming = useProject(s => s.setStreaming)
   const registerSend = useProject(s => s.registerSend)
 
@@ -89,6 +90,13 @@ export function ReviewPanel() {
     if (!review || !path || activeChatId == null) return
     if (review.status !== 'done') {
       window.alert('Ревью ещё не завершилось — подожди немного и попробуй снова.')
+      return
+    }
+    // Grok audit fix: если основной чат сейчас стримит ответ, нельзя
+    // одновременно пушить новый user message + второй ai.send — будут два
+    // assistant placeholders, события могут перепутаться.
+    if (useProject.getState().isStreaming) {
+      window.alert('Основной чат сейчас отвечает. Подожди завершения и попробуй снова.')
       return
     }
     const text = review.content.trim()
@@ -134,11 +142,15 @@ export function ReviewPanel() {
             type="button"
             className="gg-btn gg-btn-primary"
             onClick={() => void forwardToChat()}
+            disabled={isStreaming}
+            title={isStreaming ? 'Основной чат отвечает — дождись завершения' : ''}
           >
             ↪ Учесть в чате
           </button>
           <span className="gg-review-panel-hint">
-            Отправит текст ревью в основной чат — модель сама решит что с ним делать
+            {isStreaming
+              ? 'Жди завершения текущего ответа основного чата'
+              : 'Отправит текст ревью в основной чат — модель сама решит что с ним делать'}
           </span>
         </div>
       )}

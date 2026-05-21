@@ -222,6 +222,8 @@ interface ProjectState {
   registerReviewSend: (sendId: number, reviewChatId: number) => void
   /** Раскрыть/свернуть review panel. */
   toggleReviewPanel: (reviewChatId: number | null) => void
+  /** Очистить in-memory review state для удалённого main-чата. */
+  cleanupReviewsFor: (parentChatId: number) => void
 }
 
 // Monotonic token used by setProject to cancel its own stale concurrent runs.
@@ -330,7 +332,8 @@ export const useProject = create<ProjectState>((set, get) => ({
       checkpointId: null,
       // Сбрасываем reviews из памяти — для нового проекта подгружаем заново
       // через refreshReviewsFor (ниже).
-      reviews: {}
+      reviews: {},
+      openedReviewId: null
     })
     // Подгружаем ревью для активного чата (если есть). Fire-and-forget.
     if (activeChatId != null) {
@@ -518,7 +521,10 @@ export const useProject = create<ProjectState>((set, get) => ({
       activity,
       sessionUsage,
       runningPlanStep,
-      chatSnapshots: nextSnapshots
+      chatSnapshots: nextSnapshots,
+      // Grok audit fix: openedReviewId переживал смену чата и мог показать
+      // панель чужого ревью. Сбрасываем при каждом switch.
+      openedReviewId: null
     })
     // Подгружаем review sub-chats этого main-чата (fire-and-forget — pills
     // появятся когда подгрузятся; основная навигация не блокируется).
@@ -620,25 +626,31 @@ export const useProject = create<ProjectState>((set, get) => ({
   refreshReviewsFor: async (parentChatId) => {
     try {
       const list = await window.api.chatSessions.listReviews(parentChatId)
-      // Подгружаем сохранённый текст ревью из chats table (если он там есть).
-      // V1: текст ревью НЕ сохраняем в chats — он живёт только в памяти до
-      // перезапуска. Это явное упрощение, фиксируется в Definition of Done.
-      // При перезапуске review pills исчезают, но сам факт ревью (запись в
-      // chat_sessions с kind='review') остаётся для аудита.
+      // Grok audit fix (race): к моменту получения ответа из БД пользователь
+      // мог переключиться на другой чат. Проверяем, что parentChatId всё
+      // ещё активен — иначе результат stale, выбрасываем.
+      const activeNow = get().activeChatId
+      if (activeNow !== parentChatId) return
       set(s => {
         const next = { ...s.reviews }
         for (const r of list) {
-          if (!next[r.id]) {
-            next[r.id] = {
-              reviewChatId: r.id,
-              parentChatId,
-              providerId: r.providerId ?? 'unknown',
-              model: r.model,
-              content: '',
-              status: 'done',  // restored from DB — assume completed
-              createdAt: r.createdAt,
-              noteCount: -1   // unknown, content was not persisted in V1
-            }
+          // Не перезаписываем streaming/error entries в памяти данными из БД.
+          // БД-версия — это «сохранённый факт ревью», память может содержать
+          // живой стрим, который мы не должны затирать.
+          if (next[r.id] && next[r.id].status !== 'done') continue
+          next[r.id] = next[r.id] ?? {
+            reviewChatId: r.id,
+            parentChatId,
+            providerId: r.providerId ?? 'unknown',
+            model: r.model,
+            content: '',
+            // V1: текст ревью НЕ сохраняем в chats — он живёт только в памяти
+            // до перезапуска. При перезапуске restored entries имеют пустой
+            // content и noteCount=-1 (запись в chat_sessions с kind='review'
+            // остаётся для аудита).
+            status: 'done',
+            createdAt: r.createdAt,
+            noteCount: -1
           }
         }
         return { reviews: next }
@@ -705,6 +717,15 @@ export const useProject = create<ProjectState>((set, get) => ({
           useReviewerPrompt: true
         }
       )
+      // Grok audit fix: ai:send возвращает 0 если провайдер недоступен
+      // (нет API key, не найден бинарь CLI, и т.п.). Error event улетел с
+      // id=0 — наш routing его не словит, и pill повиснет в streaming.
+      // Если sendId=0, сами помечаем review как failed с понятным сообщением.
+      if (!sendId || sendId <= 0) {
+        get().failReview(reviewChat.id,
+          `Провайдер «${providerId}» недоступен (нет ключа, не установлен CLI, или другая ошибка инициализации). Проверь Settings.`)
+        return reviewChat.id
+      }
       get().registerReviewSend(sendId, reviewChat.id)
       return reviewChat.id
     } catch (err) {
@@ -737,7 +758,29 @@ export const useProject = create<ProjectState>((set, get) => ({
   })),
   toggleReviewPanel: (reviewChatId) => set(s => ({
     openedReviewId: s.openedReviewId === reviewChatId ? null : reviewChatId
-  }))
+  })),
+  cleanupReviewsFor: (parentChatId) => set(s => {
+    // Удаляем review entries этого main-чата + связанные sendId mappings.
+    // Закрываем openedReviewId если он был из этого чата.
+    const nextReviews: typeof s.reviews = {}
+    const removedIds = new Set<number>()
+    for (const r of Object.values(s.reviews)) {
+      if (r.parentChatId === parentChatId) {
+        removedIds.add(r.reviewChatId)
+      } else {
+        nextReviews[r.reviewChatId] = r
+      }
+    }
+    const nextSendMap: typeof s.sendIdToReviewChatId = {}
+    for (const [sid, rcid] of Object.entries(s.sendIdToReviewChatId)) {
+      if (!removedIds.has(rcid)) nextSendMap[Number(sid)] = rcid
+    }
+    return {
+      reviews: nextReviews,
+      sendIdToReviewChatId: nextSendMap,
+      openedReviewId: (s.openedReviewId != null && removedIds.has(s.openedReviewId)) ? null : s.openedReviewId
+    }
+  })
 }))
 
 export type { ActivityEntry, PendingCommand }
