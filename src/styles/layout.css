@@ -1227,6 +1227,21 @@
 }
 .gg-usage-sep { color: var(--text-disabled); }
 .gg-usage-cost { color: var(--accent); font-weight: 500; }
+/* Cost severity (см. lib/pricing.ts costSeverity): жёлтый > $2, красный > $5.
+ * При наведении видишь breakdown по input/output/cached в title. */
+.gg-usage-pill.is-warn {
+  border-color: rgba(215, 186, 125, 0.5);
+  background: rgba(215, 186, 125, 0.08);
+  color: var(--warning);
+}
+.gg-usage-pill.is-warn .gg-usage-cost { color: var(--warning); }
+.gg-usage-pill.is-alert {
+  border-color: rgba(244, 113, 116, 0.6);
+  background: rgba(244, 113, 116, 0.1);
+  color: var(--error);
+  font-weight: 500;
+}
+.gg-usage-pill.is-alert .gg-usage-cost { color: var(--error); }
 .gg-terminal-toggle {
   background: transparent;
   border: 1px solid transparent;

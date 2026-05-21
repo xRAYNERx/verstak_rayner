@@ -72,3 +72,55 @@ export function estimateCost(
   else usd = '$' + total.toFixed(0)
   return { usd, cents }
 }
+
+/**
+ * Cost severity для цветовой индикации pill: «спокойно / задумайся / стоп».
+ * Пороги выбраны под типичную dev-сессию (мелкие правки): 50¢ — норма,
+ * $2 — пора смотреть что происходит, $5+ — наверняка цикл / большой rip.
+ *
+ * Возвращает CSS-class suffix: '' / 'is-warn' / 'is-alert'.
+ */
+export type CostSeverity = '' | 'is-warn' | 'is-alert'
+export function costSeverity(cents: number): CostSeverity {
+  if (cents >= 500) return 'is-alert'  // $5+
+  if (cents >= 200) return 'is-warn'   // $2+
+  return ''
+}
+
+/**
+ * Детальный breakdown для tooltip: разбивка стоимости на input / cached /
+ * output, плюс цена за модель. Возвращает многострочный текст для title.
+ */
+export function costBreakdown(
+  providerId: ProviderId,
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+  cachedInputTokens: number
+): string {
+  if (CLI_FREE.has(providerId)) {
+    return `Провайдер: ${providerId} (CLI, подписка — стоимость = $0)\nТокены input: ${inputTokens}\nТокены output: ${outputTokens}`
+  }
+  const price = PRICES[model]
+  if (!price) {
+    return `Модель ${model}: цены неизвестны\nТокены input: ${inputTokens}\nТокены output: ${outputTokens}`
+  }
+  const billableInput = Math.max(0, inputTokens - cachedInputTokens)
+  const inputCost = (billableInput / 1_000_000) * price.input
+  const cachedCost = price.cached ? (cachedInputTokens / 1_000_000) * price.cached : 0
+  const outputCost = (outputTokens / 1_000_000) * price.output
+  const total = inputCost + cachedCost + outputCost
+  const lines = [
+    `Модель: ${model}`,
+    `Цена: $${price.input}/M input, $${price.output}/M output${price.cached ? `, $${price.cached}/M cached` : ''}`,
+    '',
+    `↑ input: ${billableInput.toLocaleString()} × $${price.input}/M = $${inputCost.toFixed(4)}`,
+    ...(cachedInputTokens > 0 && price.cached
+      ? [`⟲ cached: ${cachedInputTokens.toLocaleString()} × $${price.cached}/M = $${cachedCost.toFixed(4)}`]
+      : []),
+    `↓ output: ${outputTokens.toLocaleString()} × $${price.output}/M = $${outputCost.toFixed(4)}`,
+    `─────`,
+    `Итого: $${total.toFixed(4)}`
+  ]
+  return lines.join('\n')
+}

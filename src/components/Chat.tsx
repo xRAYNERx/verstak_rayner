@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent, type ClipboardEvent } from 'react'
 import { useProject } from '../store/projectStore'
 import { useProvider } from '../hooks/useProvider'
-import { estimateCost } from '../lib/pricing'
+import { estimateCost, costSeverity, costBreakdown } from '../lib/pricing'
 import { Markdown } from './Markdown'
 import { ModelPicker } from './ModelPicker'
 import { ModePicker } from './ModePicker'
@@ -819,8 +819,10 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
             })()}
             {(sessionUsage.inputTokens > 0 || sessionUsage.outputTokens > 0) && (() => {
               const cost = estimateCost(provider.id, provider.model, sessionUsage.inputTokens, sessionUsage.outputTokens, sessionUsage.cachedInputTokens)
+              const severity = costSeverity(cost.cents)
+              const breakdown = costBreakdown(provider.id, provider.model, sessionUsage.inputTokens, sessionUsage.outputTokens, sessionUsage.cachedInputTokens)
               return (
-                <span className="gg-usage-pill" title={`Токены в этом проекте\n↑ input: ${sessionUsage.inputTokens}\n↓ output: ${sessionUsage.outputTokens}\ncached: ${sessionUsage.cachedInputTokens}`}>
+                <span className={`gg-usage-pill ${severity}`} title={breakdown}>
                   <span>↑{formatTokens(sessionUsage.inputTokens)}</span>
                   <span className="gg-usage-sep">·</span>
                   <span>↓{formatTokens(sessionUsage.outputTokens)}</span>
