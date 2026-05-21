@@ -3,6 +3,8 @@ import { createFileTools, TOOL_DEFS } from '../ai/tools'
 import { createProvider, PROVIDERS, type ProviderId } from '../ai/registry'
 import { prepareSystemContext } from '../ai/compose-system'
 import { REVIEWER_SYSTEM_PROMPT } from '../ai/review-prompt'
+import { compactToolHistory } from '../ai/compact-history'
+import { withInitialRetry } from '../ai/with-retry'
 import type { AgentMode } from '../ai/mode-policy'
 import type { ChatMessage, ToolCall, ToolResult, ChatProvider, Attachment } from '../ai/types'
 import { lookupHandler, type ToolContext, type TaggedSender as HandlerTaggedSender } from './tool-handlers'
@@ -477,7 +479,36 @@ async function runApiConversation(
     }
     const toolCalls: ToolCall[] = []
     let assistantText = ''
-    for await (const event of provider.send(currentMessages, TOOL_DEFS)) {
+    // Context sliding window: старые tool results заменяем краткими маркерами,
+    // чтобы input_tokens не росли квадратично с длиной сессии. См.
+    // ai/compact-history.ts. Сам currentMessages не модифицируется — компактим
+    // копию для отправки.
+    const messagesForProvider = compactToolHistory(currentMessages, turn)
+    // withInitialRetry: если provider.send() падает на этапе connection
+    // (429/503/timeout), повторяем с экспоненциальной задержкой. Если ошибка
+    // случилась ПОСЛЕ первого chunk'а — пробрасываем как было (retry бы
+    // продублировал текст).
+    const turnNum = turn + 1
+    for await (const event of withInitialRetry(
+      () => provider.send(messagesForProvider, TOOL_DEFS),
+      {
+        label: `turn-${turnNum}`,
+        signal,
+        onRetry: ({ attempt, delayMs, error }) => {
+          const msg = error instanceof Error ? error.message : String(error)
+          console.warn(`[agent] turn ${turnNum} retry ${attempt + 1} in ${delayMs}ms: ${msg.slice(0, 200)}`)
+          sender.send('ai:event', {
+            id: sendId,
+            event: {
+              type: 'tool-blocked',
+              callId: `retry-${turnNum}-${attempt}`,
+              name: 'api-retry',
+              reason: `Транзиентная ошибка провайдера, повтор через ${Math.round(delayMs / 100) / 10}s (попытка ${attempt + 2})`
+            }
+          })
+        }
+      }
+    )) {
       if (signal.aborted) {
         exitReason = 'aborted'
         sender.send('ai:event', { id: sendId, event: { type: 'done' } })
