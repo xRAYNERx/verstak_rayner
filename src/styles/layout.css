@@ -2194,3 +2194,183 @@
   font-family: var(--font-mono);
   font-weight: 600;
 }
+
+/* ======================================================================
+   Explicit Review V1 — кнопка, dropdown, pill, panel.
+   Source: brainstorm 2026-05-21, V1 spec.
+   ====================================================================== */
+.gg-review-btn-wrap {
+  display: inline-flex; align-items: center;
+  gap: 0;
+  position: relative;
+}
+.gg-review-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-right: none;
+  border-radius: 999px 0 0 999px;
+  padding: 3px 9px 3px 11px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.gg-review-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--text-tertiary);
+}
+.gg-review-btn-dropdown {
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: 0 999px 999px 0;
+  padding: 3px 8px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.gg-review-btn-dropdown:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--text-tertiary);
+}
+.gg-review-picker {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: 6px;
+  display: flex; flex-direction: column;
+  gap: 2px;
+  min-width: 200px;
+  z-index: 50;
+}
+.gg-review-picker-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  padding: 4px 8px;
+}
+.gg-review-picker-item {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  padding: 6px 10px;
+  text-align: left;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 80ms ease;
+}
+.gg-review-picker-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.gg-review-picker-item.is-default { color: var(--text-primary); }
+.gg-review-picker-tag {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--bg-base);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+.gg-review-picker-tag.is-warn {
+  background: rgba(229, 62, 62, 0.12);
+  color: #e53e3e;
+}
+
+/* Pill ревью в Timeline. */
+.gg-review-pill {
+  cursor: pointer;
+  border-color: rgba(91, 141, 255, 0.5);
+  background: rgba(91, 141, 255, 0.08);
+  color: var(--text-primary);
+}
+.gg-review-pill:hover {
+  background: rgba(91, 141, 255, 0.15);
+}
+.gg-review-pill.is-streaming {
+  border-color: rgba(91, 141, 255, 0.7);
+  animation: gg-timeline-blink 1.4s ease-in-out infinite;
+}
+.gg-review-pill.is-error {
+  border-color: rgba(229, 62, 62, 0.6);
+  background: rgba(229, 62, 62, 0.08);
+  color: #e53e3e;
+}
+.gg-review-pill.is-done {
+  border-color: rgba(78, 201, 176, 0.4);
+}
+
+/* Раскрытый блок с текстом ревью — flex-сибиlинг между TimelineBar и
+ * composer. Не absolute (см. ReviewPills.tsx — overflow-x на timeline
+ * клиппает absolute children). */
+.gg-review-panel {
+  margin: 6px 14px 0;
+  max-height: 50vh;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.gg-review-panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-base);
+}
+.gg-review-panel-title {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.gg-review-streaming { color: var(--accent); font-weight: 400; margin-left: 6px; }
+.gg-review-error { color: #e53e3e; font-weight: 400; margin-left: 6px; }
+.gg-review-panel-close {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+.gg-review-panel-close:hover { background: var(--bg-hover); color: var(--text-primary); }
+.gg-review-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 18px;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+.gg-review-empty, .gg-review-error-msg {
+  color: var(--text-tertiary);
+  font-style: italic;
+  padding: 12px 0;
+}
+.gg-review-error-msg { color: #e53e3e; font-style: normal; }
+.gg-review-panel-actions {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-base);
+}
+.gg-review-panel-hint {
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+

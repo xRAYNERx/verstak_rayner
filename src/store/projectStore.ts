@@ -155,6 +155,9 @@ interface ProjectState {
   /** Map sendId → reviewChatId. Когда событие приходит для review-стрима,
    *  диспетчер апдейтит reviews[id], а не основной чат. */
   sendIdToReviewChatId: Record<number, number>
+  /** Текущий раскрытый review panel (или null если все свёрнуты). Хранится
+   *  в store чтобы pills и панель могли быть в разных компонентах. */
+  openedReviewId: number | null
   setProject: (path: string) => Promise<void>
   closeProject: () => void
   refreshProjectList: () => Promise<void>
@@ -217,6 +220,8 @@ interface ProjectState {
   failReview: (reviewChatId: number, message: string) => void
   /** Зарегистрировать связь sendId ↔ reviewChatId. */
   registerReviewSend: (sendId: number, reviewChatId: number) => void
+  /** Раскрыть/свернуть review panel. */
+  toggleReviewPanel: (reviewChatId: number | null) => void
 }
 
 // Monotonic token used by setProject to cancel its own stale concurrent runs.
@@ -246,6 +251,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   sendIdToChatId: {},
   reviews: {},
   sendIdToReviewChatId: {},
+  openedReviewId: null,
   setProject: async (path) => {
     const myToken = ++setProjectToken
     const s = get()
@@ -321,8 +327,15 @@ export const useProject = create<ProjectState>((set, get) => ({
       // Reset per-session UI markers when switching project — they're scoped
       // to the active conversation, not the project itself.
       touchedFiles: {},
-      checkpointId: null
+      checkpointId: null,
+      // Сбрасываем reviews из памяти — для нового проекта подгружаем заново
+      // через refreshReviewsFor (ниже).
+      reviews: {}
     })
+    // Подгружаем ревью для активного чата (если есть). Fire-and-forget.
+    if (activeChatId != null) {
+      void get().refreshReviewsFor(activeChatId)
+    }
   },
   closeProject: () => set({
     path: null,
@@ -507,6 +520,9 @@ export const useProject = create<ProjectState>((set, get) => ({
       runningPlanStep,
       chatSnapshots: nextSnapshots
     })
+    // Подгружаем review sub-chats этого main-чата (fire-and-forget — pills
+    // появятся когда подгрузятся; основная навигация не блокируется).
+    void get().refreshReviewsFor(id)
   },
   registerSend: (sendId, chatId) => set(s => ({
     sendIdToChatId: { ...s.sendIdToChatId, [sendId]: chatId }
@@ -711,6 +727,9 @@ export const useProject = create<ProjectState>((set, get) => ({
   }),
   registerReviewSend: (sendId, reviewChatId) => set(s => ({
     sendIdToReviewChatId: { ...s.sendIdToReviewChatId, [sendId]: reviewChatId }
+  })),
+  toggleReviewPanel: (reviewChatId) => set(s => ({
+    openedReviewId: s.openedReviewId === reviewChatId ? null : reviewChatId
   }))
 }))
 

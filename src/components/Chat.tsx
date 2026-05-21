@@ -7,7 +7,9 @@ import { ModelPicker } from './ModelPicker'
 import { ModePicker } from './ModePicker'
 import { VoiceInput } from './VoiceInput'
 import { TimelineBar } from './TimelineBar'
+import { ReviewPanel } from './ReviewPills'
 import { CheckpointButton } from './CheckpointButton'
+import { ReviewButton } from './ReviewButton'
 import { useAgentMode } from '../hooks/useAgentMode'
 import type { Attachment } from '../types/api'
 import iconUrl from '../assets/icon.png'
@@ -692,6 +694,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
       </div>
 
       <TimelineBar />
+      <ReviewPanel />
 
       <div className="gg-composer">
         {attachments.length > 0 && (
@@ -840,6 +843,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
               </button>
             )}
             <CheckpointButton />
+            <ReviewButton />
             <button
               type="button"
               className={`gg-terminal-toggle ${terminalOpen ? 'is-open' : ''}`}
