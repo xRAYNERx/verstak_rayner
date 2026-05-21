@@ -23,8 +23,7 @@
  */
 
 import { SYSTEM_LAYER_PROMPT } from './system-layer'
-import { loadUserLayer } from './user-layer'
-import { buildContextPack } from './context-pack'
+import { prepareParts } from './compose-system'
 import type { ChatMessage } from './types'
 
 export type CliProviderId = 'claude-cli' | 'gemini-cli' | 'grok-cli' | 'codex-cli'
@@ -49,13 +48,19 @@ export async function buildCliPrompt(opts: BuildCliPromptOpts): Promise<string> 
 
   const sections: string[] = []
 
-  // 1. System / user layer.
-  // claude-cli already runs Claude Code with its own elaborate system — we
-  // only inject the user_layer plus a short pointer. Other CLIs get the
-  // full system layer.
-  const userLayer = projectPath ? await loadUserLayer(projectPath) : { path: null, content: '' }
+  // 1. user_layer + context_pack — assembled by the shared helper so we don't
+  //    drift away from how ipc/ai.ts does it for API providers.
+  const { userLayer, contextPack } = await prepareParts({
+    projectPath,
+    messages,
+    recentWrites: recentWrites ?? []
+  })
   const trimmedUser = userLayer.content.trim()
 
+  // 2. System envelope — provider-specific. claude-cli already runs Claude
+  //    Code with its own developed system prompt; layering ours on top creates
+  //    contradictory regs and hurts answers. Other CLIs (gemini/grok/codex)
+  //    are neutral, get the full system_layer.
   if (providerId === 'claude-cli') {
     if (trimmedUser) {
       sections.push(`<user_layer source="${userLayer.path}">
@@ -65,28 +70,15 @@ ${trimmedUser}
 [gg-runtime: следуй регламентам из user_layer выше — они дополняют твой родной Claude Code system.]`)
     }
   } else {
-    // Full prepend for gemini/grok/codex CLI
     const userBlock = trimmedUser
       ? `\n\n<user_layer source="${userLayer.path}">\n${trimmedUser}\n</user_layer>`
       : ''
     sections.push(`${SYSTEM_LAYER_PROMPT}${userBlock}`)
   }
 
-  // 2. Context Pack — git/recent writes/project map/verify scripts +
-  //    cross-project path warning if the user mentioned absolute paths
-  //    outside this project.
-  if (projectPath) {
-    try {
-      const isFirstTurn = !messages.some(m => m.role === 'assistant')
-      const pack = await buildContextPack({
-        projectPath,
-        recentWrites: recentWrites ?? [],
-        latestUserMessage: lastUser.content,
-        isFirstTurn
-      })
-      if (pack) sections.push(pack)
-    } catch { /* never block CLI send if context pack fails */ }
-  }
+  // 3. Context pack — same content as API providers get, just appended as
+  //    a separate section in stdin payload.
+  if (contextPack) sections.push(contextPack)
 
   // 3. Conversation history — last 6-10 turns serialized as plain text.
   //    NEVER include system messages here (they're already above).

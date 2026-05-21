@@ -1,9 +1,7 @@
 import { ipcMain } from 'electron'
 import { createFileTools, TOOL_DEFS } from '../ai/tools'
 import { createProvider, PROVIDERS, type ProviderId } from '../ai/registry'
-import { loadUserLayer } from '../ai/user-layer'
-import { composeSystemPrompt } from '../ai/compose-prompt'
-import { buildContextPack } from '../ai/context-pack'
+import { prepareSystemContext } from '../ai/compose-system'
 import type { ChatMessage, ToolCall, ToolResult, ChatProvider, Attachment } from '../ai/types'
 import { lookupHandler, type ToolContext, type TaggedSender as HandlerTaggedSender } from './tool-handlers'
 
@@ -77,25 +75,12 @@ export function registerAiIpc(deps: AiDeps): void {
     const injectSystem = descriptor.transport === 'API'
     let messagesWithSystem = messages
     if (injectSystem) {
-      const userLayer = await loadUserLayer(projectPath)
-      // Context Pack — automatic snapshot of git state, recent writes, project
-      // map, verify scripts. Built every send so the model always sees fresh
-      // repo state without spending tool-calls to discover it.
-      let contextPack = ''
-      if (projectPath) {
-        try {
-          const lastUser = messages.filter(m => m.role === 'user').at(-1)
-          // First turn = no prior assistant message in the conversation
-          const isFirstTurn = !messages.some(m => m.role === 'assistant')
-          contextPack = await buildContextPack({
-            projectPath,
-            recentWrites: deps.recentWrites(projectPath, 8),
-            latestUserMessage: lastUser?.content ?? '',
-            isFirstTurn
-          })
-        } catch { /* never block the send if context pack fails */ }
-      }
-      const composed = composeSystemPrompt(userLayer, contextPack)
+      // Same assembly path as CLI providers — see ai/compose-system.ts.
+      const composed = await prepareSystemContext({
+        projectPath,
+        messages,
+        recentWrites: projectPath ? deps.recentWrites(projectPath, 8) : []
+      })
       messagesWithSystem = [{ role: 'system', content: composed.system }, ...messages]
     }
 
@@ -199,12 +184,13 @@ export function registerAiIpc(deps: AiDeps): void {
         const { GoogleGenAI } = await import('@google/genai')
         const client = new GoogleGenAI({ apiKey })
         const model = deps.getProviderModel(providerId) ?? descriptor.defaultModel
-        const userLayer = await loadUserLayer(projectPath)
-        let pack = ''
-        if (projectPath) {
-          try { pack = await buildContextPack({ projectPath, recentWrites: deps.recentWrites(projectPath, 8) }) } catch { /* ignore */ }
-        }
-        const composed = composeSystemPrompt(userLayer, pack)
+        // Same compose path as ai:send — keeps countTokens estimate aligned
+        // with what actually gets sent on the next ai:send.
+        const composed = await prepareSystemContext({
+          projectPath,
+          messages: [],  // estimating: no prior history, just system + draft text
+          recentWrites: projectPath ? deps.recentWrites(projectPath, 8) : []
+        })
         // Cheap approximation of the full context size: system + user text.
         const res = await (client.models as unknown as {
           countTokens: (opts: { model: string; contents: Array<{ role: string; parts: Array<{ text: string }> }> }) => Promise<{ totalTokens?: number }>
