@@ -71,7 +71,27 @@ export function registerAiIpc(deps: AiDeps): void {
     const sendId = ++currentSendId
     const ctrl = new AbortController()
     activeAborts.set(sendId, ctrl)
-    const cleanup = () => { activeAborts.delete(sendId) }
+    /**
+     * Cleanup MUST handle every dangling state owned by this sendId. Per Gemini
+     * audit finding 2.1 + 2.5: previously cleanup only wiped activeAborts,
+     * leaving pending confirmations (and their pending Promises) alive
+     * forever if the session crashed/aborted before user clicked. That was a
+     * silent memory leak AND a source of weird "ghost confirmations" on the
+     * next session with similar callId.
+     */
+    const cleanup = () => {
+      activeAborts.delete(sendId)
+      // Drain pending confirmations for this sendId — resolving with false so
+      // any awaiter unwinds cleanly instead of leaking the Promise.
+      for (const [k, p] of pendingWrites) {
+        if (p.sendId === sendId) { p.resolve(false); pendingWrites.delete(k) }
+      }
+      for (const [k, p] of pendingCommands) {
+        if (p.sendId === sendId) { p.resolve(false); pendingCommands.delete(k) }
+      }
+      // sendIdToChatId mapping cleared via separate ai:event done handler in
+      // renderer — no need to touch from main.
+    }
 
     // Load project's user-layer (AGENTS.md / CLAUDE.md / GEMINI.md / our RULES.md)
     // and prepend the immutable system layer + user layer as a single system message.
@@ -341,9 +361,17 @@ async function runApiConversation(
   // Attachments collected from browser_screenshot etc. — flushed into the
   // next user message so vision-capable providers see them.
   const pendingAttachments: Attachment[] = []
+  // Exit reason for the finally-block journal write. Mutated as the loop hits
+  // various terminal conditions. 'crashed' is the default — if the function
+  // returns abnormally (uncaught exception during streaming) the journal
+  // still captures it. Per Gemini audit 2.2 + Idea B.
+  let exitReason: ExitReason = 'crashed'
+
+  try {
 
   for (let turn = 0; turn < turnsBudget; turn++) {
     if (signal.aborted) {
+      exitReason = 'aborted'
       sender.send('ai:event', { id: sendId, event: { type: 'done' } })
       return
     }
@@ -351,6 +379,7 @@ async function runApiConversation(
     let assistantText = ''
     for await (const event of provider.send(currentMessages, TOOL_DEFS)) {
       if (signal.aborted) {
+        exitReason = 'aborted'
         sender.send('ai:event', { id: sendId, event: { type: 'done' } })
         return
       }
@@ -371,17 +400,18 @@ async function runApiConversation(
         sender.send('ai:event', { id: sendId, event })
       } else if (event.type === 'done') {
         if (toolCalls.length === 0) {
-          writeSessionJournal(recordJournal, projectPath, lastAssistantText, filesTouched, commandsRun, sessionUsage)
+          exitReason = 'completed'
           sender.send('ai:event', { id: sendId, event })
           return
         }
       } else if (event.type === 'error') {
+        exitReason = 'error'
         sender.send('ai:event', { id: sendId, event })
         return
       }
     }
     if (toolCalls.length === 0) {
-      writeSessionJournal(recordJournal, projectPath, lastAssistantText, filesTouched, commandsRun, sessionUsage)
+      exitReason = 'completed'
       sender.send('ai:event', { id: sendId, event: { type: 'done' } })
       return
     }
@@ -438,6 +468,7 @@ async function runApiConversation(
           error: 'Supervisor: вы зациклились — этот же вызов повторён несколько раз. Смените подход или сообщите пользователю что нужна помощь.'
         }))
       })
+      exitReason = 'loop-detected'
       sender.send('ai:event', { id: sendId, event: { type: 'done' } })
       return
     }
@@ -513,7 +544,7 @@ async function runApiConversation(
   // Budget exhausted — emit a dedicated event so the UI can offer "+N turns".
   // The renderer re-sends the current conversation with a larger budget if the
   // user clicks Continue.
-  writeSessionJournal(recordJournal, projectPath, lastAssistantText, filesTouched, commandsRun, sessionUsage)
+  exitReason = 'max-turns'
   const canContinue = turnsBudget < MAX_BUDGET_TURNS
   sender.send('ai:event', {
     id: sendId,
@@ -526,28 +557,52 @@ async function runApiConversation(
     }
   })
   sender.send('ai:event', { id: sendId, event: { type: 'done' } })
+  } finally {
+    // GUARANTEED journal write on every exit path — completion, abort, error,
+    // max-turns, loop-detected, crashed (uncaught). Per Gemini audit Idea B:
+    // 'любое завершение runApiConversation обязано вызвать writeSessionJournal'.
+    try {
+      writeSessionJournal(recordJournal, projectPath, lastAssistantText, filesTouched, commandsRun, sessionUsage, exitReason)
+    } catch (err) {
+      console.error('[ai.ts] writeSessionJournal failed in finally:', err)
+    }
+  }
 }
 
 /**
  * Write a brief journal summary for the just-finished agent session.
  * Skipped if nothing meaningful happened (no text, no files, no commands).
  */
+/** Reason why the agent loop ended — recorded in the journal entry. */
+type ExitReason = 'completed' | 'aborted' | 'error' | 'max-turns' | 'loop-detected' | 'crashed'
+
 function writeSessionJournal(
   recordJournal: (projectPath: string, kind: 'tool' | 'session' | 'note', title: string, detail?: string | null) => void,
   projectPath: string,
   lastAssistantText: string,
   filesTouched: Set<string>,
   commandsRun: string[],
-  usage?: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number }
+  usage?: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number },
+  reason: ExitReason = 'completed'
 ): void {
   const hasFiles = filesTouched.size > 0
   const hasCommands = commandsRun.length > 0
   const text = lastAssistantText.trim()
   const hasUsage = usage && ((usage.inputTokens ?? 0) > 0 || (usage.outputTokens ?? 0) > 0)
-  if (!hasFiles && !hasCommands && !hasUsage && text.length < 40) return
-  // Title: first sentence of the assistant's reply, capped at 100 chars.
+  // For non-completed reasons we ALWAYS write the entry, even empty — closes
+  // Gemini audit 2.2: previously aborted/crashed sessions left no trail.
+  const hasMaterial = hasFiles || hasCommands || hasUsage || text.length >= 40
+  if (reason === 'completed' && !hasMaterial) return
+  // Title prefix communicates outcome at a glance
+  const tag = reason === 'completed' ? '' :
+              reason === 'aborted' ? '⏹ Прерывание · ' :
+              reason === 'error' ? '✗ Ошибка · ' :
+              reason === 'max-turns' ? '⏸ Лимит ходов · ' :
+              reason === 'loop-detected' ? '🔁 Зацикливание · ' :
+              '💥 Крах · '
   const firstLine = text.split(/\n+/)[0] ?? ''
-  const title = (firstLine.length > 0 ? firstLine : 'AI-сессия').slice(0, 100)
+  const baseTitle = firstLine.length > 0 ? firstLine : 'AI-сессия'
+  const title = (tag + baseTitle).slice(0, 100)
   const detailLines: string[] = []
   if (hasFiles) detailLines.push(`Файлы (${filesTouched.size}): ${[...filesTouched].slice(0, 8).join(', ')}${filesTouched.size > 8 ? ' …' : ''}`)
   if (hasCommands) detailLines.push(`Команды (${commandsRun.length}): ${commandsRun.slice(0, 5).join(' · ')}${commandsRun.length > 5 ? ' …' : ''}`)
@@ -560,6 +615,9 @@ function writeSessionJournal(
   if (text && text.length > firstLine.length) {
     const rest = text.slice(firstLine.length).trim()
     if (rest) detailLines.push(rest.slice(0, 600))
+  }
+  if (reason !== 'completed') {
+    detailLines.unshift(`Состояние: ${reason}`)
   }
   try { recordJournal(projectPath, 'session', title, detailLines.join('\n') || null) } catch { /* journal not critical */ }
 }
