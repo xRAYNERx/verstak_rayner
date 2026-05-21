@@ -1,16 +1,7 @@
 import { ipcMain } from 'electron'
 import { writeFile, unlink, stat } from 'fs/promises'
-import { join, resolve, relative, sep } from 'path'
 import type { UndoStack } from '../storage/undo'
-
-function safeJoin(root: string, rel: string): string {
-  const abs = resolve(root, rel)
-  const r = relative(root, abs)
-  if (r.startsWith('..') || r.includes('..' + sep)) {
-    throw new Error(`Out-of-tree path rejected: ${rel}`)
-  }
-  return abs
-}
+import { safeRealJoin } from '../ai/path-policy'
 
 export function registerUndoIpc(stack: UndoStack): void {
   ipcMain.handle('undo:list', (_e, projectPath: string) => stack.list(projectPath))
@@ -28,7 +19,9 @@ export function registerUndoIpc(stack: UndoStack): void {
     }
     if (!entry) return { ok: false, reason: 'no entries' }
     try {
-      const abs = safeJoin(projectPath, entry.filePath)
+      // safeRealJoin: textual + symlink-aware. Same enforcement as
+      // ai-tools and files.ts — no third path-policy drift.
+      const abs = await safeRealJoin(projectPath, entry.filePath)
       const before = entry.beforeContent
       if (before === null || before === '') {
         // The file did not exist before — attempting to remove it now.
