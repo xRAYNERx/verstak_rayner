@@ -131,12 +131,15 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
             totalText += topText
           }
 
-          // 2. Always also walk candidates[].content.parts — picks up text the getter missed
-          //    AND function calls that live inside the candidate (Gemini 3 puts them here).
-          //    Skipped only if we already got the same content via the getter above —
-          //    we de-duplicate by checking if `topText` already accounts for parts text.
-          //    Gemini 3 packs `thoughtSignature` on the same part as `functionCall`
-          //    (or on a separate "thought" part). We capture and round-trip it.
+          // 2. Walk candidates[].content.parts for text + functionCalls.
+          //    IMPORTANT: c.functionCalls (top-level) is a SDK CONVENIENCE GETTER
+          //    that internally reads candidates[].content.parts[].functionCall.
+          //    Если использовать ОБА источника — каждый tool call эмитится
+          //    ДВАЖДЫ (мы наблюдали это в логе: read_file db.ts × 2, search ×
+          //    2, etc). Поэтому используем candidates[].content.parts как
+          //    primary path и top-level c.functionCalls ТОЛЬКО как fallback
+          //    когда candidates пустые.
+          let foundFunctionCallInParts = false
           if (c.candidates?.[0]?.content?.parts) {
             for (const part of c.candidates[0].content.parts) {
               if (part.text && !topText) {  // avoid double-emit if getter already gave us this text
@@ -154,13 +157,16 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
                   }
                 }
                 toolEmitted = true
+                foundFunctionCallInParts = true
               }
             }
           }
 
-          // 3. Top-level functionCalls (SDK convenience). thoughtSignature may
-          //    live on these too in newer SDK builds.
-          if (c.functionCalls) {
+          // 3. Top-level functionCalls — fallback path для SDK сборок где
+          //    candidates[].content.parts может быть пустым (старые версии).
+          //    Не запускаем если уже извлекли function call из parts —
+          //    избегаем дублирования вызовов.
+          if (c.functionCalls && !foundFunctionCallInParts) {
             for (const fc of c.functionCalls) {
               yield {
                 type: 'tool-call',

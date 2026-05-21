@@ -353,6 +353,25 @@ async function runApiConversation(
       return
     }
 
+    // Defence-in-depth dedupe: даже если провайдер эмитит один и тот же
+    // tool-call дважды в одном turn (был баг в gemini.ts с двойной
+    // экстракцией), сворачиваем дубли. Ключ — name + JSON args.
+    {
+      const seen = new Set<string>()
+      const deduped: ToolCall[] = []
+      for (const c of toolCalls) {
+        const sig = callSignature(c)
+        if (seen.has(sig)) continue
+        seen.add(sig)
+        deduped.push(c)
+      }
+      if (deduped.length !== toolCalls.length) {
+        console.warn(`[agent] dropped ${toolCalls.length - deduped.length} duplicate tool calls in turn ${turn}`)
+        toolCalls.length = 0
+        toolCalls.push(...deduped)
+      }
+    }
+
     // Loop detection — increment counter per signature; block when any tool
     // call has been issued LOOP_THRESHOLD (3) times across the whole loop.
     const loopHits: ToolCall[] = []
