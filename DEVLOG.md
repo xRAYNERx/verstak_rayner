@@ -7,6 +7,111 @@
 
 ---
 
+## 2026-05-22 (ночь→утро) — V3 Implementation Marathon
+
+**Контекст:** Pavel дал goal `C:\Users\Pavel\Downloads\GeminiGrok-V3-Plan.html`
+с инструкцией «делай до полной реализации со своей стороны». Решения зафиксированы
+в плане v1.1 раздел 14. Реализовано всё что не требует внешних credentials или
+действий на стороне Pavel.
+
+### Skills layer
+
+- **electron/ai/skills/**: types, frontmatter parser, loader (server API + ~/.geminigrok/
+  skills/ + built-in fallback), registry с refresh.
+- 3 built-in скилла: bos-sales, bos-mkt, client-cycle (портированы из ~/.claude/skills/).
+- IPC: skills:list / get / refresh / status.
+- UI: SkillPicker (🎭 кнопка в composer-toolbar) + popup с группировкой по
+  источнику. SlashCommandPopup при наборе «/» — автокомплит скиллов + системные
+  /new и /clear.
+- При активном скилле ai.send уходит через sendWithOverrides с system prompt +
+  default_provider/model из frontmatter.
+- 9 тестов на frontmatter parser.
+
+### Connectors V3 (5 новых)
+
+- **gsheets** — Google Sheets через service account JWT (RS256, без npm deps),
+  ops: read_sheet / read_as_records / get_row / append_row(s) / update_cell /
+  update_row. Access token кешируется на 50 мин.
+- **ssh** — системный ssh клиент (без npm ssh2), ops: run_remote /
+  run_python_script. Hard denylist опасных команд (rm -rf /var, /etc и т.п.),
+  whitelist hosts. 11 тестов на denylist.
+- **telegram** — Bot API через fetch, ops: send_message (с поддержкой
+  message_thread_id для топиков) / edit / send_document (URL only V1) / react /
+  delete / get_me. Rate limit 20 send/min на chat_id, whitelist chat_ids,
+  secret-scanner на исходящий текст.
+- **bitrix24** — Incoming webhook, ops: list_deals / get_deal / add_deal /
+  update_deal / add_activity / list_leads / get_source_report / raw call с
+  whitelist prefixes (crm.*, tasks.*, user.*) и denylist .delete методов.
+- **yandex_direct** — OAuth + Reports API, ops: list_campaigns / list_ads /
+  get_campaign_stats / get_keywords_stats / get_account_stats. Reports
+  async → sync polling до 30 сек, fallback к processing: true.
+
+### Artifacts
+
+- npm i docx (--legacy-peer-deps).
+- electron/ai/artifacts.ts: generateHtml (auto-wrap с базовым CSS) и generateDocx
+  (Title + Heading 1-3 + параграфы + bullets). Сохраняются в
+  `.geminigrok/artifacts/YYYY-MM-DD/`.
+- Tools: generate_html, generate_docx в TOOL_DEFS.
+- Handlers с emit нового ChatEvent `artifact-created`.
+- UI: ArtifactsPanel рендерит pills 📄 в Timeline. Клик → открытие в дефолтном
+  приложении через electron.shell.openPath (HTML→браузер, DOCX→Word).
+- 5 тестов: sanitize filename, HTML escape, DOCX zip signature, tmpdir cleanup.
+
+### Multi-user
+
+- Schema v3 migration: user_profiles таблица (name, role, default_provider,
+  default_model, skills_enabled JSON, is_active с unique partial index).
+- electron/storage/user-profiles.ts + IPC.
+- OnboardingWizard.tsx: 3 шага (имя+роль / API key / summary). 6 пресетов ролей
+  с default provider/model/skills.
+- App.tsx показывает wizard при первом запуске (settings.onboarding_completed
+  пусто).
+
+### Multi-agent
+
+- delegate_task tool: основной агент делегирует подзадачу sub-agent с
+  опциональным skill_id, provider_id, model. Sub-agent работает БЕЗ tools
+  (нет каскадов). Result возвращается обёрнутым `[Delegate from X]`.
+- skillRegistry прокинут через AiDeps → runApiConversation → ToolContext.
+- Логируется в journal kind='note' с обрезанным запросом и ответом.
+
+### Settings UI
+
+- 6 новых секций в вкладке «Коннекторы»: Google Sheets (textarea JSON),
+  Telegram (bot token + whitelist), SSH (host + key_path), Битрикс24 (webhook),
+  Я.Директ (token + Client-Login), Skills server (base URL).
+- Каждая с hint текстом: где взять credentials, что коннектор умеет.
+
+### Quick actions
+
+- Chat empty state: добавлены /bos-sales, /bos-mkt, /client-cycle quick-action
+  кнопки. Старые (улучшения / аудит / карта) сохранены.
+
+### Метрики
+
+- 16 новых файлов, 2900+ строк кода + ~700 строк HTML/CSS.
+- Тесты: 138 passing (+25 за V3). 8 sqlite-failures неизменны (нерелевантно).
+- `npm run build` — успешно.
+
+### Что осталось до production (требует действий Pavel)
+
+1. Создать Telegram bot через @BotFather → копировать token в Settings.
+2. Создать linux-user gemini-agent на 178.62.230.241, сгенерировать SSH ключ,
+   whitelist sudo на /opt/los/*.py скрипты → внести host + key path в Settings.
+3. Добавить `GET /api/skills` эндпоинт на aioperatingsystem.ru (FastAPI,
+   переиспользует skill_context.py) → внести URL в Settings.
+4. Сохранить service account JSON из /opt/los/creds.json в Settings (Google Sheets).
+5. Pilot тест с Кристиной: /bos-sales → end-to-end закрытие overdue HH-лида.
+
+### Тэги для отката
+
+```
+git log --oneline pre-night-refactor..HEAD
+```
+
+---
+
 ## 2026-05-22 — ночной рефактор V3
 
 **Контекст:** Pavel ушёл спать, дал задание «доведи до версии 3.0». Версия 3.0 за ночь невозможна, но сделан фундамент для будущих мультиагент-фич и заметный скачок надёжности.
