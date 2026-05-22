@@ -114,6 +114,7 @@
     "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",
     "better-sqlite3": "^12.10.0",
     "diff": "^9.0.0",
+    "docx": "^9.6.1",
     "highlight.js": "^11.11.1",
     "openai": "^6.38.0",
     "react": "^19.2.6",

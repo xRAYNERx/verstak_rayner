@@ -478,6 +478,54 @@ const readJournalHandler: ToolHandler = {
   }
 }
 
+// ============================================================================
+// Artifact handlers — generate_html / generate_docx
+// ============================================================================
+
+const generateHtmlHandler: ToolHandler = {
+  mode: 'sequential',
+  async handle(call, ctx) {
+    try {
+      const { generateHtml } = await import('../ai/artifacts')
+      const filename = String(call.args.filename ?? 'untitled')
+      const title = call.args.title ? String(call.args.title) : undefined
+      const content = String(call.args.content_html ?? '')
+      if (!content) return { id: call.id, name: call.name, result: '', error: 'generate_html: content_html обязателен' }
+      const res = await generateHtml(ctx.projectPath, { filename, title, content_html: content })
+      try { ctx.recordJournal(ctx.projectPath, 'tool', `📄 Артефакт HTML: ${res.filename}`, `${res.sizeBytes} bytes → ${res.path}`) } catch { /* */ }
+      ctx.sender.send('ai:event', {
+        id: ctx.sendId,
+        event: { type: 'tool-activity', callId: call.id, name: 'generate_html', label: 'generate_html', detail: `${res.filename} · ${(res.sizeBytes / 1024).toFixed(1)}KB`, status: 'ok' }
+      })
+      return { id: call.id, name: call.name, result: `HTML artifact saved: ${res.path}\nSize: ${res.sizeBytes} bytes` }
+    } catch (err) {
+      return { id: call.id, name: call.name, result: '', error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+}
+
+const generateDocxHandler: ToolHandler = {
+  mode: 'sequential',
+  async handle(call, ctx) {
+    try {
+      const { generateDocx } = await import('../ai/artifacts')
+      const filename = String(call.args.filename ?? 'untitled')
+      const title = call.args.title ? String(call.args.title) : undefined
+      const sections = Array.isArray(call.args.sections) ? call.args.sections as Array<{ heading?: string; level?: number; paragraphs?: string[]; bullets?: string[] }> : []
+      if (sections.length === 0) return { id: call.id, name: call.name, result: '', error: 'generate_docx: sections обязательны (>= 1)' }
+      const res = await generateDocx(ctx.projectPath, { filename, title, sections })
+      try { ctx.recordJournal(ctx.projectPath, 'tool', `📄 Артефакт DOCX: ${res.filename}`, `${res.sizeBytes} bytes → ${res.path}`) } catch { /* */ }
+      ctx.sender.send('ai:event', {
+        id: ctx.sendId,
+        event: { type: 'tool-activity', callId: call.id, name: 'generate_docx', label: 'generate_docx', detail: `${res.filename} · ${(res.sizeBytes / 1024).toFixed(1)}KB`, status: 'ok' }
+      })
+      return { id: call.id, name: call.name, result: `DOCX artifact saved: ${res.path}\nSize: ${res.sizeBytes} bytes` }
+    } catch (err) {
+      return { id: call.id, name: call.name, result: '', error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+}
+
 const createPlanHandler: ToolHandler = {
   mode: 'sequential',
   async handle(call, ctx) {
@@ -523,7 +571,9 @@ const HANDLER_REGISTRY: Record<string, ToolHandler> = {
   'list_connectors': listConnectorsHandler,
   'connector_query': connectorQueryHandler,
   'create_plan': createPlanHandler,
-  'read_journal': readJournalHandler
+  'read_journal': readJournalHandler,
+  'generate_html': generateHtmlHandler,
+  'generate_docx': generateDocxHandler
 }
 
 /**

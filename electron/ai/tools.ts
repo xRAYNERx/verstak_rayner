@@ -232,6 +232,53 @@ export const TOOL_DEFS: ToolDefinition[] = [
       },
       required: ['title', 'steps']
     }
+  },
+  {
+    name: 'generate_html',
+    description: 'Сохранить артефакт в формате HTML (КП, аудит, отчёт). Файл попадает в .geminigrok/artifacts/{YYYY-MM-DD}/ и открывается в preview pane. Используй для клиентских артефактов где важна визуальная структура.',
+    parameters: {
+      type: 'object',
+      properties: {
+        filename: { type: 'string', description: 'Имя файла без расширения (например "kp-alfa-development").' },
+        title: { type: 'string', description: 'Title для <title> и <h1> по умолчанию.' },
+        content_html: { type: 'string', description: 'Готовый body-HTML. CSS можно добавить inline или через <style>. Никаких <html>/<head> — обёртка собирается автоматически.' }
+      },
+      required: ['filename', 'content_html']
+    }
+  },
+  {
+    name: 'generate_docx',
+    description: 'Сохранить артефакт в формате Word (.docx). Файл попадает в .geminigrok/artifacts/{YYYY-MM-DD}/. Принимает структуру секций — каждая с heading и параграфами.',
+    parameters: {
+      type: 'object',
+      properties: {
+        filename: { type: 'string', description: 'Имя файла без расширения.' },
+        title: { type: 'string', description: 'Заголовок документа (большой шрифт сверху).' },
+        sections: {
+          type: 'array',
+          description: 'Секции документа в порядке появления.',
+          items: {
+            type: 'object',
+            properties: {
+              heading: { type: 'string', description: 'Заголовок секции (h2-стиль).' },
+              level: { type: 'number', description: 'Уровень заголовка 1-3, по умолчанию 2.' },
+              paragraphs: {
+                type: 'array',
+                description: 'Массив строк-параграфов.',
+                items: { type: 'string' }
+              },
+              bullets: {
+                type: 'array',
+                description: 'Опциональный bulleted список после параграфов.',
+                items: { type: 'string' }
+              }
+            },
+            required: ['paragraphs']
+          }
+        }
+      },
+      required: ['filename', 'sections']
+    }
   }
 ]
 
