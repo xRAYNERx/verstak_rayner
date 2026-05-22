@@ -2740,3 +2740,29 @@
   line-height: 1.4;
 }
 
+/* ======================================================================
+   Artifact pills — клик открывает в дефолтном приложении (HTML→браузер,
+   DOCX→Word). См. ArtifactsPanel.tsx + electron/ai/artifacts.ts.
+   ====================================================================== */
+.gg-artifact-pill {
+  cursor: pointer;
+  background: rgba(78, 201, 176, 0.08);
+  border-color: rgba(78, 201, 176, 0.4);
+  color: var(--text-primary);
+}
+.gg-artifact-pill:hover {
+  background: rgba(78, 201, 176, 0.18);
+  border-color: var(--success);
+}
+.gg-artifact-pill.is-html {
+  /* base coloring already covers */
+}
+.gg-artifact-pill.is-docx {
+  background: rgba(91, 141, 255, 0.08);
+  border-color: rgba(91, 141, 255, 0.4);
+}
+.gg-artifact-pill.is-docx:hover {
+  background: rgba(91, 141, 255, 0.18);
+  border-color: var(--accent);
+}
+

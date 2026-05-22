@@ -497,6 +497,10 @@ const generateHtmlHandler: ToolHandler = {
         id: ctx.sendId,
         event: { type: 'tool-activity', callId: call.id, name: 'generate_html', label: 'generate_html', detail: `${res.filename} · ${(res.sizeBytes / 1024).toFixed(1)}KB`, status: 'ok' }
       })
+      ctx.sender.send('ai:event', {
+        id: ctx.sendId,
+        event: { type: 'artifact-created', callId: call.id, kind: 'html', filename: res.filename, path: res.path, sizeBytes: res.sizeBytes }
+      })
       return { id: call.id, name: call.name, result: `HTML artifact saved: ${res.path}\nSize: ${res.sizeBytes} bytes` }
     } catch (err) {
       return { id: call.id, name: call.name, result: '', error: err instanceof Error ? err.message : String(err) }
@@ -518,6 +522,10 @@ const generateDocxHandler: ToolHandler = {
       ctx.sender.send('ai:event', {
         id: ctx.sendId,
         event: { type: 'tool-activity', callId: call.id, name: 'generate_docx', label: 'generate_docx', detail: `${res.filename} · ${(res.sizeBytes / 1024).toFixed(1)}KB`, status: 'ok' }
+      })
+      ctx.sender.send('ai:event', {
+        id: ctx.sendId,
+        event: { type: 'artifact-created', callId: call.id, kind: 'docx', filename: res.filename, path: res.path, sizeBytes: res.sizeBytes }
       })
       return { id: call.id, name: call.name, result: `DOCX artifact saved: ${res.path}\nSize: ${res.sizeBytes} bytes` }
     } catch (err) {

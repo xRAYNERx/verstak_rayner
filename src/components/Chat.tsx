@@ -270,6 +270,19 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
             event.detail ? event.detail.slice(0, 300) : null)
         }
       }
+      else if (event.type === 'artifact-created') {
+        store.recordArtifact({
+          kind: event.kind,
+          filename: event.filename,
+          path: event.path,
+          sizeBytes: event.sizeBytes
+        })
+        if (store.path) {
+          void window.api.journal.append(store.path, 'tool',
+            `📄 Артефакт ${event.kind.toUpperCase()}: ${event.filename}`,
+            `${event.path} (${event.sizeBytes} bytes)`)
+        }
+      }
       else if (event.type === 'turns-exhausted') {
         // Budget hit. Remember so the UI can offer a "+N turns" button.
         if (event.canContinue) {

@@ -1,5 +1,6 @@
 import { useProject } from '../store/projectStore'
 import { ReviewPills } from './ReviewPills'
+import { ArtifactsPanel } from './ArtifactsPanel'
 
 /**
  * Horizontal pulse lane shown between the chat stream and the composer.
@@ -38,6 +39,7 @@ export function TimelineBar() {
   const activity = useProject(s => s.activity)
   const isStreaming = useProject(s => s.isStreaming)
   const reviews = useProject(s => s.reviews)
+  const artifactsCount = useProject(s => s.artifacts.length)
   const activeChatId = useProject(s => s.activeChatId)
 
   // Считаем reviews для текущего чата, чтобы понимать показывать ли лейн.
@@ -45,9 +47,8 @@ export function TimelineBar() {
     ? 0
     : Object.values(reviews).filter(r => r.parentChatId === activeChatId).length
 
-  // Скрываем лейн только если ВСЁ пусто — иначе показываем (даже если только
-  // ревью без активити).
-  if (activity.length === 0 && reviewCount === 0) return null
+  // Скрываем лейн только если ВСЁ пусто.
+  if (activity.length === 0 && reviewCount === 0 && artifactsCount === 0) return null
 
   // Most recent at the right, like a tape moving forward.
   const visible = activity.slice(-MAX_VISIBLE)
@@ -74,6 +75,7 @@ export function TimelineBar() {
         )
       })}
       <ReviewPills />
+      <ArtifactsPanel />
     </div>
   )
 }

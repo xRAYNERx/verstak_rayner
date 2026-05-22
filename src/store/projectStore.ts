@@ -171,6 +171,9 @@ interface ProjectState {
   /** Текущий раскрытый review panel (или null если все свёрнуты). Хранится
    *  в store чтобы pills и панель могли быть в разных компонентах. */
   openedReviewId: number | null
+  /** Артефакты сгенерированные агентом в активной сессии (generate_html /
+   *  generate_docx). Сбрасываются при switchChatSession. */
+  artifacts: Array<{ kind: 'html' | 'docx'; filename: string; path: string; sizeBytes: number; ts: number }>
   setProject: (path: string) => Promise<void>
   closeProject: () => void
   refreshProjectList: () => Promise<void>
@@ -241,6 +244,10 @@ interface ProjectState {
   toggleReviewPanel: (reviewChatId: number | null) => void
   /** Очистить in-memory review state для удалённого main-чата. */
   cleanupReviewsFor: (parentChatId: number) => void
+  /** Зарегистрировать сгенерированный артефакт (для Timeline pill). */
+  recordArtifact: (a: { kind: 'html' | 'docx'; filename: string; path: string; sizeBytes: number }) => void
+  /** Сбросить артефакты (вызывается при смене чата / нового чата). */
+  clearArtifacts: () => void
 }
 
 // Monotonic token used by setProject to cancel its own stale concurrent runs.
@@ -270,6 +277,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   sendOwners: {},
   reviews: {},
   openedReviewId: null,
+  artifacts: [],
   setProject: async (path) => {
     const myToken = ++setProjectToken
     const s = get()
@@ -349,7 +357,8 @@ export const useProject = create<ProjectState>((set, get) => ({
       // Сбрасываем reviews из памяти — для нового проекта подгружаем заново
       // через refreshReviewsFor (ниже).
       reviews: {},
-      openedReviewId: null
+      openedReviewId: null,
+      artifacts: []
     })
     // Подгружаем ревью для активного чата (если есть). Fire-and-forget.
     if (activeChatId != null) {
@@ -642,7 +651,8 @@ export const useProject = create<ProjectState>((set, get) => ({
       runningPlanStep: null,
       isStreaming: false,
       touchedFiles: {},
-      checkpointId: null
+      checkpointId: null,
+      artifacts: []
     })
     return created
   },
@@ -779,6 +789,10 @@ export const useProject = create<ProjectState>((set, get) => ({
   toggleReviewPanel: (reviewChatId) => set(s => ({
     openedReviewId: s.openedReviewId === reviewChatId ? null : reviewChatId
   })),
+  recordArtifact: (a) => set(s => ({
+    artifacts: [...s.artifacts, { ...a, ts: Date.now() }]
+  })),
+  clearArtifacts: () => set({ artifacts: [] }),
   cleanupReviewsFor: (parentChatId) => set(s => {
     // Удаляем review entries этого main-чата + связанные sendOwners.
     // Закрываем openedReviewId если он был из этого чата.

@@ -61,6 +61,7 @@ export type ChatEvent =
   | { type: 'turns-exhausted'; used: number; maxBudget: number; canContinue: boolean; suggestedAdd: number }
   | { type: 'tool-activity'; callId: string; name: string; label: string; detail: string; status: 'ok' | 'error' }
   | { type: 'plan-created'; planId: number; title: string; stepCount: number }
+  | { type: 'artifact-created'; callId: string; kind: 'html' | 'docx'; filename: string; path: string; sizeBytes: number }
   | { type: 'usage'; usage: UsageDelta }
   | { type: 'done' }
   | { type: 'error'; message: string }
