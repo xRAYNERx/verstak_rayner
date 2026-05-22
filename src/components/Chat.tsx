@@ -11,6 +11,7 @@ import { ReviewPanel } from './ReviewPills'
 import { CheckpointButton } from './CheckpointButton'
 import { ReviewButton } from './ReviewButton'
 import { SkillPicker } from './SkillPicker'
+import { SlashCommandPopup, type SlashCommand } from './SlashCommandPopup'
 import { useSkills as useSkillsStore } from '../store/skillStore'
 import { useAgentMode } from '../hooks/useAgentMode'
 import type { Attachment } from '../types/api'
@@ -756,6 +757,28 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
           </div>
         )}
         <div className="gg-composer-inner">
+          <SlashCommandPopup
+            text={input}
+            onClear={() => setInput('')}
+            systemCommands={[
+              {
+                kind: 'system',
+                trigger: 'new',
+                label: 'Новый чат',
+                description: 'Создать новый чат в проекте',
+                icon: '➕',
+                action: () => { void useProject.getState().newChatSession() }
+              },
+              {
+                kind: 'system',
+                trigger: 'clear',
+                label: 'Очистить контекст',
+                description: 'Снять активный скилл (сообщения остаются)',
+                icon: '∅',
+                action: () => { useSkillsStore.getState().setActiveSkill(null) }
+              }
+            ]}
+          />
           <textarea
             ref={textareaRef}
             className="gg-composer-textarea"
@@ -764,6 +787,12 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
             onChange={e => setInput(e.target.value)}
             onPaste={onPaste}
             onKeyDown={e => {
+              // SlashCommandPopup глобально обрабатывает Enter/Esc когда
+              // текст начинается с "/". Не отправляем сообщение в этом случае.
+              const slashOpen = input.startsWith('/') && !input.includes('\n')
+              if (slashOpen && (e.key === 'Enter' || e.key === 'Escape' || e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+                return  // popup сам всё обработает
+              }
               if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
                 e.preventDefault()
                 void send()

@@ -2669,3 +2669,74 @@
   font-style: italic;
 }
 
+/* ======================================================================
+   Slash Command Popup — появляется поверх композера когда юзер набрал "/".
+   ====================================================================== */
+.gg-slash-popup {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  margin-bottom: 6px;
+  max-height: 380px;
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 60;
+  padding: 4px;
+}
+.gg-slash-header {
+  padding: 8px 10px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 4px;
+}
+.gg-slash-empty {
+  padding: 20px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+.gg-slash-item {
+  display: flex; align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 80ms ease;
+}
+.gg-slash-item.is-selected,
+.gg-slash-item:hover {
+  background: var(--accent-muted);
+}
+.gg-slash-icon { font-size: 14px; }
+.gg-slash-body {
+  display: flex; flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.gg-slash-name {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--accent);
+  font-weight: 500;
+}
+.gg-slash-label {
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-weight: 400;
+  margin-left: 6px;
+}
+.gg-slash-desc {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
