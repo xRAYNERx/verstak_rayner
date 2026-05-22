@@ -4,6 +4,8 @@ import { createHttpConnector } from './http'
 import { createGSheetsConnector } from './gsheets'
 import { createSshConnector } from './ssh'
 import { createTelegramConnector } from './telegram'
+import { createBitrix24Connector } from './bitrix24'
+import { createYandexDirectConnector } from './yandex-direct'
 
 // Built-in connectors. Adding a new adapter = register it here.
 const BUILTINS: Connector[] = [
@@ -11,7 +13,9 @@ const BUILTINS: Connector[] = [
   createHttpConnector(),
   createGSheetsConnector(),
   createSshConnector(),
-  createTelegramConnector()
+  createTelegramConnector(),
+  createBitrix24Connector(),
+  createYandexDirectConnector()
 ]
 
 export interface ConnectorRegistry {
