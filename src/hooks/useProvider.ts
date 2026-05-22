@@ -32,7 +32,7 @@ const PROVIDER_META: Record<ProviderId, Omit<ProviderInfo, 'model' | 'id'>> = {
   claude: {
     label: 'Claude',
     transport: 'API',
-    models: ['claude-opus-4-5-20251101', 'claude-sonnet-4-5-20251101', 'claude-haiku-4-5-20251101'],
+    models: ['claude-sonnet-4-6', 'claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
     supportsTools: true
   },
   'claude-cli': {
@@ -70,7 +70,7 @@ const PROVIDER_META: Record<ProviderId, Omit<ProviderInfo, 'model' | 'id'>> = {
 const DEFAULT_MODEL: Record<ProviderId, string> = {
   'gemini-api': 'gemini-3.5-flash',
   'gemini-cli': 'auto',
-  claude: 'claude-sonnet-4-5-20251101',
+  claude: 'claude-sonnet-4-6',
   'claude-cli': 'auto',
   grok: 'grok-4',
   'grok-cli': 'auto',

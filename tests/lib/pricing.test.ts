@@ -14,7 +14,7 @@ describe('estimateCost', () => {
   })
 
   it('Sonnet: 1M input + 1M output = $3 + $15 = $18', () => {
-    const c = estimateCost('claude', 'claude-sonnet-4-5-20251101', 1_000_000, 1_000_000, 0)
+    const c = estimateCost('claude', 'claude-sonnet-4-5', 1_000_000, 1_000_000, 0)
     expect(c.cents).toBe(1800)
     expect(c.usd).toBe('$18.00')
   })
@@ -22,12 +22,12 @@ describe('estimateCost', () => {
   it('Cached input снижает стоимость (для моделей с cached price)', () => {
     // Sonnet: input 3, cached 0.3
     // 1M input, из них 500k cached → billable=500k * 3 + 500k * 0.3 = $1.5 + $0.15 = $1.65
-    const c = estimateCost('claude', 'claude-sonnet-4-5-20251101', 1_000_000, 0, 500_000)
+    const c = estimateCost('claude', 'claude-sonnet-4-5', 1_000_000, 0, 500_000)
     expect(c.cents).toBe(165)  // $1.65
   })
 
   it('Маленькая стоимость показывается как <$0.01', () => {
-    const c = estimateCost('claude', 'claude-haiku-4-5-20251101', 100, 50, 0)
+    const c = estimateCost('claude', 'claude-haiku-4-5', 100, 50, 0)
     expect(c.usd).toBe('<$0.01')
   })
 })
@@ -64,7 +64,7 @@ describe('costBreakdown', () => {
   })
 
   it('Для API содержит формулу с ценами и итог', () => {
-    const b = costBreakdown('claude', 'claude-sonnet-4-5-20251101', 1_000_000, 1_000_000, 0)
+    const b = costBreakdown('claude', 'claude-sonnet-4-5', 1_000_000, 1_000_000, 0)
     expect(b).toMatch(/Sonnet/i)
     expect(b).toMatch(/\$3.+input/)
     expect(b).toMatch(/\$15.+output/)
@@ -72,9 +72,9 @@ describe('costBreakdown', () => {
   })
 
   it('Cached блок появляется только если cachedTokens > 0', () => {
-    const noCached = costBreakdown('claude', 'claude-sonnet-4-5-20251101', 1000, 500, 0)
+    const noCached = costBreakdown('claude', 'claude-sonnet-4-5', 1000, 500, 0)
     expect(noCached).not.toMatch(/cached:/)
-    const withCached = costBreakdown('claude', 'claude-sonnet-4-5-20251101', 1000, 500, 200)
+    const withCached = costBreakdown('claude', 'claude-sonnet-4-5', 1000, 500, 200)
     expect(withCached).toMatch(/cached:/)
   })
 })

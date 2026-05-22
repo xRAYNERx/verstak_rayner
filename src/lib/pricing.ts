@@ -18,9 +18,10 @@ interface ModelPrice {
 
 const PRICES: Record<string, ModelPrice> = {
   // Anthropic — anthropic.com/pricing
-  'claude-opus-4-5-20251101':    { input: 15.0, output: 75.0,  cached: 1.5 },
-  'claude-sonnet-4-5-20251101':  { input: 3.0,  output: 15.0,  cached: 0.3 },
-  'claude-haiku-4-5-20251101':   { input: 1.0,  output: 5.0,   cached: 0.1 },
+  'claude-sonnet-4-6':  { input: 3.0,  output: 15.0,  cached: 0.3 },
+  'claude-opus-4-5':    { input: 15.0, output: 75.0,  cached: 1.5 },
+  'claude-sonnet-4-5':  { input: 3.0,  output: 15.0,  cached: 0.3 },
+  'claude-haiku-4-5':   { input: 1.0,  output: 5.0,   cached: 0.1 },
   // Google — ai.google.dev/pricing
   'gemini-3-pro':                { input: 2.50, output: 15.0 },   // Gemini 3 Pro
   'gemini-3.5-flash':            { input: 0.30, output: 2.50 },   // Gemini 3.5 Flash (2026-05 release)

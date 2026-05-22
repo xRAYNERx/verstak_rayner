@@ -10,7 +10,7 @@ import type { FileNode, ChatMessage, ProjectMeta, ChatSession } from '../types/a
 const PROVIDER_MODEL_MAP: Record<string, string[]> = {
   'gemini-api': ['gemini-3-pro', 'gemini-3.5-flash', 'gemini-3-flash', 'gemini-2.5-pro', 'gemini-2.5-flash'],
   'gemini-cli': ['auto', 'gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'],
-  'claude': ['claude-opus-4-5-20251101', 'claude-sonnet-4-5-20251101', 'claude-haiku-4-5-20251101'],
+  'claude': ['claude-sonnet-4-6', 'claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
   'claude-cli': ['auto', 'claude-sonnet-4-6', 'claude-opus-4-5', 'claude-haiku-4-5', 'claude-sonnet-4-5'],
   'grok': ['grok-4', 'grok-4-fast', 'grok-3'],
   'grok-cli': ['auto', 'grok-4', 'grok-4-fast', 'grok-code-fast-1', 'grok-3'],

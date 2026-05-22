@@ -30,6 +30,8 @@ import { registerFeedbackIpc } from './ipc/feedback'
 import { registerVerifyIpc } from './ipc/verify'
 import { registerAutonomousIpc } from './ipc/autonomous'
 import { createConnectorRegistry } from './connectors/registry'
+import { PROVIDERS, type ProviderId } from './ai/registry'
+import { AGENT_MODES } from './ai/mode-policy'
 
 function createWindow(): void {
   // HERE = out/main in dev and prod
@@ -144,6 +146,30 @@ app.whenReady().then(() => {
     return
   }
   const settings = createSettings(db, safeStorage)
+
+  const ENV_MAP: Record<string, string> = {
+    gemini_api_key: 'GEMINI_API_KEY',
+    anthropic_api_key: 'ANTHROPIC_API_KEY',
+    openai_api_key: 'OPENAI_API_KEY',
+    xai_api_key: 'XAI_API_KEY',
+  }
+  const getSecret = (key: string): string | null => {
+    const stored = settings.getSecret(key)
+    if (stored) return stored
+    return process.env[ENV_MAP[key] ?? ''] ?? null
+  }
+  const getProviderId = (): ProviderId => {
+    const v = settings.getSecret('provider')
+    if (v && v in PROVIDERS) return v as ProviderId
+    return 'gemini-api'
+  }
+  const getProviderModel = (id: ProviderId): string | null => settings.getSecret(`model_${id}`)
+  const getAgentMode = () => {
+    const v = settings.getSecret('agent_mode')
+    if (v && AGENT_MODES.some(m => m.id === v)) return v as typeof AGENT_MODES[number]['id']
+    return 'ask' as const
+  }
+
   const chats = createChats(db)
   const chatSessions = createChatSessions(db)
   const tasks = createTasks(db)
@@ -158,25 +184,9 @@ app.whenReady().then(() => {
   registerFilesIpc({ getProjectRoot: getActiveProjectPath })
   registerSettingsIpc(settings)
   registerAiIpc({
-    getSecret: (key: string) => {
-      const stored = settings.getSecret(key)
-      if (stored) return stored
-      const envMap: Record<string, string> = {
-        gemini_api_key: 'GEMINI_API_KEY',
-        anthropic_api_key: 'ANTHROPIC_API_KEY',
-        openai_api_key: 'OPENAI_API_KEY',
-        xai_api_key: 'XAI_API_KEY',
-      }
-      return process.env[envMap[key] ?? ''] ?? null
-    },
-    getProviderId: () => {
-      const v = settings.getSecret('provider')
-      if (v === 'gemini-cli' || v === 'claude' || v === 'claude-cli'
-        || v === 'grok' || v === 'grok-cli'
-        || v === 'openai' || v === 'codex-cli') return v
-      return 'gemini-api'
-    },
-    getProviderModel: (id) => settings.getSecret(`model_${id}`),
+    getSecret,
+    getProviderId,
+    getProviderModel,
     recordWrite: (projectPath, filePath, before, after) => {
       undoStack.push(projectPath, filePath, before, after)
     },
@@ -203,11 +213,7 @@ app.whenReady().then(() => {
         signal
       })
     },
-    getAgentMode: () => {
-      const v = settings.getSecret('agent_mode')
-      if (v === 'ask' || v === 'accept-edits' || v === 'plan' || v === 'auto' || v === 'bypass') return v
-      return 'ask'
-    }
+    getAgentMode
   })
   registerChatsIpc(chats, chatSessions)
   registerTasksIpc(tasks)
@@ -217,25 +223,9 @@ app.whenReady().then(() => {
   registerFeedbackIpc(feedback)
   registerVerifyIpc(getActiveProjectPath)
   registerAutonomousIpc({
-    getSecret: (key) => {
-      const stored = settings.getSecret(key)
-      if (stored) return stored
-      const envMap: Record<string, string> = {
-        gemini_api_key: 'GEMINI_API_KEY',
-        anthropic_api_key: 'ANTHROPIC_API_KEY',
-        openai_api_key: 'OPENAI_API_KEY',
-        xai_api_key: 'XAI_API_KEY'
-      }
-      return process.env[envMap[key] ?? ''] ?? null
-    },
-    getProviderId: () => {
-      const v = settings.getSecret('provider')
-      if (v === 'gemini-cli' || v === 'claude' || v === 'claude-cli'
-        || v === 'grok' || v === 'grok-cli'
-        || v === 'openai' || v === 'codex-cli') return v
-      return 'gemini-api'
-    },
-    getProviderModel: (id) => settings.getSecret(`model_${id}`),
+    getSecret,
+    getProviderId,
+    getProviderModel,
     recordJournal: (projectPath, kind, title, detail) => {
       journal.append(projectPath, kind, title, detail ?? null)
     },

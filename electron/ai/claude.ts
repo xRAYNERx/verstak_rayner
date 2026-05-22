@@ -8,9 +8,10 @@ interface ClaudeOptions {
 }
 
 export const CLAUDE_MODELS = [
-  'claude-opus-4-5-20251101',
-  'claude-sonnet-4-5-20251101',
-  'claude-haiku-4-5-20251101'
+  'claude-sonnet-4-6',
+  'claude-opus-4-5',
+  'claude-sonnet-4-5',
+  'claude-haiku-4-5'
 ]
 
 const DEFAULT_MODEL = CLAUDE_MODELS[1]

@@ -53,7 +53,7 @@ export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
     transport: 'API',
     secretKey: 'anthropic_api_key',
     models: CLAUDE_MODELS,
-    defaultModel: 'claude-sonnet-4-5-20251101',
+    defaultModel: 'claude-sonnet-4-6',
     supportsTools: true,
     shortLabel: 'Claude'
   },

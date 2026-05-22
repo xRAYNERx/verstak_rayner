@@ -12,19 +12,20 @@ export interface Settings {
 }
 
 export function createSettings(db: Database, safe: SafeStorageLike): Settings {
+  const stmtGet = db.prepare('SELECT value FROM settings WHERE key = ?')
+  const stmtSet = db.prepare(
+    'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+  )
   return {
     getSecret(key) {
-      const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined
+      const row = stmtGet.get(key) as { value: string } | undefined
       if (!row) return null
       const buf = Buffer.from(row.value, 'base64')
       return safe.decryptString(buf)
     },
     setSecret(key, value) {
       const encrypted = safe.encryptString(value).toString('base64')
-      db.prepare(`
-        INSERT INTO settings (key, value) VALUES (?, ?)
-        ON CONFLICT(key) DO UPDATE SET value = excluded.value
-      `).run(key, encrypted)
+      stmtSet.run(key, encrypted)
     }
   }
 }
