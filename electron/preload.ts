@@ -85,6 +85,12 @@ contextBridge.exposeInMainWorld('api', {
     revertToCheckpoint: (projectPath: string, checkpointId: number) =>
       ipcRenderer.invoke('undo:revertToCheckpoint', projectPath, checkpointId)
   },
+  skills: {
+    list: () => ipcRenderer.invoke('skills:list'),
+    get: (id: string) => ipcRenderer.invoke('skills:get', id),
+    refresh: () => ipcRenderer.invoke('skills:refresh'),
+    status: () => ipcRenderer.invoke('skills:status')
+  },
   feedback: {
     list: (projectPath: string | null, limit?: number) => ipcRenderer.invoke('feedback:list', projectPath, limit),
     submit: (input: { projectPath: string | null; providerId: string | null; rating: number | null; message: string }) =>

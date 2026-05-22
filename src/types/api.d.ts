@@ -24,6 +24,25 @@ export interface PlanStep { id: number; planId: number; idx: number; title: stri
 export interface Plan { id: number; title: string; status: PlanStatus; createdAt: number; completedAt: number | null; steps: PlanStep[] }
 export interface FeedbackEntry { id: number; projectPath: string | null; providerId: string | null; rating: number | null; message: string; createdAt: number }
 export interface ProjectMeta { path: string; name: string; color: string; lastOpenedAt: number }
+
+/** Skill — переиспользуемый агентский пресет (system prompt + tools + provider).
+ *  См. electron/ai/skills/types.ts для серверной структуры. */
+export interface Skill {
+  id: string
+  name?: string
+  description?: string
+  icon?: string
+  default_provider?: string
+  default_model?: string
+  default_mode?: 'ask' | 'accept-edits' | 'plan' | 'auto' | 'bypass'
+  slash?: string
+  tools_allow?: string[]
+  suggested_prompts?: string[]
+  context_loaders?: Array<{ id: string; impl: string; runs_on: 'chat_open' | 'slash_arg'; args?: Record<string, unknown> }>
+  systemPrompt: string
+  source: 'server' | 'user' | 'built-in'
+  sourceRef: string
+}
 export interface ToolCall { id: string; name: string; args: Record<string, unknown> }
 export interface UsageDelta {
   inputTokens?: number
@@ -127,6 +146,12 @@ declare global {
           count: number
           failed?: Array<{ id: number; filePath: string; reason: string }>
         }>
+      }
+      skills: {
+        list: () => Promise<Skill[]>
+        get: (id: string) => Promise<Skill | null>
+        refresh: () => Promise<{ added: number; updated: number; failed: string[] }>
+        status: () => Promise<{ lastRefreshAt: number | null; serverReachable: boolean; total: number }>
       }
       feedback: {
         list: (projectPath: string | null, limit?: number) => Promise<FeedbackEntry[]>

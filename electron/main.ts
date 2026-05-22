@@ -32,6 +32,8 @@ import { registerAutonomousIpc } from './ipc/autonomous'
 import { createConnectorRegistry } from './connectors/registry'
 import { PROVIDERS, type ProviderId } from './ai/registry'
 import { AGENT_MODES } from './ai/mode-policy'
+import { createSkillRegistry } from './ai/skills/registry'
+import { registerSkillsIpc } from './ipc/skills'
 
 function createWindow(): void {
   // HERE = out/main in dev and prod
@@ -180,6 +182,17 @@ app.whenReady().then(() => {
   const feedback = createFeedback(db)
   const connectorRegistry = createConnectorRegistry()
 
+  // Skill registry — собирает скиллы из server API + ~/.geminigrok/skills/ +
+  // built-in. См. electron/ai/skills/loader.ts. Конфиг сервера читается из
+  // settings (Pavel может сменить URL через UI). Refresh при старте — async,
+  // не блокирует window open.
+  const skillRegistry = createSkillRegistry(() => ({
+    serverBase: settings.getSecret('skills_server_base')
+  }))
+  void skillRegistry.refresh().catch(err => {
+    console.warn('[skills] initial refresh failed:', err instanceof Error ? err.message : err)
+  })
+
   registerProjectIpc(projects)
   registerFilesIpc({ getProjectRoot: getActiveProjectPath })
   registerSettingsIpc(settings)
@@ -240,6 +253,7 @@ app.whenReady().then(() => {
     getActiveProject: () => getActiveProjectPath()
   })
   registerTerminalIpc()
+  registerSkillsIpc(skillRegistry)
   createWindow()
 })
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
