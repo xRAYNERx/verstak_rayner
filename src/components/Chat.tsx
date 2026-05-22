@@ -10,6 +10,8 @@ import { TimelineBar } from './TimelineBar'
 import { ReviewPanel } from './ReviewPills'
 import { CheckpointButton } from './CheckpointButton'
 import { ReviewButton } from './ReviewButton'
+import { SkillPicker } from './SkillPicker'
+import { useSkills as useSkillsStore } from '../store/skillStore'
 import { useAgentMode } from '../hooks/useAgentMode'
 import type { Attachment } from '../types/api'
 import iconUrl from '../assets/icon.png'
@@ -526,7 +528,22 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
     addMessage({ role: 'assistant', content: '' })
     setStreaming(true)
     const allMessages = [...useProject.getState().messages].slice(0, -1)
-    const sendId = await window.api.ai.send(allMessages, path)
+    // Skill override: если активен скилл — system prompt берётся из его тела,
+    // а провайдер/модель/режим — из default_* полей frontmatter (если заданы).
+    // Без активного скилла поведение прежнее.
+    const activeSkill = useSkillsStore.getState().activeSkillId
+      ? useSkillsStore.getState().skills.find(s => s.id === useSkillsStore.getState().activeSkillId)
+      : null
+    let sendId: number
+    if (activeSkill) {
+      sendId = await window.api.ai.sendWithOverrides(allMessages, path, {
+        systemPrompt: activeSkill.systemPrompt,
+        providerId: activeSkill.default_provider,
+        model: activeSkill.default_model ?? null
+      })
+    } else {
+      sendId = await window.api.ai.send(allMessages, path)
+    }
     currentSendIdRef.current = sendId
     // Bind this send to the chat that initiated it — if user switches to
     // another chat mid-stream, the event handler will route events into
@@ -861,6 +878,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
                 <span className="gg-undo-count">{undoCount}</span>
               </button>
             )}
+            <SkillPicker />
             <CheckpointButton />
             <ReviewButton />
             <button

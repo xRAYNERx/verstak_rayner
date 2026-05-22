@@ -2504,3 +2504,168 @@
   font-size: var(--text-xs);
 }
 
+/* ======================================================================
+   Skill Picker — composer toolbar button + popup со списком скиллов.
+   Источник: V3 Plan раздел 6 (Skill layer first-class).
+   ====================================================================== */
+.gg-skill-picker-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.gg-skill-picker-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: transparent;
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 3px 10px 3px 8px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.gg-skill-picker-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--text-tertiary);
+}
+.gg-skill-picker-btn.is-active {
+  background: var(--accent-muted);
+  border-color: var(--accent-border);
+  color: var(--text-primary);
+}
+.gg-skill-icon { font-size: 12px; }
+.gg-skill-name { font-weight: 500; }
+.gg-skill-clear {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px;
+  background: var(--bg-base);
+  color: var(--text-tertiary);
+  border-radius: 50%;
+  font-size: 10px;
+  line-height: 1;
+  margin-left: 2px;
+  cursor: pointer;
+  transition: all 100ms ease;
+}
+.gg-skill-clear:hover {
+  background: var(--error-muted);
+  color: var(--error);
+}
+
+.gg-skill-popup {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 6px;
+  width: 360px;
+  max-height: 480px;
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  z-index: 50;
+  padding: 6px;
+}
+.gg-skill-popup-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 10px 8px;
+}
+.gg-skill-popup-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+.gg-skill-refresh {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-tertiary);
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+.gg-skill-refresh:hover { background: var(--bg-hover); color: var(--text-primary); }
+.gg-skill-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
+.gg-skill-popup-status {
+  padding: 0 10px 8px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+}
+.gg-skill-server-ok { color: var(--success); }
+.gg-skill-server-off { color: var(--text-tertiary); }
+
+.gg-skill-group {
+  padding: 4px 0;
+}
+.gg-skill-group-label {
+  padding: 6px 10px 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+.gg-skill-popup-item {
+  display: flex; align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 80ms ease;
+  color: var(--text-secondary);
+}
+.gg-skill-popup-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.gg-skill-popup-item.is-active {
+  background: var(--accent-muted);
+  color: var(--text-primary);
+}
+.gg-skill-popup-item.is-clear {
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 4px;
+  color: var(--text-tertiary);
+}
+.gg-skill-popup-item-body {
+  display: flex; flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.gg-skill-popup-item-name {
+  display: flex; align-items: center; gap: 8px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+.gg-skill-popup-slash {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent);
+  background: var(--accent-muted);
+  border: 1px solid var(--accent-border);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.gg-skill-popup-item-desc {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+.gg-skill-popup-empty {
+  padding: 16px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
