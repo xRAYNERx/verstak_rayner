@@ -1,11 +1,15 @@
 import type { Connector, ConnectorContext, ConnectorInfo } from './types'
 import { createOneCConnector } from './onec'
 import { createHttpConnector } from './http'
+import { createGSheetsConnector } from './gsheets'
+import { createSshConnector } from './ssh'
 
 // Built-in connectors. Adding a new adapter = register it here.
 const BUILTINS: Connector[] = [
   createOneCConnector(),
-  createHttpConnector()
+  createHttpConnector(),
+  createGSheetsConnector(),
+  createSshConnector()
 ]
 
 export interface ConnectorRegistry {
