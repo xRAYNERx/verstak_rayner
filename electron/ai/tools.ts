@@ -234,6 +234,32 @@ export const TOOL_DEFS: ToolDefinition[] = [
     }
   },
   {
+    name: 'delegate_task',
+    description: 'Делегировать узкую подзадачу другому AI-агенту (другая модель или другой скилл). Используй когда: (а) нужна вторая независимая точка зрения на патч/решение; (б) подзадача узкая и можно отдать дешёвой модели (анализ stdout, классификация, поиск опечатки); (в) нужно вытащить контекст из источника с другим скиллом (например DOSSIER клиента). Результат подтягивается обратно как tool_result, основной агент использует его и продолжает свою работу. Sub-agent работает без tools (только размышление + ответ) — это намеренно, чтобы не было каскадов.',
+    parameters: {
+      type: 'object',
+      properties: {
+        skill_id: {
+          type: 'string',
+          description: 'ID скилла для sub-agent (например "bos-sales", "bos-mkt"). Если skill_id неизвестен — используется generic prompt.'
+        },
+        provider_id: {
+          type: 'string',
+          description: 'Опционально — провайдер для sub-agent (gemini-api / claude / openai / grok). Если не указан — берётся из default_provider скилла или текущий.'
+        },
+        model: {
+          type: 'string',
+          description: 'Опционально — модель в рамках provider_id.'
+        },
+        prompt: {
+          type: 'string',
+          description: 'Что именно нужно от sub-agent. Конкретный запрос с контекстом.'
+        }
+      },
+      required: ['prompt']
+    }
+  },
+  {
     name: 'generate_html',
     description: 'Сохранить артефакт в формате HTML (КП, аудит, отчёт). Файл попадает в .geminigrok/artifacts/{YYYY-MM-DD}/ и открывается в preview pane. Используй для клиентских артефактов где важна визуальная структура.',
     parameters: {

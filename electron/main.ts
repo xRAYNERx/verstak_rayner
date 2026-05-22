@@ -229,7 +229,19 @@ app.whenReady().then(() => {
         signal
       })
     },
-    getAgentMode
+    getAgentMode,
+    // Передаём skillRegistry в AI deps чтобы delegate_task tool мог
+    // подтянуть system prompt sub-skill'а. Без этого delegate_task
+    // работает с generic промптом.
+    skillRegistry: {
+      list: () => skillRegistry.list().map(s => ({
+        id: s.id,
+        name: s.name,
+        default_provider: s.default_provider,
+        default_model: s.default_model ?? undefined,
+        systemPrompt: s.systemPrompt
+      }))
+    }
   })
   registerChatsIpc(chats, chatSessions)
   registerTasksIpc(tasks)

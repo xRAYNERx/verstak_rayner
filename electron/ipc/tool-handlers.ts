@@ -66,6 +66,13 @@ export interface ToolContext {
   scopedKey: (sendId: SendId, callId: string) => string
   /** Active agent mode — controls auto-accept / confirm / block per tool. */
   agentMode: AgentMode
+  /** Skill registry для delegate_task (опционально — V3 фича). */
+  skillRegistry?: {
+    list: () => Array<{ id: string; name?: string; default_provider?: string; default_model?: string; systemPrompt: string }>
+  }
+  /** Secret reader для delegate_task — нужен чтобы достать API key
+   *  альтернативного провайдера. */
+  getSecretForDelegate?: (key: string) => string | null
 }
 
 export type ToolMode = 'parallel-read' | 'sequential' | 'confirm-write'
@@ -479,6 +486,96 @@ const readJournalHandler: ToolHandler = {
 }
 
 // ============================================================================
+// delegate_task — мультиагент V1
+// ============================================================================
+
+const delegateTaskHandler: ToolHandler = {
+  mode: 'sequential',
+  async handle(call, ctx) {
+    try {
+      const skillId = call.args.skill_id ? String(call.args.skill_id) : null
+      const providerOverride = call.args.provider_id ? String(call.args.provider_id) : null
+      const modelOverride = call.args.model ? String(call.args.model) : null
+      const prompt = String(call.args.prompt ?? '').trim()
+      if (!prompt) {
+        return { id: call.id, name: call.name, result: '', error: 'delegate_task: prompt обязателен' }
+      }
+
+      // Скилл — опционально. Если задан, тащим его системный промпт + default provider/model.
+      const skills = ctx.skillRegistry ? ctx.skillRegistry.list() : []
+      const skill = skillId ? skills.find(s => s.id === skillId) ?? null : null
+
+      const subProvider = providerOverride
+        ?? skill?.default_provider
+        ?? null  // null → ai:send возьмёт текущий default из settings
+      const subModel = modelOverride ?? skill?.default_model ?? null
+      const systemPrompt = skill?.systemPrompt
+        ?? 'Ты — sub-agent. Выполни узкую задачу, ответь в 1-3 параграфа. Без лишних tools / markdown.'
+
+      ctx.sender.send('ai:event', {
+        id: ctx.sendId,
+        event: {
+          type: 'tool-activity',
+          callId: call.id,
+          name: 'delegate_task',
+          label: 'delegate_task',
+          detail: `${skill?.name ?? skillId ?? 'generic'} via ${subProvider ?? 'auto'}`,
+          status: 'ok'
+        }
+      })
+
+      // Внутренний one-shot call — реализуем через прямой вызов provider'а,
+      // без новой ipc-сессии (никаких дополнительных sendId, событий, и т.п.).
+      const { createProvider, PROVIDERS } = await import('../ai/registry')
+      const fallbackProvider = subProvider ?? 'claude'
+      const descriptor = PROVIDERS[fallbackProvider as keyof typeof PROVIDERS]
+      if (!descriptor) {
+        return { id: call.id, name: call.name, result: '', error: `delegate_task: неизвестный provider ${fallbackProvider}` }
+      }
+      const apiKey = descriptor.secretKey ? ctx.getSecretForDelegate?.(descriptor.secretKey) ?? null : null
+      if (descriptor.secretKey && !apiKey) {
+        return { id: call.id, name: call.name, result: '', error: `delegate_task: нет API key для ${fallbackProvider}` }
+      }
+      const provider = createProvider(fallbackProvider as keyof typeof PROVIDERS, {
+        apiKey,
+        model: subModel ?? descriptor.defaultModel,
+        cwd: ctx.projectPath,
+        signal: ctx.signal
+      })
+      const messages = [
+        { role: 'system' as const, content: systemPrompt },
+        { role: 'user' as const, content: prompt }
+      ]
+      let collected = ''
+      try {
+        for await (const event of provider.send(messages, [])) {
+          if (ctx.signal.aborted) break
+          if (event.type === 'text' && typeof event.text === 'string') collected += event.text
+          else if (event.type === 'error') {
+            return { id: call.id, name: call.name, result: '', error: `delegate_task error: ${event.message}` }
+          } else if (event.type === 'done') break
+        }
+      } catch (err) {
+        return { id: call.id, name: call.name, result: '', error: `delegate_task crashed: ${err instanceof Error ? err.message : String(err)}` }
+      }
+      const trimmed = collected.trim()
+      if (!trimmed) {
+        return { id: call.id, name: call.name, result: '', error: 'delegate_task: sub-agent вернул пустой ответ' }
+      }
+      // Логируем в journal — для аудита
+      try {
+        ctx.recordJournal(ctx.projectPath, 'note',
+          `🎭 Делегирование → ${skill?.name ?? skillId ?? fallbackProvider}`,
+          `Запрос: ${prompt.slice(0, 200)}\n---\nОтвет: ${trimmed.slice(0, 600)}${trimmed.length > 600 ? '…' : ''}`)
+      } catch { /* journal не критично */ }
+      return { id: call.id, name: call.name, result: `[Delegate from ${skill?.name ?? skillId ?? fallbackProvider}]\n\n${trimmed}` }
+    } catch (err) {
+      return { id: call.id, name: call.name, result: '', error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+}
+
+// ============================================================================
 // Artifact handlers — generate_html / generate_docx
 // ============================================================================
 
@@ -581,7 +678,8 @@ const HANDLER_REGISTRY: Record<string, ToolHandler> = {
   'create_plan': createPlanHandler,
   'read_journal': readJournalHandler,
   'generate_html': generateHtmlHandler,
-  'generate_docx': generateDocxHandler
+  'generate_docx': generateDocxHandler,
+  'delegate_task': delegateTaskHandler
 }
 
 /**

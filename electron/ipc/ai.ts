@@ -32,6 +32,11 @@ interface AiDeps {
   }
   /** Active agent mode — auto-accept / confirm / block per tool category. */
   getAgentMode: () => AgentMode
+  /** Skill registry для delegate_task (V3). Optional — без него delegate_task
+   *  всё равно работает с generic prompt. */
+  skillRegistry?: {
+    list: () => Array<{ id: string; name?: string; default_provider?: string; default_model?: string; systemPrompt: string }>
+  }
 }
 
 let currentSendId = 0
@@ -193,7 +198,7 @@ export function registerAiIpc(deps: AiDeps): void {
     if (useToolsPath) {
       const tools = createFileTools(projectPath, ctrl.signal)
       const turnsBudget = Math.min(MAX_BUDGET_TURNS, Math.max(DEFAULT_AGENT_TURNS, budget ?? DEFAULT_AGENT_TURNS))
-      void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.readJournal, deps.connectors, deps.getAgentMode(), turnsBudget).finally(cleanup)
+      void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.readJournal, deps.connectors, deps.getAgentMode(), turnsBudget, deps.skillRegistry, deps.getSecret).finally(cleanup)
     } else {
       void runPlainConversation(taggedSender, sendId, provider, projectPath, messagesWithSystem, ctrl.signal, deps.recordJournal).finally(cleanup)
     }
@@ -443,7 +448,9 @@ async function runApiConversation(
     query: (id: string, args: Record<string, unknown>, signal: AbortSignal) => Promise<unknown>
   },
   agentMode: AgentMode,
-  turnsBudget: number = DEFAULT_AGENT_TURNS
+  turnsBudget: number = DEFAULT_AGENT_TURNS,
+  skillRegistry?: AiDeps['skillRegistry'],
+  getSecretForDelegate?: AiDeps['getSecret']
 ): Promise<void> {
   const currentMessages = [...initialMessages]
   // Loop detection: per-signature occurrence counter across the whole agent
@@ -612,7 +619,7 @@ async function runApiConversation(
       sender, sendId, signal, projectPath, tools,
       recordWrite, recordPlan, recordJournal, readJournal, connectors,
       pendingAttachments, pendingWrites, pendingCommands, scopedKey,
-      agentMode
+      agentMode, skillRegistry, getSecretForDelegate
     }
     const writePromises: Array<{ idx: number; promise: Promise<ToolResult> }> = []
     const readPromises: Array<{ idx: number; promise: Promise<ToolResult> }> = []
