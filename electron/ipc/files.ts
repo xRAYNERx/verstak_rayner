@@ -59,6 +59,28 @@ export function registerFilesIpc(deps: FilesIpcDeps): void {
     return { ok: err === '', error: err || null }
   })
 
+  /**
+   * Конвертация DOCX → HTML через mammoth.js для embedded preview.
+   * Возвращает чистый body HTML (без обёртки) + messages с предупреждениями
+   * от mammoth (несконвертированные стили и т.п.).
+   */
+  ipcMain.handle('files:docx-to-html', async (_e, path: string) => {
+    try {
+      const mammoth = await import('mammoth')
+      const result = await mammoth.convertToHtml({ path })
+      return {
+        ok: true,
+        html: result.value,
+        warnings: result.messages.slice(0, 10).map(m => `${m.type}: ${m.message}`)
+      }
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err)
+      }
+    }
+  })
+
   ipcMain.handle('files:read', async (_e, path: string) => {
     const root = deps.getProjectRoot()
     if (!root) throw new Error('Проект не открыт')

@@ -93,6 +93,8 @@ declare global {
         read: (path: string) => Promise<string>
         /** Открыть папку в системном проводнике через electron.shell.openPath. */
         revealInExplorer: (path: string) => Promise<{ ok: boolean; error: string | null }>
+        /** Конвертация DOCX → HTML body через mammoth.js (для embedded preview). */
+        docxToHtml: (path: string) => Promise<{ ok: true; html: string; warnings: string[] } | { ok: false; error: string }>
       }
       settings: {
         getKey: (key: string) => Promise<string | null>
