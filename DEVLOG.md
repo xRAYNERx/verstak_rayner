@@ -7,6 +7,67 @@
 
 ---
 
+## 2026-05-23 — V3 Implementation Marathon Part 2
+
+После первого марафона (16+ коммитов V3 базы) — продолжение со стороны Claude.
+
+### Skill enrichment
+- **Авто-импорт скиллов из `~/.claude/skills/`** — loader теперь смотрит и в
+  Claude Code папку, не только в `~/.geminigrok/skills/`. Pavel'я 8 BOS-скиллов
+  появляются автоматически без копирования.
+- **Context loaders реализованы.** Frontmatter `context_loaders: [{impl, runs_on}]`
+  раньше парсился но не вызывался. Теперь — registry с 3 базовыми импл:
+  - `load_client_card` — читает `agent-client-{slug}.md` по аргументу slash
+  - `load_clients_list` — все клиенты агентства из ~/.claude/agents/
+  - `load_today_brief` — дата + день недели для morning brief скиллов
+  При первом user-message чата (или slash с аргументом) loaders запускаются
+  и markdown инжектится в начало текста перед отправкой агенту.
+
+### Artifacts UX upgrade
+- **Embedded HTML preview** — клик на artifact pill открывает модал с iframe
+  внутри окна. Раньше → external браузер. Кнопка ↗ в модале для open external.
+- **DOCX preview через mammoth.js** — DOCX тоже теперь рендерится inline
+  (конвертация в HTML на стороне main process). Mammoth warnings показываются
+  жёлтым банером — для финального вида клиенту использовать «↗ Открыть внешне».
+- **render_chart tool** — SVG charts (bar/line/pie) без npm deps. Сохраняется
+  как .svg в artifacts dir, можно встраивать в HTML через `<img>`. Палитра GG,
+  auto-format больших чисел (2.5M), XML escape.
+
+### Multi-user UX
+- **Profile management UI в Settings → 👤 Профили.** Таблица всех профилей,
+  активация, удаление, форма создания. Раньше профили создавались только
+  через Onboarding wizard, нельзя было переключиться или удалить.
+
+### Bug fixes
+- **Skill provider не override'ит совместимый выбор.** Built-in скиллы
+  больше не имеют жёсткий `default_provider: claude` — наследуют выбор
+  пользователя. Family-check: claude / claude-cli = одно семейство, не
+  переключаем. То же для gemini, grok, openai/codex.
+- **Понятная ошибка для headless+Max ограничения.** Claude Code v2.1.138
+  в `--print` режиме НЕ использует Max OAuth — это известное ограничение
+  Anthropic. Раньше пользователь видел `401 Invalid credentials`. Теперь
+  чёткое сообщение с 3 вариантами решения, главное —
+  `claude setup-token` (long-lived token tied to subscription).
+
+### Тесты
+- bitrix24: 5 cases (no-webhook, denylist, allow-prefix, unknown-op, info)
+- telegram: 5 cases (no-token, bad-args, whitelist, dev fallthrough, info)
+- charts: 6 cases (bar/line/pie render, escape, format)
+- loaders: 6 cases (registry, today_brief, client_card)
+- artifacts: 5 cases (HTML escape, DOCX zip signature, tmpdir cleanup)
+
+**Итого тестов:** 160 passing (+22 за part 2, было 138). 8 sqlite-failures
+неизменно (NODE_MODULE_VERSION mismatch).
+
+### Файлы за марафон V3 part 2
+- `electron/ai/skills/loaders.ts` — реестр + 3 базовых loader
+- `electron/ai/charts.ts` — SVG renderer (~250 строк)
+- `src/components/ArtifactPreview.tsx` — модал с iframe preview
+- `src/components/ProfilesTab.tsx` — Settings вкладка профилей
+- ipc/files.ts — files:docx-to-html через mammoth
+
+---
+
 ## 2026-05-22 (ночь→утро) — V3 Implementation Marathon
 
 **Контекст:** Pavel дал goal `C:\Users\Pavel\Downloads\GeminiGrok-V3-Plan.html`
