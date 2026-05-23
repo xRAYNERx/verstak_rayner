@@ -76,10 +76,12 @@ interface CliEvent {
  *  CLI Pro/Max OAuth работает только в interactive TTY. Для --print нужен
  *  API key через ANTHROPIC_API_KEY env или через провайдера Claude (API) в GG. */
 const HEADLESS_NO_AUTH_HINT =
-  'Claude Code в headless режиме (--print) НЕ использует Max/Pro подписку — это известное ограничение Anthropic. ' +
-  'Варианты: (1) переключись на провайдера «Claude (API)» в GeminiGrok с API key из console.anthropic.com; ' +
-  '(2) используй Gemini Ultra (CLI), Grok Build (CLI) или Codex (CLI) — у них headless работает с подпиской; ' +
-  '(3) задай ANTHROPIC_API_KEY env var на машине — тогда Claude Code в headless подцепит его.'
+  'Claude Code не нашёл credentials для headless (--print) режима. ' +
+  'ИСПРАВИТЬ: открой PowerShell и выполни `claude setup-token` — откроется браузер, ' +
+  'подтверди подписку, и Claude Code получит long-lived token для headless. После ' +
+  'этого здесь сразу заработает (пересборки GeminiGrok не нужно). ' +
+  'Альтернативы: переключись на провайдера «Claude (API)» с key из console.anthropic.com, ' +
+  'или используй Gemini Ultra / Grok Build / Codex (CLI) — у них headless с подпиской работает из коробки.'
 
 export function createClaudeCliProvider(opts: ClaudeCliOptions = {}): ChatProvider {
   const binary = opts.binary ?? findBinary()
