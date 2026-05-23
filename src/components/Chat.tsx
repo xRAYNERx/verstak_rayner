@@ -542,18 +542,31 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
     addMessage({ role: 'assistant', content: '' })
     setStreaming(true)
     const allMessages = [...useProject.getState().messages].slice(0, -1)
-    // Skill override: если активен скилл — system prompt берётся из его тела,
-    // а провайдер/модель/режим — из default_* полей frontmatter (если заданы).
-    // Без активного скилла поведение прежнее.
+    // Skill override: если активен скилл — system prompt берётся из его тела.
+    // Provider/model берутся из скилла ТОЛЬКО если активный выбор пользователя
+    // несовместим с тем что предлагает скилл. Например: скилл говорит 'claude'
+    // (API), пользователь выбрал 'claude-cli' (CLI/подписка) — оба = Claude,
+    // НЕ переключаем. Это сохраняет выбор пользователя по подписке/API.
     const activeSkill = useSkillsStore.getState().activeSkillId
       ? useSkillsStore.getState().skills.find(s => s.id === useSkillsStore.getState().activeSkillId)
       : null
     let sendId: number
     if (activeSkill) {
+      // Узнаём текущий provider пользователя — чтобы решить override или нет
+      const currentProvider = await window.api.settings.getKey('provider')
+      const skillProvider = activeSkill.default_provider
+      // «Семейство» провайдера — для совместимости (claude vs claude-cli — одно)
+      const family = (p: string | null | undefined): string =>
+        (p ?? '').replace(/-cli$|-api$/, '').replace(/^gemini.*$/, 'gemini')
+            .replace(/^(claude|grok|openai|codex).*$/, '$1')
+      const overrideProvider = skillProvider && family(skillProvider) !== family(currentProvider)
+        ? skillProvider
+        : undefined
+      const overrideModel = overrideProvider ? (activeSkill.default_model ?? null) : null
       sendId = await window.api.ai.sendWithOverrides(allMessages, path, {
         systemPrompt: activeSkill.systemPrompt,
-        providerId: activeSkill.default_provider,
-        model: activeSkill.default_model ?? null
+        ...(overrideProvider ? { providerId: overrideProvider } : {}),
+        ...(overrideModel !== null ? { model: overrideModel } : {})
       })
     } else {
       sendId = await window.api.ai.send(allMessages, path)

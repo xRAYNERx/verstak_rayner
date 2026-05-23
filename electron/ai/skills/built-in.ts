@@ -15,8 +15,6 @@ id: bos-sales
 name: Продажи агентства
 description: Реактивация HH-лидов агентства, follow-up overdue компаний, дожим горячих
 icon: 💼
-default_provider: claude
-default_model: claude-sonnet-4-6
 default_mode: accept-edits
 slash: bos-sales
 tools_allow:
@@ -66,8 +64,6 @@ id: bos-mkt
 name: Маркетолог агентства
 description: Аудиты, советы, стратегии по клиентам. SEO / Я.Директ / Авито / ВК / контент
 icon: 📊
-default_provider: claude
-default_model: claude-sonnet-4-6
 default_mode: accept-edits
 slash: bos-mkt
 tools_allow:
@@ -116,8 +112,6 @@ id: client-cycle
 name: Директор по клиенту
 description: Daily/Weekly chek клиента — что нового, что зависло, что предложить, что эскалировать
 icon: 👁
-default_provider: claude
-default_model: claude-sonnet-4-6
 default_mode: accept-edits
 slash: client-cycle
 tools_allow:
