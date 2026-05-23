@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ProviderId } from '../hooks/useProvider'
 import { useTheme } from '../hooks/useTheme'
 import type { AutonomousStatus } from '../types/api'
+import { ProfilesTab } from './ProfilesTab'
 
 interface ProviderConfig {
   id: ProviderId
@@ -111,7 +112,7 @@ const PROVIDERS: ProviderConfig[] = [
   }
 ]
 
-type Tab = 'models' | 'connectors' | 'autonomous' | 'appearance'
+type Tab = 'models' | 'connectors' | 'autonomous' | 'profiles' | 'appearance'
 
 export function Settings({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<Tab>('models')
@@ -256,6 +257,11 @@ export function Settings({ onClose }: { onClose: () => void }) {
             className={`gg-settings-tab ${tab === 'autonomous' ? 'is-active' : ''}`}
             onClick={() => setTab('autonomous')}
           >🌙 Ночной режим</button>
+          <button
+            type="button"
+            className={`gg-settings-tab ${tab === 'profiles' ? 'is-active' : ''}`}
+            onClick={() => setTab('profiles')}
+          >👤 Профили</button>
           <button
             type="button"
             className={`gg-settings-tab ${tab === 'appearance' ? 'is-active' : ''}`}
@@ -663,6 +669,8 @@ export function Settings({ onClose }: { onClose: () => void }) {
           </div>
         </div>
         )}
+
+        {tab === 'profiles' && (<ProfilesTab />)}
 
         {tab === 'appearance' && (
         <div className="gg-settings-extra">
