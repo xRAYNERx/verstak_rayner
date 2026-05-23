@@ -139,6 +139,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [skillsServerBase, setSkillsServerBase] = useState('')
   const [claudeOauthToken, setClaudeOauthToken] = useState('')
   const [yDiskToken, setYDiskToken] = useState('')
+  const [costCap, setCostCap] = useState('')
   const { theme, setTheme } = useTheme()
 
   useEffect(() => {
@@ -197,6 +198,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
       setSkillsServerBase((await window.api.settings.getKey('skills_server_base')) ?? '')
       setClaudeOauthToken((await window.api.settings.getKey('claude_code_oauth_token')) ?? '')
       setYDiskToken((await window.api.settings.getKey('yandex_disk_token')) ?? '')
+      setCostCap((await window.api.settings.getKey('cost_cap_usd_per_session')) ?? '')
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -233,6 +235,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
     await window.api.settings.setKey('skills_server_base', skillsServerBase)
     await window.api.settings.setKey('claude_code_oauth_token', claudeOauthToken)
     await window.api.settings.setKey('yandex_disk_token', yDiskToken)
+    await window.api.settings.setKey('cost_cap_usd_per_session', costCap)
     setSaved(true)
     setTimeout(() => setSaved(false), 1500)
   }
@@ -373,7 +376,27 @@ export function Settings({ onClose }: { onClose: () => void }) {
 
         {tab === 'connectors' && (
         <div className="gg-settings-extra">
-          <div className="gg-settings-section-title">🔑 Claude Code OAuth (для Max подписки в headless)</div>
+          <div className="gg-settings-section-title">💰 Hard cost cap (auto-stop)</div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Лимит $/сессия</label>
+            <input
+              className="gg-input"
+              type="text"
+              value={costCap}
+              onChange={e => setCostCap(e.target.value.replace(/[^\d.]/g, ''))}
+              placeholder="Например: 5 (max $5 за сессию). Пусто = guard выключен."
+              style={{ maxWidth: 200 }}
+            />
+          </div>
+          <div className="gg-settings-hint">
+            Если AI-сессия (API-провайдер) превысит этот лимит — auto-stop с
+            сообщением «лимит израсходован». CLI-провайдеры (подписки) идут
+            мимо лимита — они $0. Лимит на ОДНУ сессию, не суммарно за день.
+            Стандартный chat = $0.05-0.50. Длинный agent loop с большим
+            проектом = $2-10. Безопасный default: 5.
+          </div>
+
+          <div className="gg-settings-section-title" style={{ marginTop: 24 }}>🔑 Claude Code OAuth (для Max подписки в headless)</div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Long-lived OAuth token</label>
             <input

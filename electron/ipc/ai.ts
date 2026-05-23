@@ -5,6 +5,7 @@ import { prepareSystemContext } from '../ai/compose-system'
 import { REVIEWER_SYSTEM_PROMPT } from '../ai/review-prompt'
 import { compactToolHistory } from '../ai/compact-history'
 import { withInitialRetry } from '../ai/with-retry'
+import { createCostGuard } from '../ai/cost-guard'
 import type { AgentMode } from '../ai/mode-policy'
 import type { ChatMessage, ToolCall, ToolResult, ChatProvider, Attachment } from '../ai/types'
 import { lookupHandler, type ToolContext, type TaggedSender as HandlerTaggedSender } from './tool-handlers'
@@ -199,14 +200,21 @@ export function registerAiIpc(deps: AiDeps): void {
       return 0
     }
 
+    // Cost guard для всей сессии (turns of API loop). Если settings задан
+    // cost_cap_usd_per_session — guard.recordAndCheck остановит цикл при
+    // превышении. CLI = подписка = $0 (guard эффективно отключен).
+    const capRaw = deps.getSecret('cost_cap_usd_per_session')
+    const capUsd = capRaw ? parseFloat(capRaw) : null
+    const costGuard = createCostGuard(capUsd && capUsd > 0 ? capUsd : null)
+
     // Force-plain path: review uses no tools regardless of provider capability.
     const useToolsPath = !overrides?.noTools && descriptor.supportsTools && projectPath
     if (useToolsPath) {
       const tools = createFileTools(projectPath, ctrl.signal)
       const turnsBudget = Math.min(MAX_BUDGET_TURNS, Math.max(DEFAULT_AGENT_TURNS, budget ?? DEFAULT_AGENT_TURNS))
-      void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.readJournal, deps.connectors, deps.getAgentMode(), turnsBudget, deps.skillRegistry, deps.getSecret).finally(cleanup)
+      void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.readJournal, deps.connectors, deps.getAgentMode(), turnsBudget, deps.skillRegistry, deps.getSecret, costGuard, providerId, model).finally(cleanup)
     } else {
-      void runPlainConversation(taggedSender, sendId, provider, projectPath, messagesWithSystem, ctrl.signal, deps.recordJournal).finally(cleanup)
+      void runPlainConversation(taggedSender, sendId, provider, projectPath, messagesWithSystem, ctrl.signal, deps.recordJournal, costGuard, providerId, model).finally(cleanup)
     }
     return sendId
   })
@@ -342,7 +350,10 @@ async function runPlainConversation(
   projectPath: string | null,
   messages: ChatMessage[],
   signal: AbortSignal,
-  recordJournal: AiDeps['recordJournal']
+  recordJournal: AiDeps['recordJournal'],
+  costGuard?: ReturnType<typeof createCostGuard>,
+  providerId?: ProviderId,
+  model?: string
 ): Promise<void> {
   let lastAssistantText = ''
   const sessionUsage: { inputTokens: number; outputTokens: number; cachedInputTokens: number } = {
@@ -365,6 +376,19 @@ async function runPlainConversation(
         sessionUsage.inputTokens += event.usage.inputTokens ?? 0
         sessionUsage.outputTokens += event.usage.outputTokens ?? 0
         sessionUsage.cachedInputTokens += event.usage.cachedInputTokens ?? 0
+        // Cost guard check — abort если превышен лимит.
+        if (costGuard && providerId) {
+          const check = costGuard.recordAndCheck(
+            providerId, model ?? '', event.usage.inputTokens ?? 0,
+            event.usage.outputTokens ?? 0, event.usage.cachedInputTokens ?? 0
+          )
+          if (check.exceeded) {
+            exitReason = 'error'
+            sender.send('ai:event', { id: sendId, event: { type: 'error', message: check.message ?? 'cost cap exceeded' } })
+            sender.send('ai:event', { id: sendId, event: { type: 'done' } })
+            return
+          }
+        }
       } else if (event.type === 'error') {
         exitReason = 'error'
       }
@@ -456,7 +480,10 @@ async function runApiConversation(
   agentMode: AgentMode,
   turnsBudget: number = DEFAULT_AGENT_TURNS,
   skillRegistry?: AiDeps['skillRegistry'],
-  getSecretForDelegate?: AiDeps['getSecret']
+  getSecretForDelegate?: AiDeps['getSecret'],
+  costGuard?: ReturnType<typeof createCostGuard>,
+  providerId?: ProviderId,
+  model?: string
 ): Promise<void> {
   const currentMessages = [...initialMessages]
   // Loop detection: per-signature occurrence counter across the whole agent
@@ -542,6 +569,20 @@ async function runApiConversation(
         sessionUsage.outputTokens += event.usage.outputTokens ?? 0
         sessionUsage.cachedInputTokens += event.usage.cachedInputTokens ?? 0
         sender.send('ai:event', { id: sendId, event })
+        // Cost guard в API path — на каждый usage event считаем total,
+        // если превышен лимит → abort всего turn-loop'a.
+        if (costGuard && providerId) {
+          const check = costGuard.recordAndCheck(
+            providerId, model ?? '', event.usage.inputTokens ?? 0,
+            event.usage.outputTokens ?? 0, event.usage.cachedInputTokens ?? 0
+          )
+          if (check.exceeded) {
+            exitReason = 'error'
+            sender.send('ai:event', { id: sendId, event: { type: 'error', message: check.message ?? 'cost cap exceeded' } })
+            sender.send('ai:event', { id: sendId, event: { type: 'done' } })
+            return
+          }
+        }
       } else if (event.type === 'done') {
         if (toolCalls.length === 0) {
           exitReason = 'completed'
