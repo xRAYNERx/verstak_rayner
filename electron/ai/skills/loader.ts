@@ -21,6 +21,12 @@ import type { ProviderId } from '../registry'
 import type { AgentMode } from '../mode-policy'
 
 const USER_SKILLS_DIR = join(homedir(), '.geminigrok', 'skills')
+/** Папка скиллов Claude Code — для migration / sharing. Если у Pavel'я там
+ *  уже лежат 8 BOS-скиллов, они автоматически появятся в GeminiGrok без
+ *  копирования. Помечаются source='user'. Если в обоих директориях есть
+ *  файл с одинаковым id — .geminigrok/skills/ имеет приоритет (это явный
+ *  GG-override). */
+const CLAUDE_SKILLS_DIR = join(homedir(), '.claude', 'skills')
 const SERVER_TIMEOUT_MS = 5_000
 
 /** Конфиг loader — путь к серверу читается из settings. */
@@ -45,8 +51,13 @@ export async function loadAllSkills(config: LoaderConfig = {}): Promise<LoadResu
   // 1) Built-in идут первыми, перебиваются user / server.
   for (const s of BUILT_IN_SKILLS) byId.set(s.id, s)
 
-  // 2) User skills из ~/.geminigrok/skills/ + extras
-  const userDirs = [USER_SKILLS_DIR, ...(config.extraDirs ?? [])]
+  // 2) User skills. Источники по приоритету (поздние перебивают):
+  //    (a) ~/.claude/skills/ — если у Pavel'я там уже лежат BOS-скиллы из
+  //        Claude Code, забираем их автоматически. Это даёт мгновенный
+  //        bootstrap для пользователей которые мигрируют из Claude Code.
+  //    (b) ~/.geminigrok/skills/ — личные скиллы GG (приоритетнее claude).
+  //    (c) extraDirs — для тестов / опытов.
+  const userDirs = [CLAUDE_SKILLS_DIR, USER_SKILLS_DIR, ...(config.extraDirs ?? [])]
   let userCount = 0
   for (const dir of userDirs) {
     try {
