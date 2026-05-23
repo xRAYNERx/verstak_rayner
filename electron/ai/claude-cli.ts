@@ -14,6 +14,10 @@ interface ClaudeCliOptions {
   /** Project-specific prompt (Project Settings → «Системный промпт проекта»).
    *  Пробрасывается в buildCliPrompt, дописывается к user_layer. */
   projectSystemPrompt?: string | null
+  /** Long-lived OAuth token из `claude setup-token`. Передаётся как env var
+   *  CLAUDE_CODE_OAUTH_TOKEN дочернему процессу. Это решает headless+Max
+   *  ограничение Claude Code v2.1+. */
+  oauthToken?: string | null
 }
 
 export const CLAUDE_CLI_MODELS = [
@@ -110,11 +114,21 @@ export function createClaudeCliProvider(opts: ClaudeCliOptions = {}): ChatProvid
       if (opts.model && opts.model !== 'auto') {
         args.push('--model', opts.model)
       }
+      // OAuth token из Settings → env var дочернему процессу. Это решает
+      // headless+Max ограничение Claude Code (см. fix(claude-cli): нашёл
+      // решение headless+Max в DEVLOG). Сначала env из текущего процесса,
+      // потом — наш токен поверх, чтобы он перекрывал даже если в системе
+      // стоит другой.
+      const env: Record<string, string> = { ...(process.env as Record<string, string>) }
+      if (opts.oauthToken) {
+        env.CLAUDE_CODE_OAUTH_TOKEN = opts.oauthToken
+      }
       const child = spawn(binary, args, {
         cwd,
         shell: binary.endsWith('.cmd') || binary.endsWith('.ps1'),
         windowsHide: true,
-        stdio: ['pipe', 'pipe', 'pipe']
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env
       })
 
       try {

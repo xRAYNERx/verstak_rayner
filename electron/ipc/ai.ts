@@ -177,12 +177,18 @@ export function registerAiIpc(deps: AiDeps): void {
       : (projectPath ? deps.getSecret(`system_prompt_${projectPath}`) : null)
     let provider: ChatProvider
     try {
+      // Claude Code OAuth token (из `claude setup-token`) — для headless+Max.
+      // Если задан в settings, передаётся как env var дочернему claude процессу.
+      const claudeOauthToken = providerId === 'claude-cli'
+        ? deps.getSecret('claude_code_oauth_token')
+        : null
       provider = createProvider(providerId, {
         apiKey,
         model,
         cwd: projectPath ?? process.cwd(),
         signal: ctrl.signal,
-        projectSystemPrompt: projectSystemPromptForProvider
+        projectSystemPrompt: projectSystemPromptForProvider,
+        claudeOauthToken
       })
     } catch (err) {
       taggedSender.send('ai:event', {

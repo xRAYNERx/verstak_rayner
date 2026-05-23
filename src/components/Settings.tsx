@@ -137,6 +137,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [yDirectToken, setYDirectToken] = useState('')
   const [yDirectLogin, setYDirectLogin] = useState('')
   const [skillsServerBase, setSkillsServerBase] = useState('')
+  const [claudeOauthToken, setClaudeOauthToken] = useState('')
   const { theme, setTheme } = useTheme()
 
   useEffect(() => {
@@ -193,6 +194,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
       setYDirectToken((await window.api.settings.getKey('yandex_direct_token')) ?? '')
       setYDirectLogin((await window.api.settings.getKey('yandex_direct_login')) ?? '')
       setSkillsServerBase((await window.api.settings.getKey('skills_server_base')) ?? '')
+      setClaudeOauthToken((await window.api.settings.getKey('claude_code_oauth_token')) ?? '')
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -227,6 +229,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
     await window.api.settings.setKey('yandex_direct_token', yDirectToken)
     await window.api.settings.setKey('yandex_direct_login', yDirectLogin)
     await window.api.settings.setKey('skills_server_base', skillsServerBase)
+    await window.api.settings.setKey('claude_code_oauth_token', claudeOauthToken)
     setSaved(true)
     setTimeout(() => setSaved(false), 1500)
   }
@@ -367,7 +370,27 @@ export function Settings({ onClose }: { onClose: () => void }) {
 
         {tab === 'connectors' && (
         <div className="gg-settings-extra">
-          <div className="gg-settings-section-title">1С OData</div>
+          <div className="gg-settings-section-title">🔑 Claude Code OAuth (для Max подписки в headless)</div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Long-lived OAuth token</label>
+            <input
+              className="gg-input"
+              type="password"
+              value={claudeOauthToken}
+              onChange={e => setClaudeOauthToken(e.target.value)}
+              placeholder="sk-ant-oat01-... (из `claude setup-token` в PowerShell)"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="gg-settings-hint">
+            Claude Code v2.1+ в headless режиме (через нашу программу) НЕ использует Max OAuth напрямую — требует
+            long-lived token. Получи: <code>claude setup-token</code> в PowerShell → подтверди в браузере →
+            копируй token сюда. GeminiGrok будет передавать его как env var <code>CLAUDE_CODE_OAUTH_TOKEN</code>
+            при запуске claude. Решает «401 Invalid credentials» при выборе провайдера Claude Code.
+            Хранится зашифрованным через safeStorage. Действителен 1 год.
+          </div>
+
+          <div className="gg-settings-section-title" style={{ marginTop: 24 }}>1С OData</div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">1С OData base URL</label>
             <input

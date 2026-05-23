@@ -118,6 +118,9 @@ export interface CreateOptions {
    *  попасть в payload CLI-провайдеров. Для API-провайдеров не нужен (там
    *  ipc/ai.ts напрямую вызывает prepareSystemContext с этим полем). */
   projectSystemPrompt?: string | null
+  /** OAuth token для Claude Code (из `claude setup-token`). Передаётся как
+   *  env var CLAUDE_CODE_OAUTH_TOKEN — решает headless+Max ограничение. */
+  claudeOauthToken?: string | null
 }
 
 export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvider {
@@ -133,7 +136,13 @@ export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvide
       return createClaudeProvider({ apiKey: opts.apiKey, model: opts.model })
     }
     case 'claude-cli':
-      return createClaudeCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model, projectSystemPrompt: opts.projectSystemPrompt })
+      return createClaudeCliProvider({
+        cwd: opts.cwd,
+        signal: opts.signal,
+        model: opts.model,
+        projectSystemPrompt: opts.projectSystemPrompt,
+        oauthToken: opts.claudeOauthToken
+      })
     case 'grok': {
       if (!opts.apiKey) throw new Error('xAI (Grok) API key not set')
       return createGrokProvider({ apiKey: opts.apiKey, model: opts.model })
