@@ -530,9 +530,35 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
     const summary = userAttachments.length > 0
       ? `${text}${text ? '\n\n' : ''}📎 ${userAttachments.map(a => a.name).join(', ')}`
       : text
-    addMessage({ role: 'user', content: text, attachments: userAttachments })
+    // Context loaders: если активен скилл с frontmatter context_loaders —
+    // запускаем их и подмешиваем результат в content user-message ПЕРЕД
+    // отправкой. Это делает скиллы реально мощными — bos-pilot получает
+    // дату/день, client-cycle получает карточку клиента, и т.п.
+    let enrichedText = text
+    const activeSkillForLoad = useSkillsStore.getState().activeSkillId
+      ? useSkillsStore.getState().skills.find(s => s.id === useSkillsStore.getState().activeSkillId)
+      : null
+    if (activeSkillForLoad?.context_loaders?.length) {
+      const isFirstUserMsg = !useProject.getState().messages.some(m => m.role === 'user')
+      const trigger: 'chat_open' | 'slash_arg' = isFirstUserMsg ? 'chat_open' : 'slash_arg'
+      try {
+        const loaded = await window.api.skills.runLoaders(activeSkillForLoad.id, {
+          trigger,
+          projectPath: path,
+          arg: text.split(/\s+/)[0]  // первое слово как arg (для /dossier alfa-development)
+        })
+        if (loaded.context) {
+          enrichedText = `${loaded.context}\n\n---\n\n${text}`
+        }
+      } catch (err) {
+        console.warn('[chat] skill loaders failed:', err)
+      }
+    }
+    addMessage({ role: 'user', content: enrichedText, attachments: userAttachments })
     const activeChatId = store.activeChatId
     if (path && activeChatId) {
+      // В БД сохраняем оригинальный text Pavel'я (без loader-контекста),
+      // чтобы при reload UI не показывал жирный системный блок.
       await window.api.chats.append(activeChatId, path, 'user', summary)
       // log the start of a session — title is the first 80 chars of the request
       const journalTitle = text.length > 80 ? text.slice(0, 80) + '…' : (text || 'Сообщение с вложением')

@@ -268,7 +268,7 @@ app.whenReady().then(() => {
     getActiveProject: () => getActiveProjectPath()
   })
   registerTerminalIpc()
-  registerSkillsIpc(skillRegistry)
+  registerSkillsIpc(skillRegistry, { getSecret })
   registerUserProfilesIpc(userProfiles)
   createWindow()
 })

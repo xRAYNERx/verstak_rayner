@@ -165,6 +165,8 @@ declare global {
         get: (id: string) => Promise<Skill | null>
         refresh: () => Promise<{ added: number; updated: number; failed: string[] }>
         status: () => Promise<{ lastRefreshAt: number | null; serverReachable: boolean; total: number }>
+        runLoaders: (skillId: string, opts: { arg?: string; projectPath?: string | null; trigger: 'chat_open' | 'slash_arg' }) =>
+          Promise<{ context: string; labels: string[] }>
       }
       userProfiles: {
         list: () => Promise<UserProfile[]>
