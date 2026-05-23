@@ -10,6 +10,7 @@
 
 **Ключевая ценность:** контроль, прозрачность, мульти-провайдерность.
 
+**Базовые фичи:**
 - **8 провайдеров одновременно:** Gemini API / Gemini CLI / Claude API / Claude Code / Grok API / Grok Build / OpenAI API / Codex CLI. Аккаунт упал — переключился, не теряя работу.
 - **5 режимов агента** (`ask` / `accept-edits` / `plan` / `auto` / `bypass`) — переключаются 1-5.
 - **Per-chat провайдер + модель.** Multi-chat со снапшотами фоновых стримов.
@@ -18,6 +19,16 @@
 - **Cost controller** в статус-баре. Жёлтый > $2, красный > $5.
 - **Context sliding window** для длинных сессий (старые tool results сжимаются в маркеры).
 - **Exponential backoff** на 429/503/ECONNRESET.
+
+**V3 фичи (агент-исполнитель для агентства):**
+- **Skills как first-class.** Frontmatter `.md` файлы → system prompt + tools_allow + context_loaders + default_provider/model. Авто-импорт из `~/.claude/skills/` + `~/.geminigrok/skills/` + 3 built-in (bos-sales / bos-mkt / client-cycle). Picker 🎭 в composer + slash commands `/bos-sales`.
+- **Context loaders** — frontmatter `context_loaders: [{impl, runs_on}]` авто-инжектят данные в первое user msg. Готовые: `load_client_card`, `load_clients_list`, `load_today_brief`.
+- **8 коннекторов:** 1C OData, generic HTTP, Google Sheets, SSH executor (с denylist), Telegram bot, Битрикс24, Я.Директ, Я.Диск.
+- **Artifacts:** `generate_html` / `generate_docx` / `render_chart` (SVG bar/line/pie) tools. Embedded preview (HTML напрямую, DOCX через mammoth.js).
+- **Multi-user profiles:** Onboarding wizard + Settings → Профили. 5 ролей с пресетами.
+- **delegate_task** — мультиагент V1: основной агент делегирует sub-task другому скиллу/модели, получает результат как tool_result.
+- **Sidecar Terminal Intelligence** — детектор ошибок (TS/Python/npm/ESLint) в потоке терминала → toast с кнопкой «Fix in chat».
+- **Claude Code OAuth env-passthrough** — Settings field, GeminiGrok передаёт `CLAUDE_CODE_OAUTH_TOKEN` дочернему claude процессу, headless+Max заработал.
 
 ---
 
@@ -28,6 +39,9 @@ electron/                  ← main process (Node.js)
 ├── main.ts                ← entry: window, IPC регистрация, db open
 ├── preload.ts             ← contextBridge: window.api для renderer
 ├── ai/                    ← провайдеры + ядро агентной логики
+│   ├── skills/              ← V3: skill loader + frontmatter + 3 built-in + loaders registry
+│   ├── artifacts.ts         ← generate_html / generate_docx (docx npm)
+│   ├── charts.ts            ← render_chart — SVG bar/line/pie без зависимостей
 │   ├── registry.ts          сводный список 8 провайдеров
 │   ├── types.ts             ChatMessage / ChatEvent / ChatProvider
 │   ├── gemini.ts, claude.ts, grok.ts, openai.ts  ← API-провайдеры
@@ -65,16 +79,31 @@ electron/                  ← main process (Node.js)
 │   ├── undo.ts              ← per-file undo stack
 │   ├── plans.ts, journal.ts, tasks.ts, projects.ts, feedback.ts
 │   └── settings.ts          ← encrypted secrets через safeStorage
-└── connectors/            ← внешние сервисы (1С, HTTP)
+└── connectors/            ← внешние сервисы — 8 шт
     ├── registry.ts
     ├── types.ts             ← Connector interface
     ├── onec.ts              ← 1С OData
-    └── http.ts              ← generic REST
+    ├── http.ts              ← generic REST
+    ├── gsheets.ts           ← Google Sheets (service account JWT, без googleapis)
+    ├── ssh.ts               ← SSH executor через системный ssh (denylist)
+    ├── telegram.ts          ← Telegram Bot API
+    ├── bitrix24.ts          ← Битрикс24 incoming webhook
+    ├── yandex-direct.ts     ← Я.Директ OAuth + Reports API (sync polling)
+    └── yandex-disk.ts       ← Я.Диск OAuth для шеринга артефактов с клиентами
 
 src/                      ← renderer (React 19)
-├── App.tsx                ← composition root
-├── store/projectStore.ts  ← один большой zustand store (см. п.5 — рефакторить!)
+├── App.tsx                ← composition root + Onboarding + Toast + Preview
+├── store/
+│   ├── projectStore.ts    ← основной zustand store (см. п.5 — рефакторить!)
+│   └── skillStore.ts      ← V3: список скиллов + activeSkillId
 ├── components/            ← UI компоненты
+│   ├── SkillPicker.tsx + SlashCommandPopup.tsx — V3 skill UX
+│   ├── ArtifactPreview.tsx + ArtifactsPanel.tsx — V3 артефакты
+│   ├── OnboardingWizard.tsx + ProfilesTab.tsx — V3 multi-user
+│   ├── TerminalErrorToast.tsx — V3 sidecar terminal intelligence
+│   ├── ReviewButton.tsx + ReviewPills.tsx — Explicit Review V1
+│   ├── CheckpointButton.tsx + TimelineBar.tsx — UX штурм V1
+│   └── (остальные старые)
 ├── hooks/                 ← useProvider / useAgentMode / useTheme
 ├── lib/                   ← compose-review-payload, pricing
 ├── styles/                ← layout / theme / markdown CSS
@@ -175,7 +204,11 @@ npm run dist:win     # NSIS + portable .exe
 ## 9. Куда писать новые фичи
 
 - **Новый AI-провайдер:** `electron/ai/{name}.ts` + регистрация в `registry.ts`. Если это API — реализуй `ChatProvider.send` как async generator. Если CLI — посмотри `claude-cli.ts` как шаблон (treeKill + stdin payload + stream-json parser).
-- **Новый коннектор (1С/Bitrix/Yandex):** `electron/connectors/{name}.ts` реализует `Connector` интерфейс (info + query). Регистрация в `connectors/registry.ts` — одна строка в BUILTINS массиве.
+- **Новый коннектор (1С/Bitrix/Yandex):** `electron/connectors/{name}.ts` реализует `Connector` интерфейс (info + query). Регистрация в `connectors/registry.ts` — одна строка в BUILTINS массиве. Settings UI секция в `src/components/Settings.tsx` вкладка connectors.
+- **Новый skill:** просто `.md` файл в `~/.geminigrok/skills/` (или редактируй `~/.claude/skills/` — авто-импортится). Frontmatter: id (обязательно) + name/description/icon/slash/tools_allow/context_loaders/suggested_prompts. Body = system prompt. Для built-in (захардкоженного fallback) — `electron/ai/skills/built-in.ts`.
+- **Новый context loader:** функция в `electron/ai/skills/loaders.ts` + регистрация в REGISTRY map. Frontmatter скилла ссылается через `impl: ваше_имя`.
+- **Новый tool (для агента):** TOOL_DEF в `electron/ai/tools.ts` + handler в `electron/ipc/tool-handlers.ts` (mode: parallel-read / sequential / confirm-write). Регистрируй в HANDLER_REGISTRY.
+- **Новый артефакт type:** добавь kind в ChatEvent `artifact-created` + handler в tool-handlers + render в ArtifactPreview.tsx.
 - **Новый IPC endpoint:** handler в `electron/ipc/{file}.ts` → bridge в `preload.ts` → тип в `src/types/api.d.ts`. Все три места.
 - **Новая таблица в БД:** добавь миграцию в `MIGRATIONS` массив `electron/storage/db.ts` с НОВЫМ version номером. Никогда не правь старые миграции.
 - **Новая фича UI:** компонент в `src/components/`, состояние через zustand, стили в `src/styles/layout.css` секцией с комментарием-маркером.
