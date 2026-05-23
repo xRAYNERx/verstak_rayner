@@ -174,6 +174,8 @@ interface ProjectState {
   /** Артефакты сгенерированные агентом в активной сессии (generate_html /
    *  generate_docx). Сбрасываются при switchChatSession. */
   artifacts: Array<{ kind: 'html' | 'docx'; filename: string; path: string; sizeBytes: number; ts: number }>
+  /** Текущий артефакт открытый в preview pane (path как ID). null = закрыт. */
+  previewArtifactId: string | null
   setProject: (path: string) => Promise<void>
   closeProject: () => void
   refreshProjectList: () => Promise<void>
@@ -248,6 +250,8 @@ interface ProjectState {
   recordArtifact: (a: { kind: 'html' | 'docx'; filename: string; path: string; sizeBytes: number }) => void
   /** Сбросить артефакты (вызывается при смене чата / нового чата). */
   clearArtifacts: () => void
+  /** Открыть preview панель для артефакта (по path как ID), или закрыть (null). */
+  setPreviewArtifact: (path: string | null) => void
 }
 
 // Monotonic token used by setProject to cancel its own stale concurrent runs.
@@ -278,6 +282,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   reviews: {},
   openedReviewId: null,
   artifacts: [],
+  previewArtifactId: null,
   setProject: async (path) => {
     const myToken = ++setProjectToken
     const s = get()
@@ -792,7 +797,8 @@ export const useProject = create<ProjectState>((set, get) => ({
   recordArtifact: (a) => set(s => ({
     artifacts: [...s.artifacts, { ...a, ts: Date.now() }]
   })),
-  clearArtifacts: () => set({ artifacts: [] }),
+  clearArtifacts: () => set({ artifacts: [], previewArtifactId: null }),
+  setPreviewArtifact: (path) => set({ previewArtifactId: path }),
   cleanupReviewsFor: (parentChatId) => set(s => {
     // Удаляем review entries этого main-чата + связанные sendOwners.
     // Закрываем openedReviewId если он был из этого чата.

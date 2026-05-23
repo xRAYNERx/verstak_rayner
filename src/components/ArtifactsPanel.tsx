@@ -11,16 +11,8 @@ import { useProject } from '../store/projectStore'
 
 export function ArtifactsPanel() {
   const artifacts = useProject(s => s.artifacts)
+  const setPreviewArtifact = useProject(s => s.setPreviewArtifact)
   if (artifacts.length === 0) return null
-
-  async function open(path: string) {
-    try {
-      await window.api.files.revealInExplorer(path)
-    } catch (err) {
-      console.error('[artifacts] open failed:', err)
-      window.alert(`Не получилось открыть ${path}`)
-    }
-  }
 
   return (
     <>
@@ -28,8 +20,8 @@ export function ArtifactsPanel() {
         <span
           key={`${a.path}-${i}`}
           className={`gg-timeline-pill gg-artifact-pill is-${a.kind}`}
-          onClick={() => void open(a.path)}
-          title={`Открыть ${a.filename} в дефолтном приложении\nПуть: ${a.path}`}
+          onClick={() => setPreviewArtifact(a.path)}
+          title={`Открыть ${a.filename} в preview pane\nКнопка ↗ внутри откроет в дефолтном приложении\nПуть: ${a.path}`}
         >
           <span className="gg-timeline-pill-icon">📄</span>
           <span className="gg-timeline-pill-detail">

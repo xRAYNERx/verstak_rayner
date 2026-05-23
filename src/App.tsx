@@ -13,6 +13,7 @@ import { DiffView } from './components/DiffView'
 import { CommandConfirm } from './components/CommandConfirm'
 import { Terminal } from './components/Terminal'
 import { OnboardingWizard } from './components/OnboardingWizard'
+import { ArtifactPreviewContainer } from './components/ArtifactPreview'
 import { useProject } from './store/projectStore'
 
 const SIDEBAR_MIN = 200
@@ -160,6 +161,7 @@ export function App() {
       </main>
       {showSettings && <Settings onClose={() => setShowSettings(false)} />}
       {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}
+      <ArtifactPreviewContainer />
       <DiffView />
       <CommandConfirm />
     </div>

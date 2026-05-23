@@ -2888,3 +2888,69 @@
   background: var(--bg-elevated);
 }
 
+/* ======================================================================
+   Artifact preview pane — embedded iframe для HTML, fallback message для DOCX.
+   Источник: V3 Plan раздел 8.2.
+   ====================================================================== */
+.gg-artifact-preview-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 90;
+}
+.gg-artifact-preview-modal {
+  width: 90vw; max-width: 1200px;
+  height: 88vh;
+  background: var(--bg-base);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.gg-artifact-preview-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+}
+.gg-artifact-preview-title {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text-primary);
+  display: flex; align-items: baseline; gap: 12px;
+}
+.gg-artifact-preview-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+.gg-artifact-preview-actions {
+  display: flex; gap: 8px;
+}
+.gg-artifact-preview-body {
+  flex: 1;
+  overflow: hidden;
+  background: #ffffff;  /* белый фон под HTML контент — артефакты дизайнятся под белое */
+  display: flex;
+}
+.gg-artifact-preview-iframe {
+  width: 100%; height: 100%;
+  border: none;
+  background: #ffffff;
+}
+.gg-artifact-preview-state {
+  padding: 60px;
+  margin: auto;
+  text-align: center;
+  color: var(--text-secondary);
+  max-width: 500px;
+}
+.gg-artifact-preview-state.is-error {
+  color: var(--error);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.gg-artifact-preview-state p { margin: 8px 0; }
+
