@@ -55,6 +55,7 @@ interface CliEvent {
   }
   is_error?: boolean
   error?: string
+  error_status?: number
   result?: string
   /** Token usage on the final `result` event (Claude Code stream-json shape).
    *  Field names track the Anthropic API: input_tokens, output_tokens,
@@ -65,7 +66,20 @@ interface CliEvent {
     cache_read_input_tokens?: number
     cache_creation_input_tokens?: number
   }
+  /** Init event содержит apiKeySource: 'none' если headless mode не нашёл
+   *  ни ANTHROPIC_API_KEY env, ни subscription token. Это известная штука:
+   *  Claude Code в --print режиме НЕ использует Max OAuth, требует API key. */
+  apiKeySource?: 'none' | 'env' | 'config' | string
 }
+
+/** Понятное сообщение про headless+Max ограничение. Известная штука Anthropic:
+ *  CLI Pro/Max OAuth работает только в interactive TTY. Для --print нужен
+ *  API key через ANTHROPIC_API_KEY env или через провайдера Claude (API) в GG. */
+const HEADLESS_NO_AUTH_HINT =
+  'Claude Code в headless режиме (--print) НЕ использует Max/Pro подписку — это известное ограничение Anthropic. ' +
+  'Варианты: (1) переключись на провайдера «Claude (API)» в GeminiGrok с API key из console.anthropic.com; ' +
+  '(2) используй Gemini Ultra (CLI), Grok Build (CLI) или Codex (CLI) — у них headless работает с подпиской; ' +
+  '(3) задай ANTHROPIC_API_KEY env var на машине — тогда Claude Code в headless подцепит его.'
 
 export function createClaudeCliProvider(opts: ClaudeCliOptions = {}): ChatProvider {
   const binary = opts.binary ?? findBinary()
@@ -124,11 +138,32 @@ export function createClaudeCliProvider(opts: ClaudeCliOptions = {}): ChatProvid
       const wake = () => { if (resolve) { const r = resolve; resolve = null; r() } }
       const lastText: Record<string, string> = {}  // delta deduplication per message id
 
+      // Флаг: Claude Code пожаловался что нет credentials в headless режиме.
+      // Выставляется на init event с apiKeySource='none' и используется при
+      // финальной ошибке чтобы выдать понятный HEADLESS_NO_AUTH_HINT.
+      let suspectHeadlessAuth = false
+
       function processLine(line: string) {
         const trimmed = line.trim()
         if (!trimmed.startsWith('{')) return
         let ev: CliEvent
         try { ev = JSON.parse(trimmed) } catch { return }
+
+        // Известная авто-диагностика: init event сразу говорит откуда взялись
+        // (или НЕ взялись) credentials. Если apiKeySource='none' — мы знаем
+        // что 401 впереди, и можем выдать понятное сообщение.
+        if (ev.type === 'system' && ev.subtype === 'init' && ev.apiKeySource === 'none') {
+          suspectHeadlessAuth = true
+        }
+        // api_retry с 401 — финальная подтверждение что headless auth не сработал
+        if (ev.type === 'system' && ev.subtype === 'api_retry' && ev.error_status === 401) {
+          if (suspectHeadlessAuth) {
+            queue.push({ type: 'error', message: HEADLESS_NO_AUTH_HINT })
+            done = true
+            wake()
+            return
+          }
+        }
 
         if (ev.type === 'assistant' && ev.message?.content) {
           for (const block of ev.message.content) {
@@ -207,8 +242,14 @@ export function createClaudeCliProvider(opts: ClaudeCliOptions = {}): ChatProvid
       })
       child.on('close', (code) => {
         if (stdoutBuffer.length > 0) processLine(stdoutBuffer)
-        if (code !== 0 && !queue.some(e => e.type === 'done')) {
-          queue.push({ type: 'error', message: `Claude CLI exit ${code}. ${stderrBuffer.slice(0, 400)}` })
+        if (code !== 0 && !queue.some(e => e.type === 'done' || e.type === 'error')) {
+          // Если перехватили "apiKeySource: none" по дороге — это headless+auth
+          // ограничение, выдаём понятное сообщение вместо raw exit code.
+          if (suspectHeadlessAuth) {
+            queue.push({ type: 'error', message: HEADLESS_NO_AUTH_HINT })
+          } else {
+            queue.push({ type: 'error', message: `Claude CLI exit ${code}. ${stderrBuffer.slice(0, 400)}` })
+          }
         }
         done = true; wake()
       })
