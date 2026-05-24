@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ProviderId } from '../hooks/useProvider'
 import { useTheme } from '../hooks/useTheme'
 import type { AutonomousStatus } from '../types/api'
 import { ProfilesTab } from './ProfilesTab'
+import { buildCatalog, connectionStatus, type ConnectionStatus } from '../lib/model-catalog'
 
 interface ProviderConfig {
   id: ProviderId
@@ -112,13 +113,39 @@ const PROVIDERS: ProviderConfig[] = [
   }
 ]
 
-type Tab = 'models' | 'connectors' | 'autonomous' | 'profiles' | 'appearance'
+type Tab = 'appearance' | 'profiles' | 'providers' | 'models' | 'connectors' | 'autonomous'
+
+// Группы для левой sidebar — повторяет OpenCode Desktop структуру.
+const TAB_GROUPS: ReadonlyArray<{ title: string; tabs: ReadonlyArray<{ id: Tab; label: string; icon: string }> }> = [
+  { title: 'Приложение', tabs: [
+    { id: 'appearance', label: 'Внешний вид',  icon: '🎨' },
+    { id: 'profiles',   label: 'Профили',      icon: '👤' }
+  ] },
+  { title: 'Сервер', tabs: [
+    { id: 'providers',  label: 'Провайдеры',   icon: '🔌' },
+    { id: 'models',     label: 'Модели',       icon: '✨' },
+    { id: 'connectors', label: 'Коннекторы',   icon: '🧩' },
+    { id: 'autonomous', label: 'Ночной режим', icon: '🌙' }
+  ] }
+]
+
+function modelKey(providerId: ProviderId, model: string): string {
+  return `${providerId}::${model}`
+}
+function allModelsSet(): Set<string> {
+  const s = new Set<string>()
+  for (const p of PROVIDERS) {
+    for (const m of p.models) s.add(modelKey(p.id, m))
+  }
+  return s
+}
 
 export function Settings({ onClose }: { onClose: () => void }) {
-  const [tab, setTab] = useState<Tab>('models')
+  const [tab, setTab] = useState<Tab>('providers')
   const [activeProvider, setActiveProvider] = useState<ProviderId>('gemini-api')
   const [keys, setKeys] = useState<Record<string, string>>({})
   const [models, setModels] = useState<Record<string, string>>({})
+  const [enabledModels, setEnabledModels] = useState<Set<string>>(new Set())
   const [saved, setSaved] = useState(false)
   const [onec, setOneC] = useState({ url: '', user: '', pass: '' })
   const [autonomous, setAutonomousState] = useState<AutonomousStatus>({
@@ -199,6 +226,18 @@ export function Settings({ onClose }: { onClose: () => void }) {
       setClaudeOauthToken((await window.api.settings.getKey('claude_code_oauth_token')) ?? '')
       setYDiskToken((await window.api.settings.getKey('yandex_disk_token')) ?? '')
       setCostCap((await window.api.settings.getKey('cost_cap_usd_per_session')) ?? '')
+      // Какие модели «включены» в picker'е. Пусто = все.
+      const em = await window.api.settings.getKey('enabled_models')
+      if (em) {
+        try {
+          const arr = JSON.parse(em) as string[]
+          setEnabledModels(Array.isArray(arr) && arr.length > 0 ? new Set(arr) : allModelsSet())
+        } catch {
+          setEnabledModels(allModelsSet())
+        }
+      } else {
+        setEnabledModels(allModelsSet())
+      }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -236,11 +275,10 @@ export function Settings({ onClose }: { onClose: () => void }) {
     await window.api.settings.setKey('claude_code_oauth_token', claudeOauthToken)
     await window.api.settings.setKey('yandex_disk_token', yDiskToken)
     await window.api.settings.setKey('cost_cap_usd_per_session', costCap)
+    await window.api.settings.setKey('enabled_models', JSON.stringify([...enabledModels]))
     setSaved(true)
     setTimeout(() => setSaved(false), 1500)
   }
-
-  const activeCfg = PROVIDERS.find(p => p.id === activeProvider)!
 
   return (
     <div className="gg-modal-backdrop" onClick={onClose}>
@@ -250,128 +288,51 @@ export function Settings({ onClose }: { onClose: () => void }) {
           <button className="gg-modal-close" onClick={onClose}>×</button>
         </div>
 
-        <div className="gg-settings-tabs" role="tablist">
-          <button
-            type="button"
-            className={`gg-settings-tab ${tab === 'models' ? 'is-active' : ''}`}
-            onClick={() => setTab('models')}
-          >Модели</button>
-          <button
-            type="button"
-            className={`gg-settings-tab ${tab === 'connectors' ? 'is-active' : ''}`}
-            onClick={() => setTab('connectors')}
-          >Коннекторы</button>
-          <button
-            type="button"
-            className={`gg-settings-tab ${tab === 'autonomous' ? 'is-active' : ''}`}
-            onClick={() => setTab('autonomous')}
-          >🌙 Ночной режим</button>
-          <button
-            type="button"
-            className={`gg-settings-tab ${tab === 'profiles' ? 'is-active' : ''}`}
-            onClick={() => setTab('profiles')}
-          >👤 Профили</button>
-          <button
-            type="button"
-            className={`gg-settings-tab ${tab === 'appearance' ? 'is-active' : ''}`}
-            onClick={() => setTab('appearance')}
-          >Внешний вид</button>
-        </div>
+        <div className="gg-settings-shell">
+          <aside className="gg-settings-nav" role="tablist" aria-label="Разделы настроек">
+            {TAB_GROUPS.map(g => (
+              <div key={g.title} className="gg-settings-nav-group">
+                <div className="gg-settings-nav-title">{g.title}</div>
+                {g.tabs.map(t => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === t.id}
+                    className={`gg-settings-nav-item ${tab === t.id ? 'is-active' : ''}`}
+                    onClick={() => setTab(t.id)}
+                  >
+                    <span className="gg-settings-nav-icon" aria-hidden>{t.icon}</span>
+                    <span>{t.label}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </aside>
+
+          <div className="gg-settings-content">
+
+        {tab === 'providers' && (
+        <ProvidersPage
+          providers={PROVIDERS}
+          keys={keys}
+          setKeys={setKeys}
+          activeProvider={activeProvider}
+          setActiveProvider={setActiveProvider}
+        />
+        )}
 
         {tab === 'models' && (
-        <div className="gg-modal-body" style={{ display: 'flex', gap: 18, padding: 0, minHeight: 420 }}>
-          <div className="gg-provider-list">
-            {PROVIDERS.map(p => (
-              <button
-                key={p.id}
-                type="button"
-                className={`gg-provider-card-row ${activeProvider === p.id ? 'active' : ''}`}
-                onClick={() => setActiveProvider(p.id)}
-              >
-                <div className="gg-provider-card-name">
-                  {p.name}
-                  {p.supportsTools && <span className="gg-provider-tag is-tools">tools</span>}
-                  {p.transport === 'CLI' && <span className="gg-provider-tag is-cli">CLI</span>}
-                </div>
-                <div className="gg-provider-card-desc">{p.description}</div>
-              </button>
-            ))}
-          </div>
-
-          <div className="gg-provider-detail">
-            <div className="gg-label">Активный провайдер</div>
-            <div className="gg-provider-detail-title">{activeCfg.name}</div>
-
-            {activeCfg.secretKey && (
-              <>
-                <div className="gg-label" style={{ marginTop: 18 }}>API ключ</div>
-                <input
-                  className="gg-input"
-                  type="password"
-                  value={keys[activeCfg.secretKey] ?? ''}
-                  onChange={e => setKeys(k => ({ ...k, [activeCfg.secretKey!]: e.target.value }))}
-                  placeholder={activeCfg.keyHint}
-                  autoFocus
-                />
-                {activeCfg.keyLink && (
-                  <div className="gg-text-tertiary" style={{ fontSize: 'var(--text-xs)', marginTop: 6 }}>
-                    Получить ключ: <a href={activeCfg.keyLink.url} target="_blank" rel="noreferrer">{activeCfg.keyLink.label}</a>. Хранится зашифрованно через safeStorage.
-                  </div>
-                )}
-              </>
-            )}
-
-            {activeCfg.id === 'gemini-cli' && (
-              <div className="gg-notice" style={{ marginTop: 12 }}>
-                Нужно установлен <code>gemini-cli</code> и пройден OAuth твоим Google аккаунтом с Ultra подпиской.
-                Открой обычный терминал, набери <code>gemini</code>, согласись с авторизацией. После этого работает в нашем приложении.
-              </div>
-            )}
-            {activeCfg.id === 'claude-cli' && (
-              <div className="gg-notice" style={{ marginTop: 12 }}>
-                Нужен установленный <code>claude</code> CLI (Claude Code). Установить:{' '}
-                <code>irm https://claude.ai/install.ps1 | iex</code> или <code>curl -fsSL https://claude.ai/install.sh | bash</code>.
-                Залогинься через <code>claude</code> в обычном терминале своей Pro/Max подпиской — после этого работает у нас.
-              </div>
-            )}
-            {activeCfg.id === 'codex-cli' && (
-              <div className="gg-notice" style={{ marginTop: 12 }}>
-                Нужен установленный <code>codex</code> CLI. Установить: <code>npm install -g @openai/codex</code>.
-                Залогинься через <code>codex login</code> своей ChatGPT Plus/Pro подпиской — после этого работает у нас.
-              </div>
-            )}
-            {activeCfg.id === 'grok-cli' && (
-              <div className="gg-notice" style={{ marginTop: 12 }}>
-                Нужен <code>grok</code> CLI (Grok Build) из <code>~/.grok/bin/grok</code>. Установка / релизы — на сайте xAI (<a href="https://x.ai" target="_blank" rel="noreferrer">x.ai</a>). Залогинься через <code>grok</code> своей SuperGrok / x.com подпиской — после этого работает у нас.
-                <br /><br />
-                <strong>Известный баг:</strong> grok CLI на Windows иногда падает с
-                <code>exit 3221225477</code> (ACCESS_VIOLATION) на больших промптах. Мы шлём минимизированный payload для grok-cli как обход. Если падает и так — обнови CLI или переключись на <strong>Grok (API)</strong>.
-              </div>
-            )}
-
-            {activeCfg.models.length > 1 && (
-              <>
-                <div className="gg-label" style={{ marginTop: 18 }}>Модель по умолчанию</div>
-                <select
-                  className="gg-input"
-                  value={models[activeCfg.id] ?? activeCfg.defaultModel}
-                  onChange={e => setModels(m => ({ ...m, [activeCfg.id]: e.target.value }))}
-                >
-                  {activeCfg.models.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-                <div className="gg-text-tertiary" style={{ fontSize: 'var(--text-xs)', marginTop: 6 }}>
-                  Можно быстро переключать в композитор-чате — клик по pill справа от поля ввода.
-                </div>
-              </>
-            )}
-
-            {!activeCfg.supportsTools && activeCfg.id !== 'gemini-cli' && (
-              <div className="gg-text-tertiary" style={{ fontSize: 'var(--text-xs)', marginTop: 18, padding: 10, background: 'var(--bg-input)', borderRadius: 'var(--radius-md)' }}>
-                Этот провайдер сейчас работает в режиме chat-only. AI tools (чтение/правка файлов, выполнение команд) пока поддерживаются только у Gemini API. Добавим в следующих итерациях.
-              </div>
-            )}
-          </div>
-        </div>
+        <ModelsPage
+          providers={PROVIDERS}
+          enabledModels={enabledModels}
+          setEnabledModels={setEnabledModels}
+          models={models}
+          setModels={setModels}
+          activeProvider={activeProvider}
+          setActiveProvider={setActiveProvider}
+          keys={keys}
+        />
         )}
 
         {tab === 'connectors' && (
@@ -764,12 +725,305 @@ export function Settings({ onClose }: { onClose: () => void }) {
         </div>
         )}
 
+          </div>{/* /gg-settings-content */}
+        </div>{/* /gg-settings-shell */}
+
         <div className="gg-modal-footer">
           <button className="gg-btn gg-btn-ghost" onClick={onClose}>Закрыть</button>
           <button className="gg-btn gg-btn-primary" onClick={save}>
             {saved ? '✓ Сохранено' : 'Сохранить'}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ProvidersPage — OpenCode Desktop-style: «Подключённые» (с бейджем + Отключить)
+// + «Доступные» (карточки с кнопкой Подключить, раскрывается inline-форма с
+// ключом / hint'ом). Источник провайдеров — массив PROVIDERS (тот же что в
+// Models). «Подключение» = задание API-ключа; для CLI-провайдеров «подключение»
+// = установка CLI вне приложения, мы только подтверждаем галкой.
+// ════════════════════════════════════════════════════════════════════════════
+
+interface ProvidersPageProps {
+  providers: ProviderConfig[]
+  keys: Record<string, string>
+  setKeys: React.Dispatch<React.SetStateAction<Record<string, string>>>
+  activeProvider: ProviderId
+  setActiveProvider: (id: ProviderId) => void
+}
+
+function statusBadge(status: ConnectionStatus, transport: 'API' | 'CLI'): { label: string; tone: 'ready' | 'cli' | 'missing' } {
+  if (transport === 'CLI') return { label: 'Среда', tone: 'cli' }
+  if (status === 'ready')  return { label: 'API ключ', tone: 'ready' }
+  return { label: 'Нет ключа', tone: 'missing' }
+}
+
+function ProvidersPage(props: ProvidersPageProps) {
+  const { providers, keys, setKeys, activeProvider, setActiveProvider } = props
+  const [expanded, setExpanded] = useState<ProviderId | null>(null)
+
+  const connected = providers.filter(p =>
+    p.transport === 'CLI' || (p.secretKey != null && keys[p.secretKey])
+  )
+  const available = providers.filter(p =>
+    p.transport === 'API' && p.secretKey != null && !keys[p.secretKey]
+  )
+
+  function disconnect(p: ProviderConfig) {
+    if (p.secretKey) {
+      setKeys(k => {
+        const next = { ...k }
+        delete next[p.secretKey!]
+        return next
+      })
+    }
+    if (activeProvider === p.id) {
+      const fallback = providers.find(x => x.id !== p.id && (x.transport === 'CLI' || (x.secretKey && keys[x.secretKey])))
+      if (fallback) setActiveProvider(fallback.id)
+    }
+  }
+
+  return (
+    <div className="gg-settings-extra gg-providers-page">
+      <h2 className="gg-settings-page-title">Провайдеры</h2>
+
+      <div className="gg-settings-section-title" style={{ marginTop: 8 }}>Подключённые провайдеры</div>
+      <div className="gg-prov-list">
+        {connected.length === 0 && (
+          <div className="gg-text-tertiary" style={{ padding: 14, fontSize: 'var(--text-sm)' }}>
+            Пока нет подключённых. Внизу — доступные.
+          </div>
+        )}
+        {connected.map(p => {
+          const status = connectionStatus(p.id, p.secretKey, keys)
+          const badge = statusBadge(status, p.transport)
+          return (
+            <div key={p.id} className="gg-prov-card">
+              <div className="gg-prov-card-main">
+                <div className="gg-prov-card-name">
+                  {p.name}
+                  <span className={`gg-prov-badge is-${badge.tone}`}>{badge.label}</span>
+                </div>
+                <div className="gg-prov-card-desc">{p.description}</div>
+              </div>
+              <div className="gg-prov-card-actions">
+                {p.transport === 'API' && (
+                  <button
+                    type="button"
+                    className="gg-btn gg-btn-ghost"
+                    onClick={() => setExpanded(expanded === p.id ? null : p.id)}
+                  >{expanded === p.id ? 'Скрыть' : 'Изменить ключ'}</button>
+                )}
+                <button
+                  type="button"
+                  className="gg-btn gg-btn-ghost"
+                  onClick={() => disconnect(p)}
+                  disabled={p.transport === 'CLI'}
+                  title={p.transport === 'CLI' ? 'CLI отключается удалением самого бинаря на машине' : ''}
+                >Отключить</button>
+              </div>
+              {expanded === p.id && p.secretKey && (
+                <div className="gg-prov-card-expand">
+                  <div className="gg-label">API ключ</div>
+                  <input
+                    className="gg-input"
+                    type="password"
+                    value={keys[p.secretKey] ?? ''}
+                    onChange={e => setKeys(k => ({ ...k, [p.secretKey!]: e.target.value }))}
+                    placeholder={p.keyHint}
+                    autoFocus
+                  />
+                  {p.keyLink && (
+                    <div className="gg-text-tertiary" style={{ fontSize: 'var(--text-xs)', marginTop: 6 }}>
+                      Получить ключ: <a href={p.keyLink.url} target="_blank" rel="noreferrer">{p.keyLink.label}</a>. Хранится зашифрованно через safeStorage.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="gg-settings-section-title" style={{ marginTop: 22 }}>Доступные провайдеры</div>
+      <div className="gg-prov-list">
+        {available.length === 0 && (
+          <div className="gg-text-tertiary" style={{ padding: 14, fontSize: 'var(--text-sm)' }}>
+            Все API-провайдеры подключены.
+          </div>
+        )}
+        {available.map(p => (
+          <div key={p.id} className="gg-prov-card">
+            <div className="gg-prov-card-main">
+              <div className="gg-prov-card-name">{p.name}<span className="gg-prov-badge is-recommended">Рекомендуемый</span></div>
+              <div className="gg-prov-card-desc">{p.description}</div>
+            </div>
+            <div className="gg-prov-card-actions">
+              <button
+                type="button"
+                className="gg-btn gg-btn-primary"
+                onClick={() => setExpanded(p.id)}
+              >+ Подключить</button>
+            </div>
+            {expanded === p.id && p.secretKey && (
+              <div className="gg-prov-card-expand">
+                <div className="gg-label">API ключ</div>
+                <input
+                  className="gg-input"
+                  type="password"
+                  value={keys[p.secretKey] ?? ''}
+                  onChange={e => setKeys(k => ({ ...k, [p.secretKey!]: e.target.value }))}
+                  placeholder={p.keyHint}
+                  autoFocus
+                />
+                {p.keyLink && (
+                  <div className="gg-text-tertiary" style={{ fontSize: 'var(--text-xs)', marginTop: 6 }}>
+                    Получить ключ: <a href={p.keyLink.url} target="_blank" rel="noreferrer">{p.keyLink.label}</a>. Хранится зашифрованно через safeStorage.
+                  </div>
+                )}
+                <div className="gg-text-tertiary" style={{ fontSize: 'var(--text-xs)', marginTop: 6 }}>
+                  Нажми «Сохранить» внизу — провайдер появится в подключённых.
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="gg-settings-hint" style={{ marginTop: 18 }}>
+        CLI-провайдеры (Gemini CLI / Claude Code / Grok Build / Codex) подключаются установкой соответствующего CLI вне приложения и логином через подписку. После этого они появляются как «Среда».
+      </div>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ModelsPage — OpenCode Desktop-style: поиск + группировка по провайдеру +
+// toggle per-модель. Toggle сохраняется в enabled_models — это управляет тем,
+// какие модели появляются в чат-picker'е. Все включены по умолчанию.
+// ════════════════════════════════════════════════════════════════════════════
+
+interface ModelsPageProps {
+  providers: ProviderConfig[]
+  enabledModels: Set<string>
+  setEnabledModels: React.Dispatch<React.SetStateAction<Set<string>>>
+  models: Record<string, string>
+  setModels: React.Dispatch<React.SetStateAction<Record<string, string>>>
+  activeProvider: ProviderId
+  setActiveProvider: (id: ProviderId) => void
+  keys: Record<string, string>
+}
+
+function ModelsPage(props: ModelsPageProps) {
+  const { providers, enabledModels, setEnabledModels, models, setModels, activeProvider, setActiveProvider, keys } = props
+  const [search, setSearch] = useState('')
+
+  // Каталог нужен только для метаданных (теги, цена); группировка по providerId.
+  const catalog = useMemo(() => buildCatalog(providers), [providers])
+  const grouped = useMemo(() => {
+    const map = new Map<ProviderId, typeof catalog>()
+    const t = search.trim().toLowerCase()
+    for (const e of catalog) {
+      if (t && !`${e.model} ${e.providerName}`.toLowerCase().includes(t)) continue
+      const list = map.get(e.providerId) ?? []
+      list.push(e)
+      map.set(e.providerId, list)
+    }
+    return map
+  }, [catalog, search])
+
+  function toggle(key: string) {
+    setEnabledModels(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  function setDefault(providerId: ProviderId, model: string) {
+    setActiveProvider(providerId)
+    setModels(m => ({ ...m, [providerId]: model }))
+  }
+
+  return (
+    <div className="gg-settings-extra gg-models-page">
+      <h2 className="gg-settings-page-title">Модели</h2>
+
+      <div className="gg-models-search-wrap">
+        <input
+          className="gg-input gg-models-search"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="🔎 Поиск моделей"
+          spellCheck={false}
+        />
+      </div>
+
+      {providers.map(p => {
+        const list = grouped.get(p.id)
+        if (!list || list.length === 0) return null
+        const status = connectionStatus(p.id, p.secretKey, keys)
+        const isProviderReady = status === 'ready' || status === 'unknown' // unknown = CLI
+        return (
+          <div key={p.id} className="gg-models-group">
+            <div className="gg-models-group-head">
+              <span className="gg-models-group-name">{p.name}</span>
+              {!isProviderReady && (
+                <span className="gg-models-group-warn">нет ключа — подключи на вкладке «Провайдеры»</span>
+              )}
+            </div>
+            <div className="gg-models-group-list">
+              {list.map(e => {
+                const enabled = enabledModels.has(e.key)
+                const isDefault = activeProvider === p.id && (models[p.id] ?? p.defaultModel) === e.model
+                return (
+                  <div key={e.key} className={`gg-models-row ${enabled ? 'is-on' : ''}`}>
+                    <button
+                      type="button"
+                      className="gg-models-row-main"
+                      onClick={() => setDefault(p.id, e.model)}
+                      title="Сделать активной моделью для этого провайдера"
+                    >
+                      <span className="gg-models-row-name">{e.model}</span>
+                      {isDefault && <span className="gg-models-row-default">по умолчанию</span>}
+                      <span className="gg-models-row-tags">
+                        {e.tags.map(t => (
+                          <span key={t} className={`gg-mpal-tag is-${t.toLowerCase().replace(/\$/g, 'd')}`}>{t}</span>
+                        ))}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={enabled}
+                      className={`gg-toggle ${enabled ? 'is-on' : ''}`}
+                      onClick={() => toggle(e.key)}
+                      title={enabled ? 'Отключить из picker’а' : 'Включить в picker'}
+                    >
+                      <span className="gg-toggle-knob" />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+
+      {grouped.size === 0 && (
+        <div className="gg-text-tertiary" style={{ padding: 18, textAlign: 'center', fontSize: 'var(--text-sm)' }}>
+          Ничего не найдено
+        </div>
+      )}
+
+      <div className="gg-settings-hint" style={{ marginTop: 16 }}>
+        Toggle справа управляет тем, какие модели появляются в picker’е чата.
+        Клик по строке делает модель дефолтом провайдера и переключает активного провайдера.
+        Поиск работает по имени модели и провайдера.
       </div>
     </div>
   )
