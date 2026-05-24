@@ -6,9 +6,15 @@ import { createGrokProvider, GROK_MODELS } from './grok'
 import { createGrokCliProvider, GROK_CLI_MODELS } from './grok-cli'
 import { createOpenAiProvider, OPENAI_MODELS } from './openai'
 import { createCodexCliProvider, CODEX_CLI_MODELS } from './codex-cli'
+import { createExtraProvider, EXTRA_PROVIDERS, type ExtraProviderSpec } from './extra-providers'
 import type { ChatProvider } from './types'
 
-export type ProviderId = 'gemini-api' | 'gemini-cli' | 'claude' | 'claude-cli' | 'grok' | 'grok-cli' | 'openai' | 'codex-cli'
+export type ProviderId =
+  | 'gemini-api' | 'gemini-cli'
+  | 'claude' | 'claude-cli'
+  | 'grok' | 'grok-cli'
+  | 'openai' | 'codex-cli'
+  | ExtraProviderSpec['id']
 
 export interface ProviderDescriptor {
   id: ProviderId
@@ -106,7 +112,20 @@ export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
     defaultModel: 'auto',
     supportsTools: false,
     shortLabel: 'Codex'
-  }
+  },
+  // OpenAI-compatible extra-провайдеры (генерим из EXTRA_PROVIDERS).
+  ...Object.fromEntries(
+    EXTRA_PROVIDERS.map(spec => [spec.id, {
+      id: spec.id,
+      name: spec.name,
+      transport: 'API' as const,
+      secretKey: spec.secretKey,
+      models: spec.models,
+      defaultModel: spec.defaultModel,
+      supportsTools: true, // OpenAI-compat по протоколу поддерживает tool-calling
+      shortLabel: spec.name
+    }])
+  ) as Record<ExtraProviderSpec['id'], ProviderDescriptor>
 }
 
 export interface CreateOptions {
@@ -121,6 +140,10 @@ export interface CreateOptions {
   /** OAuth token для Claude Code (из `claude setup-token`). Передаётся как
    *  env var CLAUDE_CODE_OAUTH_TOKEN — решает headless+Max ограничение. */
   claudeOauthToken?: string | null
+  /** Для custom-openai: переопределённый baseUrl из settings. */
+  customBaseUrl?: string
+  /** Для custom-openai: список моделей из settings (comma-separated parsed). */
+  customModels?: string[]
 }
 
 export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvider {
@@ -155,5 +178,26 @@ export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvide
     }
     case 'codex-cli':
       return createCodexCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model, projectSystemPrompt: opts.projectSystemPrompt })
+    case 'openrouter':
+    case 'deepseek':
+    case 'mistral':
+    case 'groq':
+    case 'ollama':
+    case 'custom-openai': {
+      // Для Ollama (local) ключ необязателен; для остальных — нужен.
+      const spec = EXTRA_PROVIDERS.find(p => p.id === id)!
+      if (spec.secretKey && !opts.apiKey) {
+        throw new Error(`${spec.name}: API ключ не задан`)
+      }
+      if (id === 'custom-openai' && !opts.customBaseUrl) {
+        throw new Error('Custom OpenAI-compatible: укажи Base URL в Settings → Провайдеры.')
+      }
+      return createExtraProvider(id, {
+        apiKey: opts.apiKey ?? '',
+        model: opts.model,
+        customBaseUrl: opts.customBaseUrl,
+        customModels: opts.customModels
+      })
+    }
   }
 }

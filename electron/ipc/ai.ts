@@ -183,13 +183,26 @@ export function registerAiIpc(deps: AiDeps): void {
       const claudeOauthToken = providerId === 'claude-cli'
         ? deps.getSecret('claude_code_oauth_token')
         : null
+      // custom-openai: baseUrl + список моделей задаются юзером в Settings.
+      // models приходят как comma-separated string; парсим в массив.
+      let customBaseUrl: string | undefined
+      let customModels: string[] | undefined
+      if (providerId === 'custom-openai') {
+        customBaseUrl = deps.getSecret('custom_openai_baseurl') ?? undefined
+        const modelsRaw = deps.getSecret('custom_openai_models')
+        if (modelsRaw) {
+          customModels = modelsRaw.split(',').map(s => s.trim()).filter(Boolean)
+        }
+      }
       provider = createProvider(providerId, {
         apiKey,
         model,
         cwd: projectPath ?? process.cwd(),
         signal: ctrl.signal,
         projectSystemPrompt: projectSystemPromptForProvider,
-        claudeOauthToken
+        claudeOauthToken,
+        customBaseUrl,
+        customModels
       })
     } catch (err) {
       taggedSender.send('ai:event', {

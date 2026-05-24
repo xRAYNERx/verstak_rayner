@@ -61,7 +61,24 @@ const PRICES: Record<string, { input: number; output: number }> = {
   'o1-mini':                     { input: 3.0,  output: 12.0 },
   'grok-4':                      { input: 5.0,  output: 15.0 },
   'grok-4-fast':                 { input: 0.20, output: 0.50 },
-  'grok-3':                      { input: 3.0,  output: 15.0 }
+  'grok-3':                      { input: 3.0,  output: 15.0 },
+  // DeepSeek (платформенные цены, $ / 1M)
+  'deepseek-chat':               { input: 0.27, output: 1.10 },
+  'deepseek-reasoner':           { input: 0.55, output: 2.19 },
+  'deepseek-coder':              { input: 0.27, output: 1.10 },
+  // Mistral (mistral.ai/pricing, USD)
+  'mistral-large-latest':        { input: 2.00, output: 6.00 },
+  'mistral-small-latest':        { input: 0.20, output: 0.60 },
+  'codestral-latest':            { input: 0.30, output: 0.90 },
+  'ministral-8b-latest':         { input: 0.10, output: 0.10 },
+  // Groq (groq.com/pricing)
+  'llama-3.3-70b-versatile':     { input: 0.59, output: 0.79 },
+  'llama-3.1-8b-instant':        { input: 0.05, output: 0.08 },
+  'mixtral-8x7b-32768':          { input: 0.24, output: 0.24 },
+  'gemma2-9b-it':                { input: 0.20, output: 0.20 }
+  // OpenRouter и Ollama не добавляем: OpenRouter использует prefix-нотацию
+  // (anthropic/claude-...) — цена считается на стороне OpenRouter с маржой;
+  // Ollama локальный, цена $0 (через PRICES не считается).
 }
 
 function deriveTags(p: ProviderLite, model: string): ModelTag[] {

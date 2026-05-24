@@ -110,6 +110,78 @@ const PROVIDERS: ProviderConfig[] = [
     secretKey: null,
     keyHint: '',
     supportsTools: false
+  },
+  // OpenAI-compatible extra-провайдеры (zеркало EXTRA_PROVIDERS из electron/ai/extra-providers.ts).
+  // При обновлении расширений — обновляй ОБА файла; renderer не имеет доступа к main.
+  {
+    id: 'openrouter',
+    name: 'OpenRouter',
+    transport: 'API',
+    description: 'Один ключ → все модели (Claude, GPT, Gemini, Grok, open-source).',
+    models: ['anthropic/claude-opus-4-5', 'anthropic/claude-sonnet-4-6', 'openai/gpt-5', 'openai/gpt-5-mini', 'google/gemini-3-pro', 'google/gemini-3.5-flash', 'x-ai/grok-4', 'deepseek/deepseek-v3', 'meta-llama/llama-3.3-70b-instruct'],
+    defaultModel: 'anthropic/claude-sonnet-4-6',
+    secretKey: 'openrouter_api_key',
+    keyHint: 'sk-or-...',
+    keyLink: { url: 'https://openrouter.ai/keys', label: 'openrouter.ai/keys' },
+    supportsTools: true
+  },
+  {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    transport: 'API',
+    description: 'Китайские модели, reasoner R1 за копейки. Хороший fallback для бюджета.',
+    models: ['deepseek-chat', 'deepseek-reasoner', 'deepseek-coder'],
+    defaultModel: 'deepseek-chat',
+    secretKey: 'deepseek_api_key',
+    keyHint: 'sk-...',
+    keyLink: { url: 'https://platform.deepseek.com/api_keys', label: 'platform.deepseek.com' },
+    supportsTools: true
+  },
+  {
+    id: 'mistral',
+    name: 'Mistral',
+    transport: 'API',
+    description: 'Европейский провайдер. Без санкционных рисков. Codestral хорош для кода.',
+    models: ['mistral-large-latest', 'mistral-small-latest', 'codestral-latest', 'ministral-8b-latest'],
+    defaultModel: 'mistral-large-latest',
+    secretKey: 'mistral_api_key',
+    keyHint: 'API key...',
+    keyLink: { url: 'https://console.mistral.ai/api-keys', label: 'console.mistral.ai' },
+    supportsTools: true
+  },
+  {
+    id: 'groq',
+    name: 'Groq',
+    transport: 'API',
+    description: 'LPU-инференс: Llama/Mixtral на 500+ tok/s. Для streaming-чатов где важна реакция.',
+    models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768', 'gemma2-9b-it'],
+    defaultModel: 'llama-3.3-70b-versatile',
+    secretKey: 'groq_api_key',
+    keyHint: 'gsk_...',
+    keyLink: { url: 'https://console.groq.com/keys', label: 'console.groq.com' },
+    supportsTools: true
+  },
+  {
+    id: 'ollama',
+    name: 'Ollama (local)',
+    transport: 'API',
+    description: 'Локальный сервер. Запусти `ollama serve`. $0, без интернета, данные не уходят.',
+    models: ['llama3.3', 'qwen2.5-coder', 'deepseek-r1', 'mistral', 'gemma2'],
+    defaultModel: 'llama3.3',
+    secretKey: null,
+    keyHint: '',
+    supportsTools: true
+  },
+  {
+    id: 'custom-openai',
+    name: 'Свой провайдер (OpenAI-compatible)',
+    transport: 'API',
+    description: 'Любой self-hosted endpoint совместимый с OpenAI API: vLLM, LM Studio, корпоративный шлюз.',
+    models: [], // Заполняется юзером через custom-блок в UI
+    defaultModel: '',
+    secretKey: 'custom_openai_api_key',
+    keyHint: '(опционально если endpoint требует)',
+    supportsTools: true
   }
 ]
 
@@ -167,6 +239,10 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [claudeOauthToken, setClaudeOauthToken] = useState('')
   const [yDiskToken, setYDiskToken] = useState('')
   const [costCap, setCostCap] = useState('')
+  // Custom OpenAI-compatible: base URL + список моделей через запятую.
+  // Сохраняется в settings.custom_openai_baseurl / custom_openai_models.
+  const [customOpenaiBaseUrl, setCustomOpenaiBaseUrl] = useState('')
+  const [customOpenaiModels, setCustomOpenaiModels] = useState('')
   const { theme, setTheme } = useTheme()
 
   useEffect(() => {
@@ -226,6 +302,8 @@ export function Settings({ onClose }: { onClose: () => void }) {
       setClaudeOauthToken((await window.api.settings.getKey('claude_code_oauth_token')) ?? '')
       setYDiskToken((await window.api.settings.getKey('yandex_disk_token')) ?? '')
       setCostCap((await window.api.settings.getKey('cost_cap_usd_per_session')) ?? '')
+      setCustomOpenaiBaseUrl((await window.api.settings.getKey('custom_openai_baseurl')) ?? '')
+      setCustomOpenaiModels((await window.api.settings.getKey('custom_openai_models')) ?? '')
       // Какие модели «включены» в picker'е. Пусто = все.
       const em = await window.api.settings.getKey('enabled_models')
       if (em) {
@@ -276,6 +354,8 @@ export function Settings({ onClose }: { onClose: () => void }) {
     await window.api.settings.setKey('yandex_disk_token', yDiskToken)
     await window.api.settings.setKey('cost_cap_usd_per_session', costCap)
     await window.api.settings.setKey('enabled_models', JSON.stringify([...enabledModels]))
+    await window.api.settings.setKey('custom_openai_baseurl', customOpenaiBaseUrl)
+    await window.api.settings.setKey('custom_openai_models', customOpenaiModels)
     setSaved(true)
     setTimeout(() => setSaved(false), 1500)
   }
@@ -319,6 +399,10 @@ export function Settings({ onClose }: { onClose: () => void }) {
           setKeys={setKeys}
           activeProvider={activeProvider}
           setActiveProvider={setActiveProvider}
+          customOpenaiBaseUrl={customOpenaiBaseUrl}
+          setCustomOpenaiBaseUrl={setCustomOpenaiBaseUrl}
+          customOpenaiModels={customOpenaiModels}
+          setCustomOpenaiModels={setCustomOpenaiModels}
         />
         )}
 
@@ -753,27 +837,49 @@ interface ProvidersPageProps {
   setKeys: React.Dispatch<React.SetStateAction<Record<string, string>>>
   activeProvider: ProviderId
   setActiveProvider: (id: ProviderId) => void
+  // Custom OpenAI-compatible настройки. Уникальный провайдер 'custom-openai'
+  // имеет ещё 2 поля: baseUrl и список моделей через запятую.
+  customOpenaiBaseUrl: string
+  setCustomOpenaiBaseUrl: (v: string) => void
+  customOpenaiModels: string
+  setCustomOpenaiModels: (v: string) => void
 }
 
-function statusBadge(status: ConnectionStatus, transport: 'API' | 'CLI'): { label: string; tone: 'ready' | 'cli' | 'missing' } {
+function statusBadge(
+  status: ConnectionStatus,
+  transport: 'API' | 'CLI',
+  providerId?: ProviderId,
+  secretKey?: string | null
+): { label: string; tone: 'ready' | 'cli' | 'missing' } {
   if (transport === 'CLI') return { label: 'Среда', tone: 'cli' }
+  if (providerId === 'custom-openai') return { label: 'Custom URL', tone: 'ready' }
+  if (!secretKey) return { label: 'Локально', tone: 'cli' } // Ollama-подобные
   if (status === 'ready')  return { label: 'API ключ', tone: 'ready' }
   return { label: 'Нет ключа', tone: 'missing' }
 }
 
 function ProvidersPage(props: ProvidersPageProps) {
-  const { providers, keys, setKeys, activeProvider, setActiveProvider } = props
+  const { providers, keys, setKeys, activeProvider, setActiveProvider,
+          customOpenaiBaseUrl, setCustomOpenaiBaseUrl,
+          customOpenaiModels, setCustomOpenaiModels } = props
   const [expanded, setExpanded] = useState<ProviderId | null>(null)
   // toast — короткое сообщение о результате logout/relogin. null = ничего.
   const [toast, setToast] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const [busy, setBusy] = useState<ProviderId | null>(null)
 
-  const connected = providers.filter(p =>
-    p.transport === 'CLI' || (p.secretKey != null && keys[p.secretKey])
-  )
-  const available = providers.filter(p =>
-    p.transport === 'API' && p.secretKey != null && !keys[p.secretKey]
-  )
+  // «Подключён» = доступен для отправки запросов:
+  //  - CLI: всегда (бинарь либо есть либо нет — реальный коннект сделает provider при send)
+  //  - Локальный (без secretKey, НЕ CLI): Ollama и подобное — всегда доступен на localhost
+  //  - custom-openai: главное чтобы baseUrl был задан, ключ опционален
+  //  - Обычные API: должен быть введён secretKey
+  function isConnected(p: ProviderConfig): boolean {
+    if (p.transport === 'CLI') return true
+    if (p.id === 'custom-openai') return customOpenaiBaseUrl.trim().length > 0
+    if (!p.secretKey) return true
+    return Boolean(keys[p.secretKey])
+  }
+  const connected = providers.filter(p => isConnected(p))
+  const available = providers.filter(p => p.transport === 'API' && !isConnected(p))
 
   function showToast(kind: 'ok' | 'err', text: string) {
     setToast({ kind, text })
@@ -854,7 +960,7 @@ function ProvidersPage(props: ProvidersPageProps) {
         )}
         {connected.map(p => {
           const status = connectionStatus(p.id, p.secretKey, keys)
-          const badge = statusBadge(status, p.transport)
+          const badge = statusBadge(status, p.transport, p.id, p.secretKey)
           return (
             <div key={p.id} className="gg-prov-card">
               <div className="gg-prov-card-main">
@@ -889,23 +995,16 @@ function ProvidersPage(props: ProvidersPageProps) {
                   title={p.transport === 'CLI' ? 'Выйти из подписки: бежим `<cli> logout` + удаляем credentials-файлы' : 'Очистить API ключ из настроек'}
                 >{busy === p.id ? '…' : 'Отключить'}</button>
               </div>
-              {expanded === p.id && p.secretKey && (
-                <div className="gg-prov-card-expand">
-                  <div className="gg-label">API ключ</div>
-                  <input
-                    className="gg-input"
-                    type="password"
-                    value={keys[p.secretKey] ?? ''}
-                    onChange={e => setKeys(k => ({ ...k, [p.secretKey!]: e.target.value }))}
-                    placeholder={p.keyHint}
-                    autoFocus
-                  />
-                  {p.keyLink && (
-                    <div className="gg-text-tertiary" style={{ fontSize: 'var(--text-xs)', marginTop: 6 }}>
-                      Получить ключ: <a href={p.keyLink.url} target="_blank" rel="noreferrer">{p.keyLink.label}</a>. Хранится зашифрованно через safeStorage.
-                    </div>
-                  )}
-                </div>
+              {expanded === p.id && (
+                <ProviderExpandForm
+                  p={p}
+                  keys={keys}
+                  setKeys={setKeys}
+                  customOpenaiBaseUrl={customOpenaiBaseUrl}
+                  setCustomOpenaiBaseUrl={setCustomOpenaiBaseUrl}
+                  customOpenaiModels={customOpenaiModels}
+                  setCustomOpenaiModels={setCustomOpenaiModels}
+                />
               )}
             </div>
           )
@@ -932,26 +1031,17 @@ function ProvidersPage(props: ProvidersPageProps) {
                 onClick={() => setExpanded(p.id)}
               >+ Подключить</button>
             </div>
-            {expanded === p.id && p.secretKey && (
-              <div className="gg-prov-card-expand">
-                <div className="gg-label">API ключ</div>
-                <input
-                  className="gg-input"
-                  type="password"
-                  value={keys[p.secretKey] ?? ''}
-                  onChange={e => setKeys(k => ({ ...k, [p.secretKey!]: e.target.value }))}
-                  placeholder={p.keyHint}
-                  autoFocus
-                />
-                {p.keyLink && (
-                  <div className="gg-text-tertiary" style={{ fontSize: 'var(--text-xs)', marginTop: 6 }}>
-                    Получить ключ: <a href={p.keyLink.url} target="_blank" rel="noreferrer">{p.keyLink.label}</a>. Хранится зашифрованно через safeStorage.
-                  </div>
-                )}
-                <div className="gg-text-tertiary" style={{ fontSize: 'var(--text-xs)', marginTop: 6 }}>
-                  Нажми «Сохранить» внизу — провайдер появится в подключённых.
-                </div>
-              </div>
+            {expanded === p.id && (
+              <ProviderExpandForm
+                p={p}
+                keys={keys}
+                setKeys={setKeys}
+                customOpenaiBaseUrl={customOpenaiBaseUrl}
+                setCustomOpenaiBaseUrl={setCustomOpenaiBaseUrl}
+                customOpenaiModels={customOpenaiModels}
+                setCustomOpenaiModels={setCustomOpenaiModels}
+                hint="Нажми «Сохранить» внизу — провайдер появится в подключённых."
+              />
             )}
           </div>
         ))}
@@ -960,6 +1050,94 @@ function ProvidersPage(props: ProvidersPageProps) {
       <div className="gg-settings-hint" style={{ marginTop: 18 }}>
         CLI-провайдеры (Gemini CLI / Claude Code / Grok Build / Codex) подключаются установкой соответствующего CLI вне приложения и логином через подписку. После этого они появляются как «Среда».
       </div>
+    </div>
+  )
+}
+
+/**
+ * Универсальный expand-блок для карточки провайдера: API ключ + (для custom-openai)
+ * Base URL и список моделей. Выделен в отдельный компонент чтобы не дублировать
+ * между «Подключёнными» и «Доступными» секциями.
+ */
+interface ProviderExpandFormProps {
+  p: ProviderConfig
+  keys: Record<string, string>
+  setKeys: React.Dispatch<React.SetStateAction<Record<string, string>>>
+  customOpenaiBaseUrl: string
+  setCustomOpenaiBaseUrl: (v: string) => void
+  customOpenaiModels: string
+  setCustomOpenaiModels: (v: string) => void
+  /** Опциональный hint снизу (например, «Нажми Сохранить» для доступных). */
+  hint?: string
+}
+
+function ProviderExpandForm(props: ProviderExpandFormProps) {
+  const { p, keys, setKeys, customOpenaiBaseUrl, setCustomOpenaiBaseUrl,
+          customOpenaiModels, setCustomOpenaiModels, hint } = props
+  const isCustom = p.id === 'custom-openai'
+
+  return (
+    <div className="gg-prov-card-expand">
+      {isCustom && (
+        <>
+          <div className="gg-label">Base URL</div>
+          <input
+            className="gg-input"
+            value={customOpenaiBaseUrl}
+            onChange={e => setCustomOpenaiBaseUrl(e.target.value)}
+            placeholder="https://my-endpoint.local/v1 или http://localhost:8000/v1"
+            spellCheck={false}
+            autoFocus
+          />
+          <div className="gg-text-tertiary" style={{ fontSize: 'var(--text-xs)', marginTop: 4, marginBottom: 10 }}>
+            Любой OpenAI-compatible endpoint: vLLM, LM Studio, Text Generation WebUI, корпоративный шлюз.
+          </div>
+
+          <div className="gg-label">Модели (через запятую)</div>
+          <input
+            className="gg-input"
+            value={customOpenaiModels}
+            onChange={e => setCustomOpenaiModels(e.target.value)}
+            placeholder="qwen2.5-72b-instruct, llama-3.3-70b, mistral-large"
+            spellCheck={false}
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)' }}
+          />
+          <div className="gg-text-tertiary" style={{ fontSize: 'var(--text-xs)', marginTop: 4, marginBottom: 10 }}>
+            Список ID моделей которые твой endpoint умеет (то что идёт в параметре <code>model</code> запроса).
+          </div>
+        </>
+      )}
+
+      {p.secretKey && (
+        <>
+          <div className="gg-label">{isCustom ? 'API ключ (если endpoint требует)' : 'API ключ'}</div>
+          <input
+            className="gg-input"
+            type="password"
+            value={keys[p.secretKey] ?? ''}
+            onChange={e => setKeys(k => ({ ...k, [p.secretKey!]: e.target.value }))}
+            placeholder={p.keyHint}
+            autoFocus={!isCustom}
+          />
+          {p.keyLink && (
+            <div className="gg-text-tertiary" style={{ fontSize: 'var(--text-xs)', marginTop: 6 }}>
+              Получить ключ: <a href={p.keyLink.url} target="_blank" rel="noreferrer">{p.keyLink.label}</a>. Хранится зашифрованно через safeStorage.
+            </div>
+          )}
+        </>
+      )}
+
+      {!p.secretKey && !isCustom && (
+        <div className="gg-text-tertiary" style={{ fontSize: 'var(--text-xs)' }}>
+          Ключ не нужен — это локальный/embedded провайдер. Нажми «Сохранить» внизу чтобы активировать.
+        </div>
+      )}
+
+      {hint && (
+        <div className="gg-text-tertiary" style={{ fontSize: 'var(--text-xs)', marginTop: 8 }}>
+          {hint}
+        </div>
+      )}
     </div>
   )
 }

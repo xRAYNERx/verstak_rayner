@@ -1,6 +1,13 @@
 import { useEffect, useState, useCallback } from 'react'
 
-export type ProviderId = 'gemini-api' | 'gemini-cli' | 'claude' | 'claude-cli' | 'grok' | 'grok-cli' | 'openai' | 'codex-cli'
+// Renderer-side зеркало ProviderId из electron/ai/registry.ts. Держим в синхроне
+// при добавлении новых провайдеров (electron/ai/extra-providers.ts).
+export type ProviderId =
+  | 'gemini-api' | 'gemini-cli'
+  | 'claude' | 'claude-cli'
+  | 'grok' | 'grok-cli'
+  | 'openai' | 'codex-cli'
+  | 'openrouter' | 'deepseek' | 'mistral' | 'groq' | 'ollama' | 'custom-openai'
 
 export interface ProviderInfo {
   id: ProviderId
@@ -64,6 +71,45 @@ const PROVIDER_META: Record<ProviderId, Omit<ProviderInfo, 'model' | 'id'>> = {
     transport: 'CLI',
     models: ['auto', 'gpt-5-codex', 'gpt-5', 'gpt-5-mini', 'o3', 'o3-mini', 'gpt-4o'],
     supportsTools: false
+  },
+  // OpenAI-compatible extra-провайдеры (зеркало EXTRA_PROVIDERS в main).
+  // ВАЖНО: при добавлении сюда — обнови также массив PROVIDERS в Settings.tsx
+  // и electron/ai/extra-providers.ts.
+  openrouter: {
+    label: 'OpenRouter',
+    transport: 'API',
+    models: ['anthropic/claude-opus-4-5', 'anthropic/claude-sonnet-4-6', 'openai/gpt-5', 'openai/gpt-5-mini', 'google/gemini-3-pro', 'google/gemini-3.5-flash', 'x-ai/grok-4', 'deepseek/deepseek-v3', 'meta-llama/llama-3.3-70b-instruct'],
+    supportsTools: true
+  },
+  deepseek: {
+    label: 'DeepSeek',
+    transport: 'API',
+    models: ['deepseek-chat', 'deepseek-reasoner', 'deepseek-coder'],
+    supportsTools: true
+  },
+  mistral: {
+    label: 'Mistral',
+    transport: 'API',
+    models: ['mistral-large-latest', 'mistral-small-latest', 'codestral-latest', 'ministral-8b-latest'],
+    supportsTools: true
+  },
+  groq: {
+    label: 'Groq',
+    transport: 'API',
+    models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768', 'gemma2-9b-it'],
+    supportsTools: true
+  },
+  ollama: {
+    label: 'Ollama',
+    transport: 'API',
+    models: ['llama3.3', 'qwen2.5-coder', 'deepseek-r1', 'mistral', 'gemma2'],
+    supportsTools: true
+  },
+  'custom-openai': {
+    label: 'Custom',
+    transport: 'API',
+    models: [], // Заполняется из settings.custom_openai_models
+    supportsTools: true
   }
 }
 
@@ -75,10 +121,19 @@ const DEFAULT_MODEL: Record<ProviderId, string> = {
   grok: 'grok-4',
   'grok-cli': 'auto',
   openai: 'gpt-5',
-  'codex-cli': 'auto'
+  'codex-cli': 'auto',
+  openrouter: 'anthropic/claude-sonnet-4-6',
+  deepseek: 'deepseek-chat',
+  mistral: 'mistral-large-latest',
+  groq: 'llama-3.3-70b-versatile',
+  ollama: 'llama3.3',
+  'custom-openai': ''
 }
 
-const KNOWN_IDS: ProviderId[] = ['gemini-api', 'gemini-cli', 'claude', 'claude-cli', 'grok', 'grok-cli', 'openai', 'codex-cli']
+const KNOWN_IDS: ProviderId[] = [
+  'gemini-api', 'gemini-cli', 'claude', 'claude-cli', 'grok', 'grok-cli', 'openai', 'codex-cli',
+  'openrouter', 'deepseek', 'mistral', 'groq', 'ollama', 'custom-openai'
+]
 
 function parseProviderId(v: string | null | undefined): ProviderId {
   if (v && (KNOWN_IDS as string[]).includes(v)) return v as ProviderId
