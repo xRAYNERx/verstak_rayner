@@ -172,6 +172,31 @@ const PROVIDERS: ProviderConfig[] = [
     keyHint: '',
     supportsTools: true
   },
+  // 🇷🇺 Российские провайдеры. Mark в description для отличия.
+  {
+    id: 'yandex-gpt',
+    name: 'YandexGPT',
+    transport: 'API',
+    description: '🇷🇺 152-ФЗ совместим. Yandex Cloud Foundation Models.',
+    models: ['yandexgpt/latest', 'yandexgpt-lite/latest', 'yandexgpt-32k/latest'],
+    defaultModel: 'yandexgpt/latest',
+    secretKey: 'yandex_api_key',
+    keyHint: 'AQVN…',
+    keyLink: { url: 'https://console.yandex.cloud/iam', label: 'Yandex Cloud Console' },
+    supportsTools: false
+  },
+  {
+    id: 'gigachat',
+    name: 'GigaChat',
+    transport: 'API',
+    description: '🇷🇺 152-ФЗ совместим. Сбер. GigaChat Lite / Plus / Pro / Max.',
+    models: ['GigaChat', 'GigaChat-Plus', 'GigaChat-Pro', 'GigaChat-Max'],
+    defaultModel: 'GigaChat',
+    secretKey: 'gigachat_client_id',
+    keyHint: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+    keyLink: { url: 'https://developers.sber.ru/portal/products/gigachat-api', label: 'developers.sber.ru' },
+    supportsTools: false
+  },
   {
     id: 'custom-openai',
     name: 'Свой провайдер (OpenAI-compatible)',
@@ -1130,9 +1155,48 @@ function ProviderExpandForm(props: ProviderExpandFormProps) {
   const { p, keys, setKeys, customOpenaiBaseUrl, setCustomOpenaiBaseUrl,
           customOpenaiModels, setCustomOpenaiModels, hint } = props
   const isCustom = p.id === 'custom-openai'
+  const isYandex = p.id === 'yandex-gpt'
+  const isGigaChat = p.id === 'gigachat'
 
   return (
     <div className="gg-prov-card-expand">
+      {isYandex && (
+        <>
+          <div className="gg-label">Folder ID</div>
+          <input
+            className="gg-input"
+            value={keys['yandex_folder_id'] ?? ''}
+            onChange={e => setKeys(k => ({ ...k, yandex_folder_id: e.target.value }))}
+            placeholder="b1g…"
+            spellCheck={false}
+            autoFocus
+          />
+          <div className="gg-text-tertiary" style={{ fontSize: 'var(--text-xs)', marginTop: 4, marginBottom: 10 }}>
+            Yandex Cloud Console → выбери каталог → ID в адресной строке.
+            Хранится зашифрованно через safeStorage.
+          </div>
+        </>
+      )}
+
+      {isGigaChat && (
+        <>
+          <div className="gg-label">Client Secret</div>
+          <input
+            className="gg-input"
+            type="password"
+            value={keys['gigachat_client_secret'] ?? ''}
+            onChange={e => setKeys(k => ({ ...k, gigachat_client_secret: e.target.value }))}
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            autoFocus
+          />
+          <div className="gg-text-tertiary" style={{ fontSize: 'var(--text-xs)', marginTop: 4, marginBottom: 10 }}>
+            ⚠ GigaChat использует сертификат Сбера (Russian Trusted Root CA), которого
+            нет в стандартном trust store Node.js. Соединение зашифровано TLS, но
+            CA не проверяется. В следующей версии добавим bundle Russian Trusted CA.
+          </div>
+        </>
+      )}
+
       {isCustom && (
         <>
           <div className="gg-label">Base URL</div>

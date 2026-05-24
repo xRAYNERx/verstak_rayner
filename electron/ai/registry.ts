@@ -7,6 +7,8 @@ import { createGrokCliProvider, GROK_CLI_MODELS } from './grok-cli'
 import { createOpenAiProvider, OPENAI_MODELS } from './openai'
 import { createCodexCliProvider, CODEX_CLI_MODELS } from './codex-cli'
 import { createExtraProvider, EXTRA_PROVIDERS, type ExtraProviderSpec } from './extra-providers'
+import { createYandexGptProvider, YANDEX_GPT_MODELS } from './yandex-gpt'
+import { createGigaChatProvider, GIGACHAT_MODELS } from './gigachat'
 import type { ChatProvider } from './types'
 
 export type ProviderId =
@@ -14,6 +16,7 @@ export type ProviderId =
   | 'claude' | 'claude-cli'
   | 'grok' | 'grok-cli'
   | 'openai' | 'codex-cli'
+  | 'yandex-gpt' | 'gigachat'
   | ExtraProviderSpec['id']
 
 export interface ProviderDescriptor {
@@ -113,6 +116,29 @@ export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
     supportsTools: false,
     shortLabel: 'Codex'
   },
+  // 🇷🇺 Российские провайдеры (152-ФЗ). secretKey = primary key для enabled_models;
+  // дополнительные поля (yandex_folder_id, gigachat_client_secret) читаются
+  // в ipc/ai.ts из settings и пробрасываются через CreateOptions.
+  'yandex-gpt': {
+    id: 'yandex-gpt',
+    name: 'YandexGPT',
+    transport: 'API',
+    secretKey: 'yandex_api_key',
+    models: YANDEX_GPT_MODELS,
+    defaultModel: 'yandexgpt/latest',
+    supportsTools: false,
+    shortLabel: 'YandexGPT'
+  },
+  gigachat: {
+    id: 'gigachat',
+    name: 'GigaChat',
+    transport: 'API',
+    secretKey: 'gigachat_client_id',
+    models: GIGACHAT_MODELS,
+    defaultModel: 'GigaChat',
+    supportsTools: false,
+    shortLabel: 'GigaChat'
+  },
   // OpenAI-compatible extra-провайдеры (генерим из EXTRA_PROVIDERS).
   ...Object.fromEntries(
     EXTRA_PROVIDERS.map(spec => [spec.id, {
@@ -144,6 +170,10 @@ export interface CreateOptions {
   customBaseUrl?: string
   /** Для custom-openai: список моделей из settings (comma-separated parsed). */
   customModels?: string[]
+  /** Для yandex-gpt: ID Yandex Cloud folder (из settings). */
+  yandexFolderId?: string
+  /** Для gigachat: client_secret (primary key=clientId; secret в SafeStorage отдельно). */
+  gigachatClientSecret?: string
 }
 
 export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvider {
@@ -178,6 +208,16 @@ export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvide
     }
     case 'codex-cli':
       return createCodexCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model, projectSystemPrompt: opts.projectSystemPrompt })
+    case 'yandex-gpt': {
+      if (!opts.apiKey) throw new Error('YandexGPT: API ключ не задан')
+      if (!opts.yandexFolderId) throw new Error('YandexGPT: Folder ID не задан (Settings → Провайдеры → YandexGPT)')
+      return createYandexGptProvider({ apiKey: opts.apiKey, folderId: opts.yandexFolderId, model: opts.model })
+    }
+    case 'gigachat': {
+      if (!opts.apiKey) throw new Error('GigaChat: Client ID не задан')
+      if (!opts.gigachatClientSecret) throw new Error('GigaChat: Client Secret не задан (Settings → Провайдеры → GigaChat)')
+      return createGigaChatProvider({ clientId: opts.apiKey, clientSecret: opts.gigachatClientSecret, model: opts.model })
+    }
     case 'openrouter':
     case 'deepseek':
     case 'mistral':

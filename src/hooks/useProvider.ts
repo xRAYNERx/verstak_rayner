@@ -7,6 +7,7 @@ export type ProviderId =
   | 'claude' | 'claude-cli'
   | 'grok' | 'grok-cli'
   | 'openai' | 'codex-cli'
+  | 'yandex-gpt' | 'gigachat'
   | 'openrouter' | 'deepseek' | 'mistral' | 'groq' | 'ollama' | 'custom-openai'
 
 export interface ProviderInfo {
@@ -72,6 +73,19 @@ const PROVIDER_META: Record<ProviderId, Omit<ProviderInfo, 'model' | 'id'>> = {
     models: ['auto', 'gpt-5-codex', 'gpt-5', 'gpt-5-mini', 'o3', 'o3-mini', 'gpt-4o'],
     supportsTools: false
   },
+  // 🇷🇺 Российские провайдеры (152-ФЗ).
+  'yandex-gpt': {
+    label: 'YandexGPT',
+    transport: 'API',
+    models: ['yandexgpt/latest', 'yandexgpt-lite/latest', 'yandexgpt-32k/latest'],
+    supportsTools: false
+  },
+  gigachat: {
+    label: 'GigaChat',
+    transport: 'API',
+    models: ['GigaChat', 'GigaChat-Plus', 'GigaChat-Pro', 'GigaChat-Max'],
+    supportsTools: false
+  },
   // OpenAI-compatible extra-провайдеры (зеркало EXTRA_PROVIDERS в main).
   // ВАЖНО: при добавлении сюда — обнови также массив PROVIDERS в Settings.tsx
   // и electron/ai/extra-providers.ts.
@@ -122,6 +136,8 @@ const DEFAULT_MODEL: Record<ProviderId, string> = {
   'grok-cli': 'auto',
   openai: 'gpt-5',
   'codex-cli': 'auto',
+  'yandex-gpt': 'yandexgpt/latest',
+  gigachat: 'GigaChat',
   openrouter: 'anthropic/claude-sonnet-4-6',
   deepseek: 'deepseek-chat',
   mistral: 'mistral-large-latest',
@@ -132,6 +148,7 @@ const DEFAULT_MODEL: Record<ProviderId, string> = {
 
 const KNOWN_IDS: ProviderId[] = [
   'gemini-api', 'gemini-cli', 'claude', 'claude-cli', 'grok', 'grok-cli', 'openai', 'codex-cli',
+  'yandex-gpt', 'gigachat',
   'openrouter', 'deepseek', 'mistral', 'groq', 'ollama', 'custom-openai'
 ]
 

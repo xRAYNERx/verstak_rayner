@@ -194,6 +194,15 @@ export function registerAiIpc(deps: AiDeps): void {
           customModels = modelsRaw.split(',').map(s => s.trim()).filter(Boolean)
         }
       }
+      // YandexGPT и GigaChat имеют по второму секрету: yandex_folder_id и
+      // gigachat_client_secret. Они хранятся отдельно в SafeStorage и
+      // пробрасываются в registry.createProvider() через extension options.
+      const yandexFolderId = providerId === 'yandex-gpt'
+        ? (deps.getSecret('yandex_folder_id') ?? undefined)
+        : undefined
+      const gigachatClientSecret = providerId === 'gigachat'
+        ? (deps.getSecret('gigachat_client_secret') ?? undefined)
+        : undefined
       provider = createProvider(providerId, {
         apiKey,
         model,
@@ -202,7 +211,9 @@ export function registerAiIpc(deps: AiDeps): void {
         projectSystemPrompt: projectSystemPromptForProvider,
         claudeOauthToken,
         customBaseUrl,
-        customModels
+        customModels,
+        yandexFolderId,
+        gigachatClientSecret
       })
     } catch (err) {
       taggedSender.send('ai:event', {
