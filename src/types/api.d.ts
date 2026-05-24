@@ -170,6 +170,21 @@ declare global {
         runLoaders: (skillId: string, opts: { arg?: string; projectPath?: string | null; trigger: 'chat_open' | 'slash_arg' }) =>
           Promise<{ context: string; labels: string[] }>
       }
+      cliAuth: {
+        logout: (providerId: string) => Promise<{
+          ok: boolean
+          method: 'logout-cmd' | 'creds-deleted' | 'both'
+          removedFiles: string[]
+          stdout?: string
+          stderr?: string
+          message?: string
+        }>
+        relogin: (providerId: string) => Promise<{
+          ok: boolean
+          message?: string
+          command?: string
+        }>
+      }
       userProfiles: {
         list: () => Promise<UserProfile[]>
         getActive: () => Promise<UserProfile | null>

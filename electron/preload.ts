@@ -94,6 +94,10 @@ contextBridge.exposeInMainWorld('api', {
     runLoaders: (skillId: string, opts: { arg?: string; projectPath?: string | null; trigger: 'chat_open' | 'slash_arg' }) =>
       ipcRenderer.invoke('skills:run-loaders', skillId, opts)
   },
+  cliAuth: {
+    logout: (providerId: string) => ipcRenderer.invoke('cli-auth:logout', providerId),
+    relogin: (providerId: string) => ipcRenderer.invoke('cli-auth:relogin', providerId)
+  },
   userProfiles: {
     list: () => ipcRenderer.invoke('user-profiles:list'),
     getActive: () => ipcRenderer.invoke('user-profiles:get-active'),

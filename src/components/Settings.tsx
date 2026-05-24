@@ -764,6 +764,9 @@ function statusBadge(status: ConnectionStatus, transport: 'API' | 'CLI'): { labe
 function ProvidersPage(props: ProvidersPageProps) {
   const { providers, keys, setKeys, activeProvider, setActiveProvider } = props
   const [expanded, setExpanded] = useState<ProviderId | null>(null)
+  // toast — короткое сообщение о результате logout/relogin. null = ничего.
+  const [toast, setToast] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+  const [busy, setBusy] = useState<ProviderId | null>(null)
 
   const connected = providers.filter(p =>
     p.transport === 'CLI' || (p.secretKey != null && keys[p.secretKey])
@@ -772,13 +775,42 @@ function ProvidersPage(props: ProvidersPageProps) {
     p.transport === 'API' && p.secretKey != null && !keys[p.secretKey]
   )
 
-  function disconnect(p: ProviderConfig) {
+  function showToast(kind: 'ok' | 'err', text: string) {
+    setToast({ kind, text })
+    setTimeout(() => setToast(null), 5000)
+  }
+
+  async function disconnect(p: ProviderConfig) {
+    if (p.transport === 'CLI') {
+      // CLI: реальный logout через child_process + удаление credentials.
+      setBusy(p.id)
+      try {
+        const res = await window.api.cliAuth.logout(p.id)
+        if (res.ok) {
+          const fileCount = res.removedFiles.length
+          showToast('ok',
+            res.method === 'logout-cmd' ? `${p.name}: отключено через \`${p.id.split('-')[0]} logout\`` :
+            res.method === 'both' ? `${p.name}: logout + удалено ${fileCount} файл(ов) credentials` :
+            `${p.name}: удалено ${fileCount} файл(ов) credentials`
+          )
+        } else {
+          showToast('err', res.message ?? `${p.name}: не удалось отключить`)
+        }
+      } catch (err) {
+        showToast('err', `${p.name}: ошибка — ${(err as Error).message}`)
+      } finally {
+        setBusy(null)
+      }
+      return
+    }
+    // API: просто чистим ключ в state (save → SafeStorage)
     if (p.secretKey) {
       setKeys(k => {
         const next = { ...k }
         delete next[p.secretKey!]
         return next
       })
+      showToast('ok', `${p.name}: ключ очищен. Не забудь нажать «Сохранить» внизу.`)
     }
     if (activeProvider === p.id) {
       const fallback = providers.find(x => x.id !== p.id && (x.transport === 'CLI' || (x.secretKey && keys[x.secretKey])))
@@ -786,9 +818,32 @@ function ProvidersPage(props: ProvidersPageProps) {
     }
   }
 
+  async function relogin(p: ProviderConfig) {
+    if (p.transport !== 'CLI') return
+    setBusy(p.id)
+    try {
+      const res = await window.api.cliAuth.relogin(p.id)
+      if (res.ok) {
+        showToast('ok', `${p.name}: открыл терминал для входа. Пройди OAuth в новом окне → вернись сюда.`)
+      } else {
+        showToast('err', res.message ?? `${p.name}: не удалось открыть терминал`)
+      }
+    } catch (err) {
+      showToast('err', `${p.name}: ошибка — ${(err as Error).message}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
   return (
     <div className="gg-settings-extra gg-providers-page">
       <h2 className="gg-settings-page-title">Провайдеры</h2>
+
+      {toast && (
+        <div className={`gg-prov-toast is-${toast.kind}`} role="status">
+          {toast.text}
+        </div>
+      )}
 
       <div className="gg-settings-section-title" style={{ marginTop: 8 }}>Подключённые провайдеры</div>
       <div className="gg-prov-list">
@@ -817,13 +872,22 @@ function ProvidersPage(props: ProvidersPageProps) {
                     onClick={() => setExpanded(expanded === p.id ? null : p.id)}
                   >{expanded === p.id ? 'Скрыть' : 'Изменить ключ'}</button>
                 )}
+                {p.transport === 'CLI' && (
+                  <button
+                    type="button"
+                    className="gg-btn gg-btn-ghost"
+                    onClick={() => void relogin(p)}
+                    disabled={busy === p.id}
+                    title="Открыть терминал и пройти OAuth по новой"
+                  >{busy === p.id ? '…' : 'Перелогиниться'}</button>
+                )}
                 <button
                   type="button"
                   className="gg-btn gg-btn-ghost"
-                  onClick={() => disconnect(p)}
-                  disabled={p.transport === 'CLI'}
-                  title={p.transport === 'CLI' ? 'CLI отключается удалением самого бинаря на машине' : ''}
-                >Отключить</button>
+                  onClick={() => void disconnect(p)}
+                  disabled={busy === p.id}
+                  title={p.transport === 'CLI' ? 'Выйти из подписки: бежим `<cli> logout` + удаляем credentials-файлы' : 'Очистить API ключ из настроек'}
+                >{busy === p.id ? '…' : 'Отключить'}</button>
               </div>
               {expanded === p.id && p.secretKey && (
                 <div className="gg-prov-card-expand">

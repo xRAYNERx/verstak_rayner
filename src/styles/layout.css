@@ -1260,6 +1260,24 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 
 /* ─── Providers page: cards (подключённые / доступные) ─── */
 .gg-providers-page { padding: 20px 24px; }
+.gg-prov-toast {
+  margin: 10px 0 4px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  border: 1px solid;
+  animation: gg-fade-in 180ms ease-out;
+}
+.gg-prov-toast.is-ok {
+  color: var(--success);
+  border-color: rgba(78, 201, 176, 0.4);
+  background: var(--success-muted);
+}
+.gg-prov-toast.is-err {
+  color: var(--error);
+  border-color: rgba(244, 113, 116, 0.4);
+  background: var(--error-muted);
+}
 .gg-prov-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .gg-prov-card {
   border: 1px solid var(--border-subtle);

@@ -11,6 +11,7 @@ import { registerTasksIpc } from './ipc/tasks'
 import { registerJournalIpc } from './ipc/journal'
 import { getActiveProjectPath } from './state/project-state'
 import { registerSettingsIpc } from './ipc/settings'
+import { registerCliAuthIpc } from './ipc/cli-auth'
 import { registerAiIpc } from './ipc/ai'
 import { registerChatsIpc } from './ipc/chats'
 import { registerTerminalIpc } from './ipc/terminal'
@@ -199,6 +200,7 @@ app.whenReady().then(() => {
   registerProjectIpc(projects)
   registerFilesIpc({ getProjectRoot: getActiveProjectPath })
   registerSettingsIpc(settings)
+  registerCliAuthIpc(settings)
   registerAiIpc({
     getSecret,
     getProviderId,
