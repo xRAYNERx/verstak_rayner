@@ -29,6 +29,37 @@ export function ModelPicker({ onOpenSettings }: Props) {
   const refreshChatSessions = useProject(s => s.refreshChatSessions)
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
+  // enabled_models — управляется в Settings → Модели через toggle. Хранится
+  // как JSON-массив ключей `providerId::model`. null = «фильтрация выключена,
+  // показывать всё» (дефолт при первом запуске). Загружаем при открытии
+  // popover'а — settings меняются редко, попадаем туда не часто.
+  const [enabledModels, setEnabledModels] = useState<Set<string> | null>(null)
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const raw = await window.api.settings.getKey('enabled_models')
+        if (cancelled) return
+        if (!raw) { setEnabledModels(null); return }
+        const arr = JSON.parse(raw) as string[]
+        setEnabledModels(Array.isArray(arr) && arr.length > 0 ? new Set(arr) : null)
+      } catch { if (!cancelled) setEnabledModels(null) }
+    })()
+    return () => { cancelled = true }
+  }, [open])
+
+  // Хелпер: модель «видна» если фильтр выключен, либо она в enabled, либо это
+  // ТЕКУЩАЯ активная модель чата (даже если её выключили — не прячем, иначе
+  // пользователь увидит пустой список и не поймёт что активно). Провайдеров
+  // не фильтруем — у каждого есть «auto»-модель в provider.models, поэтому
+  // фильтр уровня модели сам по себе достаточен.
+  function isModelVisible(providerId: ProviderId, model: string): boolean {
+    if (enabledModels === null) return true
+    if (enabledModels.has(`${providerId}::${model}`)) return true
+    if (providerId === provider.id && provider.model === model) return true
+    return false
+  }
 
   // Persist provider/model on the current chat session so it sticks per-chat
   async function persistOnSession(providerId: ProviderId, model: string | null) {
@@ -90,25 +121,50 @@ export function ModelPicker({ onOpenSettings }: Props) {
             ))}
           </div>
 
-          {provider.models.length > 1 && (
-            <div className="gg-mp-section">
-              <div className="gg-mp-section-title">Модель</div>
-              {provider.models.map(m => (
-                <button
-                  key={m}
-                  type="button"
-                  className={`gg-mp-row ${provider.model === m ? 'is-active' : ''}`}
-                  onClick={() => void provider.setModel(m).then(async () => {
-                    await persistOnSession(provider.id, m)
-                    setOpen(false)
-                  })}
-                >
-                  <span className="gg-mp-row-label">{m}</span>
-                  {provider.model === m && <span className="gg-mp-row-meta">✓</span>}
-                </button>
-              ))}
-            </div>
-          )}
+          {provider.models.length > 1 && (() => {
+            const visibleModels = provider.models.filter(m => isModelVisible(provider.id, m))
+            const hiddenCount = provider.models.length - visibleModels.length
+            return (
+              <div className="gg-mp-section">
+                <div className="gg-mp-section-title">
+                  Модель
+                  {hiddenCount > 0 && (
+                    <span className="gg-mp-section-hint" title="Скрыты по toggle в Настройки → Модели">
+                      {' '}· скрыто {hiddenCount}
+                    </span>
+                  )}
+                </div>
+                {visibleModels.length === 0 && (
+                  <div className="gg-mp-row gg-mp-row-empty">
+                    <span className="gg-mp-row-label">Все модели выключены</span>
+                    <span className="gg-mp-row-meta">включи в Настройки → Модели</span>
+                  </div>
+                )}
+                {visibleModels.map(m => {
+                  const isActiveModel = provider.model === m
+                  const isHidden = enabledModels !== null && !enabledModels.has(`${provider.id}::${m}`)
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      className={`gg-mp-row ${isActiveModel ? 'is-active' : ''}`}
+                      onClick={() => void provider.setModel(m).then(async () => {
+                        await persistOnSession(provider.id, m)
+                        setOpen(false)
+                      })}
+                      title={isHidden ? 'Эта модель отключена в Настройки → Модели, но активна в чате — отображается чтобы не потерять' : undefined}
+                    >
+                      <span className="gg-mp-row-label">
+                        {m}
+                        {isHidden && <span className="gg-mp-row-hidden-mark"> · скрыта</span>}
+                      </span>
+                      {isActiveModel && <span className="gg-mp-row-meta">✓</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          })()}
 
           <div className="gg-mp-section">
             <button
