@@ -266,3 +266,40 @@ export async function reloginCli(providerId: CliProviderId): Promise<ReloginResu
 export function isCliProvider(id: string): id is CliProviderId {
   return id === 'claude-cli' || id === 'gemini-cli' || id === 'grok-cli' || id === 'codex-cli'
 }
+
+export interface CliStatus {
+  /** Бинарь найден в PATH. */
+  installed: boolean
+  /** Найден хотя бы один из known credentials-файлов. */
+  loggedIn: boolean
+  /** Путь к найденному credentials-файлу (для тултипа). */
+  credPath?: string
+}
+
+/**
+ * Синхронный статус одного CLI: установлен ли бинарь + есть ли credentials.
+ * НЕ запускает CLI (был бы overhead 200-500мс на каждый). credentials-файл
+ * = достаточный индикатор «залогинен» для всех 4 CLI (они после login
+ * сохраняют OAuth/API key в этот файл).
+ */
+export function getCliStatus(providerId: CliProviderId): CliStatus {
+  const d = DESCRIPTORS[providerId]
+  const installed = whichBin(d.bin) !== null
+  const home = homedir()
+  let credPath: string | undefined
+  for (const rel of d.credFiles) {
+    const abs = join(home, rel)
+    if (existsSync(abs)) { credPath = abs; break }
+  }
+  return { installed, loggedIn: credPath !== undefined, credPath }
+}
+
+/** Bulk status для всех 4 CLI — для одного IPC-вызова на загрузку Settings. */
+export function getAllCliStatus(): Record<CliProviderId, CliStatus> {
+  return {
+    'claude-cli': getCliStatus('claude-cli'),
+    'gemini-cli': getCliStatus('gemini-cli'),
+    'grok-cli':   getCliStatus('grok-cli'),
+    'codex-cli':  getCliStatus('codex-cli')
+  }
+}

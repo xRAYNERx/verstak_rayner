@@ -849,14 +849,23 @@ function statusBadge(
   status: ConnectionStatus,
   transport: 'API' | 'CLI',
   providerId?: ProviderId,
-  secretKey?: string | null
-): { label: string; tone: 'ready' | 'cli' | 'missing' } {
-  if (transport === 'CLI') return { label: 'Среда', tone: 'cli' }
+  secretKey?: string | null,
+  cliState?: { installed: boolean; loggedIn: boolean }
+): { label: string; tone: 'ready' | 'cli' | 'missing'; title?: string } {
+  if (transport === 'CLI') {
+    if (!cliState) return { label: 'Среда', tone: 'cli', title: 'Загружаю статус…' }
+    if (!cliState.installed) return { label: 'Не установлен', tone: 'missing', title: 'Бинарь CLI не найден в PATH' }
+    if (cliState.loggedIn)   return { label: 'Залогинен', tone: 'ready', title: 'OAuth/API key найден локально' }
+    return { label: 'Не залогинен', tone: 'missing', title: 'CLI установлен но credentials не найдены — нажми «Перелогиниться»' }
+  }
   if (providerId === 'custom-openai') return { label: 'Custom URL', tone: 'ready' }
   if (!secretKey) return { label: 'Локально', tone: 'cli' } // Ollama-подобные
   if (status === 'ready')  return { label: 'API ключ', tone: 'ready' }
   return { label: 'Нет ключа', tone: 'missing' }
 }
+
+type CliId = 'claude-cli' | 'gemini-cli' | 'grok-cli' | 'codex-cli'
+type CliStatusMap = Record<CliId, { installed: boolean; loggedIn: boolean; credPath?: string }>
 
 function ProvidersPage(props: ProvidersPageProps) {
   const { providers, keys, setKeys, activeProvider, setActiveProvider,
@@ -866,6 +875,17 @@ function ProvidersPage(props: ProvidersPageProps) {
   // toast — короткое сообщение о результате logout/relogin. null = ничего.
   const [toast, setToast] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const [busy, setBusy] = useState<ProviderId | null>(null)
+  // CLI статус: загружается при открытии страницы И после logout/relogin.
+  // null = ещё не загружено (показываем "Среда" по дефолту).
+  const [cliStatus, setCliStatus] = useState<CliStatusMap | null>(null)
+
+  async function loadCliStatus() {
+    try {
+      const s = await window.api.cliAuth.statusAll()
+      setCliStatus(s)
+    } catch { /* не критично — оставим null, бейдж покажет fallback */ }
+  }
+  useEffect(() => { void loadCliStatus() }, [])
 
   // «Подключён» = доступен для отправки запросов:
   //  - CLI: всегда (бинарь либо есть либо нет — реальный коннект сделает provider при send)
@@ -906,6 +926,7 @@ function ProvidersPage(props: ProvidersPageProps) {
         showToast('err', `${p.name}: ошибка — ${(err as Error).message}`)
       } finally {
         setBusy(null)
+        void loadCliStatus() // обновить бейдж после logout
       }
       return
     }
@@ -938,6 +959,9 @@ function ProvidersPage(props: ProvidersPageProps) {
       showToast('err', `${p.name}: ошибка — ${(err as Error).message}`)
     } finally {
       setBusy(null)
+      // После relogin'а проверим статус — но не сразу, OAuth требует времени.
+      // Шлём через 8 сек когда пользователь успел пройти браузер-flow.
+      setTimeout(() => void loadCliStatus(), 8000)
     }
   }
 
@@ -960,13 +984,16 @@ function ProvidersPage(props: ProvidersPageProps) {
         )}
         {connected.map(p => {
           const status = connectionStatus(p.id, p.secretKey, keys)
-          const badge = statusBadge(status, p.transport, p.id, p.secretKey)
+          const cliState = (p.transport === 'CLI' && cliStatus)
+            ? cliStatus[p.id as CliId]
+            : undefined
+          const badge = statusBadge(status, p.transport, p.id, p.secretKey, cliState)
           return (
             <div key={p.id} className="gg-prov-card">
               <div className="gg-prov-card-main">
                 <div className="gg-prov-card-name">
                   {p.name}
-                  <span className={`gg-prov-badge is-${badge.tone}`}>{badge.label}</span>
+                  <span className={`gg-prov-badge is-${badge.tone}`} title={badge.title}>{badge.label}</span>
                 </div>
                 <div className="gg-prov-card-desc">{p.description}</div>
               </div>

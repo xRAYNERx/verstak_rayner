@@ -184,6 +184,11 @@ declare global {
           message?: string
           command?: string
         }>
+        statusAll: () => Promise<Record<'claude-cli' | 'gemini-cli' | 'grok-cli' | 'codex-cli', {
+          installed: boolean
+          loggedIn: boolean
+          credPath?: string
+        }>>
       }
       userProfiles: {
         list: () => Promise<UserProfile[]>

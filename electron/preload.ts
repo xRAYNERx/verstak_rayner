@@ -96,7 +96,8 @@ contextBridge.exposeInMainWorld('api', {
   },
   cliAuth: {
     logout: (providerId: string) => ipcRenderer.invoke('cli-auth:logout', providerId),
-    relogin: (providerId: string) => ipcRenderer.invoke('cli-auth:relogin', providerId)
+    relogin: (providerId: string) => ipcRenderer.invoke('cli-auth:relogin', providerId),
+    statusAll: () => ipcRenderer.invoke('cli-auth:status-all')
   },
   userProfiles: {
     list: () => ipcRenderer.invoke('user-profiles:list'),

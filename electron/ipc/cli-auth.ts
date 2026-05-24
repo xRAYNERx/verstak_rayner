@@ -6,10 +6,14 @@
  */
 
 import { ipcMain } from 'electron'
-import { logoutCli, reloginCli, isCliProvider, type LogoutResult, type ReloginResult } from '../ai/cli-auth'
+import { logoutCli, reloginCli, isCliProvider, getAllCliStatus, type LogoutResult, type ReloginResult } from '../ai/cli-auth'
 import type { Settings } from '../storage/settings'
 
 export function registerCliAuthIpc(settings: Settings) {
+  ipcMain.handle('cli-auth:status-all', async () => {
+    return getAllCliStatus()
+  })
+
   ipcMain.handle('cli-auth:logout', async (_event, providerId: string): Promise<LogoutResult> => {
     if (!isCliProvider(providerId)) {
       return { ok: false, method: 'creds-deleted', removedFiles: [], message: `Unknown CLI providerId: ${providerId}` }
