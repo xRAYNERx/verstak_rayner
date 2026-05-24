@@ -6,6 +6,98 @@ import type { ChatProvider, ChatMessage, ChatEvent, ToolDefinition, ToolResult }
 import { buildCliPrompt } from './cli-prompt'
 import { treeKill } from './child-kill'
 
+/**
+ * Grok-4 / Grok Build (xAI) в режиме `streaming-json` стримит ВСЁ как обычный
+ * text — включая свои внутренние рассуждения. Типичный сырой вывод:
+ *
+ *   The user said "Привет", which is Russian for "Hello".
+ *   <answer>Привет! Чем могу помочь?</answer>
+ *   Explanation
+ *   The response begins with a standard Russian-language greeting...
+ *   \confidence{75}
+ *
+ * Это его "Heavy"-режим (multi-agent + judge с confidence-метрикой), и
+ * отдельного канала для reasoning нет — всё в одном text-стриме. Парсим на
+ * нашей стороне: выделяем чистый ответ → text, всё остальное → thought
+ * (свёрнутая плашка 💭 в UI).
+ *
+ * Стратегия:
+ *  1. Если есть <answer>...</answer> — берём содержимое тега.
+ *  2. Иначе режем на параграфы, отбрасываем ведущие "почти английские"
+ *     (cyrRatio < 0.3) — это reasoning преамбулы; всё с первого русского
+ *     параграфа считаем ответом.
+ *  3. Маркеры \confidence{N} и заголовки Explanation/Reasoning/Analysis
+ *     убираем из ответа в reasoning.
+ */
+export function cleanGrokOutput(raw: string): { answer: string; reasoning: string } {
+  const reasoningParts: string[] = []
+  let work = raw
+
+  // 1) <answer>...</answer> — приоритетный путь
+  const answerMatches = [...work.matchAll(/<answer>([\s\S]*?)<\/answer>/gi)]
+  if (answerMatches.length > 0) {
+    const inner = answerMatches.map(m => m[1].trim()).filter(Boolean).join('\n\n')
+    const rest = work.replace(/<answer>[\s\S]*?<\/answer>/gi, '').trim()
+    if (rest) reasoningParts.push(rest)
+    return { answer: inner, reasoning: reasoningParts.join('\n\n').trim() }
+  }
+
+  // 2) Убираем \confidence{N} (сохраняем в reasoning для прозрачности)
+  work = work.replace(/\\confidence\{(\d+)\}/g, (_m, n) => {
+    reasoningParts.push(`confidence: ${n}`)
+    return ''
+  })
+
+  // 3) Разбиваем на параграфы, отбрасываем ведущие английские
+  const cyrRatio = (s: string): number => {
+    const letters = s.replace(/[^A-Za-zА-Яа-яЁё]/g, '')
+    if (letters.length === 0) return 1 // не текст (код / цифры) — считаем «нейтральным», не выкидываем
+    const cyr = (s.match(/[А-Яа-яЁё]/g) ?? []).length
+    return cyr / letters.length
+  }
+
+  // Типичные английские reasoning-префиксы Grok'а. cyrRatio фейлится когда
+  // он цитирует русские слова в кавычках («The user said "Привет"…») — там
+  // 5-6 кириллических букв вытягивают ratio выше 0.15. Префиксы надёжнее.
+  const REASONING_PREFIX = /^(The user |The response |The instruction|The format |The system |The directory |Why ["']|Since ["']|Since "|If |First[,.:]|Final answer|Confidence:|Context preservation|I need to|I should|Let me |Note:|Standard Electron|Only two chats|There are previous|Available tools|Looking at)/i
+
+  const paragraphs = work.split(/\n{2,}/).map(p => p.trim()).filter(Boolean)
+  const answerPars: string[] = []
+  let inAnswer = false
+  for (const p of paragraphs) {
+    // Заголовки-маркеры reasoning блоков. После них Grok часто продолжает
+    // английский анализ — сбрасываем inAnswer чтобы следующие английские
+    // параграфы тоже ушли в reasoning.
+    if (/^(Explanation|Reasoning|Analysis|Thinking|Note|Confidence):?$/i.test(p)) {
+      reasoningParts.push(p)
+      inAnswer = false
+      continue
+    }
+    // Reasoning-префикс — всегда reasoning (даже если параграф содержит
+    // русские слова в цитатах).
+    if (REASONING_PREFIX.test(p)) {
+      reasoningParts.push(p)
+      inAnswer = false
+      continue
+    }
+    // Порог 0.15: чистый английский reasoning ≈ 0 кириллицы; русский ответ
+    // с code-снипетами / URL / file paths остаётся выше (тест «Я Grok через
+    // electron/ai/grok.ts» = 0.29). Применяем независимо от inAnswer —
+    // английский «хвост» после русского ответа тоже выкидываем.
+    if (cyrRatio(p) < 0.15) {
+      reasoningParts.push(p)
+      continue
+    }
+    inAnswer = true
+    answerPars.push(p)
+  }
+
+  return {
+    answer: answerPars.join('\n\n').trim(),
+    reasoning: reasoningParts.join('\n\n').trim()
+  }
+}
+
 interface GrokCliOptions {
   binary?: string
   cwd?: string
@@ -123,6 +215,7 @@ export function createGrokCliProvider(opts: GrokCliOptions = {}): ChatProvider {
 
       let stdoutBuffer = ''
       let stderrBuffer = ''
+      let textBuffer = ''   // полный сырой text-стрим Grok'а; чистим в самом конце
       const queue: ChatEvent[] = []
       let done = false
       let resolve: (() => void) | null = null
@@ -134,14 +227,30 @@ export function createGrokCliProvider(opts: GrokCliOptions = {}): ChatProvider {
         let ev: CliEvent
         try { ev = JSON.parse(trimmed) } catch { return }
 
-        // Text-emitting events. Grok labels its streaming output as "thought"
-        // (since it thinks out loud). Also handle generic text variants.
-        if (ev.type === 'thought' || ev.type === 'text' || ev.type === 'assistant_message_delta' || ev.type === 'message_delta') {
+        // type='thought' (если CLI вдруг эмитит явно) сразу в thought-канал.
+        if (ev.type === 'thought') {
           const text = ev.data ?? ev.text ?? ev.content ?? ev.message?.content
-          if (text) { queue.push({ type: 'text', text }); wake() }
+          if (text) { queue.push({ type: 'thought', text }); wake() }
         }
-        // Completion event
+        // Любой text-event — буферизуем, НЕ стримим. Grok всегда мешает
+        // reasoning с ответом, поэтому чистим в самом конце через
+        // cleanGrokOutput() и эмитим один раз: сначала thought, потом text.
+        // Trade-off: теряем токен-by-токен стриминг для Grok, но получаем
+        // чистый ответ. Для типичных Grok-ответов (1-3 параграфа) задержка
+        // незаметна — он быстрый.
+        else if (ev.type === 'text' || ev.type === 'assistant_message_delta' || ev.type === 'message_delta') {
+          const text = ev.data ?? ev.text ?? ev.content ?? ev.message?.content
+          if (text) textBuffer += text
+        }
+        // Completion event — здесь разбираем буфер и эмитим
         else if (ev.type === 'turn_complete' || ev.type === 'done' || ev.type === 'message_complete' || ev.type === 'final') {
+          const { answer, reasoning } = cleanGrokOutput(textBuffer)
+          if (reasoning) queue.push({ type: 'thought', text: reasoning })
+          if (answer)   queue.push({ type: 'text', text: answer })
+          else if (!reasoning && textBuffer.trim()) {
+            // Защита: если парсер ничего не выделил, но текст был — отдаём как есть
+            queue.push({ type: 'text', text: textBuffer.trim() })
+          }
           queue.push({ type: 'done' }); wake()
         }
         // Error event
@@ -170,6 +279,15 @@ export function createGrokCliProvider(opts: GrokCliOptions = {}): ChatProvider {
       })
       child.on('close', (code) => {
         if (stdoutBuffer.length > 0) processLine(stdoutBuffer)
+        // Если CLI закрылся БЕЗ turn_complete event'а (некоторые версии grok
+        // так делают), но в буфере есть текст — флашим вручную.
+        if (textBuffer.length > 0 && !queue.some(e => e.type === 'text' || e.type === 'done')) {
+          const { answer, reasoning } = cleanGrokOutput(textBuffer)
+          if (reasoning) queue.push({ type: 'thought', text: reasoning })
+          if (answer)   queue.push({ type: 'text', text: answer })
+          else queue.push({ type: 'text', text: textBuffer.trim() })
+          textBuffer = ''
+        }
         if (code !== 0 && !queue.some(e => e.type === 'done')) {
           // 0xC0000005 (3221225477) = Windows STATUS_ACCESS_VIOLATION.
           // Grok CLI sometimes crashes on large prompts or odd Unicode.
