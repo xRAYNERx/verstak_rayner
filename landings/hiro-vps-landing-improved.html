@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hiro VPS — премиум туннели для интернета • 30+ стран</title>
+    <meta name="description" content="Hiro VPS — защищённые высокоскоростные туннели в 30+ странах. Скорость до 1 Гбит/с, без логов, без блокировок. Попробуйте за 10 ₽.">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #07080D;
+            --bg-2: #0E1018;
+            --bg-card: #131623;
+            --border: #1F2433;
+            --ink: #F3F5FA;
+            --muted: #8A8FA3;
+            --accent: #7B5CFF;
+            --accent-2: #00D4FF;
+            --green: #21D07A;
+            --gradient: linear-gradient(135deg, #7B5CFF 0%, #00D4FF 100%);
+            --gradient-soft: linear-gradient(135deg, rgba(123,92,255,.12), rgba(0,212,255,.10));
+            --radius: 18px;
+            --container: 1180px;
+        }
+        html { scroll-behavior: smooth; }
+        body { 
+            background: var(--bg); 
+            color: var(--ink); 
+            font-family: 'Manrope', sans-serif; 
+            line-height: 1.55; 
+            font-size: 16px; 
+            -webkit-font-smoothing: antialiased; 
+        }
+        .container { max-width: var(--container); margin: 0 auto; padding: 0 24px; }
+        h1, h2, h3 { font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+
+        /* NAV */
+        .nav { 
+            position: sticky; top: 0; z-index: 50; 
+            backdrop-filter: blur(14px); 
+            background: rgba(7,8,13,.85); 
+            border-bottom: 1px solid var(--border); 
+        }
+        .nav__inner { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; }
+        .logo { font-weight: 800; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+        .logo__mark { 
+            width: 32px; height: 32px; border-radius: 9px; 
+            background: var(--gradient); 
+            display: flex; align-items: center; justify-content: center; 
+        }
+        .nav__menu { display: flex; gap: 26px; font-size: 14px; }
+        .nav__menu a { color: var(--muted); transition: color .15s; }
+        .nav__menu a:hover { color: var(--ink); }
+
+        /* BUTTONS */
+        .btn { 
+            display: inline-flex; align-items: center; justify-content: center; gap: 10px; 
+            padding: 13px 24px; border-radius: 12px; font-weight: 600; font-size: 15px; 
+            text-decoration: none; transition: all .15s; border: 1px solid transparent; 
+        }
+        .btn--primary { background: var(--gradient); color: #fff; box-shadow: 0 10px 28px rgba(123,92,255,.4); }
+        .btn--primary:hover { transform: translateY(-1px); box-shadow: 0 14px 36px rgba(123,92,255,.55); }
+        .btn--ghost { background: rgba(255,255,255,.05); border-color: var(--border); color: var(--ink); }
+        .btn--ghost:hover { background: rgba(255,255,255,.09); }
+
+        /* HERO - Improved */
+        .hero { padding: 80px 0 50px; }
+        .hero__grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 50px; align-items: center; }
+        .hero__badge { 
+            display: inline-flex; align-items: center; gap: 8px; 
+            padding: 6px 14px; background: var(--gradient-soft); 
+            border: 1px solid rgba(123,92,255,.25); border-radius: 999px; 
+            font-size: 13px; font-weight: 600; color: var(--accent-2); margin-bottom: 20px; 
+        }
+        .hero h1 { 
+            font-size: clamp(36px, 5.8vw, 58px); 
+            margin-bottom: 18px; 
+            line-height: 1.05;
+        }
+        .hero h1 .gradient { 
+            background: var(--gradient); 
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent; 
+        }
+        .hero__sub { 
+            font-size: 17px; color: var(--muted); 
+            margin-bottom: 28px; max-width: 520px; 
+        }
+        .hero__cta { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 32px; }
+
+        .hero__stats { 
+            display: flex; gap: 12px; 
+            background: var(--bg-card); 
+            border: 1px solid var(--border); 
+            border-radius: 16px; 
+            padding: 14px 20px; 
+            width: fit-content;
+        }
+        .hero__stat { text-align: center; padding: 0 14px; }
+        .hero__stat:not(:last-child) { border-right: 1px solid var(--border); }
+        .hero__stat-value { font-size: 21px; font-weight: 800; }
+        .hero__stat-label { font-size: 11px; color: var(--muted); }
+
+        /* Media block */
+        .hero__media { 
+            position: relative; 
+            max-width: 340px; 
+            margin: 0 auto;
+            border-radius: 24px; 
+            overflow: hidden; 
+            box-shadow: 0 25px 70px rgba(0,0,0,.6); 
+            border: 1px solid rgba(123,92,255,.2);
+        }
+        .hero__video { width: 100%; display: block; background: #0a0c14; }
+
+        /* TRUSTBAR */
+        .trustbar { 
+            padding: 24px 0; 
+            border-top: 1px solid var(--border); 
+            border-bottom: 1px solid var(--border); 
+        }
+        .trustbar__row { 
+            display: flex; 
+            justify-content: space-between; 
+            gap: 20px; 
+            flex-wrap: wrap;
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        /* SECTIONS */
+        section { padding: 70px 0; }
+        .section-eyebrow { 
+            display: inline-block; 
+            padding: 4px 12px; 
+            background: var(--gradient-soft); 
+            border-radius: 999px; 
+            font-size: 12px; font-weight: 600; 
+            color: var(--accent-2); margin-bottom: 12px; 
+            letter-spacing: 0.5px;
+        }
+        .section h2 { font-size: 36px; margin-bottom: 12px; }
+
+        /* FEATURES - Improved grid */
+        .features__grid { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 16px; 
+            margin-top: 40px; 
+        }
+        .feature { 
+            padding: 24px; 
+            background: var(--bg-card); 
+            border: 1px solid var(--border); 
+            border-radius: var(--radius); 
+        }
+        .feature h3 { font-size: 18px; margin-bottom: 8px; }
+        .feature p { color: var(--muted); font-size: 14.5px; }
+        @media (max-width: 900px) { .features__grid { grid-template-columns: 1fr; } }
+
+        /* LOCATIONS */
+        .locations__grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); 
+            gap: 10px; 
+            margin-top: 32px; 
+        }
+        .loc-card { 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+            padding: 14px 16px; 
+            background: var(--bg-card); 
+            border: 1px solid var(--border); 
+            border-radius: 14px; 
+        }
+
+        /* PLANS - Stronger */
+        .plans__grid { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 18px; 
+            margin-top: 40px; 
+        }
+        .plan { 
+            padding: 28px 24px; 
+            background: var(--bg-card); 
+            border: 1px solid var(--border); 
+            border-radius: var(--radius); 
+            position: relative; 
+        }
+        .plan--best { 
+            border-color: var(--accent); 
+            background: linear-gradient(180deg, rgba(123,92,255,.1) 0%, var(--bg-card) 50%); 
+        }
+        .plan__badge { 
+            position: absolute; top: -11px; left: 50%; 
+            transform: translateX(-50%); 
+            background: var(--gradient); 
+            color: white; 
+            font-size: 11px; font-weight: 700; 
+            padding: 3px 14px; 
+            border-radius: 999px; 
+        }
+        .plan__price { font-size: 42px; font-weight: 800; }
+        .plan__price span { font-size: 15px; color: var(--muted); }
+
+        .final-cta {
+            text-align: center;
+            padding: 70px 30px;
+            background: var(--gradient-soft);
+            border-radius: 28px;
+            margin: 50px 0;
+        }
+
+        @media (max-width: 800px) {
+            .hero__grid { grid-template-columns: 1fr; }
+            .plans__grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+    <div class="container">
+        <div class="nav__inner">
+            <div class="logo">
+                <span class="logo__mark"></span>
+                Hiro <span style="color:#7b5cff">VPS</span>
+            </div>
+            <div class="nav__menu">
+                <a href="#features">Возможности</a>
+                <a href="#locations">Локации</a>
+                <a href="#plans">Тарифы</a>
+            </div>
+            <a href="#plans" class="btn btn--primary">Выбрать тариф</a>
+        </div>
+    </div>
+</nav>
+
+<!-- HERO - Improved positioning -->
+<section class="hero">
+    <div class="container">
+        <div class="hero__grid">
+            <div>
+                <span class="hero__badge">30+ стран • Работает прямо сейчас</span>
+                
+                <h1>Премиум туннели<br>для тех, кому<br>нужен <span class="gradient">быстрый и<br>защищённый интернет</span></h1>
+                
+                <p class="hero__sub">Hiro VPS — собственные высокоскоростные узлы в 30+ странах. 
+                Без посредников, без логов, без компромиссов по скорости.</p>
+                
+                <div class="hero__cta">
+                    <a href="https://play.google.com/store/apps/details?id=com.hiro.vpn" 
+                       class="btn btn--primary" target="_blank">Скачать приложение</a>
+                    <a href="#plans" class="btn btn--ghost">Посмотреть цены</a>
+                </div>
+
+                <div class="hero__stats">
+                    <div class="hero__stat">
+                        <div class="hero__stat-value">1M+</div>
+                        <div class="hero__stat-label">пользователей</div>
+                    </div>
+                    <div class="hero__stat">
+                        <div class="hero__stat-value">4.8★</div>
+                        <div class="hero__stat-label">в Google Play</div>
+                    </div>
+                    <div class="hero__stat">
+                        <div class="hero__stat-value">99.9%</div>
+                        <div class="hero__stat-label">аптайм</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Media block (keep user's video idea) -->
+            <div>
+                <div style="background: #11141d; border-radius: 24px; padding: 8px; border: 1px solid var(--border);">
+                    <div style="background: #0a0c14; border-radius: 18px; overflow: hidden; position: relative; aspect-ratio: 9/16; max-height: 520px;">
+                        <!-- Placeholder for video -->
+                        <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background: linear-gradient(180deg, #0a0c14 0%, #11141d 100%);">
+                            <div style="text-align:center;">
+                                <div style="font-size:42px; margin-bottom:8px;">📱</div>
+                                <div style="font-weight:600;">Hiro VPS</div>
+                                <div style="font-size:12px; color:#64748b;">Подключено • Нидерланды</div>
+                            </div>
+                        </div>
+                        <div style="position:absolute; bottom:12px; left:12px; right:12px; background:rgba(0,0,0,0.6); padding:8px 12px; border-radius:10px; font-size:12px;">
+                            <div style="display:flex; justify-content:space-between;">
+                                <span>🇳🇱 Амстердам</span>
+                                <span style="color:#21d07a;">↓ 942 Мбит/с</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- TRUSTBAR -->
+<div class="trustbar">
+    <div class="container">
+        <div class="trustbar__row">
+            <div>★★★★★ 4.8 • 1 000 000+ установок</div>
+            <div>AES-256 + No Logs</div>
+            <div>Скорость до 1 Гбит/с</div>
+            <div>30+ стран</div>
+        </div>
+    </div>
+</div>
+
+<!-- FEATURES -->
+<section id="features">
+    <div class="container">
+        <span class="section-eyebrow">Почему Hiro</span>
+        <h2>Не просто VPN.<br>Собственные туннели с максимальной скоростью.</h2>
+        
+        <div class="features__grid">
+            <div class="feature">
+                <h3>Скорость без компромиссов</h3>
+                <p>Прямые каналы до основных точек обмена. Реальные 700–950 Мбит/с на большинстве локаций.</p>
+            </div>
+            <div class="feature">
+                <h3>Военное шифрование</h3>
+                <p>AES-256 + ChaCha20. Политика No Logs. Защита от утечек DNS и IPv6.</p>
+            </div>
+            <div class="feature">
+                <h3>30+ стран</h3>
+                <p>Европа, Азия, США, СНГ. Можете выбрать страну под задачу — от пинга до разблокировки.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- LOCATIONS -->
+<section id="locations">
+    <div class="container">
+        <span class="section-eyebrow">География</span>
+        <h2>Свои узлы в 30+ странах</h2>
+        <p style="color:var(--muted); max-width:620px;">Каждый сервер — это выделенная машина с гарантированной полосой. Никаких перепродаж и оверселла.</p>
+        
+        <div class="locations__grid">
+            <div class="loc-card"><span style="font-size:22px">🇳🇱</span> <div><strong>Нидерланды</strong><br><span style="font-size:13px;color:#64748b">Амстердам • 12ms</span></div></div>
+            <div class="loc-card"><span style="font-size:22px">🇩🇪</span> <div><strong>Германия</strong><br><span style="font-size:13px;color:#64748b">Франкфурт • 18ms</span></div></div>
+            <div class="loc-card"><span style="font-size:22px">🇬🇧</span> <div><strong>Великобритания</strong><br><span style="font-size:13px;color:#64748b">Лондон • 28ms</span></div></div>
+            <div class="loc-card"><span style="font-size:22px">🇺🇸</span> <div><strong>США</strong><br><span style="font-size:13px;color:#64748b">Нью-Йорк • 95ms</span></div></div>
+            <div class="loc-card"><span style="font-size:22px">🇯🇵</span> <div><strong>Япония</strong><br><span style="font-size:13px;color:#64748b">Токио • 110ms</span></div></div>
+            <div class="loc-card"><span style="font-size:22px">🇸🇬</span> <div><strong>Сингапур</strong><br><span style="font-size:13px;color:#64748b">88ms</span></div></div>
+        </div>
+    </div>
+</section>
+
+<!-- PLANS - Stronger offer -->
+<section id="plans">
+    <div class="container" style="max-width:1000px">
+        <div style="text-align:center; margin-bottom:30px;">
+            <span class="section-eyebrow">Тарифы</span>
+            <h2 style="margin-bottom:8px;">От 49 ₽ в месяц</h2>
+            <p style="color:var(--muted);">Все локации + безлимитный трафик. Чем дольше — тем дешевле.</p>
+        </div>
+
+        <div class="plans__grid">
+            <!-- 1 месяц -->
+            <div class="plan">
+                <div style="font-weight:700; font-size:18px;">1 месяц</div>
+                <div style="font-size:42px; font-weight:800; margin:10px 0;">199 <span style="font-size:16px;color:var(--muted);">₽</span></div>
+                <a href="https://play.google.com/store/apps/details?id=com.hiro.vpn" class="btn btn--ghost" style="width:100%;" target="_blank">Начать</a>
+            </div>
+
+            <!-- 12 месяцев - Best -->
+            <div class="plan plan--best">
+                <div class="plan__badge">Лучший выбор</div>
+                <div style="font-weight:700; font-size:18px;">12 месяцев</div>
+                <div style="font-size:42px; font-weight:800; margin:10px 0;">49 <span style="font-size:16px;color:var(--muted);">₽/мес</span></div>
+                <div style="color:#21d07a; font-size:13px; margin-bottom:12px;">Всего 588 ₽ вместо 2388 ₽</div>
+                <a href="https://play.google.com/store/apps/details?id=com.hiro.vpn" class="btn btn--primary" style="width:100%;" target="_blank">Получить выгоду</a>
+            </div>
+
+            <!-- 3 месяца -->
+            <div class="plan">
+                <div style="font-weight:700; font-size:18px;">3 месяца</div>
+                <div style="font-size:42px; font-weight:800; margin:10px 0;">129 <span style="font-size:16px;color:var(--muted);">₽/мес</span></div>
+                <a href="https://play.google.com/store/apps/details?id=com.hiro.vpn" class="btn btn--ghost" style="width:100%;" target="_blank">Выбрать</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Final CTA -->
+<div class="container">
+    <div class="final-cta">
+        <h2 style="font-size:28px; max-width:520px; margin:0 auto 12px;">Попробуйте Hiro VPS за 10 рублей</h2>
+        <p style="color:var(--muted); max-width:420px; margin:0 auto 24px;">Полный доступ на 24 часа. Без автоматического списания.</p>
+        
+        <a href="https://play.google.com/store/apps/details?id=com.hiro.vpn" 
+           class="btn btn--primary" target="_blank" style="padding:14px 32px; font-size:16px;">
+            Попробовать за 10 ₽
+        </a>
+    </div>
+</div>
+
+</body>
+</html>

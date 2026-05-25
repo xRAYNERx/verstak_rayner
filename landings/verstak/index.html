@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verstak — AI-верстак для кода. Любая модель, один IDE</title>
+<meta name="description" content="Vendor-agnostic AI IDE для русскоязычных разработчиков. Claude, GPT, Gemini, Grok, GigaChat, YandexGPT — одна среда, любая модель, без VPN. Используй свои подписки CLI, не плати за токены дважды.">
+<meta name="theme-color" content="#1a1a1a">
+<link rel="canonical" href="https://verstak.io/">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://verstak.io/">
+<meta property="og:title" content="Verstak — AI-верстак для кода">
+<meta property="og:description" content="Claude · GPT · Gemini · Grok · GigaChat · YandexGPT — любая модель, один интерфейс, без VPN. Vendor-agnostic IDE для русскоязычных разработчиков.">
+<meta property="og:image" content="https://verstak.io/assets/og-cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ru_RU">
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Verstak — AI-верстак для кода">
+<meta name="twitter:description" content="Любая модель, один IDE. Используй свои CLI-подписки. Сделано в РФ.">
+<meta name="twitter:image" content="https://verstak.io/assets/og-cover.png">
+
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/logo-180.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #1a1a1a;
+    --bg-card: #232323;
+    --bg-deep: #141414;
+    --border: #3a3a3a;
+    --accent: #ff7a18;
+    --accent-hover: #e85d04;
+    --accent-dim: rgba(255, 122, 24, 0.08);
+    --text: #f5f5f0;
+    --text-muted: #a0a0a0;
+    --success: #4ade80;
+    --error: #ef4444;
+    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --maxw: 1200px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+  ::selection { background: var(--accent); color: #1a1a1a; }
+
+  a { color: inherit; text-decoration: none; }
+  img, svg { display: block; max-width: 100%; }
+
+  .container {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+
+  /* ==================== NAVBAR ==================== */
+  .navbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(26, 26, 26, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid transparent;
+    transition: border-color .25s ease, background .25s ease;
+  }
+  .navbar.scrolled {
+    background: rgba(20, 20, 20, 0.92);
+    border-bottom-color: var(--border);
+  }
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--mono);
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: -.02em;
+  }
+  .brand svg { width: 28px; height: 28px; }
+  .brand .accent { color: var(--accent); }
+
+  .nav-links {
+    display: flex;
+    gap: 32px;
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+  .nav-links a { transition: color .15s; }
+  .nav-links a:hover { color: var(--text); }
+
+  .nav-cta { display: flex; align-items: center; gap: 12px; }
+
+  /* Бургер */
+  .burger {
+    display: none;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    padding: 0;
+    align-items: center;
+    justify-content: center;
+  }
+  .burger span {
+    display: block;
+    width: 18px;
+    height: 2px;
+    background: var(--text);
+    position: relative;
+  }
+  .burger span::before, .burger span::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 18px;
+    height: 2px;
+    background: var(--text);
+  }
+  .burger span::before { top: -6px; }
+  .burger span::after { top: 6px; }
+
+  .mobile-menu {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .mobile-menu.open { display: block; }
+  .mobile-menu a {
+    display: block;
+    padding: 14px 32px;
+    color: var(--text);
+    font-size: 15px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ==================== BUTTONS ==================== */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 22px;
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: transform .12s ease, background .15s, border-color .15s, color .15s;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary {
+    background: var(--accent);
+    color: #1a1a1a;
+    border-color: var(--accent);
+  }
+  .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text);
+    border-color: var(--border);
+  }
+  .btn-ghost:hover { border-color: var(--text-muted); }
+  .btn-lg { padding: 16px 28px; font-size: 14px; }
+
+  /* ==================== HERO ==================== */
+  .hero {
+    position: relative;
+    padding: 80px 0 120px;
+    overflow: hidden;
+  }
+  /* Параллакс-сетка */
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 64px 64px;
+    opacity: 0.18;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+    pointer-events: none;
+  }
+  /* Искры — анимация */
+  .hero::after {
+    content: '';
+    position: absolute;
+    right: -100px;
+    bottom: -100px;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(255, 122, 24, 0.18) 0%, transparent 60%);
+    pointer-events: none;
+    animation: spark 8s ease-in-out infinite alternate;
+  }
+  @keyframes spark {
+    0%   { transform: translate(0, 0) scale(1); opacity: .85; }
+    100% { transform: translate(-30px, -20px) scale(1.1); opacity: 1; }
+  }
+
+  .hero-inner {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 64px;
+    align-items: center;
+  }
+  .hero-eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 24px;
+    display: inline-block;
+    border: 1px solid var(--accent);
+    padding: 6px 12px;
+  }
+  .hero h1 {
+    font-family: var(--mono);
+    font-weight: 800;
+    font-size: clamp(48px, 6.5vw, 84px);
+    line-height: 0.95;
+    letter-spacing: -0.04em;
+    margin-bottom: 28px;
+  }
+  .hero h1 .accent { color: var(--accent); }
+
+  .hero-sub {
+    font-size: 20px;
+    color: var(--text);
+    margin-bottom: 16px;
+    font-weight: 500;
+  }
+  .hero-sub .pipe { color: var(--accent); margin: 0 6px; }
+
+  .hero-desc {
+    font-size: 16px;
+    color: var(--text-muted);
+    margin-bottom: 36px;
+    max-width: 560px;
+  }
+  .hero-cta { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+  .hero-note {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+  }
+
+  /* Окно IDE */
+  .ide {
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255, 122, 24, 0.05);
+    font-family: var(--mono);
+    font-size: 12px;
+    overflow: hidden;
+  }
+  .ide-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: #1c1c1c;
+  }
+  .ide-dot { width: 10px; height: 10px; border-radius: 50%; background: #444; }
+  .ide-title {
+    flex: 1;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
+  .ide-body {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    min-height: 340px;
+  }
+  .ide-side {
+    border-right: 1px solid var(--border);
+    padding: 14px 12px;
+    background: #181818;
+  }
+  .ide-side .label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin: 12px 0 8px;
+  }
+  .ide-side .label:first-child { margin-top: 0; }
+  .ide-side .item {
+    color: var(--text);
+    padding: 4px 0;
+    opacity: 0.7;
+  }
+  .ide-side .item.active { color: var(--accent); opacity: 1; }
+  .ide-side .item.muted { opacity: 0.4; }
+
+  .ide-main { padding: 14px 18px; color: var(--text); }
+  .ide-line { padding: 2px 0; }
+  .ide-line .k { color: #ff7a18; }
+  .ide-line .s { color: #4ade80; }
+  .ide-line .c { color: var(--text-muted); }
+  .ide-line .n { color: #b39df7; }
+  .ide-prompt {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--border);
+    color: var(--text-muted);
+  }
+  .ide-prompt b { color: var(--accent); }
+  .ide-cursor {
+    display: inline-block;
+    width: 8px;
+    height: 14px;
+    background: var(--accent);
+    vertical-align: middle;
+    margin-left: 2px;
+    animation: blink 1s steps(2) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ==================== SECTIONS ==================== */
+  section { padding: 100px 0; }
+  .section-eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .section-eyebrow::before {
+    content: '';
+    width: 28px;
+    height: 2px;
+    background: var(--accent);
+  }
+  .section-title {
+    font-family: var(--mono);
+    font-weight: 800;
+    font-size: clamp(32px, 4vw, 52px);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    margin-bottom: 24px;
+    max-width: 800px;
+  }
+  .section-lead {
+    font-size: 18px;
+    color: var(--text-muted);
+    max-width: 680px;
+    margin-bottom: 56px;
+  }
+
+  /* ==================== USP / CARDS ==================== */
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    padding: 32px;
+    transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+  }
+  .card:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent);
+    box-shadow: 0 12px 40px rgba(255, 122, 24, 0.08);
+  }
+  .card .icon {
+    font-size: 28px;
+    margin-bottom: 16px;
+    display: block;
+  }
+  .card h3 {
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 14px;
+    letter-spacing: -.01em;
+  }
+  .card p { color: var(--text-muted); font-size: 15px; }
+
+  /* ==================== HOW IT WORKS ==================== */
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    counter-reset: step;
+  }
+  .step {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    padding: 32px 28px;
+    position: relative;
+  }
+  .step::before {
+    counter-increment: step;
+    content: '0' counter(step);
+    font-family: var(--mono);
+    font-weight: 800;
+    font-size: 48px;
+    color: var(--accent);
+    opacity: 0.25;
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    line-height: 1;
+  }
+  .step h3 {
+    font-family: var(--mono);
+    font-size: 18px;
+    margin-bottom: 12px;
+    margin-top: 8px;
+  }
+  .step p { color: var(--text-muted); font-size: 14px; }
+
+  /* ==================== TABLE ==================== */
+  .table-wrap {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  table.compare {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 15px;
+    min-width: 720px;
+  }
+  table.compare th, table.compare td {
+    padding: 18px 20px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  table.compare th {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--accent);
+    background: #1c1c1c;
+  }
+  table.compare tbody tr:last-child td { border-bottom: none; }
+  table.compare td:first-child { font-weight: 600; }
+  table.compare .verstak-col {
+    background: rgba(255, 122, 24, 0.06);
+    color: var(--text);
+    border-left: 1px solid var(--accent);
+    border-right: 1px solid var(--accent);
+    font-weight: 600;
+  }
+  table.compare thead .verstak-col { color: var(--accent); border-top: 1px solid var(--accent); }
+  table.compare tbody tr:last-child .verstak-col { border-bottom: 1px solid var(--accent); }
+  .check { color: var(--success); font-weight: 700; }
+  .cross { color: var(--error); font-weight: 700; }
+  .partial { color: #facc15; font-weight: 700; }
+
+  /* ==================== AUDIENCE ==================== */
+  .audiences { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .audience {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    padding: 32px;
+  }
+  .audience h3 {
+    font-family: var(--mono);
+    font-size: 22px;
+    margin-bottom: 8px;
+  }
+  .audience .price {
+    font-family: var(--mono);
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 18px;
+    margin: 12px 0 16px;
+    display: block;
+  }
+  .audience p { color: var(--text-muted); font-size: 15px; }
+
+  /* ==================== FEATURES GRID ==================== */
+  .features {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+  }
+  .feature {
+    background: var(--bg);
+    padding: 28px;
+  }
+  .feature .icon { font-size: 24px; margin-bottom: 12px; }
+  .feature h4 {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .feature p { color: var(--text-muted); font-size: 14px; line-height: 1.55; }
+
+  /* ==================== PRICING ==================== */
+  .pricing-note {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 8px 14px;
+    margin-bottom: 32px;
+  }
+  .plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .plan {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    padding: 36px 32px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .plan.featured {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .plan-badge {
+    position: absolute;
+    top: -12px;
+    left: 32px;
+    background: var(--accent);
+    color: #1a1a1a;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 5px 10px;
+  }
+  .plan h3 {
+    font-family: var(--mono);
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+  .plan .price {
+    font-family: var(--mono);
+    font-weight: 800;
+    font-size: 40px;
+    color: var(--text);
+    line-height: 1;
+    margin-bottom: 4px;
+    letter-spacing: -.02em;
+  }
+  .plan .price .per { font-size: 14px; color: var(--text-muted); font-weight: 500; }
+  .plan .desc { color: var(--text-muted); font-size: 14px; margin: 16px 0 24px; }
+  .plan ul { list-style: none; margin-bottom: 32px; }
+  .plan ul li {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    color: var(--text);
+  }
+  .plan ul li::before {
+    content: '✓';
+    color: var(--accent);
+    font-weight: 700;
+    margin-right: 10px;
+  }
+  .plan ul li:last-child { border-bottom: none; }
+  .plan .btn { margin-top: auto; justify-content: center; }
+
+  /* ==================== FAQ ==================== */
+  .faq { max-width: 880px; margin: 0 auto; }
+  .faq details {
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    margin-bottom: 10px;
+    transition: border-color .15s;
+  }
+  .faq details[open] { border-color: var(--accent); }
+  .faq summary {
+    padding: 22px 28px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 16px;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after {
+    content: '+';
+    font-family: var(--mono);
+    color: var(--accent);
+    font-size: 22px;
+    line-height: 1;
+    transition: transform .2s;
+  }
+  .faq details[open] summary::after { content: '−'; }
+  .faq .answer {
+    padding: 0 28px 24px;
+    color: var(--text-muted);
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* ==================== CTA ==================== */
+  .cta-block {
+    background: var(--bg-card);
+    border: 1px solid var(--accent);
+    padding: 80px 48px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .cta-block::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at top right, rgba(255, 122, 24, 0.12), transparent 60%);
+    pointer-events: none;
+  }
+  .cta-block > * { position: relative; }
+  .cta-block h2 {
+    font-family: var(--mono);
+    font-size: clamp(28px, 4vw, 44px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+    line-height: 1.1;
+  }
+  .cta-block p {
+    color: var(--text-muted);
+    font-size: 18px;
+    max-width: 640px;
+    margin: 0 auto 36px;
+  }
+  .cta-buttons {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .cta-note {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+  }
+
+  /* ==================== FOOTER ==================== */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 64px 0 32px;
+    background: var(--bg-deep);
+  }
+  .footer-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr 1fr;
+    gap: 48px;
+    margin-bottom: 48px;
+  }
+  .footer-brand .brand { margin-bottom: 16px; }
+  .footer-brand p { color: var(--text-muted); font-size: 13px; max-width: 280px; }
+  .footer-col h5 {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+  .footer-col ul { list-style: none; }
+  .footer-col li { margin-bottom: 10px; }
+  .footer-col a {
+    color: var(--text-muted);
+    font-size: 14px;
+    transition: color .15s;
+  }
+  .footer-col a:hover { color: var(--text); }
+
+  .footer-bottom {
+    border-top: 1px solid var(--border);
+    padding-top: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+  }
+  .socials { display: flex; gap: 16px; }
+  .socials a {
+    display: inline-flex;
+    width: 36px;
+    height: 36px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    transition: border-color .15s, color .15s;
+  }
+  .socials a:hover { border-color: var(--accent); color: var(--accent); }
+  .socials svg { width: 16px; height: 16px; fill: currentColor; }
+
+  /* ==================== RESPONSIVE ==================== */
+  @media (max-width: 1200px) {
+    .features { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (max-width: 900px) {
+    .container { padding: 0 24px; }
+    section { padding: 72px 0; }
+    .nav-links, .nav-cta .btn { display: none; }
+    .burger { display: inline-flex; }
+    .hero { padding: 56px 0 80px; }
+    .hero-inner { grid-template-columns: 1fr; gap: 48px; }
+    .grid-3, .audiences, .plans { grid-template-columns: 1fr; }
+    .steps { grid-template-columns: repeat(2, 1fr); }
+    .features { grid-template-columns: repeat(2, 1fr); }
+    .footer-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
+    .cta-block { padding: 56px 24px; }
+  }
+  @media (max-width: 600px) {
+    section { padding: 56px 0; }
+    .steps, .features { grid-template-columns: 1fr; }
+    .footer-grid { grid-template-columns: 1fr; }
+    .footer-bottom { flex-direction: column; gap: 16px; text-align: center; }
+    .card, .plan, .audience { padding: 24px; }
+    .ide-body { grid-template-columns: 100px 1fr; }
+    .ide-main { font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- =========== NAVBAR =========== -->
+<nav class="navbar" id="navbar">
+  <div class="container nav-inner">
+    <a href="#" class="brand" aria-label="Verstak">
+      <svg viewBox="0 0 100 100" fill="none">
+        <path d="M22 18 L50 70 L78 18" stroke="#f5f5f0" stroke-width="11" stroke-linecap="square" stroke-linejoin="round"/>
+        <path d="M12 76 L88 76 L82 88 L18 88 Z" fill="#ff7a18"/>
+        <path d="M12 76 L4 73 L4 80 L12 80 Z" fill="#ff7a18"/>
+        <rect x="40" y="88" width="20" height="6" fill="#ff7a18"/>
+      </svg>
+      <span>VERS<span class="accent">TAK</span></span>
+    </a>
+    <div class="nav-links">
+      <a href="#features">Возможности</a>
+      <a href="#pricing">Цены</a>
+      <a href="#faq">FAQ</a>
+      <a href="https://github.com/verstak" target="_blank" rel="noopener">GitHub</a>
+    </div>
+    <div class="nav-cta">
+      <a href="#download" class="btn btn-primary">Скачать</a>
+      <button class="burger" id="burger" aria-label="Меню"><span></span></button>
+    </div>
+  </div>
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="#features">Возможности</a>
+    <a href="#pricing">Цены</a>
+    <a href="#faq">FAQ</a>
+    <a href="https://github.com/verstak" target="_blank" rel="noopener">GitHub</a>
+    <a href="#download" style="color: var(--accent);">Скачать</a>
+  </div>
+</nav>
+
+<!-- =========== HERO =========== -->
+<header class="hero">
+  <div class="container hero-inner">
+    <div>
+      <span class="hero-eyebrow">Открытая бета · Июнь 2026</span>
+      <h1>Твой AI-вер<span class="accent">с</span>так<br>для кода</h1>
+      <p class="hero-sub">
+        Claude <span class="pipe">·</span> GPT <span class="pipe">·</span> Gemini <span class="pipe">·</span> Grok <span class="pipe">·</span> GigaChat <span class="pipe">·</span> YandexGPT
+      </p>
+      <p class="hero-desc">
+        Vendor-agnostic IDE для русскоязычных разработчиков. Любая модель, один интерфейс, без VPN. Используй свои подписки — не плати дважды за токены.
+      </p>
+      <div class="hero-cta">
+        <a href="#download" class="btn btn-primary btn-lg">Скачать для Windows / macOS / Linux</a>
+        <a href="https://github.com/verstak" target="_blank" rel="noopener" class="btn btn-ghost btn-lg">Посмотреть на GitHub</a>
+      </div>
+      <p class="hero-note">Бесплатно во время бета-теста · Предзаказная подписка от 1 990 ₽/мес</p>
+    </div>
+
+    <!-- Mock IDE window -->
+    <div class="ide" aria-hidden="true">
+      <div class="ide-bar">
+        <span class="ide-dot"></span>
+        <span class="ide-dot"></span>
+        <span class="ide-dot"></span>
+        <span class="ide-title">verstak — my-saas / src / api.ts</span>
+      </div>
+      <div class="ide-body">
+        <div class="ide-side">
+          <div class="label">Проекты</div>
+          <div class="item active">my-saas</div>
+          <div class="item muted">landing</div>
+          <div class="item muted">bot</div>
+          <div class="label">Модель</div>
+          <div class="item" style="color: var(--accent);">claude-4.5</div>
+          <div class="item muted">gpt-5</div>
+          <div class="item muted">gigachat</div>
+        </div>
+        <div class="ide-main">
+          <div class="ide-line"><span class="c">// api.ts — добавь endpoint /webhook</span></div>
+          <div class="ide-line"><span class="k">export async function</span> <span class="n">handleWebhook</span>(req) {</div>
+          <div class="ide-line">  <span class="k">const</span> data = <span class="k">await</span> req.<span class="n">json</span>();</div>
+          <div class="ide-line">  <span class="k">if</span> (!data.signature) <span class="k">return</span></div>
+          <div class="ide-line">    <span class="n">Response</span>.<span class="n">json</span>({ error: <span class="s">'no sig'</span> });</div>
+          <div class="ide-line">  <span class="k">await</span> <span class="n">verify</span>(data);</div>
+          <div class="ide-line">  <span class="k">return</span> <span class="n">Response</span>.<span class="n">json</span>({ ok: <span class="k">true</span> });</div>
+          <div class="ide-line">}</div>
+          <div class="ide-prompt">
+            <b>verstak ›</b> добавил верификацию подписи + 2 теста. Применить? <span class="ide-cursor"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- =========== USP =========== -->
+<section id="why">
+  <div class="container">
+    <div class="section-eyebrow">Почему Verstak</div>
+    <h2 class="section-title">Три причины, по которым тебе нужен именно этот IDE</h2>
+
+    <div class="grid-3">
+      <div class="card">
+        <span class="icon">🔧</span>
+        <h3>Любая модель, один IDE</h3>
+        <p>Claude, GPT, Gemini, Grok, GigaChat, YandexGPT. Переключайся на лету между провайдерами. Не зависишь от того, кому продастся стартап через год.</p>
+      </div>
+      <div class="card">
+        <span class="icon">💳</span>
+        <h3>Не плати за токены дважды</h3>
+        <p>Уже есть Claude Pro или ChatGPT Plus? Verstak использует твои подписочные CLI — не дублирует расходы на API. Один тулинг, все твои подписки.</p>
+      </div>
+      <div class="card">
+        <span class="icon">🇷🇺</span>
+        <h3>Локализован под РФ с первого дня</h3>
+        <p>GigaChat и YandexGPT нативно, без VPN. Оплата картой РФ. 1С-коннекторы. PDF-отчёты для бухгалтерии. Юрлицо в РФ.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========== HOW IT WORKS =========== -->
+<section id="how" style="background: var(--bg-deep);">
+  <div class="container">
+    <div class="section-eyebrow">Как работает</div>
+    <h2 class="section-title">От открытия проекта до production — четыре шага</h2>
+
+    <div class="steps">
+      <div class="step">
+        <h3>Открой проект</h3>
+        <p>Verstak видит структуру, индексирует код, читает <code>CLAUDE.md</code> / <code>AGENTS.md</code> для контекста и правил.</p>
+      </div>
+      <div class="step">
+        <h3>Выбери модель</h3>
+        <p>Клик в композере — выбор провайдера и модели. Подсчёт стоимости токенов в реальном времени.</p>
+      </div>
+      <div class="step">
+        <h3>Куй код</h3>
+        <p>Plan mode для сложных задач, Autopilot для рутины, multi-file diff с подтверждением каждой правки.</p>
+      </div>
+      <div class="step">
+        <h3>Контролируй</h3>
+        <p>Undo-стек, kill switch (Shift+Esc), secret-scanner, path policy. Ничего не уходит без твоего согласия.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========== COMPARE =========== -->
+<section id="compare">
+  <div class="container">
+    <div class="section-eyebrow">Сравнение</div>
+    <h2 class="section-title">Verstak vs западные IDE</h2>
+    <p class="section-lead">Не маркетинг — таблица фактов. Что есть у нас, чего нет у Cursor, Antigravity и Windsurf.</p>
+
+    <div class="table-wrap">
+      <table class="compare">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Cursor</th>
+            <th>Antigravity</th>
+            <th>Windsurf</th>
+            <th class="verstak-col">Verstak</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Любая модель</td>
+            <td><span class="cross">✕</span> Anthropic</td>
+            <td><span class="cross">✕</span> Gemini</td>
+            <td><span class="partial">●</span> несколько API</td>
+            <td class="verstak-col"><span class="check">✓</span> Любая + GigaChat / YandexGPT</td>
+          </tr>
+          <tr>
+            <td>Подписки CLI</td>
+            <td><span class="cross">✕</span> платишь за токены</td>
+            <td><span class="cross">✕</span> платишь за токены</td>
+            <td><span class="cross">✕</span> платишь за токены</td>
+            <td class="verstak-col"><span class="check">✓</span> Используешь свои CLI</td>
+          </tr>
+          <tr>
+            <td>Юрлицо</td>
+            <td>🇺🇸 США</td>
+            <td>🇺🇸 США</td>
+            <td>🇺🇸 США</td>
+            <td class="verstak-col">🇷🇺 РФ</td>
+          </tr>
+          <tr>
+            <td>Оплата картой РФ</td>
+            <td><span class="cross">✕</span></td>
+            <td><span class="cross">✕</span></td>
+            <td><span class="cross">✕</span></td>
+            <td class="verstak-col"><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>Российские модели</td>
+            <td><span class="cross">✕</span></td>
+            <td><span class="cross">✕</span></td>
+            <td><span class="cross">✕</span></td>
+            <td class="verstak-col"><span class="check">✓</span> Нативно</td>
+          </tr>
+          <tr>
+            <td>1С-интеграция</td>
+            <td><span class="cross">✕</span></td>
+            <td><span class="cross">✕</span></td>
+            <td><span class="cross">✕</span></td>
+            <td class="verstak-col"><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>Open-platform</td>
+            <td>Закрытая</td>
+            <td>Закрытая</td>
+            <td>Полу-открытая</td>
+            <td class="verstak-col"><span class="check">✓</span> Любые провайдеры</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- =========== AUDIENCE =========== -->
+<section id="for-who" style="background: var(--bg-deep);">
+  <div class="container">
+    <div class="section-eyebrow">Для кого</div>
+    <h2 class="section-title">Три портрета мастера</h2>
+
+    <div class="audiences">
+      <div class="audience">
+        <h3>Solo-разработчик</h3>
+        <span class="price">1 990 ₽/мес</span>
+        <p>Fullstack, frontend или backend. Уже платит за Claude Pro / ChatGPT Plus и хочет нативный РФ-инструмент без посредников.</p>
+      </div>
+      <div class="audience">
+        <h3>Команда 3–10 человек</h3>
+        <span class="price">9 990 ₽/мес</span>
+        <p>Стартап или мидл-бизнес. Единая платформа для команды, юр.чистота, общие коннекторы и приоритетная поддержка.</p>
+      </div>
+      <div class="audience">
+        <h3>Enterprise</h3>
+        <span class="price">от 100 000 ₽/мес</span>
+        <p>Банки, телеком, гос-сектор. On-premise, локальные модели (GigaChat / YandexGPT), 1С-интеграции, SLA.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========== FEATURES =========== -->
+<section id="features">
+  <div class="container">
+    <div class="section-eyebrow">Возможности</div>
+    <h2 class="section-title">Девять инструментов на верстаке</h2>
+    <p class="section-lead">Не «AI-чатик», а полноценный рабочий стол: от plan mode до vision и коннекторов в 1С.</p>
+
+    <div class="features">
+      <div class="feature">
+        <span class="icon">🔌</span>
+        <h4>8+ провайдеров</h4>
+        <p>Claude, GPT, Gemini, Grok, GigaChat, YandexGPT через API + CLI-подписки. Переключение в один клик.</p>
+      </div>
+      <div class="feature">
+        <span class="icon">📊</span>
+        <h4>Plan Mode + Autopilot</h4>
+        <p>AI генерирует структурный план, ты запускаешь по шагам или включаешь автопилот со step-verify.</p>
+      </div>
+      <div class="feature">
+        <span class="icon">🗂️</span>
+        <h4>Multi-project rail</h4>
+        <p>Все открытые проекты в одной боковой панели. Переключение без потери контекста.</p>
+      </div>
+      <div class="feature">
+        <span class="icon">🌐</span>
+        <h4>Встроенный браузер</h4>
+        <p>Electron webview + AI-tools <code>browser_navigate</code>, <code>browser_read</code>, <code>browser_screenshot</code>.</p>
+      </div>
+      <div class="feature">
+        <span class="icon">👁️</span>
+        <h4>Vision</h4>
+        <p>Gemini 3 Pro анализирует скриншоты страниц. Покажи модели UI — получи план переделки.</p>
+      </div>
+      <div class="feature">
+        <span class="icon">🔐</span>
+        <h4>Secret scanner</h4>
+        <p>.env, .ssh, ключи блокируются. API-ключи редактируются регуляркой во всех output'ах.</p>
+      </div>
+      <div class="feature">
+        <span class="icon">↶</span>
+        <h4>Undo-стек</h4>
+        <p>Откат любой правки в один клик. Никаких «ой, AI снёс важный файл».</p>
+      </div>
+      <div class="feature">
+        <span class="icon">🔗</span>
+        <h4>Connectors</h4>
+        <p>1С OData + generic HTTP из коробки. Credentials в safeStorage, не в промте.</p>
+      </div>
+      <div class="feature">
+        <span class="icon">💰</span>
+        <h4>Cost estimator</h4>
+        <p>Цена токенов с учётом кеш-скидки прямо в композере. Знаешь, сколько стоит каждый запрос.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========== PRICING =========== -->
+<section id="pricing" style="background: var(--bg-deep);">
+  <div class="container">
+    <div class="section-eyebrow">Цены</div>
+    <h2 class="section-title">Три тарифа. Без скрытых строк.</h2>
+    <span class="pricing-note">Бесплатно во время открытой беты — присоединяйся к waitlist</span>
+
+    <div class="plans">
+      <div class="plan">
+        <h3>Solo</h3>
+        <div class="price">1 990 ₽<span class="per"> / мес</span></div>
+        <p class="desc">Для одного разработчика. Всё нужное, ничего лишнего.</p>
+        <ul>
+          <li>Все 8+ провайдеров</li>
+          <li>1 пользователь</li>
+          <li>Все фичи продукта</li>
+          <li>Поддержка по email</li>
+          <li>Оплата картой РФ</li>
+        </ul>
+        <a href="#download" class="btn btn-ghost">Попробовать бесплатно</a>
+      </div>
+
+      <div class="plan featured">
+        <span class="plan-badge">Рекомендовано</span>
+        <h3>Команда</h3>
+        <div class="price">9 990 ₽<span class="per"> / мес</span></div>
+        <p class="desc">Для стартапов и команд 3–10 разработчиков.</p>
+        <ul>
+          <li>До 10 пользователей</li>
+          <li>Всё из Solo</li>
+          <li>Shared connectors</li>
+          <li>Приоритетная поддержка</li>
+          <li>Командный биллинг</li>
+        </ul>
+        <a href="#download" class="btn btn-primary">Выбрать Команду</a>
+      </div>
+
+      <div class="plan">
+        <h3>Enterprise</h3>
+        <div class="price">по запросу<span class="per"></span></div>
+        <p class="desc">Банки, телеком, гос-сектор и крупный бизнес.</p>
+        <ul>
+          <li>Безлимит пользователей</li>
+          <li>On-premise / self-hosted</li>
+          <li>Кастомные интеграции</li>
+          <li>SLA + dedicated support</li>
+          <li>Custom contracts</li>
+        </ul>
+        <a href="mailto:sales@verstak.io" class="btn btn-ghost">Связаться</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========== FAQ =========== -->
+<section id="faq">
+  <div class="container">
+    <div class="section-eyebrow">FAQ</div>
+    <h2 class="section-title">Частые вопросы</h2>
+
+    <div class="faq">
+      <details>
+        <summary>Чем Verstak отличается от Cursor?</summary>
+        <div class="answer">
+          Тремя вещами: (1) любая модель — не привязан к Anthropic; (2) использует твои CLI-подписки вместо токенов API; (3) сделан под РФ — GigaChat / YandexGPT нативно, оплата картой РФ, 1С-коннекторы, юрлицо в России.
+        </div>
+      </details>
+      <details>
+        <summary>А я уже плачу за Claude Pro / ChatGPT Plus — это пригодится?</summary>
+        <div class="answer">
+          Да. Verstak умеет работать через подписочные CLI (Claude Code, Codex, Gemini, Grok). Ставишь CLI один раз, логинишься, и Verstak использует твою подписку — не берёт ни рубля за токены. Если CLI ещё не вышел для нужного провайдера, Verstak подключается через API по твоему ключу.
+        </div>
+      </details>
+      <details>
+        <summary>Безопасны ли мои API-ключи и код?</summary>
+        <div class="answer">
+          Ключи хранятся в Electron <code>safeStorage</code> (системный keychain). Secret-scanner блокирует чтение <code>.env</code>, <code>.ssh</code>, <code>*.key</code>, <code>credentials</code>. Все output'ы инструментов проходят через регулярки, редактирующие API-ключи и приватные блоки как <code>[REDACTED:type]</code>. Код никуда не уходит, кроме выбранного тобой провайдера модели.
+        </div>
+      </details>
+      <details>
+        <summary>Какие операционные системы поддерживаются?</summary>
+        <div class="answer">
+          Windows 10/11, macOS 12+ (Intel и Apple Silicon), Linux (Ubuntu 22.04+, Fedora, Arch). Сборки — Electron, нативная производительность, ~150 МБ дистрибутив.
+        </div>
+      </details>
+      <details>
+        <summary>Нужен ли VPN для GigaChat / YandexGPT?</summary>
+        <div class="answer">
+          Нет. Verstak обращается к российским API напрямую с российских IP. Никакого VPN, никаких прокси. Это и есть одна из главных причин Russia-first позиционирования.
+        </div>
+      </details>
+      <details>
+        <summary>Поддерживается ли on-premise развёртывание?</summary>
+        <div class="answer">
+          Да, на Enterprise-тарифе. Можно поставить Verstak в закрытый контур, подключить локальные модели (GigaChat MLP, YandexGPT on-premise, llama.cpp), настроить аудит и SSO. Связывайтесь — <a href="mailto:sales@verstak.io" style="color: var(--accent);">sales@verstak.io</a>.
+        </div>
+      </details>
+      <details>
+        <summary>Как происходит оплата для РФ?</summary>
+        <div class="answer">
+          Карта любого российского банка через ЮKassa / CloudPayments. Для юрлиц — счёт по реквизитам, акт, счёт-фактура с НДС. Никаких посредников, иностранных платёжных систем или криптовалют.
+        </div>
+      </details>
+      <details>
+        <summary>Что в roadmap?</summary>
+        <div class="answer">
+          Q2 2026: open beta, packaged installer, multi-chat per project. Q3: background agents, MCP-серверы, маркетплейс коннекторов, on-premise Enterprise. Q4: коллаборативные сессии, командные библиотеки промтов, биллинг по командам. Подписывайся на GitHub — релизы выходят каждые 2 недели.
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- =========== CTA =========== -->
+<section id="download">
+  <div class="container">
+    <div class="cta-block">
+      <h2>Готов забрать AI-разработку в свои руки?</h2>
+      <p>Скачай Verstak бесплатно. Подключи свои подписки. Начни кодить уже сегодня.</p>
+      <div class="cta-buttons">
+        <a href="#" class="btn btn-primary btn-lg">Скачать для Windows</a>
+        <a href="#" class="btn btn-primary btn-lg">для macOS</a>
+        <a href="#" class="btn btn-primary btn-lg">для Linux</a>
+      </div>
+      <p class="cta-note">Открытая бета · Доступна с июня 2026 · github.com/verstak</p>
+    </div>
+  </div>
+</section>
+
+<!-- =========== FOOTER =========== -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="brand">
+          <svg viewBox="0 0 100 100" fill="none">
+            <path d="M22 18 L50 70 L78 18" stroke="#f5f5f0" stroke-width="11" stroke-linecap="square" stroke-linejoin="round"/>
+            <path d="M12 76 L88 76 L82 88 L18 88 Z" fill="#ff7a18"/>
+            <path d="M12 76 L4 73 L4 80 L12 80 Z" fill="#ff7a18"/>
+            <rect x="40" y="88" width="20" height="6" fill="#ff7a18"/>
+          </svg>
+          <span>VERS<span class="accent">TAK</span></span>
+        </div>
+        <p>© 2026 Verstak · Сделано в РФ. AI-верстак для русскоязычных разработчиков.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Продукт</h5>
+        <ul>
+          <li><a href="#download">Скачать</a></li>
+          <li><a href="#features">Возможности</a></li>
+          <li><a href="#pricing">Цены</a></li>
+          <li><a href="#">Roadmap</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Ресурсы</h5>
+        <ul>
+          <li><a href="https://github.com/verstak" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="#">Документация</a></li>
+          <li><a href="#">Сообщество</a></li>
+          <li><a href="#">Блог</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Компания</h5>
+        <ul>
+          <li><a href="#">О нас</a></li>
+          <li><a href="mailto:hello@verstak.io">Контакты</a></li>
+          <li><a href="#">Юр. информация</a></li>
+          <li><a href="mailto:sales@verstak.io">Enterprise</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <span>VERSTAK.IO · v0.1 BETA</span>
+      <div class="socials">
+        <a href="https://t.me/verstak" target="_blank" rel="noopener" aria-label="Telegram">
+          <svg viewBox="0 0 24 24"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>
+        </a>
+        <a href="https://github.com/verstak" target="_blank" rel="noopener" aria-label="GitHub">
+          <svg viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58v-2.17c-3.34.72-4.04-1.42-4.04-1.42-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.21.09 1.85 1.24 1.85 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.66-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.23-3.22-.12-.3-.53-1.52.12-3.17 0 0 1-.32 3.3 1.23a11.5 11.5 0 016 0c2.28-1.55 3.29-1.23 3.29-1.23.66 1.65.25 2.87.12 3.17.77.84 1.23 1.91 1.23 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.69.83.58C20.57 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z"/></svg>
+        </a>
+        <a href="https://x.com/verstak" target="_blank" rel="noopener" aria-label="X">
+          <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Navbar shadow on scroll
+  const nav = document.getElementById('navbar');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 20);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  // Mobile menu
+  const burger = document.getElementById('burger');
+  const menu = document.getElementById('mobileMenu');
+  burger.addEventListener('click', () => menu.classList.toggle('open'));
+  menu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => menu.classList.remove('open')));
+</script>
+
+</body>
+</html>
