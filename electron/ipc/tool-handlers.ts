@@ -57,6 +57,10 @@ export interface ToolContext {
   recordJournal: (projectPath: string, kind: 'tool' | 'session' | 'note', title: string, detail?: string | null) => void
   /** Read recent journal entries — used by the `read_journal` AI tool for self-reflection. */
   readJournal: (projectPath: string, limit: number) => Array<{ kind: string; title: string; detail: string | null; createdAt: number }>
+  /** Сохранить запись в долговременную память проекта. */
+  saveMemory: (projectPath: string, type: string, content: string, tags: string[]) => { id: string }
+  /** Поиск по долговременной памяти проекта. */
+  searchMemories: (projectPath: string, query: string, limit: number) => Array<{ id: string; type: string; content: string; tags: string[]; created_at: number }>
   connectors: ConnectorRegistry
   /** Mutated by browser_screenshot; flushed by the agent loop into next user msg. */
   pendingAttachments: Attachment[]
@@ -697,6 +701,51 @@ const createPlanHandler: ToolHandler = {
 }
 
 // ============================================================================
+// Memory: memory_save / memory_search
+// ============================================================================
+
+const memorySaveHandler: ToolHandler = {
+  mode: 'sequential',
+  async handle(call, ctx) {
+    try {
+      const type = String(call.args.type ?? '')
+      const content = String(call.args.content ?? '').trim()
+      const tags = Array.isArray(call.args.tags) ? call.args.tags.map(String) : []
+      if (!content) {
+        return { id: call.id, name: call.name, result: '', error: 'memory_save: content обязателен' }
+      }
+      const memory = ctx.saveMemory(ctx.projectPath, type, content, tags)
+      emitActivity(ctx, call, 'ok', 'memory_save', `${type} · ${content.slice(0, 60)}`)
+      return { id: call.id, name: call.name, result: `Сохранено: ${memory.id}` }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      emitActivity(ctx, call, 'error', call.name, msg)
+      return { id: call.id, name: call.name, result: '', error: msg }
+    }
+  }
+}
+
+const memorySearchHandler: ToolHandler = {
+  mode: 'parallel-read',
+  async handle(call, ctx) {
+    try {
+      const query = String(call.args.query ?? '').trim()
+      const limit = typeof call.args.limit === 'number' ? Math.max(1, Math.min(20, Math.floor(call.args.limit))) : 5
+      const results = ctx.searchMemories(ctx.projectPath, query, limit)
+      emitActivity(ctx, call, 'ok', 'memory_search', `"${query}" · ${results.length} результатов`)
+      if (results.length === 0) {
+        return { id: call.id, name: call.name, result: 'Ничего не найдено.' }
+      }
+      return { id: call.id, name: call.name, result: JSON.stringify(results, null, 2) }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      emitActivity(ctx, call, 'error', call.name, msg)
+      return { id: call.id, name: call.name, result: '', error: msg }
+    }
+  }
+}
+
+// ============================================================================
 // Registry — single source of truth for tool dispatch
 // ============================================================================
 
@@ -717,7 +766,9 @@ const HANDLER_REGISTRY: Record<string, ToolHandler> = {
   'generate_html': generateHtmlHandler,
   'generate_docx': generateDocxHandler,
   'render_chart': renderChartHandler,
-  'delegate_task': delegateTaskHandler
+  'delegate_task': delegateTaskHandler,
+  'memory_save': memorySaveHandler,
+  'memory_search': memorySearchHandler
 }
 
 /**

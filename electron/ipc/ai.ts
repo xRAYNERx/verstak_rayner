@@ -26,6 +26,10 @@ interface AiDeps {
   recordJournal: (projectPath: string, kind: 'tool' | 'session' | 'note', title: string, detail?: string | null) => void
   /** Read recent journal entries — exposed to the AI as the read_journal tool. */
   readJournal: (projectPath: string, limit: number) => Array<{ kind: string; title: string; detail: string | null; createdAt: number }>
+  /** Сохранить запись в долговременную память проекта. */
+  saveMemory: (projectPath: string, type: string, content: string, tags: string[]) => { id: string }
+  /** Поиск по долговременной памяти проекта. */
+  searchMemories: (projectPath: string, query: string, limit: number) => Array<{ id: string; type: string; content: string; tags: string[]; created_at: number }>
   /** Connector registry (list / query external services like 1C). */
   connectors: {
     list: () => Array<{ id: string; label: string; kind: string; status: string; detail?: string }>
@@ -236,7 +240,7 @@ export function registerAiIpc(deps: AiDeps): void {
     if (useToolsPath) {
       const tools = createFileTools(projectPath, ctrl.signal)
       const turnsBudget = Math.min(MAX_BUDGET_TURNS, Math.max(DEFAULT_AGENT_TURNS, budget ?? DEFAULT_AGENT_TURNS))
-      void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.readJournal, deps.connectors, deps.getAgentMode(), turnsBudget, deps.skillRegistry, deps.getSecret, costGuard, providerId, model).finally(cleanup)
+      void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.readJournal, deps.saveMemory, deps.searchMemories, deps.connectors, deps.getAgentMode(), turnsBudget, deps.skillRegistry, deps.getSecret, costGuard, providerId, model).finally(cleanup)
     } else {
       void runPlainConversation(taggedSender, sendId, provider, projectPath, messagesWithSystem, ctrl.signal, deps.recordJournal, costGuard, providerId, model).finally(cleanup)
     }
@@ -497,6 +501,8 @@ async function runApiConversation(
   recordPlan: (projectPath: string, title: string, steps: Array<{ title: string; detail?: string | null }>) => { id: number },
   recordJournal: (projectPath: string, kind: 'tool' | 'session' | 'note', title: string, detail?: string | null) => void,
   readJournal: (projectPath: string, limit: number) => Array<{ kind: string; title: string; detail: string | null; createdAt: number }>,
+  saveMemory: AiDeps['saveMemory'],
+  searchMemories: AiDeps['searchMemories'],
   connectors: {
     list: () => Array<{ id: string; label: string; kind: string; status: string; detail?: string }>
     query: (id: string, args: Record<string, unknown>, signal: AbortSignal) => Promise<unknown>
@@ -688,7 +694,7 @@ async function runApiConversation(
     // mode (parallel-read / sequential / confirm-write); the loop honours it.
     const ctx: ToolContext = {
       sender, sendId, signal, projectPath, tools,
-      recordWrite, recordPlan, recordJournal, readJournal, connectors,
+      recordWrite, recordPlan, recordJournal, readJournal, saveMemory, searchMemories, connectors,
       pendingAttachments, pendingWrites, pendingCommands, scopedKey,
       agentMode, skillRegistry, getSecretForDelegate
     }

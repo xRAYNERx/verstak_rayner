@@ -38,6 +38,7 @@ import { registerSkillsIpc } from './ipc/skills'
 import { createUserProfiles } from './storage/user-profiles'
 import { registerUserProfilesIpc } from './ipc/user-profiles'
 import { registerMemoryIpc } from './ipc/memory'
+import { saveMemory, searchMemories } from './storage/memories'
 
 function createWindow(): void {
   // HERE = out/main in dev and prod
@@ -224,6 +225,12 @@ app.whenReady().then(() => {
       return journal.list(projectPath, limit).map(e => ({
         kind: e.kind, title: e.title, detail: e.detail, createdAt: e.createdAt
       }))
+    },
+    saveMemory: (projectPath, type, content, tags) => {
+      return saveMemory(db, projectPath, type as import('./storage/memories').MemoryType, content, tags)
+    },
+    searchMemories: (projectPath, query, limit) => {
+      return searchMemories(db, projectPath, query, limit)
     },
     connectors: {
       list: () => connectorRegistry.list().map(c => ({ ...c })),

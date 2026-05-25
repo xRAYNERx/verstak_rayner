@@ -290,6 +290,31 @@ export const TOOL_DEFS: ToolDefinition[] = [
     }
   },
   {
+    name: 'memory_save',
+    description: 'Сохраняет факт, решение или паттерн в долговременную память агента для этого проекта. Используй в конце сессии или когда обнаружен важный инсайт.',
+    parameters: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', enum: ['fact', 'decision', 'bug', 'preference', 'pattern'], description: 'Тип записи' },
+        content: { type: 'string', description: 'Содержание записи (1-3 предложения)' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Теги для поиска (3-5 слов)' }
+      },
+      required: ['type', 'content', 'tags']
+    }
+  },
+  {
+    name: 'memory_search',
+    description: 'Ищет в долговременной памяти агента релевантные факты о проекте. Используй в начале сессии или при столкновении с незнакомой частью кода.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Поисковый запрос' },
+        limit: { type: 'number', description: 'Максимум результатов (default 5)' }
+      },
+      required: ['query']
+    }
+  },
+  {
     name: 'generate_docx',
     description: 'Сохранить артефакт в формате Word (.docx). Файл попадает в .verstak/artifacts/{YYYY-MM-DD}/. Принимает структуру секций — каждая с heading и параграфами.',
     parameters: {
