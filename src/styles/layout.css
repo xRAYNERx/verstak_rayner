@@ -1159,6 +1159,9 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 .gg-mp-row-label { font-weight: 500; flex: 1; }
 .gg-mp-row-meta { font-size: var(--text-xs); color: var(--text-tertiary); font-family: var(--font-mono); }
 .gg-mp-row.is-active .gg-mp-row-meta { color: var(--accent); }
+.gg-mp-row.is-unconfigured { opacity: 0.45; }
+.gg-mp-row.is-unconfigured:hover { opacity: 0.75; background: var(--bg-hover); }
+.gg-mp-lock { font-size: 10px; margin-right: 4px; opacity: 0.8; }
 
 /* ─── Settings: provider list panel ─── */
 .gg-provider-list {

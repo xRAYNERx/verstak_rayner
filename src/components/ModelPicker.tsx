@@ -21,8 +21,21 @@ const PROVIDER_OPTIONS: ProviderOption[] = [
   { id: 'grok',       label: 'Grok',               description: 'API · с tools' },
   { id: 'grok-cli',   label: 'Grok Build (beta)',  description: 'CLI · SuperGrok подписка' },
   { id: 'openai',     label: 'ChatGPT',            description: 'API · с tools' },
-  { id: 'codex-cli',  label: 'Codex (beta)',       description: 'CLI · Plus подписка' }
+  { id: 'codex-cli',  label: 'Codex (beta)',       description: 'CLI · Plus подписка' },
+  { id: 'yandex-gpt', label: 'YandexGPT 🇷🇺',     description: 'API · 152-ФЗ' },
+  { id: 'gigachat',   label: 'GigaChat 🇷🇺',       description: 'API · 152-ФЗ' },
 ]
+
+// Секретный ключ для каждого API-провайдера. CLI-провайдеры = null (не нужен).
+// null-ключ = провайдер считается «всегда настроен» (ollama, CLI).
+const API_SECRET_KEY: Partial<Record<ProviderId, string>> = {
+  'gemini-api':   'gemini_api_key',
+  'claude':       'anthropic_api_key',
+  'grok':         'xai_api_key',
+  'openai':       'openai_api_key',
+  'yandex-gpt':   'yandex_api_key',
+  'gigachat':     'gigachat_client_id',
+}
 
 interface Props {
   onOpenSettings: () => void
@@ -39,16 +52,39 @@ export function ModelPicker({ onOpenSettings }: Props) {
   // показывать всё» (дефолт при первом запуске). Загружаем при открытии
   // popover'а — settings меняются редко, попадаем туда не часто.
   const [enabledModels, setEnabledModels] = useState<Set<string> | null>(null)
+  // configuredIds: провайдеры у которых задан API-ключ (или CLI — они не требуют).
+  // Загружается при открытии пикера параллельно с enabled_models.
+  const [configuredIds, setConfiguredIds] = useState<Set<ProviderId>>(new Set())
+
   useEffect(() => {
     if (!open) return
     let cancelled = false
     void (async () => {
       try {
-        const raw = await window.api.settings.getKey('enabled_models')
+        // Загружаем enabled_models и ключи всех API-провайдеров параллельно
+        const secretEntries = Object.entries(API_SECRET_KEY) as [ProviderId, string][]
+        const [rawEnabled, ...keyValues] = await Promise.all([
+          window.api.settings.getKey('enabled_models'),
+          ...secretEntries.map(([, k]) => window.api.settings.getKey(k))
+        ])
         if (cancelled) return
-        if (!raw) { setEnabledModels(null); return }
-        const arr = JSON.parse(raw) as string[]
-        setEnabledModels(Array.isArray(arr) && arr.length > 0 ? new Set(arr) : null)
+
+        // enabled_models
+        if (!rawEnabled) {
+          setEnabledModels(null)
+        } else {
+          const arr = JSON.parse(rawEnabled) as string[]
+          setEnabledModels(Array.isArray(arr) && arr.length > 0 ? new Set(arr) : null)
+        }
+
+        // configuredIds: CLI-провайдеры всегда считаем настроенными
+        const configured = new Set<ProviderId>(
+          PROVIDER_OPTIONS.filter(p => p.id.endsWith('-cli') || !(p.id in API_SECRET_KEY)).map(p => p.id)
+        )
+        secretEntries.forEach(([pid], i) => {
+          if (keyValues[i]) configured.add(pid)
+        })
+        setConfiguredIds(configured)
       } catch { if (!cancelled) setEnabledModels(null) }
     })()
     return () => { cancelled = true }
@@ -106,24 +142,34 @@ export function ModelPicker({ onOpenSettings }: Props) {
             <div className="gg-mp-section-title">Провайдер</div>
             {PROVIDER_OPTIONS.map(p => {
               const isCli = p.id.endsWith('-cli')
+              const isConfigured = configuredIds.has(p.id)
+              const isActive = provider.id === p.id
+              let title: string | undefined
+              if (!isConfigured) title = 'API ключ не задан — нажми чтобы открыть Настройки'
+              else if (isCli) title = CLI_BETA_HINT
               return (
                 <button
                   key={p.id}
                   type="button"
-                  className={`gg-mp-row ${provider.id === p.id ? 'is-active' : ''}`}
-                  title={isCli ? CLI_BETA_HINT : undefined}
+                  className={`gg-mp-row ${isActive ? 'is-active' : ''} ${!isConfigured ? 'is-unconfigured' : ''}`}
+                  title={title}
                   onClick={async () => {
-                    // STALE CLOSURE FIX: provider.model captured BEFORE
-                    // setProviderId completes is the OLD provider's model
-                    // (e.g. 'gemini-3.5-flash' when switching to claude-cli).
-                    // Read the NEW provider's stored model directly.
+                    if (!isConfigured) {
+                      // Открыть Settings на провайдерах вместо переключения
+                      setOpen(false)
+                      onOpenSettings()
+                      return
+                    }
                     await provider.setProviderId(p.id)
                     const storedNewModel = await window.api.settings.getKey(`model_${p.id}`)
                     await persistOnSession(p.id, storedNewModel)
                     setOpen(false)
                   }}
                 >
-                  <span className="gg-mp-row-label">{p.label}</span>
+                  <span className="gg-mp-row-label">
+                    {!isConfigured && <span className="gg-mp-lock">🔒</span>}
+                    {p.label}
+                  </span>
                   <span className="gg-mp-row-meta">{p.description}</span>
                 </button>
               )
