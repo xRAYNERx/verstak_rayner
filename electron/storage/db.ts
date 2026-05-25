@@ -178,6 +178,40 @@ const MIGRATIONS: Array<{ version: number; description: string; run: (db: DB) =>
       // не нужна новая таблица. Когда wizard завершён → settings.setSecret(
       // 'onboarding_completed', '1') + создаётся первый user_profile.
     }
+  },
+  {
+    version: 4,
+    description: 'agent memories with FTS5',
+    run: (db: DB) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS memories (
+          id          TEXT PRIMARY KEY,
+          project_path TEXT NOT NULL,
+          type        TEXT NOT NULL CHECK(type IN ('fact','decision','bug','preference','pattern')),
+          content     TEXT NOT NULL,
+          tags        TEXT NOT NULL DEFAULT '[]',
+          created_at  INTEGER NOT NULL,
+          accessed_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_memories_project ON memories(project_path);
+        CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+          content,
+          tags,
+          content=memories,
+          content_rowid=rowid
+        );
+        CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
+          INSERT INTO memories_fts(rowid, content, tags) VALUES (new.rowid, new.content, new.tags);
+        END;
+        CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories BEGIN
+          INSERT INTO memories_fts(memories_fts, rowid, content, tags) VALUES('delete', old.rowid, old.content, old.tags);
+        END;
+        CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories BEGIN
+          INSERT INTO memories_fts(memories_fts, rowid, content, tags) VALUES('delete', old.rowid, old.content, old.tags);
+          INSERT INTO memories_fts(rowid, content, tags) VALUES (new.rowid, new.content, new.tags);
+        END;
+      `)
+    }
   }
 ]
 
