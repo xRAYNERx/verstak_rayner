@@ -14,7 +14,7 @@ const execFileAsync = promisify(execFile)
 const MAX_READ_BYTES = 2 * 1024 * 1024  // 2 MB
 const MAX_SEARCH_HITS = 80
 const MAX_LINE_CHARS = 220
-const IGNORE_DIRS = new Set(['node_modules', '.git', 'out', 'dist', '.next', '.vite', '.geminigrok-data', '.superpowers', '__pycache__', 'venv', '.venv', 'target', 'build'])
+const IGNORE_DIRS = new Set(['node_modules', '.git', 'out', 'dist', '.next', '.vite', '.verstak-data', '.superpowers', '__pycache__', 'venv', '.venv', 'target', 'build'])
 
 export const TOOL_DEFS: ToolDefinition[] = [
   {
@@ -190,7 +190,7 @@ export const TOOL_DEFS: ToolDefinition[] = [
   },
   {
     name: 'browser_navigate',
-    description: 'Открыть URL во встроенном браузере GeminiGrok (вкладка Browser). Возвращает финальный URL после редиректов. Если пользователь не открыл вкладку Browser, инструмент вернёт ошибку — попроси открыть вкладку.',
+    description: 'Открыть URL во встроенном браузере Verstak (вкладка Browser). Возвращает финальный URL после редиректов. Если пользователь не открыл вкладку Browser, инструмент вернёт ошибку — попроси открыть вкладку.',
     parameters: {
       type: 'object',
       properties: { url: { type: 'string', description: 'URL или поисковый запрос. Без схемы — будет добавлено https://.' } },
@@ -235,7 +235,7 @@ export const TOOL_DEFS: ToolDefinition[] = [
   },
   {
     name: 'render_chart',
-    description: 'Сгенерировать SVG-диаграмму (bar / line / pie) для встройки в HTML/DOCX артефакт. Сохраняется в .geminigrok/artifacts/{date}/. Возвращает путь — далее его можно вставить как <img src> в HTML или использовать в DOCX. Идеально для аудитов Я.Директ, отчётов по конверсиям, разбивке источников.',
+    description: 'Сгенерировать SVG-диаграмму (bar / line / pie) для встройки в HTML/DOCX артефакт. Сохраняется в .verstak/artifacts/{date}/. Возвращает путь — далее его можно вставить как <img src> в HTML или использовать в DOCX. Идеально для аудитов Я.Директ, отчётов по конверсиям, разбивке источников.',
     parameters: {
       type: 'object',
       properties: {
@@ -278,7 +278,7 @@ export const TOOL_DEFS: ToolDefinition[] = [
   },
   {
     name: 'generate_html',
-    description: 'Сохранить артефакт в формате HTML (КП, аудит, отчёт). Файл попадает в .geminigrok/artifacts/{YYYY-MM-DD}/ и открывается в preview pane. Используй для клиентских артефактов где важна визуальная структура.',
+    description: 'Сохранить артефакт в формате HTML (КП, аудит, отчёт). Файл попадает в .verstak/artifacts/{YYYY-MM-DD}/ и открывается в preview pane. Используй для клиентских артефактов где важна визуальная структура.',
     parameters: {
       type: 'object',
       properties: {
@@ -291,7 +291,7 @@ export const TOOL_DEFS: ToolDefinition[] = [
   },
   {
     name: 'generate_docx',
-    description: 'Сохранить артефакт в формате Word (.docx). Файл попадает в .geminigrok/artifacts/{YYYY-MM-DD}/. Принимает структуру секций — каждая с heading и параграфами.',
+    description: 'Сохранить артефакт в формате Word (.docx). Файл попадает в .verstak/artifacts/{YYYY-MM-DD}/. Принимает структуру секций — каждая с heading и параграфами.',
     parameters: {
       type: 'object',
       properties: {

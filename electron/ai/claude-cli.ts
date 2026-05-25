@@ -83,7 +83,7 @@ const HEADLESS_NO_AUTH_HINT =
   'Claude Code не нашёл credentials для headless (--print) режима. ' +
   'ИСПРАВИТЬ: открой PowerShell и выполни `claude setup-token` — откроется браузер, ' +
   'подтверди подписку, и Claude Code получит long-lived token для headless. После ' +
-  'этого здесь сразу заработает (пересборки GeminiGrok не нужно). ' +
+  'этого здесь сразу заработает (пересборки Verstak не нужно). ' +
   'Альтернативы: переключись на провайдера «Claude (API)» с key из console.anthropic.com, ' +
   'или используй Gemini Ultra / Grok Build / Codex (CLI) — у них headless с подпиской работает из коробки.'
 

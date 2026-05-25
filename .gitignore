@@ -3,7 +3,7 @@ out/
 dist/
 release/
 .vite/
-.geminigrok-data/
+.verstak-data/
 *.log
 .DS_Store
 .superpowers/

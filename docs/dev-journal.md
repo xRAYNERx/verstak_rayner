@@ -1,11 +1,11 @@
-# GeminiGrok — Журнал разработки
+# Verstak — Журнал разработки
 
 Хронология значимых изменений. Записывать каждое закрытое усилие (новая фича, фикс, рефакторинг).
 
 | Дата | Что сделано | Коммит | Результат |
 |------|-------------|--------|-----------|
-| 2026-05-19 | Initial design spec (10 разделов) | `5011cde` | `docs/superpowers/specs/2026-05-19-geminigrok-design.md` — что строим, зачем, как |
-| 2026-05-19 | MVP implementation plan (15 задач) | `66592aa` | `docs/superpowers/plans/2026-05-19-geminigrok-mvp.md` — пошаговый план реализации |
+| 2026-05-19 | Initial design spec (10 разделов) | `5011cde` | `docs/superpowers/specs/2026-05-19-verstak-design.md` — что строим, зачем, как |
+| 2026-05-19 | MVP implementation plan (15 задач) | `66592aa` | `docs/superpowers/plans/2026-05-19-verstak-mvp.md` — пошаговый план реализации |
 | 2026-05-19 | **Task 1.** Bootstrap Electron + Vite + React + TS | `fd49445` | Минимальный скелет. `npm run build` зелёный |
 | 2026-05-19 | **Task 2.** Vitest + sanity-тест | `7304275` | Тестовый стенд готов |
 | 2026-05-19 | **Task 3.** SQLite storage (better-sqlite3) | `2e8772f` | `db.ts` с миграциями для `settings` и `chats` |
@@ -23,7 +23,7 @@
 | 2026-05-19 | **Task 15.** README + native rebuild script | `a816d31` | Документация запуска. Electron pinned to v40 (better-sqlite3 prebuild) |
 | 2026-05-19 | **Fix.** Externalize electron в build | `de4785d` | electron-vite бандлил electron в main.mjs → ошибка "failed to install". Добавлен `externalizeDepsPlugin` |
 | 2026-05-19 | **Feature.** Gemini CLI provider (подписка) | `cc450f9` | Subprocess `gemini` с stream-json. Пользователь подключает свою Gemini Ultra подписку без API ключа |
-| 2026-05-19 | **UX.** Ярлык на рабочем столе | — | `Desktop/GeminiGrok.bat` — двойной клик и запускается |
+| 2026-05-19 | **UX.** Ярлык на рабочем столе | — | `Desktop/Verstak.bat` — двойной клик и запускается |
 | 2026-05-19 | **Design.** Полный UI редизайн | `(см. ниже)` | Geist Sans/Mono, GitHub-dark тема, markdown + highlight.js, новый layout. Sidebar с дискверным брендом, status footer с провайдером, новая модалка Settings, DiffView v2, тема терминала |
 | 2026-05-19 | **Feature.** Model pill в composer'е | — | Под полем ввода справа виден текущий провайдер `Gemini 2.5 Pro · API` или `Gemini Ultra · CLI`. Кликабельно — открывает Settings. Добавлен `hooks/useProvider.ts` (polling settings) |
 | 2026-05-19 | **Feature.** Вложения: файлы, скриншоты (Ctrl+V), drag-drop | `dc60a8f` | Кнопка скрепки в composer'е, обработчик paste для clipboard images, drag-drop overlay. API режим — `inlineData` в Gemini (нативная multimodal). CLI режим — упоминание имён файлов в промте. Лимит 5MB/файл, 8 файлов |
@@ -33,9 +33,9 @@
 | 2026-05-19 | **Security 3.** Denylist деструктивных команд | — | `ai/command-policy.ts`: hard-блок 11 паттернов (rm -rf /, format, mkfs, dd of=/dev, fork bomb, shutdown, curl|sh, sudo rm, git push --force, git filter-repo, чтение ~/.ssh / .aws / .npmrc). 12 unit-тестов. Blocked-команды не доходят до confirmation — сразу отказ с причиной |
 | 2026-05-19 | **UX.** Activity log + Changed files summary | — | Под сообщением Gemini виден список действий (read/write/command) с цветовым статусом pending/ok/rejected/blocked. После окончания ответа — выделенный блок "Изменены файлы (N)" с зелёной рамкой |
 | 2026-05-19 | **UX.** Stop streaming (Esc / красная кнопка) | `7fd7e07` | `ai:stop` IPC с AbortController per-send. CLI subprocess убивается, API loop вылетает на следующей итерации. Незавершённые подтверждения auto-rejected чтобы модалки не зависали |
-| 2026-05-19 | **Branding.** Иконка приложения | `4737cd4` | `resources/icon.png` + `.ico` (7 размеров через sharp + png-to-ico), `scripts/build-icon.mjs` для пересборки. Electron BrowserWindow + AppUserModelId. `Desktop/GeminiGrok.lnk` с кастомной иконкой, `.bat` переехал в `scripts/launch.bat`. Та же иконка в sidebar бренде и empty-state чата |
+| 2026-05-19 | **Branding.** Иконка приложения | `4737cd4` | `resources/icon.png` + `.ico` (7 размеров через sharp + png-to-ico), `scripts/build-icon.mjs` для пересборки. Electron BrowserWindow + AppUserModelId. `Desktop/Verstak.lnk` с кастомной иконкой, `.bat` переехал в `scripts/launch.bat`. Та же иконка в sidebar бренде и empty-state чата |
 | 2026-05-19 | **Feature.** Per-project views (Chat/Tasks/Journal/Plan/Workflow/Calendar) | — | В sidebar секция навигации с 6 табами. SQLite таблицы `tasks` и `journal` per-project. TasksView — добавить/check/удалить/clear-done. JournalView — composer заметок + хронология с цветовыми бейджами kind (Session/Action/Note). Auto-log: user-сообщение → session; принятая правка → tool; команда успех/упало/блок → tool. Plan/Workflow/Calendar — заглушки |
-| 2026-05-19 | **Feature.** Multi-project rail с переключением | — | Новая `projects` таблица + `storage/projects.ts`. IPC list/rename/remove поверх pick. Узкая колонка `ProjectRail` слева от sidebar: GeminiGrok-логотип-home, цветные квадраты-проекты (стабильный hash-color, первая буква), `+` для добавить. Hover → красный `×` для убрать из списка (файлы не трогаются). При старте автоматом открывается последний использованный |
+| 2026-05-19 | **Feature.** Multi-project rail с переключением | — | Новая `projects` таблица + `storage/projects.ts`. IPC list/rename/remove поверх pick. Узкая колонка `ProjectRail` слева от sidebar: Verstak-логотип-home, цветные квадраты-проекты (стабильный hash-color, первая буква), `+` для добавить. Hover → красный `×` для убрать из списка (файлы не трогаются). При старте автоматом открывается последний использованный |
 | 2026-05-19 | **Feature.** Multi-provider: Claude / Grok / ChatGPT API | — | `electron/ai/claude.ts` (Anthropic SDK), `electron/ai/openai-compat.ts` (общий для OpenAI и Grok через baseURL), `electron/ai/grok.ts` + `electron/ai/openai.ts`. `electron/ai/registry.ts` — single source of truth для метаданных провайдеров. Settings UI v3 — 5-row provider list + per-provider key + dropdown моделей. `ModelPicker.tsx` — popover из composer для быстрой смены провайдера/модели без захода в settings |
 | 2026-05-19 | **Feature.** CLI subscriptions: Claude Code + Codex | — | `electron/ai/claude-cli.ts` (wrapping `claude --print --output-format stream-json --verbose`), `electron/ai/codex-cli.ts` (`codex exec --json`). Оба stdin pipe + parse stream-json. Регистрируются как `claude-cli` и `codex-cli`. Settings UI показывает install hint для каждого. Теперь 7 провайдеров: Gemini API / Gemini CLI / Claude API / Claude Code CLI / Grok / ChatGPT / Codex CLI |
 | 2026-05-19 | **UX.** Collapsible sidebar | `b4ba01c` | Кнопка-toggle в rail под home-иконкой + `Ctrl/Cmd+B`. При сворачивании grid с 3 колонок (56/260/1fr) → 2 колонки (56/1fr), main растягивается. Project rail остаётся виден чтобы переключать проекты |
@@ -45,7 +45,7 @@
 | 2026-05-19 | **Feature.** Model selection for CLI providers | — | Раньше у `gemini-cli` / `claude-cli` / `codex-cli` была одна модель `auto`. Теперь у каждого свой список: Gemini Ultra (2.5-pro/flash, 3-pro/flash-preview), Claude Code (sonnet/opus/haiku 4-5/4-6), Codex (gpt-5-codex/gpt-5/o3/o3-mini/4o). Provider передаёт выбранную модель в субпроцесс через `--model` или `-m`. ModelPicker и Settings показывают полный список для CLI |
 | 2026-05-19 | **Feature.** Tools across all API providers (Claude/Grok/ChatGPT) | — | Раньше только Gemini API умел tools. Теперь все 4 API провайдера поддерживают полный агентский режим: function calling, диф-конфирмация для write_file, подтверждение run_command, multi-turn loop. Архитектура: `ChatMessage` расширен полями `toolCalls` и `toolResults`. Каждый провайдер форматирует их под свой формат: Gemini — `functionCall`/`functionResponse` parts; Claude — `tool_use`/`tool_result` blocks; OpenAI/Grok — `tool_calls` field + `role:'tool'` messages. IPC handler собирает structured результаты после каждой итерации цикла |
 | 2026-05-19 | **Feature.** Grok Build CLI provider (SuperGrok подписка) | — | `electron/ai/grok-cli.ts` — обёртка над `grok` (Grok Build TUI) из `~/.grok/bin/grok`. Использует `--output-format streaming-json` и парсит `{type:"thought",data:"..."}` события как text-чанки. `-m <model>` для выбора (grok-4 / grok-4-fast / grok-code-fast-1 / grok-3). 8-й провайдер в реестре: Gemini API / Gemini CLI / Claude API / Claude Code CLI / Grok API / **Grok Build CLI** / ChatGPT / Codex CLI |
-| 2026-05-19 | **AS-227 DONE.** Immutable system layer + user layer | — | Иммутабельный системный слой агента в коде продукта: `electron/ai/system-layer.ts` экспортирует `SYSTEM_LAYER_PROMPT` v1.0.0 (7-шаговый цикл, anti-patterns, scope discipline, verification contract, safety, output style). User layer auto-loaded из `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` / `.geminigrok/RULES.md` (первый найденный, лимит 64KB). `compose-prompt.ts` собирает `system_layer + user_layer` и инжектится в каждое API сообщение через role:'system'. CLI-провайдеры не инжектятся — они сами читают AGENTS.md. UI: бейдж над чатом `System layer · v1.0.0 · User layer · AGENTS.md` (кликабельно открывает SystemLayerViewer с табами System / User read-only). Соответствует постановке: пользователь может только **расширять** через AGENTS.md, перезаписать системный слой не может |
+| 2026-05-19 | **AS-227 DONE.** Immutable system layer + user layer | — | Иммутабельный системный слой агента в коде продукта: `electron/ai/system-layer.ts` экспортирует `SYSTEM_LAYER_PROMPT` v1.0.0 (7-шаговый цикл, anti-patterns, scope discipline, verification contract, safety, output style). User layer auto-loaded из `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` / `.verstak/RULES.md` (первый найденный, лимит 64KB). `compose-prompt.ts` собирает `system_layer + user_layer` и инжектится в каждое API сообщение через role:'system'. CLI-провайдеры не инжектятся — они сами читают AGENTS.md. UI: бейдж над чатом `System layer · v1.0.0 · User layer · AGENTS.md` (кликабельно открывает SystemLayerViewer с табами System / User read-only). Соответствует постановке: пользователь может только **расширять** через AGENTS.md, перезаписать системный слой не может |
 | 2026-05-19 | **Iteration: critical features sweep** | — | После аудита статьи и Codex закрыты сразу несколько критических пунктов |
 | 2026-05-19 | **Tools.** search_project + find_files | `a32f1d5` | Полнотекстовый поиск через ripgrep (fallback на манульный walker), glob-find по проекту. AI разблокирован на больших репо. Игнор node_modules/.git/out/dist/build/__pycache__/venv |
 | 2026-05-19 | **Agent.** Undo stack + Loop detection + Max-turns warning | `812695e` | `file_undo` таблица (50 на проект), кнопка `↶ N` в composer'е восстанавливает последнюю принятую правку. Loop detection — если AI 3× повторил один tool+args → break + supervisor message. Max turns 5→8 + явный warning при достижении лимита |
@@ -53,7 +53,7 @@
 | 2026-05-19 | **Feature.** Plan mode (DB + view + AI tool + execution) | `5 commits` | `plans` + `plan_steps` таблицы. PlanView заменил StubView: ручное создание плана, list+detail, шаги с чекбоксами. AI tool `create_plan(title, steps[])` — IPC перехватывает, сохраняет, шлёт `plan-created` event. Кнопка `▶ Запустить` per step → focused-промт → AI работает с tools → finalize step.result на 'done'. Кнопка `▶▶ Все шаги` — последовательный прогон pending шагов |
 | 2026-05-19 | **UI.** Multi-file DiffView | `09e5040` + `8443d3a` | Backend параллелит write_file в одном turn (Promise.all). Renderer переключился на `pendingWrites: PendingWrite[]`. DiffView: file rail слева (path + +N/−M), diff body справа, footer "Принять все (N)" / "Отклонить все" + per-file ✓/×. Когда один файл — fallback на старый layout |
 | 2026-05-19 | **Chore.** Test pipeline fix | `a777fe2` | `npm test` теперь сам ребилдит better-sqlite3 под node перед vitest. `predev` ребилдит под Electron. `test:fast` пропускает ребилд. Решена боль ABI mismatch из аудита |
-| 2026-05-19 | **Docs.** README → GGC = Gemini Grok Claude | `49f4894` | Обновлён под актуальный набор: 8 провайдеров (4 API + 4 CLI), список фич, инструкции для каждого CLI, скрипты, статус |
+| 2026-05-19 | **Docs.** README → GGC = Verstak Claude | `49f4894` | Обновлён под актуальный набор: 8 провайдеров (4 API + 4 CLI), список фич, инструкции для каждого CLI, скрипты, статус |
 | 2026-05-19 | **Safety.** Confirm project switch mid-stream | `2903cc1` | Stop-gap до полного background-agents. При клике на другой проект во время стрима — confirm `AI ещё отвечает. Прервать?`. Без подтверждения остаёмся в текущем |
 | 2026-05-19 | **Feature.** Background agents (4 коммита) | `1cc05e5` → `34a9326` | Полная фоновая работа AI во время переключения проектов. Backend: каждое `ai:event` теперь тегируется `projectPath` (taggedSender wrapper). Store: `SessionSnapshot` per-проект, snapshot/restore при `setProject`, `applyEventToSession` action для фоновых сессий. Chat: листенер маршрутизирует по `projectPath` — если событие не для текущего проекта, мутирует snapshot. UI: на ProjectChip синяя точка `hasUnread` (AI закончил пока ты был в другом проекте) или зелёная пульсирующая `isStreaming` (ещё работает). Stop-gap confirm-mid-stream удалён. Переключение проектов во время стрима безопасно: AI продолжает писать в свой проект, ты видишь точку, вернулся — увидел готовый ответ |
 
@@ -77,8 +77,8 @@ interface ChatProvider {
 ### 2026-05-19 — Settings как key/value в SQLite + safeStorage
 Все значения (включая не-секреты типа `provider`) проходят через `safeStorage.encryptString` → base64 → SQLite. Шифрование симметричное, OS-native. Доступ через `settings:get-key` / `settings:set-key` IPC.
 
-### 2026-05-19 — Чаты в SQLite, в БД приложения, не в `.geminigrok/` проекта
-Изначально проектировали хранить историю в папке проекта (`.geminigrok/chats.db`), но в реализации перешли на единую БД в `app.getPath('userData')`. История разделяется по полю `project_path`. Перенос на per-project DB — отдельная задача если понадобится "взять с собой" историю.
+### 2026-05-19 — Чаты в SQLite, в БД приложения, не в `.verstak/` проекта
+Изначально проектировали хранить историю в папке проекта (`.verstak/chats.db`), но в реализации перешли на единую БД в `app.getPath('userData')`. История разделяется по полю `project_path`. Перенос на per-project DB — отдельная задача если понадобится "взять с собой" историю.
 
 ### 2026-05-19 — Externalize нативных модулей в build config
 `electron`, `better-sqlite3`, `node-pty` помечены как `rollupOptions.external` в `electron.vite.config.ts`. Иначе Vite пытается бандлить их runtime-код и приложение падает при старте. См. фикс `de4785d`.
@@ -120,7 +120,7 @@ Goal: сделать продукт лучше Antigravity 2.0 за ночь. Ц
    политику для AI.
 4. **In-app browser** (`5f2505c`) — `src/components/BrowserView.tsx` через
    Electron `<webview>` (включён `webviewTag` в main). URL-бар, back/fwd/stop/reload,
-   error overlay, title+host status. Renderer экспортит `window.geminigrokBrowser`.
+   error overlay, title+host status. Renderer экспортит `window.verstakBrowser`.
    AI tools `browser_navigate` / `browser_read_page` диспатчатся через
    `webContents.executeJavaScript` — main процесс дёргает renderer-side API.
 5. **Connectors framework + 1C OData** (`2facb7f`) — `electron/connectors/` с
@@ -137,7 +137,7 @@ Goal: сделать продукт лучше Antigravity 2.0 за ночь. Ц
    (Anthropic prompt caching). CLI провайдеры → null (по подписке).
    Usage pill в Chat composer теперь показывает `↑in ↓out ⟲cached $cost`.
 8. **AGENTS.md auto-init + DiffView shortcuts** (`9db9a1e`) — `ensureUserLayer()`
-   создаёт `.geminigrok/RULES.md` со стартовым шаблоном при открытии проекта
+   создаёт `.verstak/RULES.md` со стартовым шаблоном при открытии проекта
    если правил нет. DiffView: Enter принять / Esc отклонить все /
    Ctrl+Enter принять все / ←→ навигация между файлами.
 9. **Generic HTTP/REST connector** (`709e855`) — `electron/connectors/http.ts`.
@@ -263,7 +263,7 @@ Cursor предложил ТЗ предполагая что studio_server.py / 
 
 - **product_stack в context-pack** — одна строка на пакет. Читает
   package.json и собирает summary типа `electron + react + vite +
-  better-sqlite3 + typescript (geminigrok)`. Fallback на pyproject /
+  better-sqlite3 + typescript (verstak)`. Fallback на pyproject /
   requirements.txt для Python проектов. Цена ~50 байт; экономит
   модели read_file package.json на первом turn.
 - **system-layer v1.2.0 · блок GROUNDING** — явные правила: стек
@@ -304,7 +304,7 @@ index.html / chats/ как legacy (это runtime/entry, не мусор).
 Закрыл «Это не продукт, это dev-сборка» из Grok audit.
 
 - package.json: build config для electron-builder
-  * appId com.pavelfrolof.geminigrok, productName GeminiGrok
+  * appId ru.verstak.ide, productName Verstak
   * Targets: NSIS installer + portable .exe (x64)
   * asarUnpack для better-sqlite3 + node-pty (native modules)
   * npmRebuild: false (используем уже собранные за predev бинарники
@@ -318,9 +318,9 @@ index.html / chats/ как legacy (это runtime/entry, не мусор).
   Prebuilt-multiarch имеет binarys для Windows/Mac/Linux out of the box.
 
 - Артефакты в release/:
-  * GeminiGrok-Setup-1.0.0-x64.exe — NSIS installer (с user choice
+  * Verstak-Setup-1.0.0-x64.exe — NSIS installer (с user choice
     install path, desktop shortcut, start menu entry)
-  * GeminiGrok-Portable-1.0.0-x64.exe — standalone, без установки
+  * Verstak-Portable-1.0.0-x64.exe — standalone, без установки
 
 - release/ добавлен в .gitignore
 

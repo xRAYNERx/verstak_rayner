@@ -125,7 +125,7 @@ export function OnboardingWizard({ onComplete }: Props) {
           {step === 1 && (
             <>
               <p className="gg-onboarding-text">
-                GeminiGrok — твой второй мозг для работы в агентстве. Чтобы подобрать правильный
+                Verstak — твой второй мозг для работы в агентстве. Чтобы подобрать правильный
                 набор скиллов и провайдеров — расскажи кто ты.
               </p>
               <div className="gg-onboarding-field">
@@ -196,7 +196,7 @@ export function OnboardingWizard({ onComplete }: Props) {
               </ul>
               <div className="gg-onboarding-hint">
                 Коннекторы (Google Sheets, Telegram, Битрикс24, Я.Директ) и SSH — настраиваются в Settings
-                по мере необходимости. См. DEVLOG.md в проекте geminigrok.
+                по мере необходимости. См. DEVLOG.md в проекте verstak.
               </div>
             </>
           )}

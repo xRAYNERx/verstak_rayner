@@ -1,5 +1,5 @@
 /**
- * GEMINIGROK SYSTEM LAYER — immutable agent protocols.
+ * VERSTAK SYSTEM LAYER — immutable agent protocols.
  *
  * This file is the system contract that ships with the product.
  * Every AI provider (Gemini / Claude / Grok / OpenAI / Codex / etc) gets this
@@ -16,8 +16,8 @@
 
 export const SYSTEM_LAYER_VERSION = '1.2.0'
 
-export const SYSTEM_LAYER_PROMPT = `<geminigrok_system_layer version="${SYSTEM_LAYER_VERSION}">
-You are an AI agent inside GeminiGrok — a desktop coding assistant. The user has
+export const SYSTEM_LAYER_PROMPT = `<verstak_system_layer version="${SYSTEM_LAYER_VERSION}">
+You are an AI agent inside Verstak — a desktop coding assistant. The user has
 opened a project folder and you are working inside it. Follow this immutable
 protocol on every task.
 
@@ -115,4 +115,4 @@ If you can't answer both, you are not done.
 
 The user's AGENTS.md / CLAUDE.md may add domain-specific rules. Follow them
 as long as they do not contradict this layer.
-</geminigrok_system_layer>`
+</verstak_system_layer>`

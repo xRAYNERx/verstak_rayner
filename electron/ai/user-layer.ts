@@ -10,13 +10,13 @@ import { join, dirname } from 'path'
  *   1. AGENTS.md          (Cursor / Codex convention)
  *   2. CLAUDE.md          (Anthropic convention)
  *   3. GEMINI.md          (Google convention)
- *   4. .geminigrok/RULES.md (our own)
+ *   4. .verstak/RULES.md (our own)
  *
  * The user layer EXTENDS the system layer; it cannot override the protocol.
  * The combined prompt is built by `composeSystemPrompt`.
  */
 
-const CANDIDATES = ['AGENTS.md', 'CLAUDE.md', 'GEMINI.md', '.geminigrok/RULES.md']
+const CANDIDATES = ['AGENTS.md', 'CLAUDE.md', 'GEMINI.md', '.verstak/RULES.md']
 const MAX_BYTES = 64 * 1024  // 64 KB safety cap for user layer
 
 export interface UserLayer {
@@ -43,7 +43,7 @@ export async function loadUserLayer(projectRoot: string | null): Promise<UserLay
   return { path: null, content: '' }
 }
 
-const DEFAULT_RULES = `# GeminiGrok Rules
+const DEFAULT_RULES = `# Verstak Rules
 
 Эти правила читает AI агент при каждой задаче в этом проекте.
 Дополни их под свой стек и стиль — система прибавит их к встроенному
@@ -76,7 +76,7 @@ const DEFAULT_RULES = `# GeminiGrok Rules
 `
 
 /**
- * Create a default `.geminigrok/RULES.md` if no user layer exists in this
+ * Create a default `.verstak/RULES.md` if no user layer exists in this
  * project. Idempotent: returns false if any of the candidate files is already
  * present. Called on project open.
  */
@@ -88,11 +88,11 @@ export async function ensureUserLayer(projectRoot: string): Promise<{ created: b
       if (st.isFile()) return { created: false, path: rel }
     } catch { /* not present, keep looking */ }
   }
-  const target = join(projectRoot, '.geminigrok', 'RULES.md')
+  const target = join(projectRoot, '.verstak', 'RULES.md')
   try {
     await mkdir(dirname(target), { recursive: true })
     await writeFile(target, DEFAULT_RULES, 'utf8')
-    return { created: true, path: '.geminigrok/RULES.md' }
+    return { created: true, path: '.verstak/RULES.md' }
   } catch {
     return { created: false, path: null }
   }

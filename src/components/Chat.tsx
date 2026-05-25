@@ -668,7 +668,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
         <div className="gg-chat-stream-inner">
         {!hasMessages && (
           <div className="gg-chat-empty">
-            <img src={iconUrl} alt="GeminiGrok" className="gg-chat-empty-mark-img" />
+            <img src={iconUrl} alt="Verstak" className="gg-chat-empty-mark-img" />
             <div className="gg-chat-empty-title">Готов к работе</div>
             <div className="gg-chat-empty-hint">
               Открой проект слева и напиши задачу. Можно прикрепить файл, бросить скриншот через Ctrl+V или drag-and-drop.

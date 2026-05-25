@@ -2,12 +2,12 @@
  * Skill — переиспользуемый агентский пресет: system prompt + список разрешённых
  * tools + auto-loaders контекста + дефолтный provider/model.
  *
- * Источник: GeminiGrok V3 Plan, раздел 6. См. Downloads/GeminiGrok-V3-Plan.html.
+ * Источник: Verstak V3 Plan, раздел 6. См. Downloads/Verstak-V3-Plan.html.
  *
  * Скиллы загружаются из:
  *  1. Server API (aioperatingsystem.ru/api/skills) — основной источник, синхронизирует
  *     14 сотрудников. См. SkillSource.serverApi.
- *  2. Локально из ~/.geminigrok/skills/*.md — fallback / личные.
+ *  2. Локально из ~/.verstak/skills/*.md — fallback / личные.
  *  3. Built-in 3 шт в коде (bos-sales, bos-mkt, client-cycle) — гарантированный
  *     baseline на случай если сервер недоступен.
  */

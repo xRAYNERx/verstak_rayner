@@ -44,7 +44,7 @@ function createWindow(): void {
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
-    title: 'GeminiGrok',
+    title: 'Verstak',
     icon: iconPath,
     webPreferences: {
       preload: join(HERE, '../preload/preload.mjs'),
@@ -121,7 +121,7 @@ function installCSP(): void {
 // Tell Windows this is its own application so the taskbar uses our icon
 // (and not the generic Electron / Node icon).
 if (process.platform === 'win32') {
-  app.setAppUserModelId('com.pavelfrolof.geminigrok')
+  app.setAppUserModelId('ru.verstak.ide')
 }
 
 app.whenReady().then(() => {
@@ -131,20 +131,20 @@ app.whenReady().then(() => {
   mkdirSync(dir, { recursive: true })
   let db
   try {
-    db = openDb(join(dir, 'geminigrok.db'))
+    db = openDb(join(dir, 'verstak.db'))
   } catch (err) {
     // DB locked, disk full, schema migration failed — show GUI error
     // instead of crashing silently with stderr only.
     const msg = err instanceof Error ? err.message : String(err)
     dialog.showErrorBox(
-      'GeminiGrok: не удалось открыть базу данных',
-      `Путь: ${join(dir, 'geminigrok.db')}\n\nОшибка: ${msg}\n\n` +
-      `Возможные причины: файл заблокирован другим процессом GeminiGrok, ` +
+      'Verstak: не удалось открыть базу данных',
+      `Путь: ${join(dir, 'verstak.db')}\n\nОшибка: ${msg}\n\n` +
+      `Возможные причины: файл заблокирован другим процессом Verstak, ` +
       `диск переполнен, или повреждённая миграция схемы.\n\n` +
       `Что попробовать:\n` +
-      `1. Закрой все другие копии GeminiGrok\n` +
+      `1. Закрой все другие копии Verstak\n` +
       `2. Проверь свободное место на диске\n` +
-      `3. Если ничего не помогает — переименуй geminigrok.db в .bak и перезапусти ` +
+      `3. Если ничего не помогает — переименуй verstak.db в .bak и перезапусти ` +
       `(чаты будут потеряны, но проект откроется)`
     )
     app.quit()
@@ -186,7 +186,7 @@ app.whenReady().then(() => {
   const connectorRegistry = createConnectorRegistry()
   const userProfiles = createUserProfiles(db)
 
-  // Skill registry — собирает скиллы из server API + ~/.geminigrok/skills/ +
+  // Skill registry — собирает скиллы из server API + ~/.verstak/skills/ +
   // built-in. См. electron/ai/skills/loader.ts. Конфиг сервера читается из
   // settings (Pavel может сменить URL через UI). Refresh при старте — async,
   // не блокирует window open.

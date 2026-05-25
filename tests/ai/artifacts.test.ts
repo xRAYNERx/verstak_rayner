@@ -17,7 +17,7 @@ afterAll(async () => {
 describe('artifactsDir', () => {
   it('возвращает путь с сегодняшней датой', () => {
     const dir = artifactsDir('/x')
-    expect(dir).toMatch(/[/\\]\.geminigrok[/\\]artifacts[/\\]\d{4}-\d{2}-\d{2}$/)
+    expect(dir).toMatch(/[/\\]\.verstak[/\\]artifacts[/\\]\d{4}-\d{2}-\d{2}$/)
   })
 })
 

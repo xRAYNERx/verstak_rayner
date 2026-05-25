@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react'
  * stays responsive even if a page hangs.
  *
  * AI tools (browser_navigate, browser_read_page, browser_screenshot) talk to
- * this view through window.geminigrokBrowser, which is set on the global
+ * this view through window.verstakBrowser, which is set on the global
  * window object when the BrowserView mounts. This is a renderer-side
  * extension point — see useEffect below.
  */
@@ -31,7 +31,7 @@ interface Webview extends HTMLElement {
 
 declare global {
   interface Window {
-    geminigrokBrowser?: {
+    verstakBrowser?: {
       navigate: (url: string) => Promise<{ ok: true; url: string } | { ok: false; error: string }>
       readPage: (selector?: string) => Promise<string>
       screenshot: () => Promise<string>  // data:image/png;base64,...
@@ -90,9 +90,9 @@ export function BrowserView() {
     }
   }, [])
 
-  // Expose the AI-facing API on window.geminigrokBrowser while this view is mounted.
+  // Expose the AI-facing API on window.verstakBrowser while this view is mounted.
   useEffect(() => {
-    window.geminigrokBrowser = {
+    window.verstakBrowser = {
       async navigate(url) {
         const wv = webviewRef.current
         if (!wv) return { ok: false, error: 'Browser view не активен' }
@@ -126,7 +126,7 @@ export function BrowserView() {
       getURL() { return webviewRef.current?.getURL() ?? null },
       getTitle() { return webviewRef.current?.getTitle() ?? null }
     }
-    return () => { delete window.geminigrokBrowser }
+    return () => { delete window.verstakBrowser }
   }, [])
 
   function go() {

@@ -21,8 +21,8 @@ import { readdir, stat, readFile } from 'fs/promises'
 import { join, relative } from 'path'
 
 const IGNORE_DIRS = new Set([
-  'node_modules', '.git', 'out', 'dist', '.next', '.vite', '.geminigrok',
-  '.geminigrok-data', '.superpowers', '__pycache__', 'venv', '.venv',
+  'node_modules', '.git', 'out', 'dist', '.next', '.vite', '.verstak',
+  '.verstak-data', '.superpowers', '__pycache__', 'venv', '.venv',
   'target', 'build', '.cache', '.turbo', '.parcel-cache'
 ])
 

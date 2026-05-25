@@ -1,4 +1,4 @@
-# GeminiGrok V3 — Vision Spec
+# Verstak V3 — Vision Spec
 **Дата:** 2026-05-23  
 **Контекст:** Brainstorm сессия ai-lab → передача в bos-hq
 
@@ -6,7 +6,7 @@
 
 ## Одна фраза
 
-**GeminiGrok V3 = Manus для маркетингового агентства.**
+**Verstak V3 = Manus для маркетингового агентства.**
 
 Пишешь задачу на обычном языке — система делает под ключ.
 
@@ -54,7 +54,7 @@
 
 ## Отличие от Manus
 
-| Manus | GeminiGrok V3 |
+| Manus | Verstak V3 |
 |---|---|
 | Общий агент, начинает с нуля | Знает инструменты агентства |
 | Браузер как единственный путь | Прямые API (быстрее, надёжнее) |
@@ -77,6 +77,6 @@
 
 ## Что передаётся в bos-hq
 
-Детальный план реализации: `C:\Users\Pavel\Downloads\GeminiGrok-V3-Plan.html` (v1.1)
+Детальный план реализации: `C:\Users\Pavel\Downloads\Verstak-V3-Plan.html` (v1.1)
 
 Задача разработчику: взять этот vision + план → написать implementation plan по неделям → стартовать Неделю 1 (коннекторы + skill loader через server-API).

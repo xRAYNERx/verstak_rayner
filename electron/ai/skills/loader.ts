@@ -4,7 +4,7 @@
  *   1. SERVER API (aioperatingsystem.ru/api/skills) — основной источник для
  *      14 сотрудников. Эндпоинт ещё не существует на момент написания —
  *      реализация падает gracefully (timeout 5s) и переходит к local.
- *   2. ~/.geminigrok/skills/*.md — пользовательские личные.
+ *   2. ~/.verstak/skills/*.md — пользовательские личные.
  *   3. BUILT_IN_SKILLS — гарантированный baseline в коде.
  *
  * Если скилл с одинаковым id встречается в нескольких источниках — приоритет
@@ -20,11 +20,11 @@ import type { Skill, SkillFrontmatter } from './types'
 import type { ProviderId } from '../registry'
 import type { AgentMode } from '../mode-policy'
 
-const USER_SKILLS_DIR = join(homedir(), '.geminigrok', 'skills')
+const USER_SKILLS_DIR = join(homedir(), '.verstak', 'skills')
 /** Папка скиллов Claude Code — для migration / sharing. Если у Pavel'я там
- *  уже лежат 8 BOS-скиллов, они автоматически появятся в GeminiGrok без
+ *  уже лежат 8 BOS-скиллов, они автоматически появятся в Verstak без
  *  копирования. Помечаются source='user'. Если в обоих директориях есть
- *  файл с одинаковым id — .geminigrok/skills/ имеет приоритет (это явный
+ *  файл с одинаковым id — .verstak/skills/ имеет приоритет (это явный
  *  GG-override). */
 const CLAUDE_SKILLS_DIR = join(homedir(), '.claude', 'skills')
 const SERVER_TIMEOUT_MS = 5_000
@@ -33,7 +33,7 @@ const SERVER_TIMEOUT_MS = 5_000
 export interface LoaderConfig {
   /** Например 'https://aioperatingsystem.ru'. Пусто = серверный источник пропускается. */
   serverBase?: string | null
-  /** Доп. пользовательские директории помимо ~/.geminigrok/skills/. */
+  /** Доп. пользовательские директории помимо ~/.verstak/skills/. */
   extraDirs?: string[]
 }
 
@@ -55,7 +55,7 @@ export async function loadAllSkills(config: LoaderConfig = {}): Promise<LoadResu
   //    (a) ~/.claude/skills/ — если у Pavel'я там уже лежат BOS-скиллы из
   //        Claude Code, забираем их автоматически. Это даёт мгновенный
   //        bootstrap для пользователей которые мигрируют из Claude Code.
-  //    (b) ~/.geminigrok/skills/ — личные скиллы GG (приоритетнее claude).
+  //    (b) ~/.verstak/skills/ — личные скиллы GG (приоритетнее claude).
   //    (c) extraDirs — для тестов / опытов.
   const userDirs = [CLAUDE_SKILLS_DIR, USER_SKILLS_DIR, ...(config.extraDirs ?? [])]
   let userCount = 0

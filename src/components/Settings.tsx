@@ -481,7 +481,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
           <div className="gg-settings-hint">
             Claude Code v2.1+ в headless режиме (через нашу программу) НЕ использует Max OAuth напрямую — требует
             long-lived token. Получи: <code>claude setup-token</code> в PowerShell → подтверди в браузере →
-            копируй token сюда. GeminiGrok будет передавать его как env var <code>CLAUDE_CODE_OAUTH_TOKEN</code>
+            копируй token сюда. Verstak будет передавать его как env var <code>CLAUDE_CODE_OAUTH_TOKEN</code>
             при запуске claude. Решает «401 Invalid credentials» при выборе провайдера Claude Code.
             Хранится зашифрованным через safeStorage. Действителен 1 год.
           </div>
@@ -696,7 +696,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
           <div className="gg-settings-hint">
             Используется агентом для шеринга артефактов с клиентами:
             upload_file → get_public_url → отправка ссылки в TG.
-            Загрузка идёт в <code>/Geminigrok/{`{дата}`}/</code> чтобы не засорять корень Диска.
+            Загрузка идёт в <code>/Verstak/{`{дата}`}/</code> чтобы не засорять корень Диска.
           </div>
 
           <div className="gg-settings-section-title" style={{ marginTop: 24 }}>🎭 Сервер скиллов</div>
@@ -713,7 +713,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
           <div className="gg-settings-hint">
             Сервер должен предоставлять <code>GET /api/skills</code> возвращающий
             <code>{`{skills: [{id, raw, sourceRef}]}`}</code>. Если недоступен — используются built-in
-            (bos-sales / bos-mkt / client-cycle) + локальные из ~/.geminigrok/skills/.
+            (bos-sales / bos-mkt / client-cycle) + локальные из ~/.verstak/skills/.
           </div>
         </div>
         )}

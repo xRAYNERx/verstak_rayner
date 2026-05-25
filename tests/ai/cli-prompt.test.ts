@@ -20,7 +20,7 @@ describe('buildCliPrompt', () => {
       messages: [{ role: 'user', content: 'привет' }]
     })
     // Полный system_layer не должен пробрасываться
-    expect(out).not.toContain('geminigrok_system_layer')
+    expect(out).not.toContain('verstak_system_layer')
     expect(out).toContain('привет')
   })
 
@@ -30,7 +30,7 @@ describe('buildCliPrompt', () => {
       projectPath: dir,
       messages: [{ role: 'user', content: 'hi' }]
     })
-    expect(out).toContain('geminigrok_system_layer')
+    expect(out).toContain('verstak_system_layer')
   })
 
   it('включает context_pack с verify_scripts когда package.json есть', async () => {

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { detectCrossProjectPaths } from '../../electron/ai/context-pack'
 
 describe('detectCrossProjectPaths', () => {
-  const proj = 'C:/Users/Pavel/geminigrok'
+  const proj = 'C:/Users/Pavel/verstak'
 
   it('flags абсолютный путь вне проекта (Windows)', () => {
     const r = detectCrossProjectPaths('сделай аудит C:\\Users\\Pavel\\grok-chat', proj)
@@ -11,7 +11,7 @@ describe('detectCrossProjectPaths', () => {
   })
 
   it('игнорирует пути внутри активного проекта', () => {
-    const r = detectCrossProjectPaths('правка C:\\Users\\Pavel\\geminigrok\\src\\App.tsx', proj)
+    const r = detectCrossProjectPaths('правка C:\\Users\\Pavel\\verstak\\src\\App.tsx', proj)
     expect(r).toEqual([])
   })
 

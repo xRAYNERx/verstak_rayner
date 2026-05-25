@@ -1,4 +1,4 @@
-# DEVLOG — журнал разработки GeminiGrok
+# DEVLOG — журнал разработки Verstak
 
 Хронологический лог значимых изменений. Свежие сверху. Пишем когда:
 - Закрыт крупный feature / refactor.
@@ -13,7 +13,7 @@
 
 ### Skill enrichment
 - **Авто-импорт скиллов из `~/.claude/skills/`** — loader теперь смотрит и в
-  Claude Code папку, не только в `~/.geminigrok/skills/`. Pavel'я 8 BOS-скиллов
+  Claude Code папку, не только в `~/.verstak/skills/`. Pavel'я 8 BOS-скиллов
   появляются автоматически без копирования.
 - **Context loaders реализованы.** Frontmatter `context_loaders: [{impl, runs_on}]`
   раньше парсился но не вызывался. Теперь — registry с 3 базовыми импл:
@@ -70,14 +70,14 @@
 
 ## 2026-05-22 (ночь→утро) — V3 Implementation Marathon
 
-**Контекст:** Pavel дал goal `C:\Users\Pavel\Downloads\GeminiGrok-V3-Plan.html`
+**Контекст:** Pavel дал goal `C:\Users\Pavel\Downloads\Verstak-V3-Plan.html`
 с инструкцией «делай до полной реализации со своей стороны». Решения зафиксированы
 в плане v1.1 раздел 14. Реализовано всё что не требует внешних credentials или
 действий на стороне Pavel.
 
 ### Skills layer
 
-- **electron/ai/skills/**: types, frontmatter parser, loader (server API + ~/.geminigrok/
+- **electron/ai/skills/**: types, frontmatter parser, loader (server API + ~/.verstak/
   skills/ + built-in fallback), registry с refresh.
 - 3 built-in скилла: bos-sales, bos-mkt, client-cycle (портированы из ~/.claude/skills/).
 - IPC: skills:list / get / refresh / status.
@@ -112,7 +112,7 @@
 - npm i docx (--legacy-peer-deps).
 - electron/ai/artifacts.ts: generateHtml (auto-wrap с базовым CSS) и generateDocx
   (Title + Heading 1-3 + параграфы + bullets). Сохраняются в
-  `.geminigrok/artifacts/YYYY-MM-DD/`.
+  `.verstak/artifacts/YYYY-MM-DD/`.
 - Tools: generate_html, generate_docx в TOOL_DEFS.
 - Handlers с emit нового ChatEvent `artifact-created`.
 - UI: ArtifactsPanel рендерит pills 📄 в Timeline. Клик → открытие в дефолтном

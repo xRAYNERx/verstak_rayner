@@ -361,7 +361,7 @@ async function dispatchBrowser(call: ToolCall, ctx: ToolContext): Promise<ToolRe
                 return { url: api.getURL(), dataUrl };`
     }
     const snippet = `(async () => {
-      const api = window.geminigrokBrowser;
+      const api = window.verstakBrowser;
       if (!api) return { __err: 'Вкладка Browser не открыта — попроси пользователя открыть её' };
       const a = JSON.parse(${argsLiteral});
       ${action}

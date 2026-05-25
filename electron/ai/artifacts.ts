@@ -1,6 +1,6 @@
 /**
  * Генератор артефактов — HTML и DOCX. Сохраняются в
- * {projectPath}/.geminigrok/artifacts/{YYYY-MM-DD}/{filename}.{ext}
+ * {projectPath}/.verstak/artifacts/{YYYY-MM-DD}/{filename}.{ext}
  *
  * Источник: V3 Plan раздел 8.
  *
@@ -25,7 +25,7 @@ export function artifactsDir(projectPath: string): string {
   const y = today.getFullYear()
   const m = String(today.getMonth() + 1).padStart(2, '0')
   const d = String(today.getDate()).padStart(2, '0')
-  return join(projectPath, '.geminigrok', 'artifacts', `${y}-${m}-${d}`)
+  return join(projectPath, '.verstak', 'artifacts', `${y}-${m}-${d}`)
 }
 
 function sanitizeFilename(name: string): string {
@@ -127,7 +127,7 @@ export async function generateDocx(
   }
 
   const doc = new Document({
-    creator: 'GeminiGrok',
+    creator: 'Verstak',
     sections: [{ properties: {}, children }]
   })
   const buf = await Packer.toBuffer(doc)

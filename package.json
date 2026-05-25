@@ -1,6 +1,6 @@
 {
-  "name": "geminigrok",
-  "version": "1.0.0",
+  "name": "verstak",
+  "version": "1.1.0",
   "description": "Desktop AI coding agent: 8 providers (API + CLI subscriptions), tools, journal, connectors",
   "main": "out/main/main.mjs",
   "scripts": {
@@ -18,8 +18,8 @@
     "dist:win": "npm run build && electron-builder --win --x64"
   },
   "build": {
-    "appId": "com.pavelfrolof.geminigrok",
-    "productName": "GeminiGrok",
+    "appId": "ru.verstak.ide",
+    "productName": "Verstak",
     "copyright": "Copyright © 2026 Pavel Frolov",
     "directories": {
       "output": "release",
@@ -63,11 +63,11 @@
       "deleteAppDataOnUninstall": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "GeminiGrok",
-      "artifactName": "GeminiGrok-Setup-${version}-${arch}.${ext}"
+      "shortcutName": "Verstak",
+      "artifactName": "Verstak-Setup-${version}-${arch}.${ext}"
     },
     "portable": {
-      "artifactName": "GeminiGrok-Portable-${version}-${arch}.${ext}"
+      "artifactName": "Verstak-Portable-${version}-${arch}.${ext}"
     },
     "mac": {
       "target": [

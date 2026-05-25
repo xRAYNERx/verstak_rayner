@@ -1,12 +1,12 @@
-# CLAUDE.md — регламент проекта GeminiGrok
+# CLAUDE.md — регламент проекта Verstak
 
-Файл читается user_layer'ом GeminiGrok и Claude Code как «правила работы с этим проектом». См. `electron/ai/user-layer.ts` — порядок поиска: AGENTS.md → CLAUDE.md → GEMINI.md → .geminigrok/RULES.md.
+Файл читается user_layer'ом Verstak и Claude Code как «правила работы с этим проектом». См. `electron/ai/user-layer.ts` — порядок поиска: AGENTS.md → CLAUDE.md → GEMINI.md → .verstak/RULES.md.
 
 ---
 
 ## 1. Что это за проект
 
-**GeminiGrok** — десктопный AI coding agent (Electron + TypeScript + React + Zustand + better-sqlite3). Позиционируется как высококонтролируемая, независимая альтернатива Cursor / Antigravity, заточенная под российские реалии 2025–2026.
+**Verstak** — десктопный AI coding agent (Electron + TypeScript + React + Zustand + better-sqlite3). Позиционируется как высококонтролируемая, независимая альтернатива Cursor / Antigravity, заточенная под российские реалии 2025–2026.
 
 **Ключевая ценность:** контроль, прозрачность, мульти-провайдерность.
 
@@ -21,14 +21,14 @@
 - **Exponential backoff** на 429/503/ECONNRESET.
 
 **V3 фичи (агент-исполнитель для агентства):**
-- **Skills как first-class.** Frontmatter `.md` файлы → system prompt + tools_allow + context_loaders + default_provider/model. Авто-импорт из `~/.claude/skills/` + `~/.geminigrok/skills/` + 3 built-in (bos-sales / bos-mkt / client-cycle). Picker 🎭 в composer + slash commands `/bos-sales`.
+- **Skills как first-class.** Frontmatter `.md` файлы → system prompt + tools_allow + context_loaders + default_provider/model. Авто-импорт из `~/.claude/skills/` + `~/.verstak/skills/` + 3 built-in (bos-sales / bos-mkt / client-cycle). Picker 🎭 в composer + slash commands `/bos-sales`.
 - **Context loaders** — frontmatter `context_loaders: [{impl, runs_on}]` авто-инжектят данные в первое user msg. Готовые: `load_client_card`, `load_clients_list`, `load_today_brief`.
 - **8 коннекторов:** 1C OData, generic HTTP, Google Sheets, SSH executor (с denylist), Telegram bot, Битрикс24, Я.Директ, Я.Диск.
 - **Artifacts:** `generate_html` / `generate_docx` / `render_chart` (SVG bar/line/pie) tools. Embedded preview (HTML напрямую, DOCX через mammoth.js).
 - **Multi-user profiles:** Onboarding wizard + Settings → Профили. 5 ролей с пресетами.
 - **delegate_task** — мультиагент V1: основной агент делегирует sub-task другому скиллу/модели, получает результат как tool_result.
 - **Sidecar Terminal Intelligence** — детектор ошибок (TS/Python/npm/ESLint) в потоке терминала → toast с кнопкой «Fix in chat».
-- **Claude Code OAuth env-passthrough** — Settings field, GeminiGrok передаёт `CLAUDE_CODE_OAUTH_TOKEN` дочернему claude процессу, headless+Max заработал.
+- **Claude Code OAuth env-passthrough** — Settings field, Verstak передаёт `CLAUDE_CODE_OAUTH_TOKEN` дочернему claude процессу, headless+Max заработал.
 
 ---
 
@@ -205,7 +205,7 @@ npm run dist:win     # NSIS + portable .exe
 
 - **Новый AI-провайдер:** `electron/ai/{name}.ts` + регистрация в `registry.ts`. Если это API — реализуй `ChatProvider.send` как async generator. Если CLI — посмотри `claude-cli.ts` как шаблон (treeKill + stdin payload + stream-json parser).
 - **Новый коннектор (1С/Bitrix/Yandex):** `electron/connectors/{name}.ts` реализует `Connector` интерфейс (info + query). Регистрация в `connectors/registry.ts` — одна строка в BUILTINS массиве. Settings UI секция в `src/components/Settings.tsx` вкладка connectors.
-- **Новый skill:** просто `.md` файл в `~/.geminigrok/skills/` (или редактируй `~/.claude/skills/` — авто-импортится). Frontmatter: id (обязательно) + name/description/icon/slash/tools_allow/context_loaders/suggested_prompts. Body = system prompt. Для built-in (захардкоженного fallback) — `electron/ai/skills/built-in.ts`.
+- **Новый skill:** просто `.md` файл в `~/.verstak/skills/` (или редактируй `~/.claude/skills/` — авто-импортится). Frontmatter: id (обязательно) + name/description/icon/slash/tools_allow/context_loaders/suggested_prompts. Body = system prompt. Для built-in (захардкоженного fallback) — `electron/ai/skills/built-in.ts`.
 - **Новый context loader:** функция в `electron/ai/skills/loaders.ts` + регистрация в REGISTRY map. Frontmatter скилла ссылается через `impl: ваше_имя`.
 - **Новый tool (для агента):** TOOL_DEF в `electron/ai/tools.ts` + handler в `electron/ipc/tool-handlers.ts` (mode: parallel-read / sequential / confirm-write). Регистрируй в HANDLER_REGISTRY.
 - **Новый артефакт type:** добавь kind в ChatEvent `artifact-created` + handler в tool-handlers + render в ArtifactPreview.tsx.

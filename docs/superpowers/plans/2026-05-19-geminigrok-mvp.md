@@ -1,4 +1,4 @@
-# GeminiGrok MVP Implementation Plan
+# Verstak MVP Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -8,14 +8,14 @@
 
 **Tech Stack:** Electron + Vite, React + TypeScript, better-sqlite3, @google/genai, node-pty, xterm.js, Zustand, Vitest
 
-**Spec:** [docs/superpowers/specs/2026-05-19-geminigrok-design.md](../specs/2026-05-19-geminigrok-design.md)
+**Spec:** [docs/superpowers/specs/2026-05-19-verstak-design.md](../specs/2026-05-19-verstak-design.md)
 
 ---
 
 ## File Structure
 
 ```
-geminigrok/
+verstak/
 ├── package.json
 ├── electron.vite.config.ts
 ├── tsconfig.json
@@ -68,7 +68,7 @@ geminigrok/
 - [ ] **Step 1: Initialize project**
 
 ```bash
-cd C:/Users/Pavel/geminigrok
+cd C:/Users/Pavel/verstak
 npm init -y
 npm install --save-dev electron electron-vite vite typescript @types/node @types/react @types/react-dom @vitejs/plugin-react
 npm install react react-dom
@@ -81,7 +81,7 @@ node_modules/
 out/
 dist/
 .vite/
-.geminigrok-data/
+.verstak-data/
 *.log
 .DS_Store
 .superpowers/brainstorm/
@@ -140,7 +140,7 @@ function createWindow(): void {
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
-    title: 'GeminiGrok',
+    title: 'Verstak',
     webPreferences: {
       preload: join(__dirname, '../preload/preload.js'),
       sandbox: false
@@ -175,7 +175,7 @@ contextBridge.exposeInMainWorld('api', {
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>GeminiGrok</title>
+    <title>Verstak</title>
   </head>
   <body>
     <div id="root"></div>
@@ -196,7 +196,7 @@ createRoot(document.getElementById('root')!).render(<App />)
 ```typescript
 // src/App.tsx
 export function App() {
-  return <div style={{ padding: 20, fontFamily: 'sans-serif' }}>GeminiGrok — Hello</div>
+  return <div style={{ padding: 20, fontFamily: 'sans-serif' }}>Verstak — Hello</div>
 }
 ```
 
@@ -214,7 +214,7 @@ export function App() {
 - [ ] **Step 10: Run dev and verify window opens**
 
 Run: `npm run dev`
-Expected: Окно открывается, виден текст "GeminiGrok — Hello"
+Expected: Окно открывается, виден текст "Verstak — Hello"
 
 - [ ] **Step 11: Commit**
 
@@ -746,7 +746,7 @@ import { ipcMain } from 'electron'
 import { readdir, stat, readFile } from 'fs/promises'
 import { join, relative, sep } from 'path'
 
-const IGNORE = new Set(['node_modules', '.git', 'out', 'dist', '.geminigrok-data', '.superpowers'])
+const IGNORE = new Set(['node_modules', '.git', 'out', 'dist', '.verstak-data', '.superpowers'])
 
 export interface FileNode {
   name: string
@@ -792,7 +792,7 @@ function createWindow(): void {
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
-    title: 'GeminiGrok',
+    title: 'Verstak',
     webPreferences: {
       preload: join(__dirname, '../preload/preload.js'),
       sandbox: false
@@ -963,7 +963,7 @@ export function App() {
 
 Run: `npm run dev`
 - Жми "Открыть проект"
-- Выбери C:\Users\Pavel\geminigrok
+- Выбери C:\Users\Pavel\verstak
 - Дерево показывает docs/, electron/, src/, etc.
 
 - [ ] **Step 6: Commit**
@@ -996,7 +996,7 @@ function getSettings() {
   if (settings) return settings
   const dir = join(app.getPath('userData'), 'storage')
   mkdirSync(dir, { recursive: true })
-  const db = openDb(join(dir, 'geminigrok.db'))
+  const db = openDb(join(dir, 'verstak.db'))
   settings = createSettings(db, safeStorage)
   return settings
 }
@@ -1056,7 +1056,7 @@ function createWindow(): void {
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
-    title: 'GeminiGrok',
+    title: 'Verstak',
     webPreferences: { preload: join(__dirname, '../preload/preload.js'), sandbox: false }
   })
   if (process.env.ELECTRON_RENDERER_URL) win.loadURL(process.env.ELECTRON_RENDERER_URL)
@@ -1066,7 +1066,7 @@ function createWindow(): void {
 app.whenReady().then(() => {
   const dir = join(app.getPath('userData'), 'storage')
   mkdirSync(dir, { recursive: true })
-  const db = openDb(join(dir, 'geminigrok.db'))
+  const db = openDb(join(dir, 'verstak.db'))
   const settings = createSettings(db, safeStorage)
 
   registerProjectIpc()
@@ -1708,7 +1708,7 @@ await window.api.ai.send(allMessages, path)
 - [ ] **Step 8: Manual test for MVP criterion 2**
 
 Run: `npm run dev`
-- Открой папку C:\Users\Pavel\geminigrok
+- Открой папку C:\Users\Pavel\verstak
 - В чат: "Опиши что в этом проекте — посмотри package.json и README"
 - Gemini должен вызвать list_directory и read_file, затем дать осмысленный ответ
 
@@ -1859,7 +1859,7 @@ Add `<DiffView />` to `App.tsx`.
 
 Run: `npm run dev`
 - Открой проект
-- В чат: "Создай файл NOTES.md с содержимым 'Тест geminigrok'"
+- В чат: "Создай файл NOTES.md с содержимым 'Тест verstak'"
 - AI должен вызвать write_file → откроется DiffView
 - Жмёшь "Принять" → файл создаётся
 - Проверь файлово: NOTES.md появился
@@ -2003,7 +2003,7 @@ Important: run_command bypasses the diff confirmation but is auto-confirmed in M
 - [ ] **Step 8: Manual test for MVP criterion 4**
 
 Run: `npm run dev`
-- Открой geminigrok как проект
+- Открой verstak как проект
 - В чат: "запусти 'npm run type'"
 - AI вызывает run_command → результат летит обратно в чат
 - В терминале внизу можно набирать команды руками
@@ -2038,7 +2038,7 @@ Run: `npm run dev`. Проверь по списку:
 - [ ] **Step 2: Write `README.md`**
 
 ```markdown
-# GeminiGrok
+# Verstak
 
 Desktop AI coding assistant. Bring your own Gemini API key.
 
@@ -2084,7 +2084,7 @@ git commit -m "docs: README + MVP complete"
 
 ## Execution Handoff
 
-Plan complete and saved to `docs/superpowers/plans/2026-05-19-geminigrok-mvp.md`. Two execution options:
+Plan complete and saved to `docs/superpowers/plans/2026-05-19-verstak-mvp.md`. Two execution options:
 
 **1. Subagent-Driven (recommended)** - я диспатчу свежего сабагента на каждую задачу, ревьюю между задачами, быстрая итерация
 

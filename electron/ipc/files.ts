@@ -4,7 +4,7 @@ import { join } from 'path'
 import { safeRealJoin } from '../ai/path-policy'
 import { isForbiddenPath, scanText } from '../ai/secret-scanner'
 
-const IGNORE = new Set(['node_modules', '.git', 'out', 'dist', '.geminigrok-data', '.superpowers'])
+const IGNORE = new Set(['node_modules', '.git', 'out', 'dist', '.verstak-data', '.superpowers'])
 const MAX_READ_BYTES = 2 * 1024 * 1024  // 2 MB safety cap
 
 export interface FileNode {

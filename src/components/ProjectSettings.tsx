@@ -113,7 +113,7 @@ export function ProjectSettings({ project, onClose }: ProjectSettingsProps) {
             <div className="gg-ps-danger-row">
               <div>
                 <div className="gg-ps-danger-title">Убрать из списка</div>
-                <div className="gg-ps-danger-desc">Файлы проекта не удаляются — только запись в GeminiGrok.</div>
+                <div className="gg-ps-danger-desc">Файлы проекта не удаляются — только запись в Verstak.</div>
               </div>
               <button className="gg-ps-danger-btn" onClick={() => void handleRemove()}>
                 Убрать

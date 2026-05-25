@@ -9,7 +9,7 @@
   "id": "find-symbol",
   "title": "Найти где определён символ",
   "prompt": "Где в проекте определён компонент Sidebar?",
-  "fixture": "geminigrok",
+  "fixture": "verstak",
   "expectations": {
     "maxToolCalls": 5,
     "mustCall": ["search_project"],

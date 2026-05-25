@@ -109,14 +109,14 @@ export const Widget = () => null
   // 11. context-pack: product_stack узнаёт electron + react + vite по package.json
   it('[11] context-pack определяет stack из package.json (electron+react)', async () => {
     writeFileSync(join(dir, 'package.json'), JSON.stringify({
-      name: 'geminigrok',
+      name: 'verstak',
       dependencies: { electron: '^32', react: '^19', vite: '^7', 'better-sqlite3': '^11' }
     }))
     const pack = await buildContextPack({ projectPath: dir, recentWrites: [] })
     expect(pack).toContain('product_stack:')
     expect(pack).toMatch(/electron/)
     expect(pack).toMatch(/react/)
-    expect(pack).toMatch(/geminigrok/)
+    expect(pack).toMatch(/verstak/)
   })
 
   // 13. path-policy: safeJoin блокирует ../ traversal

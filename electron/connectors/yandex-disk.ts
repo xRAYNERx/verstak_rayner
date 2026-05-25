@@ -9,13 +9,13 @@
  *                         https://oauth.yandex.ru/authorize?response_type=token&client_id=...
  *
  * Операции:
- *   - upload_file:   локальный файл → /Geminigrok/{папка дня}/{имя}
+ *   - upload_file:   локальный файл → /Verstak/{папка дня}/{имя}
  *   - get_public_url: после загрузки можно опубликовать → получить share URL
  *                    для отправки клиенту
  *   - list_files:    что лежит в указанной папке
  *
  * Безопасность:
- *   - Все upload идут в фиксированный root «/Geminigrok/» чтобы не засорять
+ *   - Все upload идут в фиксированный root «/Verstak/» чтобы не засорять
  *     корень Pavel'я. Pavel может поменять root через setting если хочет.
  *   - Опубликованные ссылки логируются в journal — аудит «что мы клиенту дали».
  */
@@ -25,7 +25,7 @@ import { basename } from 'path'
 import type { Connector, ConnectorInfo, ConnectorContext } from './types'
 
 const API_BASE = 'https://cloud-api.yandex.net/v1/disk'
-const DEFAULT_ROOT = '/Geminigrok'
+const DEFAULT_ROOT = '/Verstak'
 
 export function createYandexDiskConnector(): Connector {
   return {
@@ -35,7 +35,7 @@ export function createYandexDiskConnector(): Connector {
         label: 'Yandex Disk',
         kind: 'yandex_disk',
         status: 'ready',
-        detail: 'OAuth token в settings (yandex_disk_token). Upload идёт в /Geminigrok/.'
+        detail: 'OAuth token в settings (yandex_disk_token). Upload идёт в /Verstak/.'
       }
     },
 
