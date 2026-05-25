@@ -151,9 +151,15 @@ export function registerAiIpc(deps: AiDeps): void {
       // первого хода (isFirstTurn), чтобы не удваивать стоимость каждого turn'а.
       // На последующих ходах модель уже видела память в начале сессии.
       const isFirstTurn = !messages.some(m => m.role === 'assistant')
-      const memories = (projectPath && isFirstTurn)
-        ? deps.searchMemories(projectPath, '', 5)
-        : []
+      let memories: { type: string; content: string; tags: string[] }[] = []
+      if (projectPath && isFirstTurn) {
+        try {
+          memories = deps.searchMemories(projectPath, '', 5)
+        } catch (err) {
+          // Память недоступна — продолжаем без неё, не блокируем пользователя
+          console.warn('[ai] searchMemories failed:', err instanceof Error ? err.message : err)
+        }
+      }
       const composed = await prepareSystemContext({
         projectPath,
         messages,
