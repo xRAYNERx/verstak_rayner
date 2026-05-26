@@ -18,6 +18,7 @@ interface ClaudeCliOptions {
    *  CLAUDE_CODE_OAUTH_TOKEN дочернему процессу. Это решает headless+Max
    *  ограничение Claude Code v2.1+. */
   oauthToken?: string | null
+  memories?: Array<{ type: string; content: string; tags: string[] }>
 }
 
 export const CLAUDE_CLI_MODELS = [
@@ -103,7 +104,8 @@ export function createClaudeCliProvider(opts: ClaudeCliOptions = {}): ChatProvid
           providerId: 'claude-cli',
           projectPath: cwd ?? null,
           messages,
-          projectSystemPrompt: opts.projectSystemPrompt
+          projectSystemPrompt: opts.projectSystemPrompt,
+          memories: opts.memories
         })
       } catch (err) {
         yield { type: 'error', message: err instanceof Error ? err.message : String(err) }

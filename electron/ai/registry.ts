@@ -174,6 +174,9 @@ export interface CreateOptions {
   yandexFolderId?: string
   /** Для gigachat: client_secret (primary key=clientId; secret в SafeStorage отдельно). */
   gigachatClientSecret?: string
+  /** Топ-5 воспоминаний проекта — пробрасываются в buildCliPrompt для CLI-провайдеров,
+   *  чтобы они получали тот же контекст памяти что и API-провайдеры. */
+  memories?: Array<{ type: string; content: string; tags: string[] }>
 }
 
 export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvider {
@@ -183,7 +186,7 @@ export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvide
       return createGeminiProvider({ apiKey: opts.apiKey, model: opts.model })
     }
     case 'gemini-cli':
-      return createGeminiCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model, projectSystemPrompt: opts.projectSystemPrompt })
+      return createGeminiCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model, projectSystemPrompt: opts.projectSystemPrompt, memories: opts.memories })
     case 'claude': {
       if (!opts.apiKey) throw new Error('Anthropic API key not set')
       return createClaudeProvider({ apiKey: opts.apiKey, model: opts.model })
@@ -194,20 +197,21 @@ export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvide
         signal: opts.signal,
         model: opts.model,
         projectSystemPrompt: opts.projectSystemPrompt,
-        oauthToken: opts.claudeOauthToken
+        oauthToken: opts.claudeOauthToken,
+        memories: opts.memories
       })
     case 'grok': {
       if (!opts.apiKey) throw new Error('xAI (Grok) API key not set')
       return createGrokProvider({ apiKey: opts.apiKey, model: opts.model })
     }
     case 'grok-cli':
-      return createGrokCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model, projectSystemPrompt: opts.projectSystemPrompt })
+      return createGrokCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model, projectSystemPrompt: opts.projectSystemPrompt, memories: opts.memories })
     case 'openai': {
       if (!opts.apiKey) throw new Error('OpenAI API key not set')
       return createOpenAiProvider({ apiKey: opts.apiKey, model: opts.model })
     }
     case 'codex-cli':
-      return createCodexCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model, projectSystemPrompt: opts.projectSystemPrompt })
+      return createCodexCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model, projectSystemPrompt: opts.projectSystemPrompt, memories: opts.memories })
     case 'yandex-gpt': {
       if (!opts.apiKey) throw new Error('YandexGPT: API ключ не задан')
       if (!opts.yandexFolderId) throw new Error('YandexGPT: Folder ID не задан (Settings → Провайдеры → YandexGPT)')

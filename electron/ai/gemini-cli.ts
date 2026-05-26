@@ -12,6 +12,7 @@ interface GeminiCliOptions {
   model?: string
   signal?: AbortSignal
   projectSystemPrompt?: string | null
+  memories?: Array<{ type: string; content: string; tags: string[] }>
 }
 
 // CLI distinguishes between alias names it actually knows and what we expose
@@ -80,7 +81,8 @@ export function createGeminiCliProvider(opts: GeminiCliOptions = {}): ChatProvid
           providerId: 'gemini-cli',
           projectPath: opts.cwd ?? null,
           messages,
-          projectSystemPrompt: opts.projectSystemPrompt
+          projectSystemPrompt: opts.projectSystemPrompt,
+          memories: opts.memories
         })
       } catch (err) {
         yield { type: 'error', message: err instanceof Error ? err.message : String(err) }

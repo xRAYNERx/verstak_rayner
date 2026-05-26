@@ -104,6 +104,7 @@ interface GrokCliOptions {
   signal?: AbortSignal
   model?: string
   projectSystemPrompt?: string | null
+  memories?: Array<{ type: string; content: string; tags: string[] }>
 }
 
 export const GROK_CLI_MODELS = [
@@ -183,7 +184,8 @@ export function createGrokCliProvider(opts: GrokCliOptions = {}): ChatProvider {
             providerId: 'grok-cli',
             projectPath: cwd ?? null,
             messages,
-            projectSystemPrompt: opts.projectSystemPrompt
+            projectSystemPrompt: opts.projectSystemPrompt,
+            memories: opts.memories
           })
         } catch (err) {
           yield { type: 'error', message: err instanceof Error ? err.message : String(err) }

@@ -12,6 +12,7 @@ interface CodexCliOptions {
   signal?: AbortSignal
   model?: string
   projectSystemPrompt?: string | null
+  memories?: Array<{ type: string; content: string; tags: string[] }>
 }
 
 export const CODEX_CLI_MODELS = [
@@ -79,7 +80,8 @@ export function createCodexCliProvider(opts: CodexCliOptions = {}): ChatProvider
           providerId: 'codex-cli',
           projectPath: cwd ?? null,
           messages,
-          projectSystemPrompt: opts.projectSystemPrompt
+          projectSystemPrompt: opts.projectSystemPrompt,
+          memories: opts.memories
         })
       } catch (err) {
         yield { type: 'error', message: err instanceof Error ? err.message : String(err) }

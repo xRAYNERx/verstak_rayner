@@ -141,6 +141,22 @@ export function registerAiIpc(deps: AiDeps): void {
     // OVERRIDE path (Explicit Review): caller passes its own system prompt
     // (REVIEWER_SYSTEM_PROMPT) and we don't want to also inject the project's
     // user_layer — reviewer prompt is self-contained.
+    // Топ-5 воспоминаний проекта — инжектируются в context-pack один раз за
+    // app-сессию для данного чата. Вычисляем до ветки API/CLI чтобы CLI-провайдеры
+    // тоже получали память через buildCliPrompt → prepareParts.
+    const memoryCacheKey = chatId ?? (projectPath ?? '__no_project__')
+    const shouldInjectMemory = projectPath && !memorizedChats.has(memoryCacheKey)
+    if (shouldInjectMemory) memorizedChats.add(memoryCacheKey)
+    let memories: { type: string; content: string; tags: string[] }[] = []
+    if (shouldInjectMemory) {
+      try {
+        memories = deps.searchMemories(projectPath!, '', 5)
+      } catch (err) {
+        // Память недоступна — продолжаем без неё, не блокируем пользователя
+        console.warn('[ai] searchMemories failed:', err instanceof Error ? err.message : err)
+      }
+    }
+
     let messagesWithSystem = messages
     const effectiveSystemPrompt = overrides?.useReviewerPrompt
       ? REVIEWER_SYSTEM_PROMPT
@@ -153,24 +169,6 @@ export function registerAiIpc(deps: AiDeps): void {
       // (UI шестерёнки в Project Rail). Хранится в settings ключом
       // `system_prompt_${path}`. Если пусто — игнорируется.
       const projectSystemPrompt = projectPath ? deps.getSecret(`system_prompt_${projectPath}`) : null
-      // Топ-5 воспоминаний проекта для инжекции в context-pack — только один раз
-      // за app-сессию для данного чата. Используем memorizedChats (Set на уровне
-      // модуля): первый ai:send для конкретного chatId инжектит память, все
-      // последующие — нет. Это работает и для новых чатов, и для reopened-чатов
-      // с уже существующими assistant-сообщениями (в отличие от старой проверки
-      // isFirstTurn которая ломалась при открытии старого чата).
-      const memoryCacheKey = chatId ?? (projectPath ?? '__no_project__')
-      const shouldInjectMemory = projectPath && !memorizedChats.has(memoryCacheKey)
-      if (shouldInjectMemory) memorizedChats.add(memoryCacheKey)
-      let memories: { type: string; content: string; tags: string[] }[] = []
-      if (shouldInjectMemory) {
-        try {
-          memories = deps.searchMemories(projectPath!, '', 5)
-        } catch (err) {
-          // Память недоступна — продолжаем без неё, не блокируем пользователя
-          console.warn('[ai] searchMemories failed:', err instanceof Error ? err.message : err)
-        }
-      }
       const composed = await prepareSystemContext({
         projectPath,
         messages,
@@ -242,7 +240,8 @@ export function registerAiIpc(deps: AiDeps): void {
         customBaseUrl,
         customModels,
         yandexFolderId,
-        gigachatClientSecret
+        gigachatClientSecret,
+        memories: descriptor.transport === 'CLI' ? memories : undefined
       })
     } catch (err) {
       taggedSender.send('ai:event', {

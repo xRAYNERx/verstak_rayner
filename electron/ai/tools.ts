@@ -1,6 +1,6 @@
 import { readFile, readdir, stat, writeFile } from 'fs/promises'
 import { join, relative } from 'path'
-import { execFile } from 'child_process'
+import { execFile, spawn } from 'child_process'
 import { promisify } from 'util'
 import { existsSync } from 'fs'
 import type { ToolDefinition } from './types'
@@ -8,6 +8,7 @@ import { classifyCommand } from './command-policy'
 import { isForbiddenPath, scanText } from './secret-scanner'
 import { getProjectMap, invalidateProjectMap, projectMapToText } from './project-map'
 import { safeRealJoin } from './path-policy'
+import { treeKill } from './child-kill'
 
 const execFileAsync = promisify(execFile)
 
@@ -564,32 +565,68 @@ function globToRegExp(glob: string): RegExp {
 
 export function createFileTools(root: string, signal?: AbortSignal): FileTools {
   async function runCommand(command: string) {
-    // Spawn the shell ourselves rather than using execSync: we want a hard
-    // timeout, captured stderr, and no parent-process hijack.
+    // Spawn the shell ourselves so we can treeKill the entire process group on
+    // Windows when Stop is pressed. execFileAsync only kills the top-level
+    // cmd.exe — grandchild processes (node.exe spawned by npm scripts) are
+    // orphaned. spawn() gives us the child handle we need for treeKill.
     const isWindows = process.platform === 'win32'
     const shell = isWindows ? process.env.ComSpec || 'cmd.exe' : '/bin/sh'
-    const shellArg = isWindows ? '/d /s /c' : '-c'
-    try {
-      const { stdout, stderr } = await execFileAsync(shell, [...shellArg.split(' '), command], {
+    const shellArgs = isWindows ? ['/d', '/s', '/c', command] : ['-c', command]
+
+    return new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve) => {
+      const child = spawn(shell, shellArgs, {
         cwd: root,
-        timeout: 60_000,
-        maxBuffer: 4 * 1024 * 1024,
         windowsHide: true,
-        // Propagate the outer agent's abort so Stop / Shift+Esc actually
-        // kills the child process instead of waiting out the 60s timeout.
-        signal
+        stdio: ['ignore', 'pipe', 'pipe']
       })
-      return { stdout: String(stdout ?? ''), stderr: String(stderr ?? ''), exitCode: 0 }
-    } catch (err) {
-      const e = err as { stdout?: string; stderr?: string; code?: number; killed?: boolean; signal?: string; message?: string; name?: string }
-      // Abort signal surfaces as AbortError — report cleanly
-      if (e.name === 'AbortError') {
-        return { stdout: String(e.stdout ?? ''), stderr: 'Команда прервана пользователем', exitCode: 130 }
+
+      let stdout = ''
+      let stderr = ''
+      const MAX_BUF = 4 * 1024 * 1024
+      let settled = false
+      const settle = (result: { stdout: string; stderr: string; exitCode: number }) => {
+        if (settled) return
+        settled = true
+        resolve(result)
       }
-      const exitCode = typeof e.code === 'number' ? e.code : 1
-      const stderr = String(e.stderr ?? e.message ?? '')
-      return { stdout: String(e.stdout ?? ''), stderr, exitCode }
-    }
+
+      child.stdout?.on('data', (chunk: Buffer) => {
+        if (stdout.length < MAX_BUF) stdout += chunk.toString()
+      })
+      child.stderr?.on('data', (chunk: Buffer) => {
+        if (stderr.length < MAX_BUF) stderr += chunk.toString()
+      })
+
+      // Hard timeout — resolve with exitCode 124 (same as GNU timeout)
+      const timer = setTimeout(() => {
+        treeKill(child)
+        settle({ stdout, stderr: stderr + '\nКоманда прервана по таймауту (60s)', exitCode: 124 })
+      }, 60_000)
+
+      // AbortSignal — Stop / Shift+Esc: kill the whole process tree on Windows
+      // so npm run build → node.exe etc. are also terminated.
+      let abortListener: (() => void) | null = null
+      if (signal) {
+        abortListener = () => {
+          clearTimeout(timer)
+          treeKill(child)
+          settle({ stdout, stderr: stderr + '\nКоманда прервана пользователем', exitCode: 130 })
+        }
+        signal.addEventListener('abort', abortListener, { once: true })
+      }
+
+      child.on('close', (code: number | null) => {
+        clearTimeout(timer)
+        if (abortListener) signal?.removeEventListener('abort', abortListener)
+        settle({ stdout, stderr, exitCode: typeof code === 'number' ? code : 1 })
+      })
+
+      child.on('error', (err: Error) => {
+        clearTimeout(timer)
+        if (abortListener) signal?.removeEventListener('abort', abortListener)
+        settle({ stdout, stderr: err.message, exitCode: 1 })
+      })
+    })
   }
 
   return {
