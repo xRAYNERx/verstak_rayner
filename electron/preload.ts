@@ -19,17 +19,18 @@ contextBridge.exposeInMainWorld('api', {
     setKey: (key: string, value: string) => ipcRenderer.invoke('settings:set-key', key, value)
   },
   ai: {
-    send: (messages: unknown[], projectPath: string | null) =>
-      ipcRenderer.invoke('ai:send', messages, projectPath),
-    sendWithBudget: (messages: unknown[], projectPath: string | null, budget: number) =>
-      ipcRenderer.invoke('ai:send', messages, projectPath, budget),
+    send: (messages: unknown[], projectPath: string | null, chatId?: string) =>
+      ipcRenderer.invoke('ai:send', messages, projectPath, undefined, undefined, chatId),
+    sendWithBudget: (messages: unknown[], projectPath: string | null, budget: number, chatId?: string) =>
+      ipcRenderer.invoke('ai:send', messages, projectPath, budget, undefined, chatId),
     /** Send with provider/model/systemPrompt override. Used by Explicit Review:
      *  routes through ai:send with overrides so reviewer ≠ chat provider. */
     sendWithOverrides: (
       messages: unknown[],
       projectPath: string | null,
-      overrides: { providerId?: string; model?: string | null; noTools?: boolean; systemPrompt?: string; useReviewerPrompt?: boolean }
-    ) => ipcRenderer.invoke('ai:send', messages, projectPath, undefined, overrides),
+      overrides: { providerId?: string; model?: string | null; noTools?: boolean; systemPrompt?: string; useReviewerPrompt?: boolean },
+      chatId?: string
+    ) => ipcRenderer.invoke('ai:send', messages, projectPath, undefined, overrides, chatId),
     resolveWrite: (callId: string, accept: boolean, sendId?: number) =>
       ipcRenderer.invoke('ai:resolve-write', callId, accept, sendId),
     resolveCommand: (callId: string, accept: boolean, sendId?: number) =>

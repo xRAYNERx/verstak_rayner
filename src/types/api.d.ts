@@ -101,12 +101,13 @@ declare global {
         setKey: (key: string, value: string) => Promise<void>
       }
       ai: {
-        send: (messages: ChatMessage[], projectPath: string | null) => Promise<number>
-        sendWithBudget: (messages: ChatMessage[], projectPath: string | null, budget: number) => Promise<number>
+        send: (messages: ChatMessage[], projectPath: string | null, chatId?: string) => Promise<number>
+        sendWithBudget: (messages: ChatMessage[], projectPath: string | null, budget: number, chatId?: string) => Promise<number>
         sendWithOverrides: (
           messages: ChatMessage[],
           projectPath: string | null,
-          overrides: { providerId?: string; model?: string | null; noTools?: boolean; systemPrompt?: string; useReviewerPrompt?: boolean }
+          overrides: { providerId?: string; model?: string | null; noTools?: boolean; systemPrompt?: string; useReviewerPrompt?: boolean },
+          chatId?: string
         ) => Promise<number>
         resolveWrite: (callId: string, accept: boolean, sendId?: number) => Promise<void>
         resolveCommand: (callId: string, accept: boolean, sendId?: number) => Promise<void>

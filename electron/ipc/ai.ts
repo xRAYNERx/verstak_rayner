@@ -47,6 +47,12 @@ interface AiDeps {
 let currentSendId = 0
 const activeAborts = new Map<number, AbortController>()
 
+// Track which chats have already received memory injection in this process
+// lifetime. Replaces the old isFirstTurn check so memory is injected on the
+// first ai:send for a chat in this app session — not only on truly-first-ever
+// turns (which broke reopened old chats with existing assistant messages).
+const memorizedChats = new Set<string>()
+
 // Local TaggedSender alias — shape-compatible with tool-handlers.TaggedSender.
 type TaggedSender = HandlerTaggedSender
 
@@ -99,7 +105,7 @@ export function registerAiIpc(deps: AiDeps): void {
     useReviewerPrompt?: boolean
   }
 
-  ipcMain.handle('ai:send', async (e, messages: ChatMessage[], projectPath: string | null, budget?: number, overrides?: AiSendOverrides) => {
+  ipcMain.handle('ai:send', async (e, messages: ChatMessage[], projectPath: string | null, budget?: number, overrides?: AiSendOverrides, chatId?: string) => {
     const providerId = overrides?.providerId ?? deps.getProviderId()
     const descriptor = PROVIDERS[providerId]
     const sendId = ++currentSendId
@@ -147,14 +153,19 @@ export function registerAiIpc(deps: AiDeps): void {
       // (UI шестерёнки в Project Rail). Хранится в settings ключом
       // `system_prompt_${path}`. Если пусто — игнорируется.
       const projectSystemPrompt = projectPath ? deps.getSecret(`system_prompt_${projectPath}`) : null
-      // Топ-5 воспоминаний проекта для инжекции в context-pack — только для
-      // первого хода (isFirstTurn), чтобы не удваивать стоимость каждого turn'а.
-      // На последующих ходах модель уже видела память в начале сессии.
-      const isFirstTurn = !messages.some(m => m.role === 'assistant')
+      // Топ-5 воспоминаний проекта для инжекции в context-pack — только один раз
+      // за app-сессию для данного чата. Используем memorizedChats (Set на уровне
+      // модуля): первый ai:send для конкретного chatId инжектит память, все
+      // последующие — нет. Это работает и для новых чатов, и для reopened-чатов
+      // с уже существующими assistant-сообщениями (в отличие от старой проверки
+      // isFirstTurn которая ломалась при открытии старого чата).
+      const memoryCacheKey = chatId ?? (projectPath ?? '__no_project__')
+      const shouldInjectMemory = projectPath && !memorizedChats.has(memoryCacheKey)
+      if (shouldInjectMemory) memorizedChats.add(memoryCacheKey)
       let memories: { type: string; content: string; tags: string[] }[] = []
-      if (projectPath && isFirstTurn) {
+      if (shouldInjectMemory) {
         try {
-          memories = deps.searchMemories(projectPath, '', 5)
+          memories = deps.searchMemories(projectPath!, '', 5)
         } catch (err) {
           // Память недоступна — продолжаем без неё, не блокируем пользователя
           console.warn('[ai] searchMemories failed:', err instanceof Error ? err.message : err)
@@ -330,10 +341,18 @@ export function registerAiIpc(deps: AiDeps): void {
         // + draft text. Without history the estimate could be off by orders of
         // magnitude on long conversations (50+ msgs → ~20k tokens of history).
         const history = Array.isArray(historyMessages) ? historyMessages : []
+        // Include memories so the token count matches what ai:send actually sends.
+        let countTokensMemories: { type: string; content: string; tags: string[] }[] = []
+        if (projectPath) {
+          try {
+            countTokensMemories = deps.searchMemories(projectPath, '', 5)
+          } catch { /* ignore — token count stays a bit low rather than throwing */ }
+        }
         const composed = await prepareSystemContext({
           projectPath,
           messages: history,
-          recentWrites: projectPath ? deps.recentWrites(projectPath, 8) : []
+          recentWrites: projectPath ? deps.recentWrites(projectPath, 8) : [],
+          memories: countTokensMemories
         })
         // Full context size: system + every prior turn + the draft text.
         const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [
