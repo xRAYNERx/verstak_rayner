@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
+import type { Memory } from '../types/api'
 import type { ProviderId } from '../hooks/useProvider'
 import { useTheme } from '../hooks/useTheme'
 import type { AutonomousStatus } from '../types/api'
@@ -210,7 +211,7 @@ const PROVIDERS: ProviderConfig[] = [
   }
 ]
 
-type Tab = 'appearance' | 'profiles' | 'providers' | 'models' | 'connectors' | 'autonomous'
+type Tab = 'appearance' | 'profiles' | 'providers' | 'models' | 'connectors' | 'autonomous' | 'memory'
 
 // Группы для левой sidebar — повторяет OpenCode Desktop структуру.
 const TAB_GROUPS: ReadonlyArray<{ title: string; tabs: ReadonlyArray<{ id: Tab; label: string; icon: string }> }> = [
@@ -222,7 +223,8 @@ const TAB_GROUPS: ReadonlyArray<{ title: string; tabs: ReadonlyArray<{ id: Tab; 
     { id: 'providers',  label: 'Провайдеры',   icon: '🔌' },
     { id: 'models',     label: 'Модели',       icon: '✨' },
     { id: 'connectors', label: 'Коннекторы',   icon: '🧩' },
-    { id: 'autonomous', label: 'Ночной режим', icon: '🌙' }
+    { id: 'autonomous', label: 'Ночной режим', icon: '🌙' },
+    { id: 'memory',     label: 'Память',       icon: '🧠' }
   ] }
 ]
 
@@ -268,6 +270,8 @@ export function Settings({ onClose }: { onClose: () => void }) {
   // Сохраняется в settings.custom_openai_baseurl / custom_openai_models.
   const [customOpenaiBaseUrl, setCustomOpenaiBaseUrl] = useState('')
   const [customOpenaiModels, setCustomOpenaiModels] = useState('')
+  const [memories, setMemories] = useState<Memory[]>([])
+  const [memoriesPath, setMemoriesPath] = useState<string | null>(null)
   const { theme, setTheme } = useTheme()
 
   useEffect(() => {
@@ -344,6 +348,27 @@ export function Settings({ onClose }: { onClose: () => void }) {
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const loadMemories = useCallback(async (path: string) => {
+    try {
+      const list = await window.api.memory.list(path)
+      setMemories(list)
+    } catch { /* ignore */ }
+  }, [])
+
+  // Загружаем память когда открывается вкладка «Память»
+  useEffect(() => {
+    if (tab !== 'memory') return
+    void (async () => {
+      const projects = await window.api.projects.list()
+      // Берём проект с последним открытием — он же активный
+      if (projects.length === 0) return
+      const sorted = [...projects].sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)
+      const path = sorted[0].path
+      setMemoriesPath(path)
+      void loadMemories(path)
+    })()
+  }, [tab, loadMemories])
 
   async function save() {
     await window.api.settings.setKey('provider', activeProvider)
@@ -808,6 +833,62 @@ export function Settings({ onClose }: { onClose: () => void }) {
         )}
 
         {tab === 'profiles' && (<ProfilesTab />)}
+
+        {tab === 'memory' && (
+        <div className="gg-settings-extra">
+          <div className="gg-settings-section-title">🧠 Память агента</div>
+          {memoriesPath && (
+            <div className="gg-settings-hint" style={{ marginBottom: 12 }}>
+              Проект: <code>{memoriesPath}</code>
+            </div>
+          )}
+          {memories.length === 0 ? (
+            <div className="gg-text-tertiary" style={{ padding: '18px 0', fontSize: 'var(--text-sm)' }}>
+              Нет сохранённых воспоминаний для этого проекта
+            </div>
+          ) : (
+            <>
+              <div className="gg-memory-list">
+                {memories.map(m => (
+                  <div key={m.id} className="gg-memory-row">
+                    <div className="gg-memory-row-main">
+                      <span className="gg-memory-type-badge">{m.type}</span>
+                      <span className="gg-memory-content">{m.content}</span>
+                    </div>
+                    {m.tags.length > 0 && (
+                      <div className="gg-memory-tags">
+                        {m.tags.map(t => <span key={t} className="gg-memory-tag">{t}</span>)}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      className="gg-btn gg-btn-ghost gg-memory-delete"
+                      title="Удалить"
+                      onClick={async () => {
+                        await window.api.memory.delete(m.id)
+                        if (memoriesPath) void loadMemories(memoriesPath)
+                      }}
+                    >🗑</button>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 16 }}>
+                <button
+                  type="button"
+                  className="gg-btn gg-btn-danger"
+                  onClick={async () => {
+                    if (!memoriesPath) return
+                    for (const m of memories) {
+                      await window.api.memory.delete(m.id)
+                    }
+                    setMemories([])
+                  }}
+                >Очистить всё</button>
+              </div>
+            </>
+          )}
+        </div>
+        )}
 
         {tab === 'appearance' && (
         <div className="gg-settings-extra">

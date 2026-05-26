@@ -212,6 +212,15 @@ const MIGRATIONS: Array<{ version: number; description: string; run: (db: DB) =>
         END;
       `)
     }
+  },
+  {
+    version: 5,
+    description: 'memories: UNIQUE constraint on (project_path, content) to prevent duplicate saves',
+    run: (db: DB) => {
+      db.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_memories_unique_content ON memories(project_path, content);
+      `)
+    }
   }
 ]
 

@@ -43,9 +43,22 @@ export function saveMemory(
 ): Memory {
   const now = Date.now()
   const id = randomUUID()
-  db.prepare(
-    'INSERT INTO memories (id, project_path, type, content, tags, created_at, accessed_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+
+  // Try insert, ignore if duplicate
+  const result = db.prepare(
+    `INSERT OR IGNORE INTO memories (id, project_path, type, content, tags, created_at, accessed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).run(id, projectPath, type, content, JSON.stringify(tags), now, now)
+
+  if (result.changes === 0) {
+    // Дубль — обновить accessed_at и вернуть существующую запись
+    db.prepare(`UPDATE memories SET accessed_at = ? WHERE project_path = ? AND content = ?`)
+      .run(now, projectPath, content)
+    const existing = db.prepare(`SELECT * FROM memories WHERE project_path = ? AND content = ?`)
+      .get(projectPath, content) as MemoryRow
+    return rowToMemory(existing)
+  }
+
   return { id, project_path: projectPath, type, content, tags, created_at: now, accessed_at: now }
 }
 
