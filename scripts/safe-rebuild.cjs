@@ -1,63 +1,108 @@
 #!/usr/bin/env node
 /**
- * Best-effort rebuild better-sqlite3 под текущий Node ABI перед тестами.
+ * Self-healing ABI для better-sqlite3 перед тестами.
  *
- * Зачем — better-sqlite3 в node_modules скомпилирован под Electron'овский
- * Node ABI (NODE_MODULE_VERSION 143). Vitest бежит под чистым Node (137),
- * и тесты которые открывают БД падают `NODE_MODULE_VERSION mismatch`.
+ * Зачем — better-sqlite3 в node_modules компилируется под Electron'овский
+ * Node ABI (NODE_MODULE_VERSION 143) при `npm run dev` (predev → electron-rebuild).
+ * Vitest бежит под чистым Node (ABI 137), и тесты которые открывают БД падают
+ * `NODE_MODULE_VERSION mismatch`.
  *
- * Раньше — 8 sqlite-тестов всегда падали. ТЗ Pavel'а: добавить pretest hook
- * который перекомпилирует. ПРОБЛЕМА: если параллельно крутится electron-dev,
- * .node-файл заблокирован Windows'ом → npm rebuild падает EBUSY → весь
- * test:fast становится невозможен.
+ * Решение: перед тестами пробуем загрузить better-sqlite3 под текущим Node ABI.
+ *   - грузится → ничего не делаем (быстрый путь, без лишней пересборки);
+ *   - ABI mismatch → пересобираем под Node (`npm rebuild ... --runtime=node`);
+ *   - rebuild упал (EBUSY/EPERM — .node заблокирован запущенным Electron) →
+ *     предупреждаем, но НЕ валим: тесты запустятся, sqlite-группа просто упадёт
+ *     как раньше.
  *
- * Решение: пробуем rebuild, ловим любую ошибку (особенно EBUSY/EPERM на
- * Win и ESRCH на *nix), завершаемся с exit 0 + понятное warning. Тесты
- * запускаются. Если rebuild прошёл — 8 sqlite-тестов теперь зелёные;
- * если не прошёл — поведение как было раньше (8 падают, остальные ок).
+ * Экспортирует ensureNodeAbi() для переиспользования из Vitest globalSetup
+ * (tests/global-setup.ts) — так self-healing работает и при прямом
+ * `npx vitest run` (минуя npm-pretest хук). При запуске как CLI (npm pretest)
+ * выполняет ту же проверку и всегда завершается exit 0.
  */
-const { spawn } = require('child_process')
+const { spawnSync } = require('child_process')
 const { platform } = require('os')
 
-const npmCmd = platform() === 'win32' ? 'npm.cmd' : 'npm'
-
-// На Windows spawn .cmd / .bat файла требует shell:true (иначе EINVAL в Node 24+).
-const child = spawn(npmCmd, [
-  'rebuild',
-  'better-sqlite3',
-  '--runtime=node',
-  '--update-binary'
-], {
-  stdio: ['ignore', 'pipe', 'pipe'],
-  shell: platform() === 'win32'
-})
-
-let stdoutBuf = ''
-let stderrBuf = ''
-child.stdout.on('data', (chunk) => { stdoutBuf += chunk.toString() })
-child.stderr.on('data', (chunk) => { stderrBuf += chunk.toString() })
-
-child.on('close', (code) => {
-  if (code === 0) {
-    console.log('[safe-rebuild] better-sqlite3 пересобран под Node ABI ✓')
-    process.exit(0)
+/**
+ * Пробует загрузить better-sqlite3 под текущим Node ABI.
+ * @returns {{ok: true} | {ok: false, abiMismatch: boolean, message: string}}
+ */
+function probe() {
+  try {
+    const Database = require('better-sqlite3')
+    const db = new Database(':memory:')
+    db.prepare('select 1 as x').get()
+    db.close()
+    return { ok: true }
+  } catch (err) {
+    const message = String((err && err.message) || err).split('\n')[0]
+    const abiMismatch = /NODE_MODULE_VERSION/i.test(String((err && err.message) || err))
+    return { ok: false, abiMismatch, message }
   }
-  // Распознаём типичный «занят dev'ом» сценарий — даём подсказку, но НЕ валим.
-  const combined = (stdoutBuf + '\n' + stderrBuf).toLowerCase()
-  const isBusy = combined.includes('ebusy') || combined.includes('eperm') ||
-                 combined.includes('resource busy') || combined.includes('operation not permitted')
+}
+
+function rebuild() {
+  const npmCmd = platform() === 'win32' ? 'npm.cmd' : 'npm'
+  // На Windows spawn .cmd требует shell:true (иначе EINVAL в Node 24+).
+  return spawnSync(
+    npmCmd,
+    ['rebuild', 'better-sqlite3', '--runtime=node', '--update-binary'],
+    { stdio: ['ignore', 'pipe', 'pipe'], shell: platform() === 'win32', encoding: 'utf8' }
+  )
+}
+
+/**
+ * Гарантирует, что better-sqlite3 собран под текущий Node ABI.
+ * Никогда не бросает и не блокирует — худший случай возвращает 'failed'.
+ * @param {{log?: Pick<Console,'log'|'warn'>}} [opts]
+ * @returns {{status: 'ok'|'rebuilt'|'failed'|'error', rebuilt: boolean}}
+ */
+function ensureNodeAbi(opts = {}) {
+  const log = opts.log || console
+  const abi = process.versions.modules
+
+  const first = probe()
+  if (first.ok) {
+    log.log(`[safe-rebuild] better-sqlite3 уже под Node ABI ${abi} ✓`)
+    return { status: 'ok', rebuilt: false }
+  }
+
+  if (!first.abiMismatch) {
+    // Не ABI-проблема (например модуль не установлен) — пересборка не поможет.
+    log.warn(`[safe-rebuild] better-sqlite3 не загрузился (не ABI mismatch): ${first.message}`)
+    return { status: 'error', rebuilt: false }
+  }
+
+  log.log(`[safe-rebuild] ABI mismatch — пересобираю better-sqlite3 под Node ABI ${abi}…`)
+  const res = rebuild()
+
+  if (res.error) {
+    log.warn(`[safe-rebuild] spawn error: ${res.error.message}. Пропускаю.`)
+    return { status: 'failed', rebuilt: false }
+  }
+  if (res.status === 0) {
+    log.log('[safe-rebuild] better-sqlite3 пересобран под Node ABI ✓')
+    return { status: 'rebuilt', rebuilt: true }
+  }
+
+  const combined = `${res.stdout || ''}\n${res.stderr || ''}`.toLowerCase()
+  const isBusy =
+    combined.includes('ebusy') || combined.includes('eperm') ||
+    combined.includes('resource busy') || combined.includes('operation not permitted')
   if (isBusy) {
-    console.warn('[safe-rebuild] rebuild skipped: .node файл заблокирован (видимо запущен `npm run dev`).')
-    console.warn('[safe-rebuild] sqlite-тесты могут падать с NODE_MODULE_VERSION mismatch.')
-    console.warn('[safe-rebuild] Закрой Electron-приложение и запусти ещё раз — тогда rebuild пройдёт.')
+    log.warn('[safe-rebuild] rebuild skipped: .node файл заблокирован (видимо запущен `npm run dev`).')
+    log.warn('[safe-rebuild] sqlite-тесты могут падать с NODE_MODULE_VERSION mismatch.')
+    log.warn('[safe-rebuild] Закрой Electron-приложение и запусти ещё раз — тогда rebuild пройдёт.')
   } else {
-    console.warn(`[safe-rebuild] rebuild failed (exit ${code}), пропускаю и продолжаю.`)
-    if (stderrBuf) console.warn(stderrBuf.slice(0, 400))
+    log.warn(`[safe-rebuild] rebuild failed (exit ${res.status}), пропускаю и продолжаю.`)
+    if (res.stderr) log.warn(String(res.stderr).slice(0, 400))
   }
-  process.exit(0) // НЕ блокируем тесты
-})
+  return { status: 'failed', rebuilt: false }
+}
 
-child.on('error', (err) => {
-  console.warn(`[safe-rebuild] spawn error: ${err.message}. Пропускаю.`)
+module.exports = { ensureNodeAbi }
+
+// CLI-режим (npm pretest) — выполнить и всегда выйти 0, чтобы не блокировать тесты.
+if (require.main === module) {
+  ensureNodeAbi({ log: console })
   process.exit(0)
-})
+}
