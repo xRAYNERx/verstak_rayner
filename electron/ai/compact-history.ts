@@ -28,6 +28,7 @@
  */
 
 import type { ChatMessage } from './types'
+import { estimateTokens, getContextLimit, COMPACT_THRESHOLD } from './context-limits'
 
 /** Сколько последних turn'ов оставляем целиком. */
 const KEEP_RECENT_TURNS = 3
@@ -105,6 +106,96 @@ function capFreshResults(m: ChatMessage): ChatMessage {
     return { ...r, result: tailTruncate(raw, FRESH_RESULT_HARD_CAP) }
   })
   return changed ? { ...m, toolResults: next } : m
+}
+
+// ─── Авто-компакшн (auto-compact) ────────────────────────────────────────────
+// Отдельный механизм от sliding window (compactToolHistory). Срабатывает
+// значительно реже — только когда вся история приближается к 95% context window.
+// Вместо того чтобы удалять старые tool results, создаёт суммаризированную
+// «сжатую сессию»: системное сообщение-резюме + последние 3 поворота диалога.
+
+/**
+ * Оценивает суммарный размер истории в токенах (эвристика: 4 симв./токен).
+ */
+function estimateTotalTokens(messages: ChatMessage[]): number {
+  let total = 0
+  for (const m of messages) {
+    total += estimateTokens(m.content ?? '')
+    if (m.toolResults) {
+      for (const r of m.toolResults) {
+        const raw = typeof r.result === 'string' ? r.result : JSON.stringify(r.result)
+        total += estimateTokens(raw)
+      }
+    }
+  }
+  return total
+}
+
+/**
+ * Возвращает true если история занимает > 95% контекстного окна модели.
+ * Минимальный порог: 10 сообщений — до этого компактить бессмысленно.
+ */
+export function shouldAutoCompact(messages: ChatMessage[], model: string): boolean {
+  if (messages.length < 10) return false
+  const limit = getContextLimit(model)
+  const used = estimateTotalTokens(messages)
+  return used > limit * COMPACT_THRESHOLD
+}
+
+/**
+ * Промпт для суммаризации: просим модель собрать сжатое резюме сессии.
+ * Добавляем саму историю в конце, чтобы у модели был весь контекст.
+ */
+export function buildCompactSummaryPrompt(messages: ChatMessage[]): ChatMessage[] {
+  // Берём только текстовые сообщения (без tool internals) для суммаризации —
+  // меньше токенов, модель фокусируется на сути а не на tool payloads.
+  const textHistory = messages
+    .filter(m => m.role !== 'system' && (m.content ?? '').trim().length > 0)
+    .map(m => `[${m.role}]: ${(m.content ?? '').slice(0, 2000)}`)
+    .join('\n\n')
+
+  return [
+    {
+      role: 'user',
+      content:
+        'Суммаризируй этот разговор кратко и чётко. ' +
+        'Включи: ключевые решения, изменённые файлы (если упоминались), текущий статус задачи, нерешённые вопросы. ' +
+        'Максимум 600 слов. Не включай вводные фразы вроде «Вот резюме». ' +
+        'Отвечай на том же языке что и разговор.\n\n' +
+        textHistory
+    }
+  ]
+}
+
+/** Количество последних поворотов диалога которые сохраняем после компакшна. */
+const KEEP_RECENT_FOR_COMPACT = 3
+
+/**
+ * Создаёт сжатую историю: системное сообщение с резюме + последние N пар user/assistant.
+ * Возвращаемый массив готов для подстановки в currentMessages.
+ */
+export function createCompactedHistory(summary: string, messages: ChatMessage[]): ChatMessage[] {
+  // Берём последние KEEP_RECENT_FOR_COMPACT пары (user + assistant)
+  // Считаем с конца: ищем user-сообщения (они маркируют начало turn'а)
+  const recentTurns: ChatMessage[] = []
+  let turnsFound = 0
+  for (let i = messages.length - 1; i >= 0 && turnsFound < KEEP_RECENT_FOR_COMPACT; i--) {
+    recentTurns.unshift(messages[i])
+    if (messages[i].role === 'user' && !messages[i].toolResults) {
+      // Нашли user-сообщение без tool results = начало поворота диалога
+      turnsFound++
+    }
+  }
+
+  return [
+    {
+      role: 'system',
+      content:
+        '[Авто-компакшн: предыдущая часть сессии сжата в резюме]\n\n' +
+        summary
+    },
+    ...recentTurns
+  ]
 }
 
 /** Статистика сжатия — для журнала / отладки. */

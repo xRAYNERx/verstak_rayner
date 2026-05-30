@@ -79,6 +79,8 @@ export type ChatEvent =
   | { type: 'plan-created'; planId: number; title: string; stepCount: number }
   | { type: 'artifact-created'; callId: string; kind: 'html' | 'docx'; filename: string; path: string; sizeBytes: number }
   | { type: 'usage'; usage: UsageDelta }
+  /** Информационное сообщение для UI (тост). Не блокирует сессию. */
+  | { type: 'info'; text: string }
   | { type: 'done' }
   | { type: 'error'; message: string }
 

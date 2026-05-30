@@ -3,7 +3,8 @@ import { createFileTools, TOOL_DEFS } from '../ai/tools'
 import { createProvider, PROVIDERS, type ProviderId } from '../ai/registry'
 import { prepareSystemContext } from '../ai/compose-system'
 import { REVIEWER_SYSTEM_PROMPT } from '../ai/review-prompt'
-import { compactToolHistory } from '../ai/compact-history'
+import { compactToolHistory, shouldAutoCompact, buildCompactSummaryPrompt, createCompactedHistory } from '../ai/compact-history'
+import { estimateTokens } from '../ai/context-limits'
 import { withInitialRetry } from '../ai/with-retry'
 import { createCostGuard } from '../ai/cost-guard'
 import type { AgentMode } from '../ai/mode-policy'
@@ -811,6 +812,50 @@ async function runApiConversation(
       pendingAttachments.length = 0
     }
     currentMessages.push(nextUserMsg)
+
+    // Авто-компакшн: после каждого turn'а проверяем не исчерпали ли 95%
+    // контекстного окна. Если да — суммаризируем одним синхронным API-вызовом
+    // и заменяем currentMessages на сжатую версию. Механизм полностью независим
+    // от sliding window (compactToolHistory выше) который работает на уровне
+    // отдельных tool results.
+    // auto_compact = 'false' отключает фичу; по умолчанию включена.
+    const autoCompactEnabled = getSecretForDelegate?.('auto_compact') !== 'false'
+    if (autoCompactEnabled && model && shouldAutoCompact(currentMessages, model)) {
+      try {
+        // Получаем резюме от той же модели — один non-streamed вызов
+        const summaryMessages = buildCompactSummaryPrompt(currentMessages)
+        let summaryText = ''
+        for await (const ev of provider.send(summaryMessages, [])) {
+          if (ev.type === 'text') summaryText += ev.text
+          if (ev.type === 'done' || ev.type === 'error') break
+        }
+        if (summaryText.trim()) {
+          const beforeLen = currentMessages.length
+          const compacted = createCompactedHistory(summaryText, currentMessages)
+          currentMessages.length = 0
+          currentMessages.push(...compacted)
+          // Уведомляем пользователя через info-событие (UI покажет тост)
+          sender.send('ai:event', {
+            id: sendId,
+            event: { type: 'info', text: '🔄 Контекст сжат — сессия продолжена' }
+          })
+          // Записываем в журнал
+          const summaryTokens = estimateTokens(summaryText)
+          recordJournal(
+            projectPath,
+            'note',
+            `[auto-compact] ${beforeLen} сообщений → резюме (${summaryTokens} токенов)`,
+            null
+          )
+          console.log(`[agent] auto-compact: ${beforeLen} msgs → ${compacted.length} msgs (summary ${summaryTokens} tokens)`)
+        } else {
+          console.warn('[agent] auto-compact: summary was empty, continuing without compaction')
+        }
+      } catch (err) {
+        // Грейсфул деградация: компакшн упал — продолжаем без него
+        console.warn('[agent] auto-compact failed, continuing without compaction:', err instanceof Error ? err.message : err)
+      }
+    }
   }
   // Budget exhausted — emit a dedicated event so the UI can offer "+N turns".
   // The renderer re-sends the current conversation with a larger budget if the
