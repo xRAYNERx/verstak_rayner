@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import React, { useEffect, useMemo, useState, useCallback } from 'react'
 import { useProject } from '../store/projectStore'
 import type { Memory } from '../types/api'
 import type { ProviderId } from '../hooks/useProvider'
@@ -6,6 +6,11 @@ import { useTheme } from '../hooks/useTheme'
 import type { AutonomousStatus } from '../types/api'
 import { ProfilesTab } from './ProfilesTab'
 import { buildCatalog, connectionStatus, type ConnectionStatus } from '../lib/model-catalog'
+import {
+  IconClaude, Icon1C, IconGoogleSheets, IconTelegram,
+  IconSSH, IconBitrix, IconYandexDirect, IconYandexDisk,
+  IconSkillsServer, IconPlug
+} from './ConnectorIcons'
 
 interface ProviderConfig {
   id: ProviderId
@@ -215,7 +220,7 @@ const PROVIDERS: ProviderConfig[] = [
 type Tab = 'appearance' | 'profiles' | 'providers' | 'models' | 'connectors' | 'autonomous' | 'memory'
 
 // Группы для левой sidebar — повторяет OpenCode Desktop структуру.
-const TAB_GROUPS: ReadonlyArray<{ title: string; tabs: ReadonlyArray<{ id: Tab; label: string; icon: string }> }> = [
+const TAB_GROUPS: ReadonlyArray<{ title: string; tabs: ReadonlyArray<{ id: Tab; label: string; icon: React.ReactNode }> }> = [
   { title: 'Приложение', tabs: [
     { id: 'appearance', label: 'Внешний вид',  icon: '🎨' },
     { id: 'profiles',   label: 'Профили',      icon: '👤' }
@@ -223,7 +228,7 @@ const TAB_GROUPS: ReadonlyArray<{ title: string; tabs: ReadonlyArray<{ id: Tab; 
   { title: 'Сервер', tabs: [
     { id: 'providers',  label: 'Провайдеры',   icon: '🔌' },
     { id: 'models',     label: 'Модели',       icon: '✨' },
-    { id: 'connectors', label: 'Коннекторы',   icon: '🧩' },
+    { id: 'connectors', label: 'Коннекторы',   icon: <IconPlug size={16} /> },
     { id: 'autonomous', label: 'Ночной режим', icon: '🌙' },
     { id: 'memory',     label: 'Память',       icon: '🧠' }
   ] }
@@ -506,7 +511,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
             проектом = $2-10. Безопасный default: 5.
           </div>
 
-          <div className="gg-settings-section-title" style={{ marginTop: 24 }}>🔑 Claude Code OAuth (для Max подписки в headless)</div>
+          <div className="gg-settings-section-title" style={{ marginTop: 24 }}><IconClaude /> Claude Code OAuth (для Max подписки в headless)</div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Long-lived OAuth token</label>
             <input
@@ -526,7 +531,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
             Хранится зашифрованным через safeStorage. Действителен 1 год.
           </div>
 
-          <div className="gg-settings-section-title" style={{ marginTop: 24 }}>1С OData</div>
+          <div className="gg-settings-section-title" style={{ marginTop: 24 }}><Icon1C /> 1С OData</div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">1С OData base URL</label>
             <input
@@ -603,7 +608,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
           {/* ============================================================
               V3 — российские коннекторы (раздел 5 плана).
               ============================================================ */}
-          <div className="gg-settings-section-title" style={{ marginTop: 24 }}>📊 Google Sheets</div>
+          <div className="gg-settings-section-title" style={{ marginTop: 24 }}><IconGoogleSheets /> Google Sheets</div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Service Account JSON</label>
             <textarea
@@ -622,7 +627,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
             <code>"update_row"</code> / etc. См. electron/connectors/gsheets.ts.
           </div>
 
-          <div className="gg-settings-section-title" style={{ marginTop: 24 }}>✉ Telegram bot</div>
+          <div className="gg-settings-section-title" style={{ marginTop: 24 }}><IconTelegram /> Telegram bot</div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Bot token</label>
             <input
@@ -650,7 +655,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
             Rate limit 20 send/min на chat_id вшит в коннектор. Read истории — через SSH к Telethon скрипту.
           </div>
 
-          <div className="gg-settings-section-title" style={{ marginTop: 24 }}>🔧 SSH executor</div>
+          <div className="gg-settings-section-title" style={{ marginTop: 24 }}><IconSSH /> SSH executor</div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Default host</label>
             <input
@@ -677,7 +682,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
             Через connector_query с <code>id="ssh"</code> и <code>op="run_remote"</code>.
           </div>
 
-          <div className="gg-settings-section-title" style={{ marginTop: 24 }}>💼 Битрикс24</div>
+          <div className="gg-settings-section-title" style={{ marginTop: 24 }}><IconBitrix /> Битрикс24</div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Incoming webhook URL</label>
             <input
@@ -694,7 +699,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
             Denied methods: *.delete (crm.deal/lead/contact/company/user). Allowed prefixes: crm.*, tasks.*, user.*.
           </div>
 
-          <div className="gg-settings-section-title" style={{ marginTop: 24 }}>📈 Яндекс.Директ</div>
+          <div className="gg-settings-section-title" style={{ marginTop: 24 }}><IconYandexDirect /> Яндекс.Директ</div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">OAuth token</label>
             <input
@@ -721,7 +726,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
             возвращается <code>processing: true</code>, повторяй запрос.
           </div>
 
-          <div className="gg-settings-section-title" style={{ marginTop: 24 }}>📦 Yandex Disk</div>
+          <div className="gg-settings-section-title" style={{ marginTop: 24 }}><IconYandexDisk /> Yandex Disk</div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">OAuth token</label>
             <input
@@ -739,7 +744,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
             Загрузка идёт в <code>/Verstak/{`{дата}`}/</code> чтобы не засорять корень Диска.
           </div>
 
-          <div className="gg-settings-section-title" style={{ marginTop: 24 }}>🎭 Сервер скиллов</div>
+          <div className="gg-settings-section-title" style={{ marginTop: 24 }}><IconSkillsServer /> Сервер скиллов</div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Skills server base URL</label>
             <input

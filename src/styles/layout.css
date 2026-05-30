@@ -617,6 +617,14 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   letter-spacing: 0.08em;
   color: var(--text-tertiary);
   margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+}
+.gg-settings-section-title svg {
+  vertical-align: -3px;
+  margin-right: 6px;
+  opacity: 0.7;
+  flex-shrink: 0;
 }
 .gg-settings-row {
   display: flex; align-items: center; gap: 12px;
@@ -1251,7 +1259,8 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   color: var(--accent);
   border-color: var(--accent);
 }
-.gg-settings-nav-icon { width: 16px; text-align: center; opacity: 0.85; }
+.gg-settings-nav-icon { width: 16px; text-align: center; opacity: 0.85; display: flex; align-items: center; justify-content: center; }
+.gg-settings-nav-icon svg { vertical-align: middle; }
 .gg-settings-content { flex: 1; overflow-y: auto; }
 .gg-settings-page-title {
   font-size: 18px;

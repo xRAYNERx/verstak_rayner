@@ -1,0 +1,104 @@
+// Inline SVG icons for connectors — monochrome, currentColor, 18×18
+
+interface IconProps {
+  size?: number
+}
+
+export function IconClaude({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="9" r="7" />
+      <path d="M6 9c0-1.66 1.34-3 3-3s3 1.34 3 3-1.34 3-3 3" />
+      <circle cx="9" cy="9" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+export function Icon1C({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="14" height="14" rx="2" />
+      <path d="M6 13V7l-1.5 1.5" strokeLinecap="round" />
+      <path d="M9.5 13h3M9.5 7h3M11 7v6" />
+    </svg>
+  )
+}
+
+export function IconGoogleSheets({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="14" height="14" rx="1.5" />
+      <line x1="2" y1="7" x2="16" y2="7" />
+      <line x1="2" y1="11" x2="16" y2="11" />
+      <line x1="7" y1="2" x2="7" y2="16" />
+      <line x1="11" y1="2" x2="11" y2="16" />
+    </svg>
+  )
+}
+
+export function IconTelegram({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 9l13-6-5 14-3-5-5-3z" />
+      <path d="M10 7l-3 5" />
+    </svg>
+  )
+}
+
+export function IconSSH({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="14" height="12" rx="1.5" />
+      <path d="M5 8l2.5 2.5L5 13" />
+      <line x1="10" y1="13" x2="13" y2="13" />
+    </svg>
+  )
+}
+
+export function IconBitrix({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 13c0 1.1.9 2 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v8z" />
+      <path d="M6 7h3.5a1.5 1.5 0 0 1 0 3H6v3" />
+      <path d="M6 7v3" />
+    </svg>
+  )
+}
+
+export function IconYandexDirect({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="10" width="3" height="5" rx="0.5" />
+      <rect x="7.5" y="7" width="3" height="8" rx="0.5" />
+      <rect x="12" y="3" width="3" height="12" rx="0.5" />
+    </svg>
+  )
+}
+
+export function IconYandexDisk({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M13 12a4 4 0 0 0-1-7.87A5 5 0 0 0 3 9a3 3 0 1 0 1 5.83" />
+      <polyline points="9 12 9 16" />
+      <polyline points="7 14 9 16 11 14" />
+    </svg>
+  )
+}
+
+export function IconSkillsServer({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 2l1.8 3.6L15 6.3l-3 2.9.7 4.1L9 11.3l-3.7 1.9.7-4.1-3-2.9 4.2-.7L9 2z" />
+    </svg>
+  )
+}
+
+export function IconPlug({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 2v4M12 2v4" />
+      <path d="M5 6h8a1 1 0 0 1 1 1v2a5 5 0 0 1-10 0V7a1 1 0 0 1 1-1z" />
+      <line x1="9" y1="13" x2="9" y2="16" />
+    </svg>
+  )
+}
