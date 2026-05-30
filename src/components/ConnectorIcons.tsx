@@ -93,6 +93,16 @@ export function IconSkillsServer({ size = 18 }: IconProps) {
   )
 }
 
+export function IconHTTP({ size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="9" r="7" />
+      <line x1="2" y1="9" x2="16" y2="9" />
+      <path d="M9 2a11.5 11.5 0 0 1 3 7 11.5 11.5 0 0 1-3 7 11.5 11.5 0 0 1-3-7 11.5 11.5 0 0 1 3-7z" />
+    </svg>
+  )
+}
+
 export function IconPlug({ size = 18 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

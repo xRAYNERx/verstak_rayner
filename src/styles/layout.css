@@ -3526,3 +3526,118 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   gap: 8px;
 }
 
+/* ─── Connector card grid — Codex-style marketplace ─── */
+.gg-connector-cost-cap {
+  margin-bottom: 8px;
+}
+.gg-connector-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 16px 0;
+}
+.gg-connector-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-base);
+  cursor: pointer;
+  transition: all 120ms ease;
+  text-align: left;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+.gg-connector-card:hover {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+.gg-connector-card.is-open {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.gg-connector-card-icon {
+  flex: 0 0 32px;
+  color: var(--text-secondary);
+}
+.gg-connector-card.is-connected .gg-connector-card-icon {
+  color: var(--accent);
+}
+.gg-connector-card-body {
+  flex: 1;
+  min-width: 0;
+}
+.gg-connector-card-name {
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+.gg-connector-card-desc {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gg-badge-connected {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+.gg-badge-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-subtle);
+  color: var(--text-tertiary);
+  font-size: 16px;
+}
+.gg-connector-card:hover .gg-badge-add {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Detail panel */
+.gg-connector-detail {
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 20px;
+  margin-top: 8px;
+  background: var(--bg-raised, var(--bg-surface));
+}
+.gg-connector-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  font-size: var(--text-base);
+  color: var(--text-primary);
+}
+.gg-connector-detail-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+.gg-connector-detail-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+

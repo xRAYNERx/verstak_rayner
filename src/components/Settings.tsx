@@ -9,7 +9,7 @@ import { buildCatalog, connectionStatus, type ConnectionStatus } from '../lib/mo
 import {
   IconClaude, Icon1C, IconGoogleSheets, IconTelegram,
   IconSSH, IconBitrix, IconYandexDirect, IconYandexDisk,
-  IconSkillsServer, IconPlug
+  IconSkillsServer, IconPlug, IconHTTP
 } from './ConnectorIcons'
 
 interface ProviderConfig {
@@ -245,6 +245,27 @@ function allModelsSet(): Set<string> {
   return s
 }
 
+interface ConnectorDef {
+  id: string
+  name: string
+  description: string
+  icon: React.FC<{ size?: number }>
+  configuredKey: string  // settings key to check — if non-empty, connector is "connected"
+}
+
+const CONNECTORS: ConnectorDef[] = [
+  { id: 'claude-oauth', name: 'Claude Code', description: 'OAuth token для Max подписки', icon: IconClaude, configuredKey: 'claude_code_oauth_token' },
+  { id: 'onec', name: '1С OData', description: 'ERP-система, справочники, документы', icon: Icon1C, configuredKey: 'onec_base_url' },
+  { id: 'http', name: 'HTTP API', description: 'Произвольные REST endpoints', icon: IconHTTP, configuredKey: '' },
+  { id: 'gsheets', name: 'Google Sheets', description: 'Таблицы, данные, отчёты', icon: IconGoogleSheets, configuredKey: 'gsheets_service_account_json' },
+  { id: 'telegram', name: 'Telegram', description: 'Бот для уведомлений и команд', icon: IconTelegram, configuredKey: 'telegram_bot_token' },
+  { id: 'ssh', name: 'SSH', description: 'Удалённое выполнение команд', icon: IconSSH, configuredKey: 'ssh_default_host' },
+  { id: 'bitrix', name: 'Битрикс24', description: 'CRM, сделки, задачи', icon: IconBitrix, configuredKey: 'bitrix24_webhook_url' },
+  { id: 'ydirect', name: 'Яндекс.Директ', description: 'Рекламные кампании и отчёты', icon: IconYandexDirect, configuredKey: 'yandex_direct_token' },
+  { id: 'ydisk', name: 'Яндекс.Диск', description: 'Файлы и шеринг артефактов', icon: IconYandexDisk, configuredKey: 'yandex_disk_token' },
+  { id: 'skills-server', name: 'Сервер скиллов', description: 'Удалённые AI-скиллы', icon: IconSkillsServer, configuredKey: 'skills_server_base' },
+]
+
 export function Settings({ onClose }: { onClose: () => void }) {
   const activeProjectPath = useProject(s => s.path)
   const [tab, setTab] = useState<Tab>('providers')
@@ -273,6 +294,8 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [claudeOauthToken, setClaudeOauthToken] = useState('')
   const [yDiskToken, setYDiskToken] = useState('')
   const [costCap, setCostCap] = useState('')
+  const [configuredConnectors, setConfiguredConnectors] = useState<Set<string>>(new Set())
+  const [openConnector, setOpenConnector] = useState<string | null>(null)
   // Custom OpenAI-compatible: base URL + список моделей через запятую.
   // Сохраняется в settings.custom_openai_baseurl / custom_openai_models.
   const [customOpenaiBaseUrl, setCustomOpenaiBaseUrl] = useState('')
@@ -390,6 +413,18 @@ export function Settings({ onClose }: { onClose: () => void }) {
     })()
   }, [tab, activeProjectPath, loadMemories])
 
+  // Detect which connectors are configured (for card badges)
+  useEffect(() => {
+    if (tab !== 'connectors') return
+    void Promise.all(CONNECTORS.map(async c => {
+      if (!c.configuredKey) return null
+      const val = await window.api.settings.getKey(c.configuredKey)
+      return val ? c.id : null
+    })).then(results => {
+      setConfiguredConnectors(new Set(results.filter(Boolean) as string[]))
+    })
+  }, [tab])
+
   async function save() {
     await window.api.settings.setKey('provider', activeProvider)
     for (const p of PROVIDERS) {
@@ -428,6 +463,279 @@ export function Settings({ onClose }: { onClose: () => void }) {
     await window.api.settings.setKey('custom_openai_models', customOpenaiModels)
     setSaved(true)
     setTimeout(() => setSaved(false), 1500)
+  }
+
+  function renderConnectorForm(id: string): React.ReactNode {
+    switch (id) {
+      case 'claude-oauth': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Long-lived OAuth token</label>
+            <input
+              className="gg-input"
+              type="password"
+              value={claudeOauthToken}
+              onChange={e => setClaudeOauthToken(e.target.value)}
+              placeholder="sk-ant-oat01-... (из `claude setup-token` в PowerShell)"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="gg-settings-hint">
+            Claude Code v2.1+ в headless режиме (через нашу программу) НЕ использует Max OAuth напрямую — требует
+            long-lived token. Получи: <code>claude setup-token</code> в PowerShell → подтверди в браузере →
+            копируй token сюда. Verstak будет передавать его как env var <code>CLAUDE_CODE_OAUTH_TOKEN</code>
+            при запуске claude. Решает «401 Invalid credentials» при выборе провайдера Claude Code.
+            Хранится зашифрованным через safeStorage. Действителен 1 год.
+          </div>
+        </>
+      )
+      case 'onec': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">1С OData base URL</label>
+            <input
+              className="gg-input"
+              value={onec.url}
+              onChange={e => setOneC(s => ({ ...s, url: e.target.value }))}
+              placeholder="https://1c.example.com/base/odata/standard.odata"
+              spellCheck={false}
+            />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Логин</label>
+            <input
+              className="gg-input"
+              value={onec.user}
+              onChange={e => setOneC(s => ({ ...s, user: e.target.value }))}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Пароль</label>
+            <input
+              className="gg-input"
+              type="password"
+              value={onec.pass}
+              onChange={e => setOneC(s => ({ ...s, pass: e.target.value }))}
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="gg-settings-hint">
+            Кред хранится зашифрованным в Electron safeStorage. AI может звать
+            tool <code>connector_query</code> с id=<code>onec</code>; пароль
+            никогда не попадает в промпт.
+          </div>
+        </>
+      )
+      case 'http': return (
+        <>
+          {httpEndpoints.map((ep, i) => (
+            <div key={i} className="gg-http-endpoint">
+              <div className="gg-http-endpoint-head">#{i + 1}</div>
+              <div className="gg-settings-row">
+                <label className="gg-settings-label">Имя</label>
+                <input className="gg-input" value={ep.name} placeholder='напр. "github" или "internal-api"'
+                  onChange={e => setHttpEndpoints(arr => arr.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
+                  spellCheck={false} />
+              </div>
+              <div className="gg-settings-row">
+                <label className="gg-settings-label">Base URL</label>
+                <input className="gg-input" value={ep.base} placeholder="https://api.github.com"
+                  onChange={e => setHttpEndpoints(arr => arr.map((x, j) => j === i ? { ...x, base: e.target.value } : x))}
+                  spellCheck={false} />
+              </div>
+              <div className="gg-settings-row">
+                <label className="gg-settings-label">Authorization</label>
+                <input className="gg-input" type="password" value={ep.auth} placeholder='напр. "Bearer ghp_…"'
+                  onChange={e => setHttpEndpoints(arr => arr.map((x, j) => j === i ? { ...x, auth: e.target.value } : x))}
+                  autoComplete="new-password" />
+              </div>
+              <div className="gg-settings-row">
+                <label className="gg-settings-label">Allow-paths</label>
+                <input className="gg-input" value={ep.paths} placeholder="/repos,/user (пусто = всё под base)"
+                  onChange={e => setHttpEndpoints(arr => arr.map((x, j) => j === i ? { ...x, paths: e.target.value } : x))}
+                  spellCheck={false} />
+              </div>
+            </div>
+          ))}
+          <div className="gg-settings-hint">
+            AI вызывает <code>connector_query</code> с <code>id="http"</code>,
+            <code>endpoint=&lt;имя&gt;</code> и path/method/query/body/headers.
+            Auth-заголовок подставляется из настроек, AI его не видит.
+            Allow-paths ограничивает к каким путям эндпоинта можно обращаться.
+          </div>
+        </>
+      )
+      case 'gsheets': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Service Account JSON</label>
+            <textarea
+              className="gg-input"
+              value={gsheetsJson}
+              onChange={e => setGsheetsJson(e.target.value)}
+              placeholder='{"type": "service_account", "client_email": "...", "private_key": "-----BEGIN PRIVATE KEY-----\\n...", ...}'
+              rows={5}
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}
+              spellCheck={false}
+            />
+          </div>
+          <div className="gg-settings-hint">
+            JSON service account (как в <code>/opt/los/creds.json</code>). Шифруется через safeStorage.
+            AI вызывает <code>connector_query</code> с <code>id="gsheets"</code> и <code>op="read_as_records"</code> /
+            <code>"update_row"</code> / etc. См. electron/connectors/gsheets.ts.
+          </div>
+        </>
+      )
+      case 'telegram': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Bot token</label>
+            <input
+              className="gg-input"
+              type="password"
+              value={telegramBotToken}
+              onChange={e => setTelegramBotToken(e.target.value)}
+              placeholder="1234567890:AAH... (от @BotFather)"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Chat whitelist (JSON)</label>
+            <input
+              className="gg-input"
+              value={telegramWhitelist}
+              onChange={e => setTelegramWhitelist(e.target.value)}
+              placeholder='["-1003242936373", "@private_chat"]'
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}
+              spellCheck={false}
+            />
+          </div>
+          <div className="gg-settings-hint">
+            JSON-массив chat_id куда боту разрешено отправлять. Пустая строка = всем (только dev).
+            Rate limit 20 send/min на chat_id вшит в коннектор. Read истории — через SSH к Telethon скрипту.
+          </div>
+        </>
+      )
+      case 'ssh': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Default host</label>
+            <input
+              className="gg-input"
+              value={sshHost}
+              onChange={e => setSshHost(e.target.value)}
+              placeholder="user@178.62.230.241 или alias из ~/.ssh/config"
+              spellCheck={false}
+            />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Path к private key</label>
+            <input
+              className="gg-input"
+              value={sshKeyPath}
+              onChange={e => setSshKeyPath(e.target.value)}
+              placeholder="C:/Users/Pavel/.ssh/id_ed25519 (или путь к ключу gemini-agent)"
+              spellCheck={false}
+            />
+          </div>
+          <div className="gg-settings-hint">
+            Whitelist: только default host разрешён для запросов. Команды денилист:
+            rm -rf системных корней, mkfs, dd на /dev, passwd, sudo su, systemctl stop, и т.п.
+            Через connector_query с <code>id="ssh"</code> и <code>op="run_remote"</code>.
+          </div>
+        </>
+      )
+      case 'bitrix': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Incoming webhook URL</label>
+            <input
+              className="gg-input"
+              type="password"
+              value={bitrixWebhook}
+              onChange={e => setBitrixWebhook(e.target.value)}
+              placeholder="https://your-portal.bitrix24.ru/rest/USER_ID/TOKEN/"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="gg-settings-hint">
+            Создать в Битрикс24: Разработчикам → Другое → Входящий вебхук. Полный URL с токеном.
+            Denied methods: *.delete (crm.deal/lead/contact/company/user). Allowed prefixes: crm.*, tasks.*, user.*.
+          </div>
+        </>
+      )
+      case 'ydirect': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">OAuth token</label>
+            <input
+              className="gg-input"
+              type="password"
+              value={yDirectToken}
+              onChange={e => setYDirectToken(e.target.value)}
+              placeholder="Получить: oauth.yandex.ru, scope: direct:api"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Client-Login (опц.)</label>
+            <input
+              className="gg-input"
+              value={yDirectLogin}
+              onChange={e => setYDirectLogin(e.target.value)}
+              placeholder="Login клиента — для агентских аккаунтов"
+              spellCheck={false}
+            />
+          </div>
+          <div className="gg-settings-hint">
+            Reports API асинхронный — connector polls до 30s. Если отчёт большой,
+            возвращается <code>processing: true</code>, повторяй запрос.
+          </div>
+        </>
+      )
+      case 'ydisk': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">OAuth token</label>
+            <input
+              className="gg-input"
+              type="password"
+              value={yDiskToken}
+              onChange={e => setYDiskToken(e.target.value)}
+              placeholder="oauth.yandex.ru со scope cloud_api:disk.write"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="gg-settings-hint">
+            Используется агентом для шеринга артефактов с клиентами:
+            upload_file → get_public_url → отправка ссылки в TG.
+            Загрузка идёт в <code>/Verstak/{`{дата}`}/</code> чтобы не засорять корень Диска.
+          </div>
+        </>
+      )
+      case 'skills-server': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Skills server base URL</label>
+            <input
+              className="gg-input"
+              value={skillsServerBase}
+              onChange={e => setSkillsServerBase(e.target.value)}
+              placeholder="https://aioperatingsystem.ru (или пусто для built-in only)"
+              spellCheck={false}
+            />
+          </div>
+          <div className="gg-settings-hint">
+            Сервер должен предоставлять <code>GET /api/skills</code> возвращающий
+            <code>{`{skills: [{id, raw, sourceRef}]}`}</code>. Если недоступен — используются built-in
+            (bos-sales / bos-mkt / client-cycle) + локальные из ~/.verstak/skills/.
+          </div>
+        </>
+      )
+      default: return null
+    }
   }
 
   return (
@@ -491,275 +799,64 @@ export function Settings({ onClose }: { onClose: () => void }) {
 
         {tab === 'connectors' && (
         <div className="gg-settings-extra">
-          <div className="gg-settings-section-title">💰 Hard cost cap (auto-stop)</div>
-          <div className="gg-settings-row">
-            <label className="gg-settings-label">Лимит $/сессия</label>
-            <input
-              className="gg-input"
-              type="text"
-              value={costCap}
-              onChange={e => setCostCap(e.target.value.replace(/[^\d.]/g, ''))}
-              placeholder="Например: 5 (max $5 за сессию). Пусто = guard выключен."
-              style={{ maxWidth: 200 }}
-            />
-          </div>
-          <div className="gg-settings-hint">
-            Если AI-сессия (API-провайдер) превысит этот лимит — auto-stop с
-            сообщением «лимит израсходован». CLI-провайдеры (подписки) идут
-            мимо лимита — они $0. Лимит на ОДНУ сессию, не суммарно за день.
-            Стандартный chat = $0.05-0.50. Длинный agent loop с большим
-            проектом = $2-10. Безопасный default: 5.
-          </div>
-
-          <div className="gg-settings-section-title" style={{ marginTop: 24 }}><IconClaude /> Claude Code OAuth (для Max подписки в headless)</div>
-          <div className="gg-settings-row">
-            <label className="gg-settings-label">Long-lived OAuth token</label>
-            <input
-              className="gg-input"
-              type="password"
-              value={claudeOauthToken}
-              onChange={e => setClaudeOauthToken(e.target.value)}
-              placeholder="sk-ant-oat01-... (из `claude setup-token` в PowerShell)"
-              autoComplete="new-password"
-            />
-          </div>
-          <div className="gg-settings-hint">
-            Claude Code v2.1+ в headless режиме (через нашу программу) НЕ использует Max OAuth напрямую — требует
-            long-lived token. Получи: <code>claude setup-token</code> в PowerShell → подтверди в браузере →
-            копируй token сюда. Verstak будет передавать его как env var <code>CLAUDE_CODE_OAUTH_TOKEN</code>
-            при запуске claude. Решает «401 Invalid credentials» при выборе провайдера Claude Code.
-            Хранится зашифрованным через safeStorage. Действителен 1 год.
+          {/* Cost cap — not a connector, stays at top */}
+          <div className="gg-connector-cost-cap">
+            <div className="gg-settings-section-title">💰 Hard cost cap (auto-stop)</div>
+            <div className="gg-settings-row">
+              <label className="gg-settings-label">Лимит $/сессия</label>
+              <input
+                className="gg-input"
+                type="text"
+                value={costCap}
+                onChange={e => setCostCap(e.target.value.replace(/[^\d.]/g, ''))}
+                placeholder="Например: 5 (max $5 за сессию). Пусто = guard выключен."
+                style={{ maxWidth: 200 }}
+              />
+            </div>
+            <div className="gg-settings-hint">
+              Если AI-сессия (API-провайдер) превысит этот лимит — auto-stop с
+              сообщением «лимит израсходован». CLI-провайдеры (подписки) идут
+              мимо лимита — они $0. Лимит на ОДНУ сессию, не суммарно за день.
+              Стандартный chat = $0.05-0.50. Длинный agent loop с большим
+              проектом = $2-10. Безопасный default: 5.
+            </div>
           </div>
 
-          <div className="gg-settings-section-title" style={{ marginTop: 24 }}><Icon1C /> 1С OData</div>
-          <div className="gg-settings-row">
-            <label className="gg-settings-label">1С OData base URL</label>
-            <input
-              className="gg-input"
-              value={onec.url}
-              onChange={e => setOneC(s => ({ ...s, url: e.target.value }))}
-              placeholder="https://1c.example.com/base/odata/standard.odata"
-              spellCheck={false}
-            />
-          </div>
-          <div className="gg-settings-row">
-            <label className="gg-settings-label">Логин</label>
-            <input
-              className="gg-input"
-              value={onec.user}
-              onChange={e => setOneC(s => ({ ...s, user: e.target.value }))}
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </div>
-          <div className="gg-settings-row">
-            <label className="gg-settings-label">Пароль</label>
-            <input
-              className="gg-input"
-              type="password"
-              value={onec.pass}
-              onChange={e => setOneC(s => ({ ...s, pass: e.target.value }))}
-              autoComplete="new-password"
-            />
-          </div>
-          <div className="gg-settings-hint">
-            Кред хранится зашифрованным в Electron safeStorage. AI может звать
-            tool <code>connector_query</code> с id=<code>onec</code>; пароль
-            никогда не попадает в промпт.
+          {/* Card grid — Codex-style marketplace */}
+          <div className="gg-connector-grid">
+            {CONNECTORS.map(c => {
+              const configured = configuredConnectors.has(c.id)
+              return (
+                <button
+                  key={c.id}
+                  className={`gg-connector-card ${configured ? 'is-connected' : ''} ${openConnector === c.id ? 'is-open' : ''}`}
+                  onClick={() => setOpenConnector(openConnector === c.id ? null : c.id)}
+                >
+                  <div className="gg-connector-card-icon"><c.icon size={32} /></div>
+                  <div className="gg-connector-card-body">
+                    <div className="gg-connector-card-name">{c.name}</div>
+                    <div className="gg-connector-card-desc">{c.description}</div>
+                  </div>
+                  <div className="gg-connector-card-status">
+                    {configured ? <span className="gg-badge-connected">&#10003;</span> : <span className="gg-badge-add">+</span>}
+                  </div>
+                </button>
+              )
+            })}
           </div>
 
-          <div className="gg-settings-section-title" style={{ marginTop: 18 }}>HTTP коннекторы</div>
-          {httpEndpoints.map((ep, i) => (
-            <div key={i} className="gg-http-endpoint">
-              <div className="gg-http-endpoint-head">#{i + 1}</div>
-              <div className="gg-settings-row">
-                <label className="gg-settings-label">Имя</label>
-                <input className="gg-input" value={ep.name} placeholder='напр. "github" или "internal-api"'
-                  onChange={e => setHttpEndpoints(arr => arr.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
-                  spellCheck={false} />
+          {/* Expanded settings panel below the grid */}
+          {openConnector && (
+            <div className="gg-connector-detail">
+              <div className="gg-connector-detail-header">
+                {(() => { const def = CONNECTORS.find(c => c.id === openConnector); return def ? <><def.icon size={20} /> {def.name}</> : null })()}
+                <button className="gg-connector-detail-close" onClick={() => setOpenConnector(null)}>×</button>
               </div>
-              <div className="gg-settings-row">
-                <label className="gg-settings-label">Base URL</label>
-                <input className="gg-input" value={ep.base} placeholder="https://api.github.com"
-                  onChange={e => setHttpEndpoints(arr => arr.map((x, j) => j === i ? { ...x, base: e.target.value } : x))}
-                  spellCheck={false} />
-              </div>
-              <div className="gg-settings-row">
-                <label className="gg-settings-label">Authorization</label>
-                <input className="gg-input" type="password" value={ep.auth} placeholder='напр. "Bearer ghp_…"'
-                  onChange={e => setHttpEndpoints(arr => arr.map((x, j) => j === i ? { ...x, auth: e.target.value } : x))}
-                  autoComplete="new-password" />
-              </div>
-              <div className="gg-settings-row">
-                <label className="gg-settings-label">Allow-paths</label>
-                <input className="gg-input" value={ep.paths} placeholder="/repos,/user (пусто = всё под base)"
-                  onChange={e => setHttpEndpoints(arr => arr.map((x, j) => j === i ? { ...x, paths: e.target.value } : x))}
-                  spellCheck={false} />
+              <div className="gg-connector-detail-body">
+                {renderConnectorForm(openConnector)}
               </div>
             </div>
-          ))}
-          <div className="gg-settings-hint">
-            AI вызывает <code>connector_query</code> с <code>id="http"</code>,
-            <code>endpoint=&lt;имя&gt;</code> и path/method/query/body/headers.
-            Auth-заголовок подставляется из настроек, AI его не видит.
-            Allow-paths ограничивает к каким путям эндпоинта можно обращаться.
-          </div>
-
-          {/* ============================================================
-              V3 — российские коннекторы (раздел 5 плана).
-              ============================================================ */}
-          <div className="gg-settings-section-title" style={{ marginTop: 24 }}><IconGoogleSheets /> Google Sheets</div>
-          <div className="gg-settings-row">
-            <label className="gg-settings-label">Service Account JSON</label>
-            <textarea
-              className="gg-input"
-              value={gsheetsJson}
-              onChange={e => setGsheetsJson(e.target.value)}
-              placeholder='{"type": "service_account", "client_email": "...", "private_key": "-----BEGIN PRIVATE KEY-----\\n...", ...}'
-              rows={5}
-              style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}
-              spellCheck={false}
-            />
-          </div>
-          <div className="gg-settings-hint">
-            JSON service account (как в <code>/opt/los/creds.json</code>). Шифруется через safeStorage.
-            AI вызывает <code>connector_query</code> с <code>id="gsheets"</code> и <code>op="read_as_records"</code> /
-            <code>"update_row"</code> / etc. См. electron/connectors/gsheets.ts.
-          </div>
-
-          <div className="gg-settings-section-title" style={{ marginTop: 24 }}><IconTelegram /> Telegram bot</div>
-          <div className="gg-settings-row">
-            <label className="gg-settings-label">Bot token</label>
-            <input
-              className="gg-input"
-              type="password"
-              value={telegramBotToken}
-              onChange={e => setTelegramBotToken(e.target.value)}
-              placeholder="1234567890:AAH... (от @BotFather)"
-              autoComplete="new-password"
-            />
-          </div>
-          <div className="gg-settings-row">
-            <label className="gg-settings-label">Chat whitelist (JSON)</label>
-            <input
-              className="gg-input"
-              value={telegramWhitelist}
-              onChange={e => setTelegramWhitelist(e.target.value)}
-              placeholder='["-1003242936373", "@private_chat"]'
-              style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}
-              spellCheck={false}
-            />
-          </div>
-          <div className="gg-settings-hint">
-            JSON-массив chat_id куда боту разрешено отправлять. Пустая строка = всем (только dev).
-            Rate limit 20 send/min на chat_id вшит в коннектор. Read истории — через SSH к Telethon скрипту.
-          </div>
-
-          <div className="gg-settings-section-title" style={{ marginTop: 24 }}><IconSSH /> SSH executor</div>
-          <div className="gg-settings-row">
-            <label className="gg-settings-label">Default host</label>
-            <input
-              className="gg-input"
-              value={sshHost}
-              onChange={e => setSshHost(e.target.value)}
-              placeholder="user@178.62.230.241 или alias из ~/.ssh/config"
-              spellCheck={false}
-            />
-          </div>
-          <div className="gg-settings-row">
-            <label className="gg-settings-label">Path к private key</label>
-            <input
-              className="gg-input"
-              value={sshKeyPath}
-              onChange={e => setSshKeyPath(e.target.value)}
-              placeholder="C:/Users/Pavel/.ssh/id_ed25519 (или путь к ключу gemini-agent)"
-              spellCheck={false}
-            />
-          </div>
-          <div className="gg-settings-hint">
-            Whitelist: только default host разрешён для запросов. Команды денилист:
-            rm -rf системных корней, mkfs, dd на /dev, passwd, sudo su, systemctl stop, и т.п.
-            Через connector_query с <code>id="ssh"</code> и <code>op="run_remote"</code>.
-          </div>
-
-          <div className="gg-settings-section-title" style={{ marginTop: 24 }}><IconBitrix /> Битрикс24</div>
-          <div className="gg-settings-row">
-            <label className="gg-settings-label">Incoming webhook URL</label>
-            <input
-              className="gg-input"
-              type="password"
-              value={bitrixWebhook}
-              onChange={e => setBitrixWebhook(e.target.value)}
-              placeholder="https://your-portal.bitrix24.ru/rest/USER_ID/TOKEN/"
-              autoComplete="new-password"
-            />
-          </div>
-          <div className="gg-settings-hint">
-            Создать в Битрикс24: Разработчикам → Другое → Входящий вебхук. Полный URL с токеном.
-            Denied methods: *.delete (crm.deal/lead/contact/company/user). Allowed prefixes: crm.*, tasks.*, user.*.
-          </div>
-
-          <div className="gg-settings-section-title" style={{ marginTop: 24 }}><IconYandexDirect /> Яндекс.Директ</div>
-          <div className="gg-settings-row">
-            <label className="gg-settings-label">OAuth token</label>
-            <input
-              className="gg-input"
-              type="password"
-              value={yDirectToken}
-              onChange={e => setYDirectToken(e.target.value)}
-              placeholder="Получить: oauth.yandex.ru, scope: direct:api"
-              autoComplete="new-password"
-            />
-          </div>
-          <div className="gg-settings-row">
-            <label className="gg-settings-label">Client-Login (опц.)</label>
-            <input
-              className="gg-input"
-              value={yDirectLogin}
-              onChange={e => setYDirectLogin(e.target.value)}
-              placeholder="Login клиента — для агентских аккаунтов"
-              spellCheck={false}
-            />
-          </div>
-          <div className="gg-settings-hint">
-            Reports API асинхронный — connector polls до 30s. Если отчёт большой,
-            возвращается <code>processing: true</code>, повторяй запрос.
-          </div>
-
-          <div className="gg-settings-section-title" style={{ marginTop: 24 }}><IconYandexDisk /> Yandex Disk</div>
-          <div className="gg-settings-row">
-            <label className="gg-settings-label">OAuth token</label>
-            <input
-              className="gg-input"
-              type="password"
-              value={yDiskToken}
-              onChange={e => setYDiskToken(e.target.value)}
-              placeholder="oauth.yandex.ru со scope cloud_api:disk.write"
-              autoComplete="new-password"
-            />
-          </div>
-          <div className="gg-settings-hint">
-            Используется агентом для шеринга артефактов с клиентами:
-            upload_file → get_public_url → отправка ссылки в TG.
-            Загрузка идёт в <code>/Verstak/{`{дата}`}/</code> чтобы не засорять корень Диска.
-          </div>
-
-          <div className="gg-settings-section-title" style={{ marginTop: 24 }}><IconSkillsServer /> Сервер скиллов</div>
-          <div className="gg-settings-row">
-            <label className="gg-settings-label">Skills server base URL</label>
-            <input
-              className="gg-input"
-              value={skillsServerBase}
-              onChange={e => setSkillsServerBase(e.target.value)}
-              placeholder="https://aioperatingsystem.ru (или пусто для built-in only)"
-              spellCheck={false}
-            />
-          </div>
-          <div className="gg-settings-hint">
-            Сервер должен предоставлять <code>GET /api/skills</code> возвращающий
-            <code>{`{skills: [{id, raw, sourceRef}]}`}</code>. Если недоступен — используются built-in
-            (bos-sales / bos-mkt / client-cycle) + локальные из ~/.verstak/skills/.
-          </div>
+          )}
         </div>
         )}
 
