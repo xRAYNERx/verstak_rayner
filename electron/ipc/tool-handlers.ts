@@ -77,6 +77,8 @@ export interface ToolContext {
   /** Secret reader для delegate_task — нужен чтобы достать API key
    *  альтернативного провайдера. */
   getSecretForDelegate?: (key: string) => string | null
+  /** ID текущего провайдера чата — используется как fallback в delegate_task. */
+  currentProviderId?: string
 }
 
 export type ToolMode = 'parallel-read' | 'sequential' | 'confirm-write'
@@ -531,7 +533,10 @@ const delegateTaskHandler: ToolHandler = {
       // Внутренний one-shot call — реализуем через прямой вызов provider'а,
       // без новой ipc-сессии (никаких дополнительных sendId, событий, и т.п.).
       const { createProvider, PROVIDERS } = await import('../ai/registry')
-      const fallbackProvider = subProvider ?? 'claude'
+      const fallbackProvider = subProvider ?? ctx.currentProviderId ?? null
+      if (!fallbackProvider) {
+        return { id: call.id, name: call.name, result: '', error: 'delegate_task: provider_id не задан и у текущего чата нет провайдера. Укажи provider_id явно.' }
+      }
       const descriptor = PROVIDERS[fallbackProvider as keyof typeof PROVIDERS]
       if (!descriptor) {
         return { id: call.id, name: call.name, result: '', error: `delegate_task: неизвестный provider ${fallbackProvider}` }

@@ -88,4 +88,33 @@ B2
 >>>>>>> REPLACE`
     expect(applySearchReplaceBlocks(before, diff)).toBe('A\nB\nB2\nc\n')
   })
+
+  it('whitespace fallback: applies patch on \\r\\n file with trailing spaces in SEARCH', () => {
+    // File uses \r\n line endings + trailing spaces on some lines
+    const before = 'function foo() {\r\n  return 1;  \r\n}\r\n'
+    // AI generates patch with \n and without trailing spaces
+    const diff = `<<<<<<< SEARCH
+function foo() {
+  return 1;
+}
+=======
+function foo() {
+  return 42;
+}
+>>>>>>> REPLACE`
+    const result = applySearchReplaceBlocks(before, diff)
+    expect(result).toContain('return 42')
+    expect(result).not.toContain('return 1')
+  })
+
+  it('whitespace fallback: throws when normalized search matches multiple times', () => {
+    // Both lines become the same after trailing-space strip
+    const before = 'x = 1   \nx = 1\n'
+    const diff = `<<<<<<< SEARCH
+x = 1
+=======
+x = 99
+>>>>>>> REPLACE`
+    expect(() => applySearchReplaceBlocks(before, diff)).toThrow(/несколько раз/)
+  })
 })

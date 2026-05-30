@@ -51,12 +51,12 @@ export function saveMemory(
   ).run(id, projectPath, type, content, JSON.stringify(tags), now, now)
 
   if (result.changes === 0) {
-    // Дубль — обновить accessed_at и вернуть существующую запись
-    db.prepare(`UPDATE memories SET accessed_at = ? WHERE project_path = ? AND content = ?`)
-      .run(now, projectPath, content)
-    const existing = db.prepare(`SELECT * FROM memories WHERE project_path = ? AND content = ?`)
+    // Дубль — last-write-wins: обновить type, tags и accessed_at, затем вернуть актуальную запись
+    db.prepare(`UPDATE memories SET type = ?, tags = ?, accessed_at = ? WHERE project_path = ? AND content = ?`)
+      .run(type, JSON.stringify(tags), now, projectPath, content)
+    const updated = db.prepare(`SELECT * FROM memories WHERE project_path = ? AND content = ?`)
       .get(projectPath, content) as MemoryRow
-    return rowToMemory(existing)
+    return rowToMemory(updated)
   }
 
   return { id, project_path: projectPath, type, content, tags, created_at: now, accessed_at: now }

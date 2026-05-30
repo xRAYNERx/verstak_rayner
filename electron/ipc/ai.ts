@@ -53,6 +53,23 @@ const activeAborts = new Map<number, AbortController>()
 // turns (which broke reopened old chats with existing assistant messages).
 const memorizedChats = new Set<string>()
 
+/**
+ * Remove a single chat key from the memory-injection cache.
+ * Call when a chat session is deleted so a new session reusing the same
+ * numeric id (or projectPath fallback) gets a fresh memory injection.
+ */
+export function forgetMemorizedChat(key: string): void {
+  memorizedChats.delete(key)
+}
+
+/**
+ * Remove a projectPath fallback key when a project is removed.
+ * Only relevant for chats where no chatId was provided to ai:send.
+ */
+export function forgetMemorizedProject(projectPath: string): void {
+  memorizedChats.delete(projectPath)
+}
+
 // Local TaggedSender alias — shape-compatible with tool-handlers.TaggedSender.
 type TaggedSender = HandlerTaggedSender
 
@@ -146,7 +163,13 @@ export function registerAiIpc(deps: AiDeps): void {
     // тоже получали память через buildCliPrompt → prepareParts.
     const memoryCacheKey = chatId ?? (projectPath ?? '__no_project__')
     const shouldInjectMemory = projectPath && !memorizedChats.has(memoryCacheKey)
-    if (shouldInjectMemory) memorizedChats.add(memoryCacheKey)
+    if (shouldInjectMemory) {
+      // Safety net: if the Set has grown past 500 entries (process running for
+      // many days without restart), clear it entirely. This is a one-time
+      // cache miss — memories get re-injected once per affected chat — not data loss.
+      if (memorizedChats.size > 500) memorizedChats.clear()
+      memorizedChats.add(memoryCacheKey)
+    }
     let memories: { type: string; content: string; tags: string[] }[] = []
     if (shouldInjectMemory) {
       try {
@@ -728,7 +751,8 @@ async function runApiConversation(
       sender, sendId, signal, projectPath, tools,
       recordWrite, recordPlan, recordJournal, readJournal, saveMemory, searchMemories, connectors,
       pendingAttachments, pendingWrites, pendingCommands, scopedKey,
-      agentMode, skillRegistry, getSecretForDelegate
+      agentMode, skillRegistry, getSecretForDelegate,
+      currentProviderId: providerId
     }
     const writePromises: Array<{ idx: number; promise: Promise<ToolResult> }> = []
     const readPromises: Array<{ idx: number; promise: Promise<ToolResult> }> = []

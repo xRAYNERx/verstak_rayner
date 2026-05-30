@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useProject } from '../store/projectStore'
 import type { Memory } from '../types/api'
 import type { ProviderId } from '../hooks/useProvider'
 import { useTheme } from '../hooks/useTheme'
@@ -240,6 +241,7 @@ function allModelsSet(): Set<string> {
 }
 
 export function Settings({ onClose }: { onClose: () => void }) {
+  const activeProjectPath = useProject(s => s.path)
   const [tab, setTab] = useState<Tab>('providers')
   const [activeProvider, setActiveProvider] = useState<ProviderId>('gemini-api')
   const [keys, setKeys] = useState<Record<string, string>>({})
@@ -360,15 +362,20 @@ export function Settings({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (tab !== 'memory') return
     void (async () => {
+      // Приоритет — активный проект из store; fallback на lastOpenedAt
+      if (activeProjectPath) {
+        setMemoriesPath(activeProjectPath)
+        void loadMemories(activeProjectPath)
+        return
+      }
       const projects = await window.api.projects.list()
-      // Берём проект с последним открытием — он же активный
       if (projects.length === 0) return
       const sorted = [...projects].sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)
       const path = sorted[0].path
       setMemoriesPath(path)
       void loadMemories(path)
     })()
-  }, [tab, loadMemories])
+  }, [tab, activeProjectPath, loadMemories])
 
   async function save() {
     await window.api.settings.setKey('provider', activeProvider)

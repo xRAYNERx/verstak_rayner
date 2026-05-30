@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import type { Chats } from '../storage/chats'
 import type { ChatSessions, ChatKind } from '../storage/chat-sessions'
+import { forgetMemorizedChat } from './ai'
 
 export function registerChatsIpc(chats: Chats, sessions: ChatSessions): void {
   // Sessions
@@ -18,7 +19,12 @@ export function registerChatsIpc(chats: Chats, sessions: ChatSessions): void {
   ipcMain.handle('chat-sessions:set-model', (_e, id: number, providerId: string | null, model: string | null) =>
     sessions.setProviderModel(id, providerId, model)
   )
-  ipcMain.handle('chat-sessions:remove', (_e, id: number) => sessions.remove(id))
+  ipcMain.handle('chat-sessions:remove', (_e, id: number) => {
+    sessions.remove(id)
+    // Clear memory-injection cache so if a new session reuses this id as key,
+    // it still receives a fresh memory injection.
+    forgetMemorizedChat(String(id))
+  })
 
   // Messages
   ipcMain.handle('chats:list', (_e, sessionId: number) => chats.listBySession(sessionId))

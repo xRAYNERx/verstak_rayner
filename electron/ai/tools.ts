@@ -263,7 +263,7 @@ export const TOOL_DEFS: ToolDefinition[] = [
         },
         provider_id: {
           type: 'string',
-          description: 'Опционально — провайдер для sub-agent (gemini-api / claude / openai / grok). Если не указан — берётся из default_provider скилла или текущий.'
+          description: 'Опционально — провайдер для sub-agent (gemini-api / claude / openai / grok). Если не указан — берётся из default_provider скилла, иначе используется провайдер текущего чата.'
         },
         model: {
           type: 'string',
@@ -380,12 +380,11 @@ export function applySearchReplaceBlocks(input: string, diff: string): string {
     let first = result.indexOf(search)
     let actualSearch = search
     if (first === -1) {
-      // Fallback 1: trim trailing whitespace on each line of SEARCH AND target.
-      // LLMs commonly add/strip a trailing space — exact match fails on that
-      // and the agent then re-reads the file 3 times → loop detection breaks
-      // a legitimate turn. We try a normalized comparison; if it matches
-      // uniquely, accept it.
-      const stripTrailing = (s: string) => s.split('\n').map(l => l.replace(/[\t ]+$/, '')).join('\n')
+      // Fallback: normalize line endings (\r\n → \n) and trim trailing whitespace
+      // on each line of both SEARCH and file content, then apply to the
+      // normalized content directly (avoids fragile character-position
+      // reconstruction that was unreliable on \r\n files and mixed tabs/spaces).
+      const stripTrailing = (s: string) => s.replace(/\r\n/g, '\n').split('\n').map(l => l.replace(/[\t ]+$/, '')).join('\n')
       const normSearch = stripTrailing(search)
       const normResult = stripTrailing(result)
       const normFirst = normResult.indexOf(normSearch)
@@ -394,25 +393,10 @@ export function applySearchReplaceBlocks(input: string, diff: string): string {
         if (normNext !== -1) {
           throw new Error(`apply_patch: SEARCH блок #${applied + 1} после нормализации whitespace встречается несколько раз (позиции ${normFirst} и ${normNext}). Добавь контекста.`)
         }
-        // Find the real (un-normalized) range that corresponds to normFirst.
-        // We walk lines in result until we reach the normalized position.
-        let charsInNorm = 0
-        let realPos = 0
-        for (const realLine of result.split('\n')) {
-          if (charsInNorm >= normFirst) break
-          charsInNorm += realLine.replace(/[\t ]+$/, '').length + 1  // +newline
-          realPos += realLine.length + 1
-        }
-        // Approximate — but for the un-normalized substring of equivalent
-        // length: walk forward search.length characters preserving original.
-        first = realPos - search.length >= 0 ? result.indexOf(result.slice(realPos - 1).split('\n', search.split('\n').length).join('\n')) : -1
-        if (first === -1) {
-          // Robust fallback: rebuild by joining the right number of lines.
-          const startLine = result.slice(0, realPos).split('\n').length - search.split('\n').length
-          const lines = result.split('\n')
-          actualSearch = lines.slice(startLine, startLine + search.split('\n').length).join('\n')
-          first = result.indexOf(actualSearch)
-        }
+        // Operate on the normalized content — single safe substitution.
+        result = normResult.slice(0, normFirst) + replace + normResult.slice(normFirst + normSearch.length)
+        applied++
+        continue
       }
     }
     if (first === -1) {

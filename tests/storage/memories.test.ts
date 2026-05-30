@@ -48,6 +48,21 @@ describe('memories storage', () => {
       const list = listMemories(db, PROJECT)
       expect(list[0].tags).toEqual(['sql', 'security'])
     })
+
+    it('duplicate content: last write wins on type and tags', () => {
+      saveMemory(db, PROJECT, 'bug', 'X', ['a'])
+      const second = saveMemory(db, PROJECT, 'decision', 'X', ['b'])
+
+      // returned object должен отражать новые type/tags
+      expect(second.type).toBe('decision')
+      expect(second.tags).toEqual(['b'])
+
+      // в БД должна остаться ровно одна строка с обновлёнными полями
+      const list = listMemories(db, PROJECT)
+      expect(list).toHaveLength(1)
+      expect(list[0].type).toBe('decision')
+      expect(list[0].tags).toEqual(['b'])
+    })
   })
 
   describe('listMemories', () => {

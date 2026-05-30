@@ -2,6 +2,7 @@ import { dialog, ipcMain, BrowserWindow } from 'electron'
 import { setActiveProjectPath } from '../state/project-state'
 import { ensureUserLayer } from '../ai/user-layer'
 import type { Projects } from '../storage/projects'
+import { forgetMemorizedProject } from './ai'
 
 export function registerProjectIpc(projects: Projects): void {
   ipcMain.handle('projects:pick', async () => {
@@ -29,5 +30,9 @@ export function registerProjectIpc(projects: Projects): void {
 
   ipcMain.handle('projects:list', () => projects.list())
   ipcMain.handle('projects:rename', (_e, path: string, name: string) => projects.rename(path, name))
-  ipcMain.handle('projects:remove', (_e, path: string) => projects.remove(path))
+  ipcMain.handle('projects:remove', (_e, path: string) => {
+    projects.remove(path)
+    // Clear projectPath fallback key from memory-injection cache.
+    forgetMemorizedProject(path)
+  })
 }
