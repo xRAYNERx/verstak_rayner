@@ -88,7 +88,9 @@ export function createCodexCliProvider(opts: CodexCliOptions = {}): ChatProvider
         return
       }
 
-      const args = ['exec', '--json']
+      // --skip-git-repo-check: разрешает работу вне доверенной git-директории.
+      // Без этого Codex CLI exit 1 с "Not inside a trusted directory".
+      const args = ['exec', '--json', '--skip-git-repo-check']
       if (opts.model && opts.model !== 'auto') {
         args.push('-m', opts.model)
       }
