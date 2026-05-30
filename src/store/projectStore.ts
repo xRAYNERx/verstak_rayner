@@ -265,6 +265,9 @@ interface ProjectState {
   clearArtifacts: () => void
   /** Открыть preview панель для артефакта (по path как ID), или закрыть (null). */
   setPreviewArtifact: (path: string | null) => void
+  /** Уровень усилий модели. Влияет на max_tokens / extended thinking. */
+  effortLevel: 'quick' | 'standard' | 'deep'
+  setEffortLevel: (level: 'quick' | 'standard' | 'deep') => void
 }
 
 // Monotonic token used by setProject to cancel its own stale concurrent runs.
@@ -296,6 +299,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   openedReviewId: null,
   artifacts: [],
   previewArtifactId: null,
+  effortLevel: 'standard',
   setProject: async (path) => {
     const myToken = ++setProjectToken
     const s = get()
@@ -815,6 +819,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   })),
   clearArtifacts: () => set({ artifacts: [], previewArtifactId: null }),
   setPreviewArtifact: (path) => set({ previewArtifactId: path }),
+  setEffortLevel: (level) => set({ effortLevel: level }),
   cleanupReviewsFor: (parentChatId) => set(s => {
     // Удаляем review entries этого main-чата + связанные sendOwners.
     // Закрываем openedReviewId если он был из этого чата.

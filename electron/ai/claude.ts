@@ -5,6 +5,7 @@ import type { ChatProvider, ChatMessage, ChatEvent, ToolDefinition, ToolResult }
 interface ClaudeOptions {
   apiKey: string
   model?: string
+  effortLevel?: 'quick' | 'standard' | 'deep'
 }
 
 export const CLAUDE_MODELS = [
@@ -60,9 +61,13 @@ function buildContent(message: ChatMessage): string | AnyBlock[] {
   return blocks
 }
 
+// Модели Claude поддерживающие extended thinking (budget_tokens)
+const THINKING_MODELS = new Set(['claude-sonnet-4-6', 'claude-opus-4-5', 'claude-opus-4'])
+
 export function createClaudeProvider(opts: ClaudeOptions): ChatProvider {
   const model = opts.model ?? DEFAULT_MODEL
   const client = new Anthropic({ apiKey: opts.apiKey })
+  const effortLevel = opts.effortLevel ?? 'standard'
 
   return {
     id: 'claude',
@@ -92,14 +97,28 @@ export function createClaudeProvider(opts: ClaudeOptions): ChatProvider {
 
       // Accumulators for in-progress tool_use blocks (Claude streams partial JSON)
       const activeToolUses: Record<number, { id: string; name: string; input: string }> = {}
+      // Extended thinking blocks (content_block.type === 'thinking')
+      const activeThinkingBlocks: Record<number, string> = {}
+
+      // Параметры зависят от effortLevel:
+      // quick    → max_tokens 2048, без thinking
+      // standard → max_tokens 8192 (ранее было 4096), без thinking
+      // deep     → max_tokens 16000, extended thinking если модель поддерживает
+      const maxTokens = effortLevel === 'quick' ? 2048 : effortLevel === 'deep' ? 16000 : 8192
+      const useThinking = effortLevel === 'deep' && THINKING_MODELS.has(model)
+      // Extended thinking несовместимо с tool use по Anthropic API — только plain
+      const thinkingParam = useThinking && !apiTools
+        ? { thinking: { type: 'enabled' as const, budget_tokens: 10000 } }
+        : {}
 
       try {
         const stream = await client.messages.stream({
           model,
-          max_tokens: 4096,
+          max_tokens: maxTokens,
           system: systemMessages || undefined,
           messages: conversation as Anthropic.Messages.MessageParam[],
-          ...(apiTools ? { tools: apiTools } : {})
+          ...(apiTools ? { tools: apiTools } : {}),
+          ...thinkingParam
         })
 
         let inputTokens = 0
@@ -111,19 +130,34 @@ export function createClaudeProvider(opts: ClaudeOptions): ChatProvider {
             cachedInputTokens = (event.message.usage as { cache_read_input_tokens?: number }).cache_read_input_tokens ?? 0
           } else if (event.type === 'message_delta' && event.usage) {
             outputTokens = event.usage.output_tokens ?? 0
-          } else if (event.type === 'content_block_start' && event.content_block.type === 'tool_use') {
-            activeToolUses[event.index] = {
-              id: event.content_block.id ?? randomUUID(),
-              name: event.content_block.name,
-              input: ''
+          } else if (event.type === 'content_block_start') {
+            if (event.content_block.type === 'tool_use') {
+              activeToolUses[event.index] = {
+                id: event.content_block.id ?? randomUUID(),
+                name: event.content_block.name,
+                input: ''
+              }
+            } else if ((event.content_block as { type: string }).type === 'thinking') {
+              activeThinkingBlocks[event.index] = ''
             }
           } else if (event.type === 'content_block_delta') {
             if (event.delta.type === 'text_delta') {
               yield { type: 'text', text: event.delta.text }
             } else if (event.delta.type === 'input_json_delta' && activeToolUses[event.index]) {
               activeToolUses[event.index].input += event.delta.partial_json
+            } else if ((event.delta as { type: string; thinking?: string }).type === 'thinking_delta' && activeThinkingBlocks[event.index] !== undefined) {
+              activeThinkingBlocks[event.index] += (event.delta as { type: string; thinking?: string }).thinking ?? ''
             }
-          } else if (event.type === 'content_block_stop' && activeToolUses[event.index]) {
+          } else if (event.type === 'content_block_stop') {
+            // Emit accumulated thinking block
+            if (activeThinkingBlocks[event.index] !== undefined) {
+              if (activeThinkingBlocks[event.index]) {
+                yield { type: 'thought', text: activeThinkingBlocks[event.index] }
+              }
+              delete activeThinkingBlocks[event.index]
+            }
+          }
+          if (event.type === 'content_block_stop' && activeToolUses[event.index]) {
             const tu = activeToolUses[event.index]
             let args: Record<string, unknown> = {}
             try { args = tu.input ? JSON.parse(tu.input) : {} } catch { args = {} }

@@ -9,7 +9,7 @@ export const GROK_MODELS = [
 
 const DEFAULT_MODEL = GROK_MODELS[0]
 
-export function createGrokProvider(opts: { apiKey: string; model?: string }): ChatProvider {
+export function createGrokProvider(opts: { apiKey: string; model?: string; effortLevel?: 'quick' | 'standard' | 'deep' }): ChatProvider {
   return createOpenAiCompatProvider({
     id: 'grok',
     name: 'Grok',
@@ -17,6 +17,7 @@ export function createGrokProvider(opts: { apiKey: string; model?: string }): Ch
     defaultModel: DEFAULT_MODEL,
     apiKey: opts.apiKey,
     baseUrl: 'https://api.x.ai/v1',
-    model: opts.model
+    model: opts.model,
+    effortLevel: opts.effortLevel
   })
 }

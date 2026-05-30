@@ -177,19 +177,22 @@ export interface CreateOptions {
   /** Топ-5 воспоминаний проекта — пробрасываются в buildCliPrompt для CLI-провайдеров,
    *  чтобы они получали тот же контекст памяти что и API-провайдеры. */
   memories?: Array<{ type: string; content: string; tags: string[] }>
+  /** Уровень усилий модели: влияет на max_tokens и extended thinking.
+   *  'quick' — короткие ответы; 'standard' (default) — без изменений; 'deep' — максимальное мышление. */
+  effortLevel?: 'quick' | 'standard' | 'deep'
 }
 
 export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvider {
   switch (id) {
     case 'gemini-api': {
       if (!opts.apiKey) throw new Error('Gemini API key not set')
-      return createGeminiProvider({ apiKey: opts.apiKey, model: opts.model })
+      return createGeminiProvider({ apiKey: opts.apiKey, model: opts.model, effortLevel: opts.effortLevel })
     }
     case 'gemini-cli':
       return createGeminiCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model, projectSystemPrompt: opts.projectSystemPrompt, memories: opts.memories })
     case 'claude': {
       if (!opts.apiKey) throw new Error('Anthropic API key not set')
-      return createClaudeProvider({ apiKey: opts.apiKey, model: opts.model })
+      return createClaudeProvider({ apiKey: opts.apiKey, model: opts.model, effortLevel: opts.effortLevel })
     }
     case 'claude-cli':
       return createClaudeCliProvider({
@@ -202,13 +205,13 @@ export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvide
       })
     case 'grok': {
       if (!opts.apiKey) throw new Error('xAI (Grok) API key not set')
-      return createGrokProvider({ apiKey: opts.apiKey, model: opts.model })
+      return createGrokProvider({ apiKey: opts.apiKey, model: opts.model, effortLevel: opts.effortLevel })
     }
     case 'grok-cli':
       return createGrokCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model, projectSystemPrompt: opts.projectSystemPrompt, memories: opts.memories })
     case 'openai': {
       if (!opts.apiKey) throw new Error('OpenAI API key not set')
-      return createOpenAiProvider({ apiKey: opts.apiKey, model: opts.model })
+      return createOpenAiProvider({ apiKey: opts.apiKey, model: opts.model, effortLevel: opts.effortLevel })
     }
     case 'codex-cli':
       return createCodexCliProvider({ cwd: opts.cwd, signal: opts.signal, model: opts.model, projectSystemPrompt: opts.projectSystemPrompt, memories: opts.memories })

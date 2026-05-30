@@ -5,6 +5,7 @@ import type { ChatProvider, ChatMessage, ChatEvent, ToolDefinition, ToolResult }
 interface GeminiOptions {
   apiKey: string
   model?: string
+  effortLevel?: 'quick' | 'standard' | 'deep'
   sdk?: { models: { generateContentStream: (opts: unknown) => Promise<AsyncIterable<unknown>> } }
 }
 
@@ -49,6 +50,7 @@ function partsForMessage(m: ChatMessage): Array<Record<string, unknown>> {
 export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
   const model = opts.model ?? 'gemini-3.5-flash'
   const client = opts.sdk ?? new GoogleGenAI({ apiKey: opts.apiKey })
+  const effortLevel = opts.effortLevel ?? 'standard'
 
   return {
     id: 'gemini',
@@ -74,6 +76,12 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
       }))
 
       const config: Record<string, unknown> = {}
+      // Thinking budget: quick=0 (disable), standard=default, deep=max
+      if (effortLevel === 'quick') {
+        config.thinkingConfig = { thinkingBudget: 0 }
+      } else if (effortLevel === 'deep') {
+        config.thinkingConfig = { thinkingBudget: 24576 }
+      }
       if (tools.length > 0) {
         config.tools = [{ functionDeclarations: tools.map(t => ({
           name: t.name,

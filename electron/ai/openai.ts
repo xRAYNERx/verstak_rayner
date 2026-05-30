@@ -12,13 +12,14 @@ export const OPENAI_MODELS = [
 
 const DEFAULT_MODEL = OPENAI_MODELS[0]
 
-export function createOpenAiProvider(opts: { apiKey: string; model?: string }): ChatProvider {
+export function createOpenAiProvider(opts: { apiKey: string; model?: string; effortLevel?: 'quick' | 'standard' | 'deep' }): ChatProvider {
   return createOpenAiCompatProvider({
     id: 'openai',
     name: 'ChatGPT',
     models: OPENAI_MODELS,
     defaultModel: DEFAULT_MODEL,
     apiKey: opts.apiKey,
-    model: opts.model
+    model: opts.model,
+    effortLevel: opts.effortLevel
   })
 }

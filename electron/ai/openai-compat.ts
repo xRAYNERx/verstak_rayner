@@ -10,6 +10,7 @@ export interface OpenAiCompatOptions {
   apiKey: string
   baseUrl?: string
   model?: string
+  effortLevel?: 'quick' | 'standard' | 'deep'
 }
 
 interface OpenAiContentPart {
@@ -79,6 +80,7 @@ function buildOpenAiMessages(messages: ChatMessage[]): OpenAI.Chat.ChatCompletio
 export function createOpenAiCompatProvider(opts: OpenAiCompatOptions): ChatProvider {
   const model = opts.model ?? opts.defaultModel
   const client = new OpenAI({ apiKey: opts.apiKey, baseURL: opts.baseUrl })
+  const effortLevel = opts.effortLevel ?? 'standard'
 
   return {
     id: opts.id,
@@ -101,12 +103,14 @@ export function createOpenAiCompatProvider(opts: OpenAiCompatOptions): ChatProvi
       // Accumulators for streaming tool calls (OpenAI sends incremental delta.tool_calls)
       const inProgress: Record<number, { id: string; name: string; args: string }> = {}
 
+      const maxTokens = effortLevel === 'quick' ? 2048 : effortLevel === 'deep' ? 16384 : 4096
+
       try {
         const stream = await client.chat.completions.create({
           model,
           messages: apiMessages,
           stream: true,
-          max_tokens: 4096,
+          max_tokens: maxTokens,
           stream_options: { include_usage: true },
           ...(apiTools ? { tools: apiTools } : {})
         })
