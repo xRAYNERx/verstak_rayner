@@ -593,6 +593,107 @@ const delegateTaskHandler: ToolHandler = {
 }
 
 // ============================================================================
+// delegate_parallel — мультиагент V2: параллельное выполнение N задач
+// ============================================================================
+
+const delegateParallelHandler: ToolHandler = {
+  mode: 'sequential',
+  async handle(call, ctx) {
+    try {
+      const tasks = call.args.tasks as Array<{ id: string; prompt: string; provider_id?: string; model?: string }> | undefined
+      if (!Array.isArray(tasks) || tasks.length === 0) {
+        return { id: call.id, name: call.name, result: '', error: 'delegate_parallel: tasks обязателен и не должен быть пустым' }
+      }
+      if (tasks.length > 5) {
+        return { id: call.id, name: call.name, result: '', error: 'delegate_parallel: максимум 5 параллельных задач' }
+      }
+
+      const { createProvider, PROVIDERS } = await import('../ai/registry')
+
+      ctx.sender.send('ai:event', {
+        id: ctx.sendId,
+        event: {
+          type: 'tool-activity',
+          callId: call.id,
+          name: 'delegate_parallel',
+          label: 'delegate_parallel',
+          detail: `${tasks.length} задач параллельно`,
+          status: 'ok'
+        }
+      })
+
+      const results = await Promise.allSettled(
+        tasks.map(async (task) => {
+          const providerId = task.provider_id ?? ctx.currentProviderId ?? 'gemini-api'
+          const descriptor = PROVIDERS[providerId as keyof typeof PROVIDERS]
+          if (!descriptor) {
+            throw new Error(`неизвестный provider ${providerId}`)
+          }
+          const apiKey = descriptor.secretKey ? ctx.getSecretForDelegate?.(descriptor.secretKey) ?? null : null
+          if (descriptor.secretKey && !apiKey) {
+            throw new Error(`нет API key для ${providerId}`)
+          }
+
+          // Per-task AbortController с таймаутом 60 секунд
+          const taskAc = new AbortController()
+          const timeoutId = setTimeout(() => taskAc.abort(), 60_000)
+          // Если родительский signal прерван — прерываем и подзадачу
+          const parentAbortHandler = () => taskAc.abort()
+          ctx.signal.addEventListener('abort', parentAbortHandler, { once: true })
+
+          try {
+            const provider = createProvider(providerId as keyof typeof PROVIDERS, {
+              apiKey,
+              model: task.model ?? descriptor.defaultModel,
+              cwd: ctx.projectPath,
+              signal: taskAc.signal
+            })
+            const messages = [
+              { role: 'system' as const, content: 'Ты — sub-agent. Выполни узкую задачу, ответь в 1-3 параграфа. Без лишних tools / markdown.' },
+              { role: 'user' as const, content: task.prompt }
+            ]
+            let collected = ''
+            for await (const event of provider.send(messages, [])) {
+              if (taskAc.signal.aborted) break
+              if (event.type === 'text' && typeof event.text === 'string') collected += event.text
+              else if (event.type === 'error') throw new Error(event.message)
+              else if (event.type === 'done') break
+            }
+            const trimmed = collected.trim()
+            if (!trimmed) throw new Error('sub-agent вернул пустой ответ')
+            return { id: task.id, result: trimmed }
+          } finally {
+            clearTimeout(timeoutId)
+            ctx.signal.removeEventListener('abort', parentAbortHandler)
+          }
+        })
+      )
+
+      const output = results.map((r, i) => {
+        const taskId = tasks[i].id
+        if (r.status === 'fulfilled') {
+          return `## ${taskId}\n${r.value.result}`
+        } else {
+          const msg = r.reason instanceof Error ? r.reason.message : String(r.reason)
+          return `## ${taskId}\n❌ Ошибка: ${msg}`
+        }
+      }).join('\n\n---\n\n')
+
+      const successCount = results.filter(r => r.status === 'fulfilled').length
+      try {
+        ctx.recordJournal(ctx.projectPath, 'note',
+          `🔀 delegate_parallel — ${successCount}/${tasks.length} успешно`,
+          tasks.map(t => t.id).join(', '))
+      } catch { /* journal не критично */ }
+
+      return { id: call.id, name: call.name, result: output }
+    } catch (err) {
+      return { id: call.id, name: call.name, result: '', error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+}
+
+// ============================================================================
 // Artifact handlers — generate_html / generate_docx
 // ============================================================================
 
@@ -974,6 +1075,7 @@ const HANDLER_REGISTRY: Record<string, ToolHandler> = {
   'generate_docx': generateDocxHandler,
   'render_chart': renderChartHandler,
   'delegate_task': delegateTaskHandler,
+  'delegate_parallel': delegateParallelHandler,
   'memory_save': memorySaveHandler,
   'memory_search': memorySearchHandler,
   // Core Memory (Hermes-style) — sequential, file-backed, no user confirmation

@@ -278,6 +278,30 @@ export const TOOL_DEFS: ToolDefinition[] = [
     }
   },
   {
+    name: 'delegate_parallel',
+    description: 'Запускает несколько подзадач параллельно на разных провайдерах. Каждая задача выполняется независимо, результаты возвращаются все вместе. Используй для: параллельного анализа кода, одновременного поиска в нескольких файлах, cross-verification результатов.',
+    parameters: {
+      type: 'object',
+      properties: {
+        tasks: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: 'Уникальный ID задачи для идентификации в результатах' },
+              prompt: { type: 'string', description: 'Текст задачи для субагента' },
+              provider_id: { type: 'string', description: 'Провайдер (опц. — по умолчанию текущий)' },
+              model: { type: 'string', description: 'Модель (опц.)' }
+            },
+            required: ['id', 'prompt']
+          },
+          description: 'Массив подзадач (2-5 штук)'
+        }
+      },
+      required: ['tasks']
+    }
+  },
+  {
     name: 'generate_html',
     description: 'Сохранить артефакт в формате HTML (КП, аудит, отчёт). Файл попадает в .verstak/artifacts/{YYYY-MM-DD}/ и открывается в preview pane. Используй для клиентских артефактов где важна визуальная структура.',
     parameters: {
