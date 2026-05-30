@@ -180,14 +180,15 @@ async function detectVerifyScripts(projectPath: string, pkg: ParsedPkg | null): 
     if (scripts.lint) hints.push('npm run lint')
     if (scripts.build) hints.push('npm run build')
   }
-  // tsconfig present → tsc --noEmit is a reasonable verify
+  // tsconfig present → tsc --noEmit is a reasonable verify; check_diagnostics tool доступен
   try {
     await readFile(join(projectPath, 'tsconfig.json'), 'utf8')
     if (!hints.some(h => h.includes('tsc') || h.includes('type-check'))) {
       hints.push('npx tsc --noEmit')
     }
+    hints.push('check_diagnostics (после правок .ts/.tsx файлов используй этот tool для проверки типов)')
   } catch { /* no tsconfig */ }
-  return hints.slice(0, 4)  // cap to keep it short
+  return hints.slice(0, 5)  // cap to keep it short
 }
 
 /**

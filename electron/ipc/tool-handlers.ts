@@ -24,9 +24,15 @@
  */
 
 import { randomUUID } from 'crypto'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
+import { existsSync } from 'fs'
+import { join } from 'path'
 import type { Attachment, ToolCall, ToolResult } from '../ai/types'
 import { applySearchReplaceBlocks, type FileTools } from '../ai/tools'
 import { decide, blockReason, type AgentMode } from '../ai/mode-policy'
+
+const execFileAsync = promisify(execFile)
 
 // ============================================================================
 // Types
@@ -751,6 +757,87 @@ const memorySearchHandler: ToolHandler = {
 }
 
 // ============================================================================
+// check_diagnostics — tsc --noEmit, возвращает структурированный список ошибок
+// ============================================================================
+
+/**
+ * Parse a single line of `tsc --noEmit --pretty false` output.
+ * Format: path(line,col): error TSxxxx: message
+ * Returns null if the line doesn't match.
+ */
+function parseTscLine(line: string): { path: string; line: number; col: number; code: string; message: string } | null {
+  // Windows paths: C:\...\foo.ts(10,5): error TS2345: ...
+  // Unix paths:    src/foo.ts(10,5): error TS2345: ...
+  const m = /^(.+?)\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.+)$/.exec(line.trim())
+  if (!m) return null
+  return { path: m[1], line: parseInt(m[2], 10), col: parseInt(m[3], 10), code: m[4], message: m[5] }
+}
+
+const checkDiagnosticsHandler: ToolHandler = {
+  mode: 'parallel-read',
+  async handle(call, ctx) {
+    const fileFilter = call.args.file ? String(call.args.file) : null
+
+    // Проверяем наличие tsconfig.json — если нет, возвращаем понятное сообщение
+    const tsconfigPath = join(ctx.projectPath, 'tsconfig.json')
+    if (!existsSync(tsconfigPath)) {
+      emitActivity(ctx, call, 'ok', 'check_diagnostics', 'нет tsconfig.json')
+      return { id: call.id, name: call.name, result: 'tsconfig.json не найден — проект не TypeScript или tsconfig в нестандартном месте.' }
+    }
+
+    // Ищем tsc из node_modules проекта, чтобы не требовать глобальной установки
+    const localTsc = join(ctx.projectPath, 'node_modules', '.bin', process.platform === 'win32' ? 'tsc.cmd' : 'tsc')
+    const tscBin = existsSync(localTsc) ? localTsc : 'npx'
+    const tscArgs = tscBin === 'npx'
+      ? ['tsc', '--noEmit', '--pretty', 'false']
+      : ['--noEmit', '--pretty', 'false']
+
+    let stdout = ''
+    let stderr = ''
+    try {
+      const res = await execFileAsync(tscBin, tscArgs, {
+        cwd: ctx.projectPath,
+        timeout: 30_000,
+        windowsHide: true,
+        maxBuffer: 2 * 1024 * 1024
+      })
+      stdout = res.stdout
+      stderr = res.stderr
+    } catch (err) {
+      // tsc exits with non-zero when there are errors — that's expected.
+      // We still want to parse the output.
+      const e = err as { stdout?: string; stderr?: string; code?: number; message?: string }
+      stdout = e.stdout ?? ''
+      stderr = e.stderr ?? ''
+      // If it's a real spawn error (ENOENT / EACCES), stderr will be empty and message will describe it
+      if (!stdout && !stderr && e.message) {
+        emitActivity(ctx, call, 'error', 'check_diagnostics', e.message)
+        return { id: call.id, name: call.name, result: '', error: `Не удалось запустить tsc: ${e.message}` }
+      }
+    }
+
+    const allOutput = (stdout + '\n' + stderr).split('\n')
+    const errors = allOutput
+      .map(parseTscLine)
+      .filter((e): e is NonNullable<typeof e> => e !== null)
+
+    const filtered = fileFilter
+      ? errors.filter(e => e.path.replace(/\\/g, '/').includes(fileFilter.replace(/\\/g, '/')))
+      : errors
+
+    emitActivity(ctx, call, 'ok', 'check_diagnostics', `${filtered.length} ошибок${fileFilter ? ` в ${fileFilter}` : ''}`)
+
+    if (filtered.length === 0) {
+      return { id: call.id, name: call.name, result: '✅ Нет ошибок TypeScript.' }
+    }
+
+    const lines = filtered.map(e => `${e.path}:${e.line}:${e.col} — ${e.code}: ${e.message}`)
+    const header = `Found ${filtered.length} error${filtered.length === 1 ? '' : 's'}:`
+    return { id: call.id, name: call.name, result: `${header}\n\n${lines.join('\n')}` }
+  }
+}
+
+// ============================================================================
 // Registry — single source of truth for tool dispatch
 // ============================================================================
 
@@ -773,7 +860,9 @@ const HANDLER_REGISTRY: Record<string, ToolHandler> = {
   'render_chart': renderChartHandler,
   'delegate_task': delegateTaskHandler,
   'memory_save': memorySaveHandler,
-  'memory_search': memorySearchHandler
+  'memory_search': memorySearchHandler,
+  // Diagnostics — parallel-read, no user confirmation needed
+  'check_diagnostics': checkDiagnosticsHandler
 }
 
 /**

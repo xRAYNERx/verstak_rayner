@@ -316,6 +316,17 @@ export const TOOL_DEFS: ToolDefinition[] = [
     }
   },
   {
+    name: 'check_diagnostics',
+    description: 'Запускает проверку типов TypeScript (tsc --noEmit) на проекте и возвращает список ошибок. Используй после правок файлов чтобы убедиться что нет регрессий.',
+    parameters: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', description: 'Опциональный путь к файлу — если задан, фильтрует вывод только по этому файлу' }
+      },
+      required: []
+    }
+  },
+  {
     name: 'generate_docx',
     description: 'Сохранить артефакт в формате Word (.docx). Файл попадает в .verstak/artifacts/{YYYY-MM-DD}/. Принимает структуру секций — каждая с heading и параграфами.',
     parameters: {
