@@ -76,6 +76,7 @@ export type ChatEvent =
   | { type: 'artifact-created'; callId: string; kind: 'html' | 'docx'; filename: string; path: string; sizeBytes: number }
   | { type: 'usage'; usage: UsageDelta }
   | { type: 'info'; text: string }
+  | { type: 'cross-verify'; result: string; provider: string; ok: boolean }
   | { type: 'done' }
   | { type: 'error'; message: string }
 
@@ -107,7 +108,7 @@ declare global {
         sendWithOverrides: (
           messages: ChatMessage[],
           projectPath: string | null,
-          overrides: { providerId?: string; model?: string | null; noTools?: boolean; systemPrompt?: string; useReviewerPrompt?: boolean },
+          overrides: { providerId?: string; model?: string | null; noTools?: boolean; systemPrompt?: string; useReviewerPrompt?: boolean; effortLevel?: 'quick' | 'standard' | 'deep' },
           chatId?: string
         ) => Promise<number>
         resolveWrite: (callId: string, accept: boolean, sendId?: number) => Promise<void>

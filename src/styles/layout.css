@@ -1648,6 +1648,34 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 .gg-mode-icon { font-size: 12px; }
 .gg-mode-label { white-space: nowrap; }
 
+/* ─── Effort toggle (quick / standard / deep) ─── */
+.gg-effort-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-raised);
+  border-radius: 6px;
+  padding: 2px;
+  border: 1px solid var(--border-subtle);
+}
+.gg-effort-toggle button {
+  padding: 3px 7px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  opacity: 0.45;
+  transition: opacity 100ms, background 100ms;
+  line-height: 1;
+}
+.gg-effort-toggle button.active {
+  background: var(--accent-muted);
+  opacity: 1;
+}
+.gg-effort-toggle button:hover:not(.active) {
+  opacity: 0.75;
+}
+
 .gg-usage-pill {
   display: inline-flex; align-items: center; gap: 4px;
   background: transparent;
@@ -2941,6 +2969,53 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 .gg-review-panel-hint {
   color: var(--text-tertiary);
   font-size: var(--text-xs);
+}
+
+/* ======================================================================
+   Auto Cross-Verify pill — показывается под ответом агента когда другой
+   провайдер автоматически проверил изменённые файлы.
+   ====================================================================== */
+.gg-cross-verify {
+  margin: 4px 0 8px 48px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: all 100ms;
+  display: inline-block;
+  max-width: 100%;
+}
+.gg-cross-verify.is-ok {
+  background: rgba(72, 187, 120, 0.08);
+  border: 1px solid rgba(72, 187, 120, 0.2);
+}
+.gg-cross-verify.is-warn {
+  background: rgba(236, 201, 75, 0.08);
+  border: 1px solid rgba(236, 201, 75, 0.2);
+}
+.gg-cross-verify:hover {
+  filter: brightness(1.08);
+}
+.gg-cv-badge {
+  font-weight: 500;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+.gg-cv-chevron {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-left: 2px;
+}
+.gg-cv-detail {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  max-width: 600px;
 }
 
 /* ======================================================================

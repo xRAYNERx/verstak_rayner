@@ -81,6 +81,8 @@ export type ChatEvent =
   | { type: 'usage'; usage: UsageDelta }
   /** Информационное сообщение для UI (тост). Не блокирует сессию. */
   | { type: 'info'; text: string }
+  /** Результат авто-кросс-верификации: другой провайдер просмотрел изменённые файлы. */
+  | { type: 'cross-verify'; result: string; provider: string; ok: boolean }
   | { type: 'done' }
   | { type: 'error'; message: string }
 

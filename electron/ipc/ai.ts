@@ -11,6 +11,7 @@ import { createCostGuard } from '../ai/cost-guard'
 import type { AgentMode } from '../ai/mode-policy'
 import type { ChatMessage, ToolCall, ToolResult, ChatProvider, Attachment } from '../ai/types'
 import { lookupHandler, type ToolContext, type TaggedSender as HandlerTaggedSender } from './tool-handlers'
+import { pickReviewProvider, buildCrossVerifyPrompt, runCrossVerify, getConfiguredApiProviders, type TurnChange } from '../ai/cross-verify'
 
 export type { ProviderId } from '../ai/registry'
 
@@ -104,6 +105,44 @@ function scopedKey(sendId: number, callId: string): string {
   return `${sendId}::${callId}`
 }
 
+/**
+ * Fire-and-forget: запускаем кросс-верификацию асинхронно после done.
+ * Никогда не бросает — любые ошибки логируем и тихо игнорируем.
+ * Результат приходит как cross-verify event ПОСЛЕ done основного ответа.
+ */
+function fireCrossVerify(
+  sender: TaggedSender,
+  sendId: number,
+  changes: TurnChange[],
+  currentProviderId: ProviderId | undefined,
+  getSecret: ((key: string) => string | null) | undefined
+): void {
+  if (!changes.length) return
+  if (!currentProviderId) return
+  if (!getSecret) return
+  // Проверяем настройку cross_verify (по умолчанию включена)
+  if (getSecret('cross_verify') === 'false') return
+
+  // Асинхронно, не блокируем
+  void (async () => {
+    try {
+      const configured = getConfiguredApiProviders(getSecret)
+      const reviewProviderId = pickReviewProvider(currentProviderId, configured)
+      if (!reviewProviderId) return  // только 1 провайдер — пропускаем
+
+      const prompt = buildCrossVerifyPrompt(changes)
+      const cvResult = await runCrossVerify(reviewProviderId, prompt, getSecret)
+
+      sender.send('ai:event', {
+        id: sendId,
+        event: { type: 'cross-verify', result: cvResult.result, provider: cvResult.provider, ok: cvResult.ok }
+      })
+    } catch (err) {
+      console.warn('[cross-verify] unexpected error:', err instanceof Error ? err.message : err)
+    }
+  })()
+}
+
 export function registerAiIpc(deps: AiDeps): void {
   /**
    * Optional overrides for ai:send. Used by Explicit Review feature: the
@@ -124,6 +163,8 @@ export function registerAiIpc(deps: AiDeps): void {
      *  so it sends this flag instead of the full string. Takes precedence over
      *  systemPrompt if both are set. */
     useReviewerPrompt?: boolean
+    /** Уровень усилий: quick / standard / deep. Влияет на max_tokens и extended thinking. */
+    effortLevel?: 'quick' | 'standard' | 'deep'
   }
 
   ipcMain.handle('ai:send', async (e, messages: ChatMessage[], projectPath: string | null, budget?: number, overrides?: AiSendOverrides, chatId?: string) => {
@@ -271,7 +312,8 @@ export function registerAiIpc(deps: AiDeps): void {
         customModels,
         yandexFolderId,
         gigachatClientSecret,
-        memories: descriptor.transport === 'CLI' ? memories : undefined
+        memories: descriptor.transport === 'CLI' ? memories : undefined,
+        effortLevel: overrides?.effortLevel
       })
     } catch (err) {
       taggedSender.send('ai:event', {
@@ -592,6 +634,8 @@ async function runApiConversation(
   // Tally tool activity over the whole session so we can write one journal summary at the end.
   const filesTouched = new Set<string>()
   const commandsRun: string[] = []
+  // Cross-verify: накапливаем изменённые файлы с контентом для ревью другим провайдером.
+  const sessionChanges: TurnChange[] = []
   let lastAssistantText = ''
   // Attachments collected from browser_screenshot etc. — flushed into the
   // next user message so vision-capable providers see them.
@@ -680,6 +724,9 @@ async function runApiConversation(
         if (toolCalls.length === 0) {
           exitReason = 'completed'
           sender.send('ai:event', { id: sendId, event })
+          // Cross-verify: запускаем асинхронно ПОСЛЕ отправки done,
+          // чтобы не блокировать UI. Результат придёт отдельным событием.
+          fireCrossVerify(sender, sendId, sessionChanges, providerId, getSecretForDelegate)
           return
         }
       } else if (event.type === 'error') {
@@ -691,6 +738,8 @@ async function runApiConversation(
     if (toolCalls.length === 0) {
       exitReason = 'completed'
       sender.send('ai:event', { id: sendId, event: { type: 'done' } })
+      // Cross-verify: запускаем асинхронно ПОСЛЕ отправки done.
+      fireCrossVerify(sender, sendId, sessionChanges, providerId, getSecretForDelegate)
       return
     }
 
@@ -795,7 +844,14 @@ async function runApiConversation(
       if (!result) continue
       if ((call.name === 'write_file' || call.name === 'apply_patch') && !result.error) {
         const p = String(call.args.path ?? '')
-        if (p) filesTouched.add(p)
+        if (p) {
+          filesTouched.add(p)
+          // Track content for cross-verify (write_file has 'content', apply_patch has 'patch')
+          const content = String(call.args.content ?? call.args.patch ?? '')
+          if (content && sessionChanges.length < 5) {
+            sessionChanges.push({ file: p, type: call.name === 'write_file' ? 'write' : 'patch', content })
+          }
+        }
         acceptedWritesThisTurn++
       } else if (call.name === 'run_command' && !result.error) {
         const cmd = String(call.args.command ?? '')
