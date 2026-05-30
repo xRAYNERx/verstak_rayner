@@ -219,6 +219,10 @@ declare global {
         list(projectPath: string): Promise<Memory[]>
         delete(id: string): Promise<boolean>
       }
+      coreMemory: {
+        load(projectPath: string): Promise<{ memory: string; user: string }>
+        save(projectPath: string, block: string, content: string): Promise<{ ok: boolean }>
+      }
       verify: {
         exec: (command: string) => Promise<{ exitCode: number; stdout: string; stderr: string }>
       }

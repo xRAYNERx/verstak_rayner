@@ -274,6 +274,10 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [customOpenaiModels, setCustomOpenaiModels] = useState('')
   const [memories, setMemories] = useState<Memory[]>([])
   const [memoriesPath, setMemoriesPath] = useState<string | null>(null)
+  // Core memory — MEMORY.md и USER.md
+  const [coreMemoryText, setCoreMemoryText] = useState('')
+  const [coreUserText, setCoreUserText] = useState('')
+  const [coreMemorySaved, setCoreMemorySaved] = useState(false)
   const { theme, setTheme } = useTheme()
 
   useEffect(() => {
@@ -363,17 +367,21 @@ export function Settings({ onClose }: { onClose: () => void }) {
     if (tab !== 'memory') return
     void (async () => {
       // Приоритет — активный проект из store; fallback на lastOpenedAt
-      if (activeProjectPath) {
-        setMemoriesPath(activeProjectPath)
-        void loadMemories(activeProjectPath)
-        return
+      let path = activeProjectPath
+      if (!path) {
+        const projects = await window.api.projects.list()
+        if (projects.length === 0) return
+        const sorted = [...projects].sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)
+        path = sorted[0].path
       }
-      const projects = await window.api.projects.list()
-      if (projects.length === 0) return
-      const sorted = [...projects].sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)
-      const path = sorted[0].path
       setMemoriesPath(path)
       void loadMemories(path)
+      // Загружаем core memory
+      try {
+        const cm = await window.api.coreMemory.load(path)
+        setCoreMemoryText(cm.memory)
+        setCoreUserText(cm.user)
+      } catch { /* ignore */ }
     })()
   }, [tab, activeProjectPath, loadMemories])
 
@@ -849,6 +857,67 @@ export function Settings({ onClose }: { onClose: () => void }) {
               Проект: <code>{memoriesPath}</code>
             </div>
           )}
+
+          {/* ── Core Memory ── */}
+          <div className="gg-core-memory-section">
+            <div className="gg-core-memory-header">
+              Core Memory
+              <span className="gg-settings-hint" style={{ marginLeft: 8, display: 'inline', fontStyle: 'normal' }}>
+                (всегда в контексте агента)
+              </span>
+            </div>
+
+            <label className="gg-core-memory-label">О проекте (MEMORY.md)</label>
+            <div className="gg-core-memory-field">
+              <textarea
+                className="gg-input gg-core-memory-textarea"
+                value={coreMemoryText}
+                onChange={e => setCoreMemoryText(e.target.value)}
+                maxLength={2000}
+                rows={6}
+                placeholder="Агент заполнит автоматически или напиши сам: конвенции, архитектура, важные решения..."
+                spellCheck={false}
+              />
+              <span className={`gg-char-count ${coreMemoryText.length > 1900 ? 'is-warn' : ''}`}>
+                {coreMemoryText.length}/2000
+              </span>
+            </div>
+
+            <label className="gg-core-memory-label">О пользователе (USER.md)</label>
+            <div className="gg-core-memory-field">
+              <textarea
+                className="gg-input gg-core-memory-textarea"
+                value={coreUserText}
+                onChange={e => setCoreUserText(e.target.value)}
+                maxLength={1500}
+                rows={4}
+                placeholder="Предпочтения, стиль общения, правила взаимодействия..."
+                spellCheck={false}
+              />
+              <span className={`gg-char-count ${coreUserText.length > 1400 ? 'is-warn' : ''}`}>
+                {coreUserText.length}/1500
+              </span>
+            </div>
+
+            <div className="gg-core-memory-actions">
+              <button
+                type="button"
+                className="gg-btn gg-btn-primary"
+                disabled={!memoriesPath}
+                onClick={async () => {
+                  if (!memoriesPath) return
+                  await window.api.coreMemory.save(memoriesPath, 'memory', coreMemoryText)
+                  await window.api.coreMemory.save(memoriesPath, 'user', coreUserText)
+                  setCoreMemorySaved(true)
+                  setTimeout(() => setCoreMemorySaved(false), 1500)
+                }}
+              >
+                {coreMemorySaved ? '✓ Сохранено' : 'Сохранить Core Memory'}
+              </button>
+            </div>
+          </div>
+
+          <div className="gg-settings-section-title" style={{ marginTop: 20 }}>Архивная память</div>
           {memories.length === 0 ? (
             <div className="gg-text-tertiary" style={{ padding: '18px 0', fontSize: 'var(--text-sm)' }}>
               Нет сохранённых воспоминаний для этого проекта

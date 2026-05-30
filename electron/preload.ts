@@ -136,6 +136,11 @@ contextBridge.exposeInMainWorld('api', {
     delete: (id: string) =>
       ipcRenderer.invoke('memory:delete', { id })
   },
+  coreMemory: {
+    load: (projectPath: string) => ipcRenderer.invoke('core-memory:load', projectPath),
+    save: (projectPath: string, block: string, content: string) =>
+      ipcRenderer.invoke('core-memory:save', { projectPath, block, content })
+  },
   verify: {
     exec: (command: string) => ipcRenderer.invoke('verify:exec', command) as Promise<{ exitCode: number; stdout: string; stderr: string }>
   },

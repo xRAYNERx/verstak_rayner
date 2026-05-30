@@ -3467,3 +3467,53 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   display: flex; gap: 8px;
 }
 
+/* ─── Core Memory section (Settings → Память) ─── */
+.gg-core-memory-section {
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 14px 16px 16px;
+  margin-bottom: 20px;
+}
+.gg-core-memory-header {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+.gg-core-memory-label {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  margin-top: 10px;
+}
+.gg-core-memory-label:first-of-type { margin-top: 0; }
+.gg-core-memory-field {
+  position: relative;
+}
+.gg-core-memory-textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+.gg-char-count {
+  display: block;
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 3px;
+  font-family: var(--font-mono);
+}
+.gg-char-count.is-warn {
+  color: var(--warning, #f59e0b);
+}
+.gg-core-memory-actions {
+  margin-top: 14px;
+  display: flex;
+  gap: 8px;
+}
+
