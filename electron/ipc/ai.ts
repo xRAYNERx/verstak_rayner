@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { createFileTools, TOOL_DEFS } from '../ai/tools'
 import { createProvider, PROVIDERS, type ProviderId } from '../ai/registry'
 import { prepareSystemContext } from '../ai/compose-system'
+import { loadCoreMemory } from '../ai/core-memory'
 import { REVIEWER_SYSTEM_PROMPT } from '../ai/review-prompt'
 import { compactToolHistory, shouldAutoCompact, buildCompactSummaryPrompt, createCompactedHistory } from '../ai/compact-history'
 import { estimateTokens } from '../ai/context-limits'
@@ -195,12 +196,15 @@ export function registerAiIpc(deps: AiDeps): void {
       // (UI шестерёнки в Project Rail). Хранится в settings ключом
       // `system_prompt_${path}`. Если пусто — игнорируется.
       const projectSystemPrompt = projectPath ? deps.getSecret(`system_prompt_${projectPath}`) : null
+      // Core memory загружается при каждом turn'е — MEMORY.md + USER.md всегда актуальны.
+      const coreMemory = projectPath ? loadCoreMemory(projectPath) : { memory: '', user: '' }
       const composed = await prepareSystemContext({
         projectPath,
         messages,
         recentWrites: projectPath ? deps.recentWrites(projectPath, 8) : [],
         projectSystemPrompt,
-        memories
+        memories,
+        coreMemory
       })
       messagesWithSystem = [{ role: 'system', content: composed.system }, ...messages]
     }

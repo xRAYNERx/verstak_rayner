@@ -339,6 +339,43 @@ export const TOOL_DEFS: ToolDefinition[] = [
     }
   },
   {
+    name: 'core_memory_append',
+    description: 'Добавляет текст в core memory (MEMORY.md или USER.md). Core memory всегда видна агенту в system prompt. Используй для записи важных фактов о проекте или предпочтениях пользователя.',
+    parameters: {
+      type: 'object',
+      properties: {
+        block: { type: 'string', enum: ['memory', 'user'], description: 'memory = о проекте (MEMORY.md), user = о пользователе (USER.md)' },
+        content: { type: 'string', description: 'Текст для добавления в конец блока' }
+      },
+      required: ['block', 'content']
+    }
+  },
+  {
+    name: 'core_memory_replace',
+    description: 'Заменяет фрагмент в core memory. Используй когда факт устарел или нужно обновить информацию.',
+    parameters: {
+      type: 'object',
+      properties: {
+        block: { type: 'string', enum: ['memory', 'user'], description: 'memory = о проекте, user = о пользователе' },
+        old_text: { type: 'string', description: 'Существующий фрагмент для замены (должен точно совпадать)' },
+        new_text: { type: 'string', description: 'Новый текст' }
+      },
+      required: ['block', 'old_text', 'new_text']
+    }
+  },
+  {
+    name: 'core_memory_remove',
+    description: 'Удаляет фрагмент из core memory. Используй когда информация больше не актуальна.',
+    parameters: {
+      type: 'object',
+      properties: {
+        block: { type: 'string', enum: ['memory', 'user'], description: 'memory = о проекте, user = о пользователе' },
+        text: { type: 'string', description: 'Текст для удаления (должен точно совпадать)' }
+      },
+      required: ['block', 'text']
+    }
+  },
+  {
     name: 'generate_docx',
     description: 'Сохранить артефакт в формате Word (.docx). Файл попадает в .verstak/artifacts/{YYYY-MM-DD}/. Принимает структуру секций — каждая с heading и параграфами.',
     parameters: {

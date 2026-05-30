@@ -29,6 +29,12 @@ interface MemoryEntry {
   tags: string[]
 }
 
+/** Core memory blocks — всегда в system prompt (загружаются при каждом turn'е). */
+interface CoreMemoryBlocks {
+  memory: string
+  user: string
+}
+
 const execFileAsync = promisify(execFile)
 
 export interface ContextPackInput {
@@ -43,6 +49,9 @@ export interface ContextPackInput {
   /** Топ-5 воспоминаний проекта из долговременной памяти — инжектятся как
    *  информационный блок. Пустой массив или undefined = секция не добавляется. */
   memories?: MemoryEntry[]
+  /** Core memory (Hermes-style) — всегда в system prompt, обновляется агентом через tools.
+   *  Инжектируется ДО архивной памяти, т.к. всегда релевантна. */
+  coreMemory?: CoreMemoryBlocks
 }
 
 /**
@@ -101,7 +110,23 @@ export async function buildContextPack(input: ContextPackInput): Promise<string>
     /* map build failed — skip silently */
   }
 
-  // 5. Долговременная память — топ-N воспоминаний проекта. Каждое — одна строка,
+  // 5. Core Memory (Hermes-style) — всегда в system prompt, загружается при каждом turn'е.
+  //    MEMORY.md = заметки о проекте, USER.md = заметки о пользователе.
+  //    Инжектируется перед архивной памятью — она всегда актуальна, не нужно искать.
+  let coreMemorySection = ''
+  if (input.coreMemory) {
+    const { memory, user } = input.coreMemory
+    const hasMemory = memory.trim().length > 0
+    const hasUser = user.trim().length > 0
+    if (hasMemory || hasUser) {
+      const parts2: string[] = []
+      if (hasMemory) parts2.push(`### О проекте (MEMORY.md)\n${memory.trim()}`)
+      if (hasUser) parts2.push(`### О пользователе (USER.md)\n${user.trim()}`)
+      coreMemorySection = `\n\n## Core Memory (обновляется агентом)\n\n${parts2.join('\n\n')}`
+    }
+  }
+
+  // 6. Долговременная память — топ-N воспоминаний проекта. Каждое — одна строка,
   //    только информационно, не инструкция. Не добавляем пустую секцию.
   let memorySection = ''
   if (input.memories && input.memories.length > 0) {
@@ -112,12 +137,12 @@ export async function buildContextPack(input: ContextPackInput): Promise<string>
     memorySection = `\n\n## Память агента (из прошлых сессий)\n\n${lines.join('\n')}`
   }
 
-  if (parts.length === 0 && !mapBlock && !memorySection) return ''
+  if (parts.length === 0 && !mapBlock && !coreMemorySection && !memorySection) return ''
 
   const meta = parts.length > 0 ? parts.join('\n') : '(no git, no recent writes)'
   const mapSection = mapBlock ? `\n\nproject_map (compact):\n${mapBlock}` : ''
   return `<context_pack generated="auto" project="${escapeAttr(projectPath)}">
-${meta}${mapSection}${memorySection}
+${meta}${mapSection}${coreMemorySection}${memorySection}
 </context_pack>`
 }
 

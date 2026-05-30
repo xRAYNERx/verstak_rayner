@@ -20,6 +20,7 @@ import { loadUserLayer, type UserLayer } from './user-layer'
 import { buildContextPack } from './context-pack'
 import { composeSystemPrompt, type ComposedPrompt } from './compose-prompt'
 import type { ChatMessage } from './types'
+import type { CoreMemoryBlocks } from './core-memory'
 
 export interface PrepareSystemInput {
   projectPath: string | null
@@ -34,6 +35,9 @@ export interface PrepareSystemInput {
   /** Топ-5 воспоминаний проекта — передаются в context-pack для инжекции
    *  в system prompt. Опционально: если не передано, секция не появляется. */
   memories?: Array<{ type: string; content: string; tags: string[] }>
+  /** Core memory (Hermes-style) — MEMORY.md + USER.md, всегда в system prompt.
+   *  Загружается при каждом turn'е в отличие от архивной памяти. */
+  coreMemory?: CoreMemoryBlocks
 }
 
 export interface PreparedParts {
@@ -60,7 +64,7 @@ export async function prepareSystemContext(input: PrepareSystemInput): Promise<C
  * developed system prompt — we don't want to layer ours on top.
  */
 export async function prepareParts(input: PrepareSystemInput): Promise<PreparedParts> {
-  const { projectPath, messages, recentWrites, projectSystemPrompt, memories } = input
+  const { projectPath, messages, recentWrites, projectSystemPrompt, memories, coreMemory } = input
   let userLayer = projectPath ? await loadUserLayer(projectPath) : { path: null, content: '' }
 
   // Project Settings — пользователь может задать промпт через UI шестерёнки
@@ -76,6 +80,13 @@ export async function prepareParts(input: PrepareSystemInput): Promise<PreparedP
     }
   }
 
+  // Подсказка по core memory tools — добавляется один раз к userLayer,
+  // чтобы агент знал как обновлять MEMORY.md / USER.md.
+  if (userLayer.content !== undefined) {
+    const hint = '\n\n<!-- core_memory_hint -->\nИспользуй core_memory_append/replace/remove чтобы обновлять свою память о проекте (MEMORY.md) и пользователе (USER.md). Core memory всегда видна — не нужно искать, она автоматически в контексте.'
+    userLayer = { path: userLayer.path, content: userLayer.content + hint }
+  }
+
   let contextPack = ''
   if (projectPath) {
     const lastUser = messages.filter(m => m.role === 'user').at(-1)
@@ -86,7 +97,8 @@ export async function prepareParts(input: PrepareSystemInput): Promise<PreparedP
         recentWrites,
         latestUserMessage: lastUser?.content ?? '',
         isFirstTurn,
-        memories
+        memories,
+        coreMemory
       })
     } catch (err) {
       // Visible failure — previously this was silent and made debugging hard.
