@@ -9,7 +9,7 @@ import { buildCatalog, connectionStatus, type ConnectionStatus } from '../lib/mo
 import {
   IconClaude, Icon1C, IconGoogleSheets, IconTelegram,
   IconSSH, IconBitrix, IconYandexDirect, IconYandexDisk,
-  IconSkillsServer, IconPlug, IconHTTP
+  IconSkillsServer, IconPlug, IconHTTP, IconGitHub
 } from './ConnectorIcons'
 
 interface ProviderConfig {
@@ -264,6 +264,7 @@ const CONNECTORS: ConnectorDef[] = [
   { id: 'ydirect', name: 'Яндекс.Директ', description: 'Рекламные кампании и отчёты', icon: IconYandexDirect, configuredKey: 'yandex_direct_token' },
   { id: 'ydisk', name: 'Яндекс.Диск', description: 'Файлы и шеринг артефактов', icon: IconYandexDisk, configuredKey: 'yandex_disk_token' },
   { id: 'skills-server', name: 'Сервер скиллов', description: 'Удалённые AI-скиллы', icon: IconSkillsServer, configuredKey: 'skills_server_base' },
+  { id: 'github', name: 'GitHub', description: 'Репозитории, issues, PR, code search', icon: IconGitHub, configuredKey: 'github_token' },
 ]
 
 export function Settings({ onClose }: { onClose: () => void }) {
@@ -293,6 +294,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [skillsServerBase, setSkillsServerBase] = useState('')
   const [claudeOauthToken, setClaudeOauthToken] = useState('')
   const [yDiskToken, setYDiskToken] = useState('')
+  const [githubToken, setGithubToken] = useState('')
   const [costCap, setCostCap] = useState('')
   const [configuredConnectors, setConfiguredConnectors] = useState<Set<string>>(new Set())
   const [openConnector, setOpenConnector] = useState<string | null>(null)
@@ -364,6 +366,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
       setSkillsServerBase((await window.api.settings.getKey('skills_server_base')) ?? '')
       setClaudeOauthToken((await window.api.settings.getKey('claude_code_oauth_token')) ?? '')
       setYDiskToken((await window.api.settings.getKey('yandex_disk_token')) ?? '')
+      setGithubToken((await window.api.settings.getKey('github_token')) ?? '')
       setCostCap((await window.api.settings.getKey('cost_cap_usd_per_session')) ?? '')
       setCustomOpenaiBaseUrl((await window.api.settings.getKey('custom_openai_baseurl')) ?? '')
       setCustomOpenaiModels((await window.api.settings.getKey('custom_openai_models')) ?? '')
@@ -457,6 +460,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
     await window.api.settings.setKey('skills_server_base', skillsServerBase)
     await window.api.settings.setKey('claude_code_oauth_token', claudeOauthToken)
     await window.api.settings.setKey('yandex_disk_token', yDiskToken)
+    await window.api.settings.setKey('github_token', githubToken)
     await window.api.settings.setKey('cost_cap_usd_per_session', costCap)
     await window.api.settings.setKey('enabled_models', JSON.stringify([...enabledModels]))
     await window.api.settings.setKey('custom_openai_baseurl', customOpenaiBaseUrl)
@@ -731,6 +735,27 @@ export function Settings({ onClose }: { onClose: () => void }) {
             Сервер должен предоставлять <code>GET /api/skills</code> возвращающий
             <code>{`{skills: [{id, raw, sourceRef}]}`}</code>. Если недоступен — используются built-in
             (bos-sales / bos-mkt / client-cycle) + локальные из ~/.verstak/skills/.
+          </div>
+        </>
+      )
+      case 'github': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Personal Access Token</label>
+            <input
+              className="gg-input"
+              type="password"
+              value={githubToken}
+              onChange={e => setGithubToken(e.target.value)}
+              placeholder="ghp_... (Settings → Developer settings → Personal access tokens)"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="gg-settings-hint">
+            Создать: GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens.
+            Нужны scopes: <code>repo</code>, <code>read:org</code>. AI вызывает <code>connector_query</code> с{' '}
+            <code>id="github"</code> и <code>op="list_repos"</code> / <code>"list_issues"</code> / etc.
+            Хранится зашифрованным через safeStorage.
           </div>
         </>
       )
