@@ -1,9 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { cleanGrokOutput } from '../../electron/ai/grok-cli'
 
-// Все примеры взяты с реального экрана Павла (2026-05-23) — Grok-4 в
-// Heavy-режиме сливает свои мысли в text-стрим вместе с финальным ответом.
-// Парсер должен отделить чистый русский ответ от английского reasoning.
+// Grok-4 в Heavy-режиме сливает свои мысли в text-стрим вместе с финальным
+// ответом. Парсер должен отделить чистый русский ответ от английского reasoning.
 
 describe('cleanGrokOutput — real Grok-4 leak patterns', () => {
   it('<answer>…</answer> wrapper: берём содержимое тега, остальное в reasoning', () => {

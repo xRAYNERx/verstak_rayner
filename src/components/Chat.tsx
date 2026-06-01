@@ -566,8 +566,8 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
       : text
     // Context loaders: если активен скилл с frontmatter context_loaders —
     // запускаем их и подмешиваем результат в content user-message ПЕРЕД
-    // отправкой. Это делает скиллы реально мощными — bos-pilot получает
-    // дату/день, client-cycle получает карточку клиента, и т.п.
+    // отправкой. Это делает скиллы реально мощными — скилл может подгрузить
+    // нужные данные (карточку, отчёт, контекст) автоматически.
     let enrichedText = text
     const activeSkillForLoad = useSkillsStore.getState().activeSkillId
       ? useSkillsStore.getState().skills.find(s => s.id === useSkillsStore.getState().activeSkillId)

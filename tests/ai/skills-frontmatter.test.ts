@@ -10,17 +10,17 @@ describe('parseSkillDoc', () => {
 
   it('парсит простые scalar поля', () => {
     const raw = `---
-id: bos-sales
-name: Продажи агентства
-icon: "💼"
+id: code-review
+name: Code Review
+icon: "🔍"
 default_provider: claude
 ---
 
 Body here.`
     const doc = parseSkillDoc(raw)
-    expect(doc.frontmatter.id).toBe('bos-sales')
-    expect(doc.frontmatter.name).toBe('Продажи агентства')
-    expect(doc.frontmatter.icon).toBe('💼')
+    expect(doc.frontmatter.id).toBe('code-review')
+    expect(doc.frontmatter.name).toBe('Code Review')
+    expect(doc.frontmatter.icon).toBe('🔍')
     expect(doc.frontmatter.default_provider).toBe('claude')
     expect(doc.body).toBe('Body here.')
   })

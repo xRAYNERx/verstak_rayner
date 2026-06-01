@@ -1,7 +1,7 @@
 /**
  * Bitrix24 connector — через входящий webhook (incoming webhook).
  *
- * Источник: V3 Plan раздел 5.4. Пилот клиент — БАУМЕХ.
+ * Источник: V3 Plan раздел 5.4. Пилот клиент — example.
  *
  * Credentials (settings keys):
  *   bitrix24_webhook_url    — полный URL вида
@@ -39,7 +39,7 @@ export function createBitrix24Connector(): Connector {
         label: 'Битрикс24',
         kind: 'bitrix24',
         status: 'ready',
-        detail: 'Incoming webhook URL в settings (bitrix24_webhook_url). Пилот: БАУМЕХ.'
+        detail: 'Incoming webhook URL в settings (bitrix24_webhook_url). Пилот: example.'
       }
     },
 
