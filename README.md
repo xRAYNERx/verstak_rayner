@@ -1,78 +1,152 @@
-# Verstak · GGC
+# Verstak
 
-**G**emini · **G**rok · **C**laude — desktop AI coding assistant that talks to all three (plus ChatGPT/Codex) through one interface. Chat-first, project-aware, runs on your own keys or your existing subscriptions.
+Open-source desktop AI coding IDE. Vendor-agnostic, 10+ providers, persistent memory, parallel agents.
 
-## Why
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A clean alternative to Cursor / ClawCode / Antigravity. Open a project folder, pick a provider, ask. Tools (file read/write, terminal, project search) work on any of the 4 API providers. Subscription CLIs run as subprocess so you don't pay per-token if you already pay flat.
+---
 
-## Providers (8)
+## What is Verstak
 
-| Brand   | API (own key)              | CLI (your subscription)            |
-| ------- | -------------------------- | ---------------------------------- |
-| Gemini  | ✓ with tools               | ✓ Gemini Ultra (`gemini` CLI)      |
-| Claude  | ✓ with tools               | ✓ Pro / Max (`claude` CLI)         |
-| Grok    | ✓ with tools               | ✓ SuperGrok (`grok` CLI)           |
-| ChatGPT | ✓ with tools               | ✓ Plus / Pro (`codex` CLI)         |
+Verstak is a desktop AI coding assistant built on Electron + TypeScript + React. It's a local-first alternative to Cursor, Claude Code, and GitHub Copilot that runs entirely on your own API keys or existing CLI subscriptions — no cloud account required beyond the providers you already use.
 
-Switch in the chat composer's model picker. Each provider has its own list of models (Sonnet 4.5 / Opus 4.5, GPT-5 / o3, grok-4 / grok-code-fast-1, gemini-2.5-pro / 3-flash-preview, …).
+The key idea: never be locked in. If one provider is down or expensive, switch in one click. Your project context, memory, and chat history stay local.
+
+---
 
 ## Features
 
-- **Multi-project rail.** Sidebar holds all opened folders, click to switch. Last project auto-opens on startup.
-- **Per-project views.** Chat / Tasks / Journal / Plan / Browser / Feedback.
-- **Multi-chat per project.** Chat as collapsible section in sidebar with multiple sessions; rename on double-click, delete with ×. Background sessions keep streaming when you switch projects.
-- **Plan mode + Autopilot.** AI generates structured plans via `create_plan`; run steps one-by-one or enable **Autopilot** (limit N steps, optional verify command like `npm test` / `npx tsc --noEmit` between steps — fails → pause).
-- **Project map.** `get_project_map` AI tool — one call returns directory tree + top-level symbols (functions, classes, components, types, exports) for every code file. Cache auto-invalidates on write_file.
-- **In-app browser.** Native Electron `<webview>` tab with URL bar / back-forward / reload. AI tools `browser_navigate`, `browser_read_page`, `browser_screenshot`.
-- **Vision.** `browser_screenshot` data URL is attached as `inlineData` to the next user message; Gemini 3.5 Flash / 3 Pro see it and can analyse UI visually.
-- **Connectors.** Pluggable adapters for external systems. Built-in: 1С OData (standard.odata + HTTP Basic), generic HTTP. Credentials in encrypted `safeStorage`, never in the prompt. AI tools `list_connectors`, `connector_query`.
-- **Secret scanner + path policy.** `.env`, `.ssh`, `.aws`, `*.key`, `*.pem`, `credentials`, `cookies` blocked at read/write/list. Output of every read_file / search_project / connector response goes through regex pass redacting API keys (OpenAI, Anthropic, GitHub, AWS, JWT, private-key blocks, basic-auth in URLs) as `[REDACTED:type]`.
-- **Tools across API providers.** read_file, list_directory, write_file (with diff confirm), run_command (with confirm + denylist), search_project (ripgrep), find_files, get_project_map, browser_*, connector_*.
-- **Multi-file diff.** When AI writes 2+ files in one turn, all confirmations land in a single modal with a file rail. Keyboard: Enter / Esc / Ctrl+Enter / ←→.
-- **Undo stack.** Every accepted write is recorded; "↶ N" button in the composer reverts the most recent.
-- **Loop detection.** Same tool+args called 3× → break with supervisor message; max 8 turns per send.
-- **Cost estimator.** `↑2.1k · ↓0.8k · $0.014` in the composer — pricing for Anthropic/Google/OpenAI/xAI with cached-input discount; CLI providers show `—`.
-- **Emergency stop.** Floating red pill while streaming + Shift+Esc kills every active stream and clears pending confirmations.
-- **Resizable sidebar.** Drag right edge to resize (200..480px), width persisted to localStorage.
-- **Auto-summary journal.** Every AI session writes a brief entry (touched files, commands run, last reply); plans get their own entry.
-- **CLI parity (light).** Subscription CLIs (Claude Code / Gemini / Grok Build / Codex) get the same Context Pack + user_layer + recent chat history as API providers. **Agent mode = API only; CLI = shared brain, no tools** — function-calling needs multi-turn protocol that vendors' one-shot `stream-json` modes don't expose.
-- **System layer.** Immutable agent protocols (7-step cycle, scope discipline, verification, secret-scanner policy) baked into the build. User extends via `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` / `.verstak/RULES.md` in the project root (auto-init on first project open).
-- **Dark / light theme.** Toggle in Settings.
+### Providers (10+)
 
-## Setup
+**API providers** (bring your own key):
+- Gemini, Claude, Grok, ChatGPT, OpenRouter, DeepSeek, Mistral, Groq, Ollama, Custom OpenAI-compatible
+
+**CLI providers** (use your existing subscription):
+- Claude Code, Codex, Gemini CLI, Grok Build, Hermes, Aider
+
+Verstak **auto-detects installed CLIs on startup**. Switch provider and model per chat — background sessions keep streaming when you switch projects.
+
+---
+
+### Memory (Hermes-style)
+
+Verstak maintains persistent memory across sessions, not just a long context window:
+
+| Layer | What it stores |
+|---|---|
+| **Core Memory** | `MEMORY.md` + `USER.md` always injected into context. Agent self-updates these. |
+| **Archival Memory** | FTS5-indexed facts searchable across all sessions |
+| **Conversation Search** | Full-text search across all past chats |
+
+Memory is visible and editable in Settings → Memory.
+
+---
+
+### Agent Capabilities
+
+- **20+ tools:** read/write files, terminal, search, browser navigation, diagnostics
+- **`check_diagnostics`** — runs `tsc --noEmit` as a native agent tool; agent sees and fixes type errors in the loop
+- **`delegate_parallel`** — dispatches 2–5 subtasks to different providers simultaneously and merges results
+- **Auto cross-verify** — second provider reviews code changes automatically (configurable)
+- **Effort control** — quick / standard / deep thinking toggle per message
+- **Auto-compact** — session summarization kicks in at 95% context window, no context overflow errors
+- **Loop detection** — same tool + args called 3× triggers supervisor break; max turns per send configurable
+- **Exponential backoff** — automatic retry on 429 / 503 / ECONNRESET
+
+---
+
+### UI / UX
+
+- Multi-project sidebar with: **Chat · Tasks · Journal · Plan · Skills · Browser · Design · Video**
+- Multi-chat per project — rename, delete, background sessions keep streaming
+- Multi-file diff modal — accept/reject all changes from one turn in a single view
+- Premium auth screen with Higgsfield-generated video background
+- Connector marketplace (card grid, Codex-style)
+- Custom commands from `.md` files (Skills system)
+- Cost estimator in composer — shows `↑ tokens · ↓ tokens · $cost` per send
+- Dark / light theme
+
+---
+
+### Connectors (11)
+
+GitHub, Google Sheets, Telegram Bot, SSH Executor, Битрикс24, Яндекс.Директ, Яндекс.Диск, 1С OData, Generic HTTP API, Skills Server, Custom OpenAI-compatible endpoint.
+
+Credentials stored in encrypted `safeStorage` (Electron built-in), never in prompts or logs.
+
+---
+
+### Security
+
+- **Secret scanner** — API keys, tokens, JWTs, private key blocks redacted as `[REDACTED:type]` in all tool outputs and logs
+- **Path policy** — `.env`, `.ssh`, `.aws`, `*.key`, `*.pem`, `creds*`, `cookies` blocked at read/write/list level
+- **No telemetry** — nothing leaves your machine except calls to the providers you configure
+- **No cloud dependency** — SQLite local storage, all state on disk
+
+---
+
+## Quick Start
 
 ```bash
+git clone https://github.com/frolofpavel/verstak.git
+cd verstak
 npm install --legacy-peer-deps
-npm run electron-rebuild   # one-time: build native modules (better-sqlite3, node-pty) for Electron
+npm run electron-rebuild
 npm run dev
 ```
 
-Then click ⚙ → pick provider → paste API key (or use a CLI provider if its binary is on your PATH and logged in).
+Then open Settings (⚙), pick a provider, paste your API key — or select a CLI provider if the binary is on your PATH and already logged in.
 
-### CLI subscription providers
+---
 
-- **Gemini Ultra:** `npm i -g @google/gemini-cli` → `gemini` (OAuth Google account)
-- **Claude Code:** `irm https://claude.ai/install.ps1 | iex` (or curl on macOS/Linux) → `claude` once
-- **Grok Build:** installer from grok.com/build → `grok` once
-- **Codex:** `npm i -g @openai/codex` → `codex login`
+## Download
+
+- **Windows installer:** see [Releases](https://github.com/frolofpavel/verstak/releases) (coming soon)
+- **Build from source:** `npm run dist:win` → produces NSIS installer + portable `.exe` in `release/`
+
+---
+
+## CLI Auto-Detection
+
+On startup, Verstak scans your PATH for installed CLI tools and makes them available as providers instantly — no manual configuration needed:
+
+| Tool | Command |
+|---|---|
+| Claude Code | `claude` |
+| Codex | `codex` |
+| Gemini CLI | `gemini` |
+| Grok Build | `grok` |
+| Hermes | `hermes` |
+| Aider | `aider` |
+
+---
 
 ## Stack
 
-Electron · Vite · React · TypeScript · better-sqlite3 · @google/genai · @anthropic-ai/sdk · openai · node-pty · xterm · highlight.js · Zustand · Geist Sans/Mono.
+Electron 40 · React 19 · TypeScript · Zustand · better-sqlite3 · Vite · node-pty · xterm.js
+
+---
 
 ## Scripts
 
 | Command | Does |
-| --- | --- |
-| `npm run dev` | Auto-rebuilds native modules for Electron, starts dev (HMR) |
-| `npm run build` | Production bundle into `out/` |
-| `npm test` | Rebuilds native modules for Node, runs Vitest |
-| `npm run test:fast` | Skips rebuild — only use when bindings are correct |
+|---|---|
+| `npm run dev` | Dev mode with HMR |
+| `npm run build` | Production bundle → `out/` |
 | `npm run type` | `tsc --noEmit` |
+| `npm run test:fast` | Vitest (skip native rebuild) |
+| `npm run dist:win` | NSIS + portable installer |
 
-## Status
+---
 
-MVP that's daily-driven. Working: 8 providers, multi-project, full agent loop on 4 APIs, plans with execution, attachments (paste/drop/picker), terminal, theme toggle. Pending: background agents, project context indexing, multi-chat per project, packaged installer.
+## Contributing
 
-See `docs/dev-journal.md` for the full history.
+PRs welcome. See [CLAUDE.md](CLAUDE.md) for architecture docs, file zone rules, and code conventions.
+
+Before submitting: `npm run type && npm run test:fast` must pass.
+
+---
+
+## License
+
+MIT
