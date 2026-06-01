@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react'
 import { useProject } from '../store/projectStore'
-import type { Memory } from '../types/api'
+import type { Memory, DetectedCli } from '../types/api'
 import type { ProviderId } from '../hooks/useProvider'
 import { useTheme } from '../hooks/useTheme'
 import type { AutonomousStatus } from '../types/api'
@@ -1187,6 +1187,8 @@ function ProvidersPage(props: ProvidersPageProps) {
   // CLI статус: загружается при открытии страницы И после logout/relogin.
   // null = ещё не загружено (показываем "Среда" по дефолту).
   const [cliStatus, setCliStatus] = useState<CliStatusMap | null>(null)
+  // Обнаруженные CLI-инструменты на компьютере пользователя.
+  const [detectedClis, setDetectedClis] = useState<DetectedCli[] | null>(null)
 
   async function loadCliStatus() {
     try {
@@ -1194,7 +1196,10 @@ function ProvidersPage(props: ProvidersPageProps) {
       setCliStatus(s)
     } catch { /* не критично — оставим null, бейдж покажет fallback */ }
   }
-  useEffect(() => { void loadCliStatus() }, [])
+  useEffect(() => {
+    void loadCliStatus()
+    window.api.cli.detect().then(setDetectedClis).catch(() => {})
+  }, [])
 
   // «Подключён» = доступен для отправки запросов:
   //  - CLI: всегда (бинарь либо есть либо нет — реальный коннект сделает provider при send)
@@ -1414,6 +1419,21 @@ function ProvidersPage(props: ProvidersPageProps) {
       <div className="gg-settings-hint" style={{ marginTop: 18 }}>
         CLI-провайдеры (Gemini CLI / Claude Code / Grok Build / Codex) подключаются установкой соответствующего CLI вне приложения и логином через подписку. После этого они появляются как «Среда».
       </div>
+
+      {detectedClis !== null && detectedClis.length > 0 && (
+        <div className="gg-prov-detected">
+          <div className="gg-settings-section-title" style={{ marginTop: 22 }}>Обнаруженные CLI</div>
+          <div className="gg-prov-detected-list">
+            {detectedClis.map(c => (
+              <div key={c.id} className="gg-prov-detected-item">
+                <span className={`gg-prov-detected-dot${c.status === 'found' ? ' is-yellow' : ''}`} />
+                <span className="gg-prov-detected-name">{c.name}</span>
+                <span className="gg-prov-detected-version">{c.version}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

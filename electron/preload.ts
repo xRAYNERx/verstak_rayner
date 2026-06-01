@@ -153,6 +153,9 @@ contextBridge.exposeInMainWorld('api', {
   commands: {
     list: (projectPath: string | null) => ipcRenderer.invoke('commands:list', projectPath)
   },
+  cli: {
+    detect: () => ipcRenderer.invoke('cli:detect')
+  },
   term: {
     spawn: (cwd: string) => ipcRenderer.invoke('term:spawn', cwd) as Promise<number>,
     write: (id: number, data: string) => ipcRenderer.invoke('term:write', id, data),

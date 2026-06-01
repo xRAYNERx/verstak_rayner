@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import authBgUrl from '../assets/auth-bg.webp'
 import authVideoUrl from '../assets/auth-bg.mp4'
+import type { DetectedCli } from '../types/api'
 
 /**
  * AuthScreen — экран регистрации/входа. Показывается ПЕРЕД основным приложением
@@ -57,6 +58,7 @@ export function AuthScreen({ onComplete }: Props) {
   const [error, setError] = useState<string | null>(null)
   // fade-out animation при успешном входе
   const [leaving, setLeaving] = useState(false)
+  const [clis, setClis] = useState<DetectedCli[]>([])
 
   useEffect(() => {
     void (async () => {
@@ -71,6 +73,7 @@ export function AuthScreen({ onComplete }: Props) {
       } catch { /* первый запуск */ }
       setLoading(false)
     })()
+    window.api.cli.detect().then(setClis).catch(() => {})
   }, [])
 
   async function handleSignUp() {
@@ -162,6 +165,19 @@ export function AuthScreen({ onComplete }: Props) {
               Параллельные агенты
             </li>
           </ul>
+
+          {clis.length > 0 && (
+            <div className="gg-auth-detected">
+              <div className="gg-auth-detected-title">Найдено на компьютере:</div>
+              {clis.map(c => (
+                <div key={c.id} className="gg-auth-detected-item">
+                  <span className={`gg-auth-detected-dot${c.status === 'found' ? ' is-yellow' : ''}`} />
+                  <span>{c.name}</span>
+                  <span className="gg-auth-detected-version">{c.version}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

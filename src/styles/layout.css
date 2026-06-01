@@ -1322,6 +1322,40 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   border-color: rgba(244, 113, 116, 0.4);
   background: var(--error-muted);
 }
+/* Detected CLIs — Settings providers tab */
+.gg-prov-detected-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.gg-prov-detected-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.gg-prov-detected-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+  flex-shrink: 0;
+}
+.gg-prov-detected-dot.is-yellow {
+  background: #facc15;
+}
+.gg-prov-detected-name {
+  flex: 1;
+}
+.gg-prov-detected-version {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+
 .gg-prov-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .gg-prov-card {
   border: 1px solid var(--border-subtle);
@@ -4111,6 +4145,46 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 .gg-auth-submit:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* Detected CLI tools — AuthScreen left panel */
+.gg-auth-detected {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  width: 100%;
+  max-width: 280px;
+}
+.gg-auth-detected-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.4);
+  margin-bottom: 8px;
+}
+.gg-auth-detected-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+  color: rgba(255,255,255,0.7);
+}
+.gg-auth-detected-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+  flex-shrink: 0;
+}
+.gg-auth-detected-dot.is-yellow {
+  background: #facc15;
+}
+.gg-auth-detected-version {
+  margin-left: auto;
+  font-size: 11px;
+  color: rgba(255,255,255,0.3);
+  font-family: var(--font-mono);
 }
 
 /* ── Responsive: narrow screens hide left panel ── */

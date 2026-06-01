@@ -245,6 +245,9 @@ declare global {
       commands: {
         list: (projectPath: string | null) => Promise<UserCommand[]>
       }
+      cli: {
+        detect(): Promise<DetectedCli[]>
+      }
     }
   }
 }
@@ -278,4 +281,14 @@ export interface AutonomousStatus {
   lastRunError: string | null
   nextRunAt: number | null
 }
+
+/** Обнаруженный CLI-инструмент на компьютере пользователя. */
+export interface DetectedCli {
+  id: string
+  name: string
+  binary: string
+  version: string
+  status: 'ready' | 'found' | 'error'
+}
+
 export {}
