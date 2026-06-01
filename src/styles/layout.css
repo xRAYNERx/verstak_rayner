@@ -3716,3 +3716,54 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   color: var(--text-primary);
 }
 
+/* ─── Placeholder views (Skills / Design / Video) ─── */
+.gg-view-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  padding: 40px;
+  color: var(--text-secondary);
+}
+.gg-view-placeholder-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+.gg-view-placeholder h2 {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+.gg-view-placeholder p {
+  max-width: 400px;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+.gg-view-placeholder-hint {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+.gg-view-placeholder-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+.gg-view-placeholder-actions button {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  transition: all 100ms;
+}
+.gg-view-placeholder-actions button:hover {
+  background: var(--accent);
+  color: white;
+}
+

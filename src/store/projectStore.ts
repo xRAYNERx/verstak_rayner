@@ -69,7 +69,7 @@ interface ActivityEntry {
 export type TouchKind = 'read' | 'write' | 'list'
 const TOUCH_PRIORITY: Record<TouchKind, number> = { write: 3, read: 2, list: 1 }
 
-export type ViewId = 'chat' | 'tasks' | 'journal' | 'plan' | 'workflow' | 'calendar' | 'feedback' | 'browser'
+export type ViewId = 'chat' | 'tasks' | 'journal' | 'plan' | 'workflow' | 'calendar' | 'feedback' | 'browser' | 'skills' | 'design' | 'video'
 
 export interface SessionUsage {
   inputTokens: number

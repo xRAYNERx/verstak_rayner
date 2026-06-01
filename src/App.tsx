@@ -42,7 +42,7 @@ export function App() {
     return stored >= SIDEBAR_MIN && stored <= SIDEBAR_MAX ? stored : SIDEBAR_DEFAULT
   })
   const dragRef = useRef<{ startX: number; startW: number } | null>(null)
-  const { path, activeView, isStreaming, setStreaming, clearPendingWrites, setPendingCommand } = useProject()
+  const { path, activeView, setActiveView, isStreaming, setStreaming, clearPendingWrites, setPendingCommand } = useProject()
   const canShowTerminal = path && showTerminal
 
   // Ctrl/Cmd+B toggles the project sidebar; Esc cancels active stream (safety
@@ -143,6 +143,42 @@ export function App() {
         {activeView === 'calendar' && <StubView title="Calendar" description="Здесь будут события и дедлайны проекта. В работе." />}
         {activeView === 'feedback' && <FeedbackView />}
         {activeView === 'browser' && <BrowserView />}
+        {activeView === 'skills' && (
+          <div className="gg-view-placeholder">
+            <div className="gg-view-placeholder-icon">⚡</div>
+            <h2>Skills</h2>
+            <p>AI-навыки расширяют возможности агента. Создавай .md файлы в <code>.verstak/skills/</code> или подключи сервер скиллов.</p>
+            <div className="gg-view-placeholder-actions">
+              {/* TODO: открыть папку skills через window.api.files.revealInExplorer */}
+              <button onClick={() => void window.api.files.revealInExplorer('.verstak/skills')}>Открыть папку скиллов</button>
+              <button onClick={() => setActiveView('chat')}>Настроить сервер</button>
+            </div>
+          </div>
+        )}
+        {activeView === 'design' && (
+          <div className="gg-view-placeholder">
+            <div className="gg-view-placeholder-icon">🎨</div>
+            <h2>Design Studio</h2>
+            <p>AI-дизайн: макеты, UI-компоненты, лендинги, презентации. Опиши что нужно — агент создаст интерактивный прототип.</p>
+            <p className="gg-view-placeholder-hint">Поддержка: HTML/CSS экспорт, 150+ дизайн-систем, адаптивные макеты</p>
+            <div className="gg-view-placeholder-actions">
+              {/* TODO: переключить в chat с предзаполненным сообщением */}
+              <button onClick={() => setActiveView('chat')}>Создать макет</button>
+            </div>
+          </div>
+        )}
+        {activeView === 'video' && (
+          <div className="gg-view-placeholder">
+            <div className="gg-view-placeholder-icon">🎬</div>
+            <h2>Video Studio</h2>
+            <p>AI-генерация видео, картинок, анимации. Опиши сцену — агент создаст видео через подключённые модели.</p>
+            <p className="gg-view-placeholder-hint">Модели: Veo, Kling, Seedance, Flux, Midjourney (через API ключи)</p>
+            <div className="gg-view-placeholder-actions">
+              {/* TODO: переключить в chat с предзаполненным сообщением */}
+              <button onClick={() => setActiveView('chat')}>Создать видео</button>
+            </div>
+          </div>
+        )}
         {activeView === 'chat' && canShowTerminal && (
           <div className="gg-terminal-wrap">
             <div className="gg-terminal-header">
