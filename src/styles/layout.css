@@ -3796,15 +3796,16 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   justify-content: center;
 }
 
-/* Фоновая картинка (Higgsfield slot) — скрывается если нет файла */
-.gg-auth-bg-image {
+/* Фоновое видео (Higgsfield Seedance 2.0) — loop на левой панели */
+.gg-auth-bg-video {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.4;
+  opacity: 0.35;
   z-index: 0;
+  pointer-events: none;
 }
 
 /* CSS orbs — анимированный градиентный фон */

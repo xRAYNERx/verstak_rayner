@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import authBgUrl from '../assets/auth-bg.webp'
+import authVideoUrl from '../assets/auth-bg.mp4'
 
 /**
  * AuthScreen — экран регистрации/входа. Показывается ПЕРЕД основным приложением
@@ -123,12 +124,15 @@ export function AuthScreen({ onComplete }: Props) {
     <div className={`gg-auth-root${leaving ? ' is-leaving' : ''}`}>
       {/* ── Left panel: visual / animation ── */}
       <div className="gg-auth-left">
-        {/* Фоновая картинка — если нет файла, скрывается через onError */}
-        <img
-          src={authBgUrl}
-          className="gg-auth-bg-image"
-          alt=""
-          onError={e => { (e.target as HTMLElement).style.display = 'none' }}
+        {/* Фоновое видео — Higgsfield Seedance 2.0 loop */}
+        <video
+          className="gg-auth-bg-video"
+          src={authVideoUrl}
+          autoPlay
+          loop
+          muted
+          playsInline
+          poster={authBgUrl}
         />
 
         {/* CSS orbs — fallback и подложка */}
