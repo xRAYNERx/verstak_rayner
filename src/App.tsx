@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { AuthScreen } from './components/AuthScreen'
 import { ProjectRail } from './components/ProjectRail'
 import { Sidebar } from './components/Sidebar'
 import { Settings } from './components/Settings'
@@ -26,17 +27,46 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showTerminal, setShowTerminal] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  // ── Auth gate: null = загрузка, false = нужна авторизация, true = готово ──
+  const [authDone, setAuthDone] = useState<boolean | null>(null)
+  useEffect(() => {
+    void (async () => {
+      try {
+        // Если ровно 1 профиль — автовход без экрана
+        const [authVal, profiles] = await Promise.all([
+          window.api.settings.getKey('auth_completed'),
+          window.api.userProfiles.list(),
+        ])
+        if (authVal === 'true') {
+          setAuthDone(true)
+        } else if (profiles.length === 1) {
+          // Авто-вход: один профиль, экран не нужен
+          await window.api.userProfiles.setActive(profiles[0].id)
+          await window.api.settings.setKey('auth_completed', 'true')
+          setAuthDone(true)
+        } else {
+          setAuthDone(false)
+        }
+      } catch {
+        // Первый запуск — нет settings
+        setAuthDone(false)
+      }
+    })()
+  }, [])
+
   // Onboarding: показывается при первом запуске пока не помечен completed
   // в settings. После — больше не появляется.
   const [showOnboarding, setShowOnboarding] = useState(false)
   useEffect(() => {
+    if (!authDone) return
     void (async () => {
       try {
         const done = await window.api.settings.getKey('onboarding_completed')
         if (!done) setShowOnboarding(true)
       } catch { /* первый запуск, settings ещё нет */ setShowOnboarding(true) }
     })()
-  }, [])
+  }, [authDone])
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     const stored = parseInt(localStorage.getItem(SIDEBAR_WIDTH_KEY) || '0', 10)
     return stored >= SIDEBAR_MIN && stored <= SIDEBAR_MAX ? stored : SIDEBAR_DEFAULT
@@ -111,6 +141,11 @@ export function App() {
     document.documentElement.style.setProperty('--gg-sidebar-w', `${sidebarWidth}px`)
     try { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth)) } catch { /* ignore */ }
   }, [sidebarWidth])
+
+  // Пока проверяем auth — ничего не рендерим
+  if (authDone === null) return null
+  // Нужна авторизация — показываем AuthScreen поверх всего
+  if (!authDone) return <AuthScreen onComplete={() => setAuthDone(true)} />
 
   return (
     <div className={`gg-app ${sidebarOpen ? '' : 'is-sidebar-collapsed'}`}>

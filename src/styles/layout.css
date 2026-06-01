@@ -3767,3 +3767,354 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   color: white;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Auth Screen — split-screen registration / login gate (Comet Browser style)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* Root: full-viewport split */
+.gg-auth-root {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  z-index: 9999;
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
+.gg-auth-root.is-leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── Left visual panel ── */
+.gg-auth-left {
+  position: relative;
+  width: 50%;
+  overflow: hidden;
+  background: linear-gradient(135deg, #0a0e1a 0%, #0d1117 50%, #161b22 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Фоновая картинка (Higgsfield slot) — скрывается если нет файла */
+.gg-auth-bg-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.4;
+  z-index: 0;
+}
+
+/* CSS orbs — анимированный градиентный фон */
+.gg-auth-orb {
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  filter: blur(80px);
+  animation: gg-auth-orb-float 8s ease-in-out infinite;
+  pointer-events: none;
+}
+.gg-auth-orb-1 {
+  background: rgba(88, 101, 242, 0.3);
+  top: 20%; left: 30%;
+}
+.gg-auth-orb-2 {
+  background: rgba(155, 89, 255, 0.2);
+  top: 50%; left: 50%;
+  animation-delay: -4s;
+}
+.gg-auth-orb-3 {
+  background: rgba(45, 212, 191, 0.15);
+  top: 70%; left: 20%;
+  animation-delay: -2s;
+}
+@keyframes gg-auth-orb-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(30px, -20px) scale(1.1); }
+  66%       { transform: translate(-20px, 20px) scale(0.9); }
+}
+
+/* Контент левой панели */
+.gg-auth-left-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 40px;
+  text-align: center;
+  width: 100%;
+}
+
+/* Логотип */
+.gg-auth-logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.gg-auth-logo-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #5865f2, #9b59ff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 800;
+  color: white;
+  box-shadow: 0 8px 32px rgba(88, 101, 242, 0.4);
+  letter-spacing: -1px;
+}
+.gg-auth-logo-text {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.5px;
+}
+
+/* Tagline */
+.gg-auth-tagline {
+  font-size: 16px;
+  color: rgba(201, 209, 217, 0.7);
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+
+/* Feature bullets */
+.gg-auth-features {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 280px;
+}
+.gg-auth-features li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: rgba(139, 148, 158, 0.9);
+  text-align: left;
+}
+.gg-auth-feature-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #5865f2;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(88, 101, 242, 0.6);
+}
+
+/* ── Right form panel ── */
+.gg-auth-right {
+  width: 50%;
+  background: #0d1117;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.gg-auth-form-wrap {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Tabs (Войти / Новый профиль) */
+.gg-auth-tabs {
+  display: flex;
+  gap: 0;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 3px;
+}
+.gg-auth-tab {
+  flex: 1;
+  padding: 8px 0;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #8b949e;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 160ms ease;
+}
+.gg-auth-tab:hover { color: #c9d1d9; }
+.gg-auth-tab.is-active {
+  background: rgba(255,255,255,0.09);
+  color: #ffffff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+/* Form header (без tabs) */
+.gg-auth-form-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.gg-auth-form-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+.gg-auth-form-sub {
+  font-size: 13px;
+  color: #8b949e;
+  margin: 0;
+}
+
+/* Form fields */
+.gg-auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.gg-auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gg-auth-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.gg-auth-optional {
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: none;
+  color: #484f58;
+  letter-spacing: 0;
+  margin-left: 4px;
+}
+
+.gg-auth-input {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #c9d1d9;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+.gg-auth-input::placeholder { color: #484f58; }
+.gg-auth-input:focus {
+  border-color: rgba(88, 101, 242, 0.6);
+  box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.15);
+}
+
+.gg-auth-select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238b949e' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+.gg-auth-select option { background: #161b22; color: #c9d1d9; }
+
+/* Role buttons */
+.gg-auth-roles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.gg-auth-role-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  color: #8b949e;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 160ms ease;
+  font-family: inherit;
+}
+.gg-auth-role-btn:hover {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.15);
+  color: #c9d1d9;
+}
+.gg-auth-role-btn.is-active {
+  background: rgba(88, 101, 242, 0.18);
+  border-color: rgba(88, 101, 242, 0.5);
+  color: #ffffff;
+  box-shadow: 0 0 0 1px rgba(88, 101, 242, 0.2) inset;
+}
+.gg-auth-role-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+/* Error message */
+.gg-auth-error {
+  background: rgba(220, 53, 69, 0.12);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #ff7b7b;
+}
+
+/* Submit button */
+.gg-auth-submit {
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #5865f2, #7b4fff);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease, opacity 120ms ease;
+  box-shadow: 0 4px 16px rgba(88, 101, 242, 0.35);
+  font-family: inherit;
+  letter-spacing: 0.01em;
+  margin-top: 4px;
+}
+.gg-auth-submit:hover:not(:disabled) {
+  transform: translateY(-1px) scale(1.01);
+  box-shadow: 0 6px 24px rgba(88, 101, 242, 0.5);
+}
+.gg-auth-submit:active:not(:disabled) {
+  transform: translateY(0) scale(0.99);
+}
+.gg-auth-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Responsive: narrow screens hide left panel ── */
+@media (max-width: 800px) {
+  .gg-auth-left  { display: none; }
+  .gg-auth-right { width: 100%; padding: 32px 24px; }
+}
+
