@@ -1,20 +1,17 @@
 import { useEffect, useState } from 'react'
 
 /**
- * OnboardingWizard — мастер первого запуска для нового сотрудника.
- *
- * Источник: V3 Plan раздел 10.1.
+ * OnboardingWizard — мастер первого запуска.
  *
  * Шаги:
  *  1. Привет — кто ты? (имя + роль)
  *  2. API key Anthropic (минимально один; остальные опционально)
- *  3. Опционально — Google Sheets / Telegram / SSH (с подсказкой «можно позже»)
- *  4. Готово — открывается главный экран
+ *  3. Готово — открывается главный экран
  *
  * Триггер: при старте App.tsx проверяется settings.getKey('onboarding_completed').
  * Если пусто и user_profiles пустой → показывается wizard.
  *
- * Отмена/Skip: создаёт минимальный профиль «Pavel / без роли» и помечает
+ * Отмена/Skip: создаёт минимальный профиль «User / developer» и помечает
  * onboarding completed. Пользователь может донастроить через Settings.
  */
 
@@ -22,21 +19,19 @@ interface Props {
   onComplete: () => void
 }
 
-type Role = 'owner' | 'sales' | 'delivery' | 'analytics' | 'finance' | 'other'
+type Role = 'developer' | 'designer' | 'manager' | 'student'
 
 const ROLE_PRESETS: Record<Role, { label: string; defaultProvider: string; defaultModel: string; skills: string[] }> = {
-  owner:     { label: 'Владелец / Pavel',         defaultProvider: 'claude', defaultModel: 'claude-sonnet-4-6', skills: ['bos-mkt', 'bos-sales', 'bos-pilot', 'client-cycle'] },
-  sales:     { label: 'Продажи / Кристина',       defaultProvider: 'claude', defaultModel: 'claude-haiku-4-5',  skills: ['bos-sales', 'client-cycle'] },
-  delivery:  { label: 'Delivery / Ярослав',       defaultProvider: 'claude', defaultModel: 'claude-sonnet-4-6', skills: ['bos-pilot', 'client-cycle'] },
-  analytics: { label: 'Аналитика / Игорь',        defaultProvider: 'gemini-api', defaultModel: 'gemini-3.5-flash', skills: ['bos-mkt'] },
-  finance:   { label: 'Финансы / Надежда',        defaultProvider: 'claude', defaultModel: 'claude-haiku-4-5',  skills: [] },
-  other:     { label: 'Другая роль',              defaultProvider: 'claude', defaultModel: 'claude-sonnet-4-6', skills: ['bos-mkt', 'bos-sales', 'client-cycle'] }
+  developer: { label: 'Developer',         defaultProvider: 'gemini-api', defaultModel: 'gemini-2.5-flash', skills: ['code-review', 'git-summary', 'explain-code'] },
+  designer:  { label: 'Designer',          defaultProvider: 'gemini-api', defaultModel: 'gemini-2.5-flash', skills: ['explain-code'] },
+  manager:   { label: 'Project Manager',   defaultProvider: 'gemini-api', defaultModel: 'gemini-2.5-flash', skills: ['git-summary'] },
+  student:   { label: 'Student',           defaultProvider: 'gemini-api', defaultModel: 'gemini-2.5-flash', skills: ['explain-code'] }
 }
 
 export function OnboardingWizard({ onComplete }: Props) {
   const [step, setStep] = useState(1)
   const [name, setName] = useState('')
-  const [role, setRole] = useState<Role>('owner')
+  const [role, setRole] = useState<Role>('developer')
   const [apiKey, setApiKey] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -59,7 +54,7 @@ export function OnboardingWizard({ onComplete }: Props) {
       const preset = ROLE_PRESETS[role]
       // 1) Создаём профиль
       const profile = await window.api.userProfiles.create({
-        name: name.trim() || 'Pavel',
+        name: name.trim() || 'User',
         role,
         defaultProvider: preset.defaultProvider,
         defaultModel: preset.defaultModel,
@@ -96,7 +91,7 @@ export function OnboardingWizard({ onComplete }: Props) {
       // Создаём минимальный профиль если совсем нет
       const list = await window.api.userProfiles.list()
       if (list.length === 0) {
-        const p = await window.api.userProfiles.create({ name: 'Pavel', role: 'owner' })
+        const p = await window.api.userProfiles.create({ name: 'User', role: 'developer' })
         await window.api.userProfiles.setActive(p.id)
       } else if (!list.some(p => p.isActive)) {
         await window.api.userProfiles.setActive(list[0].id)
@@ -125,15 +120,14 @@ export function OnboardingWizard({ onComplete }: Props) {
           {step === 1 && (
             <>
               <p className="gg-onboarding-text">
-                Verstak — твой второй мозг для работы в агентстве. Чтобы подобрать правильный
-                набор скиллов и провайдеров — расскажи кто ты.
+                Verstak — AI-ассистент для разработки. Выбери свою роль для настройки под тебя.
               </p>
               <div className="gg-onboarding-field">
                 <label>Имя</label>
                 <input
                   type="text"
                   className="gg-input"
-                  placeholder="Например: Кристина"
+                  placeholder="Твоё имя"
                   value={name}
                   onChange={e => setName(e.target.value)}
                   autoFocus
@@ -189,14 +183,13 @@ export function OnboardingWizard({ onComplete }: Props) {
                 Всё готово. После «Начать» откроется главный экран.
               </p>
               <ul className="gg-onboarding-summary">
-                <li>👤 <strong>{name || 'Pavel'}</strong> · {ROLE_PRESETS[role].label}</li>
+                <li>👤 <strong>{name || 'User'}</strong> · {ROLE_PRESETS[role].label}</li>
                 <li>🤖 Провайдер: <code>{ROLE_PRESETS[role].defaultProvider}</code> / <code>{ROLE_PRESETS[role].defaultModel}</code></li>
                 <li>🎭 Активные скиллы: {ROLE_PRESETS[role].skills.length > 0 ? ROLE_PRESETS[role].skills.join(', ') : '—'}</li>
                 <li>🔑 API key: {apiKey ? '✓ задан' : '⚠ нужно ввести позже в Settings'}</li>
               </ul>
               <div className="gg-onboarding-hint">
-                Коннекторы (Google Sheets, Telegram, Битрикс24, Я.Директ) и SSH — настраиваются в Settings
-                по мере необходимости. См. DEVLOG.md в проекте verstak.
+                Коннекторы (Google Sheets, Telegram, SSH и др.) — настраиваются в Settings по мере необходимости.
               </div>
             </>
           )}

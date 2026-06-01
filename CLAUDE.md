@@ -20,8 +20,8 @@
 - **Context sliding window** для длинных сессий (старые tool results сжимаются в маркеры).
 - **Exponential backoff** на 429/503/ECONNRESET.
 
-**V3 фичи (агент-исполнитель для агентства):**
-- **Skills как first-class.** Frontmatter `.md` файлы → system prompt + tools_allow + context_loaders + default_provider/model. Авто-импорт из `~/.claude/skills/` + `~/.verstak/skills/` + 3 built-in (bos-sales / bos-mkt / client-cycle). Picker 🎭 в composer + slash commands `/bos-sales`.
+**V3 фичи:**
+- **Skills как first-class.** Frontmatter `.md` файлы → system prompt + tools_allow + context_loaders + default_provider/model. Авто-импорт из `~/.claude/skills/` + `~/.verstak/skills/` + 3 built-in (code-review / git-summary / explain-code). Picker 🎭 в composer + slash commands `/code-review`.
 - **Context loaders** — frontmatter `context_loaders: [{impl, runs_on}]` авто-инжектят данные в первое user msg. Готовые: `load_client_card`, `load_clients_list`, `load_today_brief`.
 - **8 коннекторов:** 1C OData, generic HTTP, Google Sheets, SSH executor (с denylist), Telegram bot, Битрикс24, Я.Директ, Я.Диск.
 - **Artifacts:** `generate_html` / `generate_docx` / `render_chart` (SVG bar/line/pie) tools. Embedded preview (HTML напрямую, DOCX через mammoth.js).
@@ -219,7 +219,7 @@ npm run dist:win     # NSIS + portable .exe
 
 - **Не делать MCP Client рефактор** коннекторов сейчас — сломает текущие onec/http и блокирует приоритет российских коннекторов.
 - **Не делать JSON-RPC events** стандартизацию — большой инвазивный рефактор IPC, низкий ROI пока.
-- **Не строить cross-platform encryption fallback** — Pavel на Windows, safeStorage работает.
+- **Не строить cross-platform encryption fallback** — safeStorage на Windows работает, cross-platform при необходимости добавляется отдельно.
 - **Не пытаться сделать "version 3.0" одной большой PR.** Инкрементально, фазы с тегами, каждый коммит откатывается.
 
 ---
