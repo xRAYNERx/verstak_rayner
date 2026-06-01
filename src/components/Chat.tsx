@@ -716,24 +716,24 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
               <div className="gg-chat-empty-quick">
                 <button
                   className="gg-quick-action"
-                  onClick={() => setInput('/bos-sales')}
-                  title="Активировать скилл «Продажи агентства» — voronka HH-лидов, overdue, follow-ups"
+                  onClick={() => setInput('/code-review')}
+                  title="Запустить скилл «Code Review» — анализ изменений, поиск багов и регрессий"
                 >
-                  💼 Продажи (bos-sales)
+                  🔍 Code Review
                 </button>
                 <button
                   className="gg-quick-action"
-                  onClick={() => setInput('/bos-mkt')}
-                  title="Активировать скилл «Маркетолог» — аудиты, КП, стратегии по клиентам"
+                  onClick={() => setInput('/git-summary')}
+                  title="Запустить скилл «Git Summary» — краткая сводка последних коммитов"
                 >
-                  📊 Маркетинг (bos-mkt)
+                  📝 Git Summary
                 </button>
                 <button
                   className="gg-quick-action"
-                  onClick={() => setInput('/client-cycle')}
-                  title="Активировать скилл «Директор по клиенту» — daily/weekly check"
+                  onClick={() => setInput('/explain')}
+                  title="Запустить скилл «Explain Code» — объяснение выбранного кода"
                 >
-                  👁 Директор по клиенту
+                  💡 Explain Code
                 </button>
                 <button
                   className="gg-quick-action"

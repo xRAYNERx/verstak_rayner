@@ -727,14 +727,14 @@ export function Settings({ onClose }: { onClose: () => void }) {
               className="gg-input"
               value={skillsServerBase}
               onChange={e => setSkillsServerBase(e.target.value)}
-              placeholder="https://aioperatingsystem.ru (или пусто для built-in only)"
+              placeholder="https://your-skills-server.example.com (или пусто для built-in only)"
               spellCheck={false}
             />
           </div>
           <div className="gg-settings-hint">
             Сервер должен предоставлять <code>GET /api/skills</code> возвращающий
             <code>{`{skills: [{id, raw, sourceRef}]}`}</code>. Если недоступен — используются built-in
-            (bos-sales / bos-mkt / client-cycle) + локальные из ~/.verstak/skills/.
+            (code-review / git-summary / explain-code) + локальные из ~/.verstak/skills/.
           </div>
         </>
       )

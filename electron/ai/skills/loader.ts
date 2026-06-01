@@ -1,9 +1,9 @@
 /**
  * Skill loader — собирает скиллы из 3 источников по приоритету:
  *
- *   1. SERVER API (aioperatingsystem.ru/api/skills) — основной источник для
- *      14 сотрудников. Эндпоинт ещё не существует на момент написания —
- *      реализация падает gracefully (timeout 5s) и переходит к local.
+ *   1. SERVER API (your-skills-server.example.com/api/skills) — основной источник
+ *      для команды. Эндпоинт настраивается в Settings.
+ *      Реализация падает gracefully (timeout 5s) и переходит к local.
  *   2. ~/.verstak/skills/*.md — пользовательские личные.
  *   3. BUILT_IN_SKILLS — гарантированный baseline в коде.
  *
@@ -31,7 +31,7 @@ const SERVER_TIMEOUT_MS = 5_000
 
 /** Конфиг loader — путь к серверу читается из settings. */
 export interface LoaderConfig {
-  /** Например 'https://aioperatingsystem.ru'. Пусто = серверный источник пропускается. */
+  /** Например 'https://your-skills-server.example.com'. Пусто = серверный источник пропускается. */
   serverBase?: string | null
   /** Доп. пользовательские директории помимо ~/.verstak/skills/. */
   extraDirs?: string[]

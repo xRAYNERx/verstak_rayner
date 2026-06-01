@@ -259,7 +259,7 @@ export const TOOL_DEFS: ToolDefinition[] = [
       properties: {
         skill_id: {
           type: 'string',
-          description: 'ID скилла для sub-agent (например "bos-sales", "bos-mkt"). Если skill_id неизвестен — используется generic prompt.'
+          description: 'ID скилла для sub-agent (например "code-review", "git-summary"). Если skill_id неизвестен — используется generic prompt.'
         },
         provider_id: {
           type: 'string',
