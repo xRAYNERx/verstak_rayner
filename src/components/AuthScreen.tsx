@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import authBgUrl from '../assets/auth-bg.webp'
 
 /**
  * AuthScreen — экран регистрации/входа. Показывается ПЕРЕД основным приложением
@@ -124,7 +125,7 @@ export function AuthScreen({ onComplete }: Props) {
       <div className="gg-auth-left">
         {/* Фоновая картинка — если нет файла, скрывается через onError */}
         <img
-          src="verstak-auth-bg.webp"
+          src={authBgUrl}
           className="gg-auth-bg-image"
           alt=""
           onError={e => { (e.target as HTMLElement).style.display = 'none' }}
