@@ -291,7 +291,12 @@ export const TOOL_DEFS: ToolDefinition[] = [
               id: { type: 'string', description: 'Уникальный ID задачи для идентификации в результатах' },
               prompt: { type: 'string', description: 'Текст задачи для субагента' },
               provider_id: { type: 'string', description: 'Провайдер (опц. — по умолчанию текущий)' },
-              model: { type: 'string', description: 'Модель (опц.)' }
+              model: { type: 'string', description: 'Модель (опц.)' },
+              role: {
+                type: 'string',
+                enum: ['planner', 'critic', 'executor', 'verifier', 'researcher'],
+                description: 'Роль субагента — определяет его поведение и фокус (опц.)'
+              }
             },
             required: ['id', 'prompt']
           },

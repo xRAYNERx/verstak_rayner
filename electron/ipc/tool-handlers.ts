@@ -31,6 +31,7 @@ import { join } from 'path'
 import type { Attachment, ToolCall, ToolResult } from '../ai/types'
 import { applySearchReplaceBlocks, type FileTools } from '../ai/tools'
 import { decide, blockReason, type AgentMode } from '../ai/mode-policy'
+import { getRolePrompt } from '../ai/agent-roles'
 
 const execFileAsync = promisify(execFile)
 
@@ -600,7 +601,7 @@ const delegateParallelHandler: ToolHandler = {
   mode: 'sequential',
   async handle(call, ctx) {
     try {
-      const tasks = call.args.tasks as Array<{ id: string; prompt: string; provider_id?: string; model?: string }> | undefined
+      const tasks = call.args.tasks as Array<{ id: string; prompt: string; provider_id?: string; model?: string; role?: string }> | undefined
       if (!Array.isArray(tasks) || tasks.length === 0) {
         return { id: call.id, name: call.name, result: '', error: 'delegate_parallel: tasks обязателен и не должен быть пустым' }
       }
@@ -648,9 +649,14 @@ const delegateParallelHandler: ToolHandler = {
               cwd: ctx.projectPath,
               signal: taskAc.signal
             })
+            const rolePrompt = task.role ? getRolePrompt(task.role) : null
+            const systemContent = rolePrompt ?? 'Ты — sub-agent. Выполни узкую задачу, ответь в 1-3 параграфа. Без лишних tools / markdown.'
+            const fullPrompt = rolePrompt
+              ? `${rolePrompt}\n\n---\n\nЗадача:\n${task.prompt}`
+              : task.prompt
             const messages = [
-              { role: 'system' as const, content: 'Ты — sub-agent. Выполни узкую задачу, ответь в 1-3 параграфа. Без лишних tools / markdown.' },
-              { role: 'user' as const, content: task.prompt }
+              { role: 'system' as const, content: systemContent },
+              { role: 'user' as const, content: fullPrompt }
             ]
             let collected = ''
             for await (const event of provider.send(messages, [])) {

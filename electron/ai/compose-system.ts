@@ -94,6 +94,12 @@ export async function prepareParts(input: PrepareSystemInput): Promise<PreparedP
     userLayer = { path: userLayer.path, content: userLayer.content + karpathyHint }
   }
 
+  // Подсказка про мультиагентные роли в delegate_parallel.
+  if (userLayer.content !== undefined) {
+    const delegateHint = '\n\n<!-- delegate_parallel_roles_hint -->\ndelegate_parallel поддерживает роли: planner (разбей задачу), critic (найди проблемы), executor (сделай), verifier (проверь), researcher (исследуй код). Роли опциональны.'
+    userLayer = { path: userLayer.path, content: userLayer.content + delegateHint }
+  }
+
   let contextPack = ''
   if (projectPath) {
     const lastUser = messages.filter(m => m.role === 'user').at(-1)
