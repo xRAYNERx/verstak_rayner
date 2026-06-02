@@ -65,7 +65,7 @@ describe('compactToolHistory', () => {
     const r = out[1].toolResults![0].result as string
     expect(r.length).toBeLessThan(50_000)
     expect(r.length).toBeLessThanOrEqual(12_000)
-    expect(r).toMatch(/вырезано/)
+    expect(r).toMatch(/omitted|вырезано/)
   })
 
   it('не модифицирует оригинальный массив', () => {
