@@ -1,9 +1,11 @@
 import { ipcMain } from 'electron'
+import type { Database } from 'better-sqlite3'
 import type { Chats } from '../storage/chats'
 import type { ChatSessions, ChatKind } from '../storage/chat-sessions'
 import { forgetMemorizedChat } from './ai'
+import { summarizeAndSaveSession } from '../ai/session-summary'
 
-export function registerChatsIpc(chats: Chats, sessions: ChatSessions): void {
+export function registerChatsIpc(chats: Chats, sessions: ChatSessions, db: Database): void {
   // Sessions
   ipcMain.handle('chat-sessions:list', (_e, projectPath: string) => sessions.list(projectPath))
   /** Review sub-chats для родительского — для рендера pills в Timeline. */
@@ -20,6 +22,12 @@ export function registerChatsIpc(chats: Chats, sessions: ChatSessions): void {
     sessions.setProviderModel(id, providerId, model)
   )
   ipcMain.handle('chat-sessions:remove', (_e, id: number) => {
+    // Читаем сессию и сообщения перед удалением, чтобы сохранить резюме в памяти
+    const session = sessions.get(id)
+    if (session) {
+      const messages = chats.listBySession(id)
+      summarizeAndSaveSession(db, id, session.projectPath, messages)
+    }
     sessions.remove(id)
     // Clear memory-injection cache so if a new session reuses this id as key,
     // it still receives a fresh memory injection.

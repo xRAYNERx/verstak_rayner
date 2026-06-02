@@ -11,6 +11,7 @@ export interface Memory {
   tags: string[]
   created_at: number
   accessed_at: number
+  decay_score: number
 }
 
 // Row shape as stored in SQLite — tags is a JSON string
@@ -22,6 +23,7 @@ interface MemoryRow {
   tags: string
   created_at: number
   accessed_at: number
+  decay_score: number
 }
 
 function rowToMemory(row: MemoryRow): Memory {
@@ -31,7 +33,7 @@ function rowToMemory(row: MemoryRow): Memory {
   } catch {
     tags = []
   }
-  return { ...row, tags }
+  return { ...row, tags, decay_score: row.decay_score ?? 1.0 }
 }
 
 export function saveMemory(
@@ -46,20 +48,20 @@ export function saveMemory(
 
   // Try insert, ignore if duplicate
   const result = db.prepare(
-    `INSERT OR IGNORE INTO memories (id, project_path, type, content, tags, created_at, accessed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT OR IGNORE INTO memories (id, project_path, type, content, tags, created_at, accessed_at, decay_score)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1.0)`
   ).run(id, projectPath, type, content, JSON.stringify(tags), now, now)
 
   if (result.changes === 0) {
-    // Дубль — last-write-wins: обновить type, tags и accessed_at, затем вернуть актуальную запись
-    db.prepare(`UPDATE memories SET type = ?, tags = ?, accessed_at = ? WHERE project_path = ? AND content = ?`)
+    // Дубль — last-write-wins: обновить type, tags, accessed_at и сбросить decay, затем вернуть актуальную запись
+    db.prepare(`UPDATE memories SET type = ?, tags = ?, accessed_at = ?, decay_score = 1.0 WHERE project_path = ? AND content = ?`)
       .run(type, JSON.stringify(tags), now, projectPath, content)
     const updated = db.prepare(`SELECT * FROM memories WHERE project_path = ? AND content = ?`)
       .get(projectPath, content) as MemoryRow
     return rowToMemory(updated)
   }
 
-  return { id, project_path: projectPath, type, content, tags, created_at: now, accessed_at: now }
+  return { id, project_path: projectPath, type, content, tags, created_at: now, accessed_at: now, decay_score: 1.0 }
 }
 
 export function searchMemories(
@@ -95,9 +97,9 @@ export function searchMemories(
     const ids = rows.map(r => r.id)
     const placeholders = ids.map(() => '?').join(', ')
     db.prepare(
-      `UPDATE memories SET accessed_at = ? WHERE id IN (${placeholders})`
+      `UPDATE memories SET accessed_at = ?, decay_score = 1.0 WHERE id IN (${placeholders})`
     ).run(now, ...ids)
-    return rows.map(r => rowToMemory({ ...r, accessed_at: now }))
+    return rows.map(r => rowToMemory({ ...r, accessed_at: now, decay_score: 1.0 }))
   }
 
   return rows.map(rowToMemory)
@@ -113,4 +115,31 @@ export function listMemories(db: Database, projectPath: string): Memory[] {
 export function deleteMemory(db: Database, id: string): boolean {
   const info = db.prepare('DELETE FROM memories WHERE id = ?').run(id)
   return info.changes > 0
+}
+
+/**
+ * Применяет формулу затухания Эббингауза к воспоминаниям.
+ * Вызывается один раз при старте приложения.
+ *
+ * Формула: каждый день без обращения decay_score *= 0.95
+ * Удаляем записи старше 30 дней с decay_score < 0.1.
+ */
+export function applyMemoryDecay(db: Database): { decayed: number; deleted: number } {
+  const now = Date.now()
+  const DAY_MS = 86_400_000
+
+  // Уменьшаем score для записей, к которым не обращались более суток
+  const decayed = db.prepare(`
+    UPDATE memories
+    SET decay_score = decay_score * 0.95
+    WHERE accessed_at < ? AND decay_score > 0.05
+  `).run(now - DAY_MS).changes
+
+  // Удаляем совсем протухшие (>30 дней без обращения И score < 0.1)
+  const deleted = db.prepare(`
+    DELETE FROM memories
+    WHERE accessed_at < ? AND decay_score < 0.1
+  `).run(now - 30 * DAY_MS).changes
+
+  return { decayed, deleted }
 }

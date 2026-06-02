@@ -38,7 +38,7 @@ import { registerSkillsIpc } from './ipc/skills'
 import { createUserProfiles } from './storage/user-profiles'
 import { registerUserProfilesIpc } from './ipc/user-profiles'
 import { registerMemoryIpc } from './ipc/memory'
-import { saveMemory, searchMemories } from './storage/memories'
+import { saveMemory, searchMemories, applyMemoryDecay } from './storage/memories'
 import { searchConversations } from './storage/chats'
 import { registerCommandsIpc } from './ipc/commands'
 
@@ -154,6 +154,16 @@ app.whenReady().then(() => {
     app.quit()
     return
   }
+  // Затухание памяти — раз в запуск, тихо
+  try {
+    const decayResult = applyMemoryDecay(db)
+    if (decayResult.decayed > 0 || decayResult.deleted > 0) {
+      console.log(`[memory] decay: ${decayResult.decayed} updated, ${decayResult.deleted} deleted`)
+    }
+  } catch (err) {
+    console.warn('[memory] decay failed:', err instanceof Error ? err.message : err)
+  }
+
   const settings = createSettings(db, safeStorage)
 
   const ENV_MAP: Record<string, string> = {
@@ -258,7 +268,7 @@ app.whenReady().then(() => {
       }))
     }
   })
-  registerChatsIpc(chats, chatSessions)
+  registerChatsIpc(chats, chatSessions, db)
   registerTasksIpc(tasks)
   registerJournalIpc(journal)
   registerUndoIpc(undoStack)

@@ -245,6 +245,16 @@ const MIGRATIONS: Array<{ version: number; description: string; run: (db: DB) =>
         END;
       `)
     }
+  },
+  {
+    version: 7,
+    description: 'memories: add decay_score column for Ebbinghaus forgetting curve',
+    run: (db: DB) => {
+      const cols = (db.prepare('PRAGMA table_info(memories)').all() as Array<{ name: string }>).map(c => c.name)
+      if (!cols.includes('decay_score')) {
+        db.exec('ALTER TABLE memories ADD COLUMN decay_score REAL NOT NULL DEFAULT 1.0')
+      }
+    }
   }
 ]
 
