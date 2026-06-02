@@ -50,6 +50,71 @@ function tailTruncate(text: string, cap: number): string {
   return `${text.slice(0, headLen)}\n[…вырезано ${text.length - cap + 60} симв., см. оригинал в исходном файле…]\n${text.slice(text.length - tailLen)}`
 }
 
+// ─── Smart compression helpers ────────────────────────────────────────────────
+
+function truncateWithContext(text: string, max: number): string {
+  if (text.length <= max) return text
+  const head = Math.floor(max * 0.6)
+  const tail = Math.floor(max * 0.3)
+  return text.slice(0, head) + `\n... (${text.length - head - tail} chars omitted) ...\n` + text.slice(-tail)
+}
+
+function keepTail(text: string, max: number): string {
+  if (text.length <= max) return text
+  const lines = text.split('\n')
+  const result: string[] = []
+  let len = 0
+  for (let i = lines.length - 1; i >= 0 && len < max; i--) {
+    result.unshift(lines[i])
+    len += lines[i].length + 1
+  }
+  const omitted = lines.length - result.length
+  return omitted > 0 ? `(${omitted} lines omitted)\n` + result.join('\n') : result.join('\n')
+}
+
+function truncateList(text: string, max: number): string {
+  if (text.length <= max) return text
+  const lines = text.split('\n').filter(l => l.trim())
+  const keepN = Math.max(10, Math.floor(max / 80))
+  return lines.slice(0, keepN).join('\n') + `\n... (${lines.length - keepN} more results)`
+}
+
+/**
+ * Умное сжатие tool result с учётом типа инструмента.
+ * Вместо единого tailTruncate — подбираем стратегию по имени тулзы.
+ */
+export function smartCompressResult(toolName: string, result: string, maxLen: number): string {
+  if (result.length <= maxLen) return result
+
+  switch (toolName) {
+    case 'read_file':
+      // Файл: голова + хвост — начало и конец чаще всего важнее середины
+      return truncateWithContext(result, maxLen)
+
+    case 'run_command':
+      // Команда: последние строки самые релевантные (итог, ошибки)
+      return keepTail(result, maxLen)
+
+    case 'search_project':
+    case 'find_files':
+      // Список совпадений: первые N результатов + счётчик остатка
+      return truncateList(result, maxLen)
+
+    case 'list_directory':
+      // Листинг: та же логика что и для списков
+      return truncateList(result, maxLen)
+
+    case 'get_project_map':
+    case 'refresh_project_map':
+      // Карта проекта: голова + хвост сохраняют структуру лучше
+      return truncateWithContext(result, maxLen)
+
+    default:
+      // Generic: первые 60% + последние 30%
+      return truncateWithContext(result, maxLen)
+  }
+}
+
 /**
  * Возвращает компактную копию messages для отправки провайдеру.
  *
@@ -103,7 +168,7 @@ function capFreshResults(m: ChatMessage): ChatMessage {
     const raw = typeof r.result === 'string' ? r.result : JSON.stringify(r.result)
     if (raw.length <= FRESH_RESULT_HARD_CAP) return r
     changed = true
-    return { ...r, result: tailTruncate(raw, FRESH_RESULT_HARD_CAP) }
+    return { ...r, result: smartCompressResult(r.name, raw, FRESH_RESULT_HARD_CAP) }
   })
   return changed ? { ...m, toolResults: next } : m
 }

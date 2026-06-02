@@ -87,6 +87,13 @@ export async function prepareParts(input: PrepareSystemInput): Promise<PreparedP
     userLayer = { path: userLayer.path, content: userLayer.content + hint }
   }
 
+  // Принципы Карпати — краткие правила AI-кодинга, добавляются к userLayer.
+  // Намеренно коротко: идут в каждый промпт, каждый токен на счету.
+  if (userLayer.content !== undefined) {
+    const karpathyHint = '\n\n<!-- agent_principles -->\n## Принципы работы\n1. Думай перед кодом — озвучивай предположения, при неопределённости спроси\n2. Минимализм — только запрошенный код, без спекулятивных абстракций\n3. Точечные правки — меняй только что просили, сохраняй существующий стиль\n4. Цели через тесты — сначала критерий «как поймём что готово», потом код'
+    userLayer = { path: userLayer.path, content: userLayer.content + karpathyHint }
+  }
+
   let contextPack = ''
   if (projectPath) {
     const lastUser = messages.filter(m => m.role === 'user').at(-1)

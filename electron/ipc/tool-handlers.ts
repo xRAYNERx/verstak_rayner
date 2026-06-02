@@ -1054,6 +1054,97 @@ const conversationSearchHandler: ToolHandler = {
 }
 
 // ============================================================================
+// convert_file — конвертация не-текстовых форматов в markdown/text
+// ============================================================================
+
+function csvToMarkdown(lines: string[]): string {
+  if (lines.length === 0) return '(пустой CSV)'
+  const rows = lines.map(l => l.split(',').map(c => c.trim()))
+  const header = rows[0]
+  const sep = header.map(() => '---')
+  const body = rows.slice(1)
+  return [
+    '| ' + header.join(' | ') + ' |',
+    '| ' + sep.join(' | ') + ' |',
+    ...body.map(r => '| ' + r.join(' | ') + ' |')
+  ].join('\n')
+}
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 10000)
+}
+
+const convertFileHandler: ToolHandler = {
+  mode: 'parallel-read',
+  async handle(call, ctx) {
+    try {
+      const { readFileSync, existsSync } = await import('fs')
+      const { extname } = await import('path')
+      const { safeRealJoin } = await import('../ai/path-policy')
+      const relPath = String(call.args.path ?? '')
+      if (!relPath) {
+        return { id: call.id, name: call.name, result: '', error: 'convert_file: path обязателен' }
+      }
+      const filePath = await safeRealJoin(ctx.projectPath, relPath)
+      if (!existsSync(filePath)) {
+        return { id: call.id, name: call.name, result: '', error: `convert_file: файл не найден: ${relPath}` }
+      }
+      const ext = extname(filePath).toLowerCase()
+
+      if (ext === '.csv') {
+        const text = readFileSync(filePath, 'utf-8')
+        const lines = text.split('\n').filter(l => l.trim()).slice(0, 50)
+        const result = csvToMarkdown(lines)
+        emitActivity(ctx, call, 'ok', 'convert_file', `${relPath} · CSV → table`)
+        return { id: call.id, name: call.name, result }
+      }
+
+      if (ext === '.html' || ext === '.htm') {
+        const html = readFileSync(filePath, 'utf-8')
+        emitActivity(ctx, call, 'ok', 'convert_file', `${relPath} · HTML → text`)
+        return { id: call.id, name: call.name, result: stripHtml(html) }
+      }
+
+      if (ext === '.docx') {
+        // mammoth уже в зависимостях для ArtifactPreview
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const mammoth = require('mammoth') as { extractRawText: (opts: { path: string }) => Promise<{ value: string }> }
+        const result = await mammoth.extractRawText({ path: filePath })
+        emitActivity(ctx, call, 'ok', 'convert_file', `${relPath} · DOCX → text`)
+        return { id: call.id, name: call.name, result: result.value.slice(0, 20000) }
+      }
+
+      if (ext === '.json') {
+        const text = readFileSync(filePath, 'utf-8')
+        emitActivity(ctx, call, 'ok', 'convert_file', `${relPath} · JSON`)
+        return { id: call.id, name: call.name, result: '```json\n' + text.slice(0, 10000) + '\n```' }
+      }
+
+      if (ext === '.xml') {
+        const text = readFileSync(filePath, 'utf-8')
+        emitActivity(ctx, call, 'ok', 'convert_file', `${relPath} · XML`)
+        return { id: call.id, name: call.name, result: text.slice(0, 10000) }
+      }
+
+      return {
+        id: call.id, name: call.name,
+        result: `Формат ${ext} не поддерживается. Поддерживаемые: .csv, .html, .htm, .docx, .json, .xml`
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      emitActivity(ctx, call, 'error', call.name, msg)
+      return { id: call.id, name: call.name, result: '', error: msg }
+    }
+  }
+}
+
+// ============================================================================
 // Registry — single source of truth for tool dispatch
 // ============================================================================
 
@@ -1085,7 +1176,9 @@ const HANDLER_REGISTRY: Record<string, ToolHandler> = {
   // Diagnostics — parallel-read, no user confirmation needed
   'check_diagnostics': checkDiagnosticsHandler,
   // Conversation history search — parallel-read, FTS5
-  'conversation_search': conversationSearchHandler
+  'conversation_search': conversationSearchHandler,
+  // File conversion — parallel-read, no user confirmation needed
+  'convert_file': convertFileHandler
 }
 
 /**

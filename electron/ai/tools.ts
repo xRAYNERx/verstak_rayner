@@ -400,6 +400,17 @@ export const TOOL_DEFS: ToolDefinition[] = [
     }
   },
   {
+    name: 'convert_file',
+    description: 'Конвертирует файл (DOCX, CSV, HTML, JSON, XML) в текст/markdown. Используй когда нужно прочитать не-текстовый файл.',
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Путь к файлу (относительно корня проекта)' }
+      },
+      required: ['path']
+    }
+  },
+  {
     name: 'generate_docx',
     description: 'Сохранить артефакт в формате Word (.docx). Файл попадает в .verstak/artifacts/{YYYY-MM-DD}/. Принимает структуру секций — каждая с heading и параграфами.',
     parameters: {
