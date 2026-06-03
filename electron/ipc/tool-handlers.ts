@@ -1362,9 +1362,8 @@ const screenInfoHandler: ToolHandler = {
         const tag = d.id === primary.id ? ' [primary]' : ''
         return `Monitor ${i + 1}: ${d.size.width}x${d.size.height} (scale ${d.scaleFactor}x) pos=(${d.bounds.x},${d.bounds.y})${tag}`
       })
-      const result = lines.join('
-')
-      emitActivity(ctx, call, 'ok', 'screen_info', `${displays.length} монитор(ов)`)
+      const result = lines.join('\n')
+      emitActivity(ctx, call, 'ok', 'screen_info', `${displays.length} мониторов`)
       return { id: call.id, name: call.name, result }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
