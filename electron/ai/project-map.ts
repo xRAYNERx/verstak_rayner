@@ -18,7 +18,7 @@
  */
 
 import { readdir, stat, readFile } from 'fs/promises'
-import { join, relative } from 'path'
+import { join, relative, dirname, resolve, extname } from 'path'
 
 const IGNORE_DIRS = new Set([
   'node_modules', '.git', 'out', 'dist', '.next', '.vite', '.verstak',
@@ -194,6 +194,138 @@ export function projectMapToText(map: ProjectMap, opts: ProjectMapTextOptions = 
     if (!compact) lines.push('')
   }
   return lines.join('\n')
+}
+
+// ============================================================================
+// Dependency map — Feature 5
+// ============================================================================
+
+export interface DependencyMap {
+  files: Record<string, {
+    imports: string[]      // relative posix paths this file imports (resolved)
+    importedBy: string[]   // files that import this file
+    exports: string[]      // exported symbol names
+  }>
+}
+
+const IMPORT_RE = /(?:^|\n)\s*import\s+(?:[\s\S]*?\s+from\s+)?['"]([^'"]+)['"]/g
+const REQUIRE_RE = /(?:^|\n)\s*(?:const|let|var)\s+[\s\S]*?=\s*require\s*\(\s*['"]([^'"]+)['"]\s*\)/g
+const EXPORT_SYM_RE = /^\s*export\s+(?:async\s+)?(?:function|class|const|let|var|type|interface|enum)\s+([A-Za-z_$][\w$]*)/gm
+const EXPORT_DEFAULT_RE = /^\s*export\s+default\s+(?:async\s+)?(?:function|class)\s+([A-Za-z_$][\w$]*)/gm
+
+function collectImportPaths(content: string): string[] {
+  const paths: string[] = []
+  let m: RegExpExecArray | null
+  IMPORT_RE.lastIndex = 0
+  while ((m = IMPORT_RE.exec(content)) !== null) paths.push(m[1])
+  REQUIRE_RE.lastIndex = 0
+  while ((m = REQUIRE_RE.exec(content)) !== null) paths.push(m[1])
+  return paths
+}
+
+function collectExports(content: string): string[] {
+  const syms: string[] = []
+  let m: RegExpExecArray | null
+  EXPORT_SYM_RE.lastIndex = 0
+  while ((m = EXPORT_SYM_RE.exec(content)) !== null) syms.push(m[1])
+  EXPORT_DEFAULT_RE.lastIndex = 0
+  while ((m = EXPORT_DEFAULT_RE.exec(content)) !== null) syms.push(m[1])
+  return [...new Set(syms)]
+}
+
+/** Resolve a bare import specifier to a relative posix path within the project,
+ *  or null if it's an external package. */
+function resolveImport(fromAbs: string, specifier: string, root: string): string | null {
+  if (!specifier.startsWith('.') && !specifier.startsWith('/')) return null  // npm package
+  const fromDir = dirname(fromAbs)
+  const resolved = resolve(fromDir, specifier)
+  // Try with known extensions if the specifier had none
+  const candidates: string[] = [resolved]
+  const ext = extname(resolved)
+  if (!ext) {
+    candidates.push(
+      resolved + '.ts', resolved + '.tsx', resolved + '.js', resolved + '.jsx',
+      join(resolved, 'index.ts'), join(resolved, 'index.tsx'), join(resolved, 'index.js')
+    )
+  }
+  for (const c of candidates) {
+    // We can't do existsSync here (async context) — use best-effort posix path
+    const rel = relative(root, c).replace(/\\/g, '/')
+    if (!rel.startsWith('..')) return rel
+  }
+  return null
+}
+
+// In-memory dependency map cache keyed by project root
+const depCache = new Map<string, DependencyMap>()
+
+export async function buildDependencyMap(projectRoot: string): Promise<DependencyMap> {
+  const fileMap: DependencyMap['files'] = {}
+
+  async function walk(dir: string): Promise<void> {
+    let entries: string[]
+    try { entries = await readdir(dir) } catch { return }
+    entries.sort()
+    for (const name of entries) {
+      if (IGNORE_DIRS.has(name)) continue
+      if (name.startsWith('.')) continue
+      const abs = join(dir, name)
+      let st
+      try { st = await stat(abs) } catch { continue }
+      if (st.isDirectory()) { await walk(abs); continue }
+      if (!st.isFile()) continue
+      const dotIdx = name.lastIndexOf('.')
+      const ext = dotIdx > 0 ? name.slice(dotIdx) : ''
+      if (!CODE_EXT.has(ext)) continue
+      if (st.size > MAX_FILE_SCAN_BYTES) continue
+      let content: string
+      try { content = await readFile(abs, 'utf8') } catch { continue }
+      const rel = relative(projectRoot, abs).replace(/\\/g, '/')
+      const rawImports = collectImportPaths(content)
+      const resolvedImports: string[] = []
+      for (const spec of rawImports) {
+        const r = resolveImport(abs, spec, projectRoot)
+        if (r) resolvedImports.push(r)
+      }
+      fileMap[rel] = {
+        imports: [...new Set(resolvedImports)],
+        importedBy: [],  // filled in pass 2
+        exports: collectExports(content)
+      }
+    }
+  }
+
+  await walk(projectRoot)
+
+  // Pass 2: fill importedBy
+  for (const [file, info] of Object.entries(fileMap)) {
+    for (const imp of info.imports) {
+      // imp may lack extension — try exact match first, then with extensions
+      const candidates = [imp, imp + '.ts', imp + '.tsx', imp + '.js', imp + '.jsx']
+      for (const c of candidates) {
+        if (fileMap[c]) {
+          if (!fileMap[c].importedBy.includes(file)) fileMap[c].importedBy.push(file)
+          break
+        }
+      }
+    }
+  }
+
+  return { files: fileMap }
+}
+
+export async function getDependencyMap(root: string, refresh = false): Promise<DependencyMap> {
+  if (!refresh) {
+    const cached = depCache.get(root)
+    if (cached) return cached
+  }
+  const map = await buildDependencyMap(root)
+  depCache.set(root, map)
+  return map
+}
+
+export function invalidateDependencyMap(root: string): void {
+  depCache.delete(root)
 }
 
 // In-memory cache keyed by project root

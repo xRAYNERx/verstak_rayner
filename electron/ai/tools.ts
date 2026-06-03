@@ -3,10 +3,11 @@ import { join, relative } from 'path'
 import { execFile, spawn } from 'child_process'
 import { promisify } from 'util'
 import { existsSync } from 'fs'
+import { createHash } from 'crypto'
 import type { ToolDefinition } from './types'
 import { classifyCommand } from './command-policy'
 import { isForbiddenPath, scanText } from './secret-scanner'
-import { getProjectMap, invalidateProjectMap, projectMapToText } from './project-map'
+import { getProjectMap, invalidateProjectMap, projectMapToText, getDependencyMap, invalidateDependencyMap } from './project-map'
 import { safeRealJoin } from './path-policy'
 import { treeKill } from './child-kill'
 
@@ -66,7 +67,8 @@ export const TOOL_DEFS: ToolDefinition[] = [
       type: 'object',
       properties: {
         path: { type: 'string', description: 'Относительный путь к существующему файлу.' },
-        diff: { type: 'string', description: 'Один или несколько SEARCH/REPLACE блоков.' }
+        diff: { type: 'string', description: 'Один или несколько SEARCH/REPLACE блоков.' },
+        anchor_hash: { type: 'string', description: 'SHA-256 первых 8 символов от строки-якоря. Если указан, патч применяется только если хэш строки совпадает — защита от промаха по позиции. Опционально.' }
       },
       required: ['path', 'diff']
     }
@@ -307,6 +309,18 @@ export const TOOL_DEFS: ToolDefinition[] = [
     }
   },
   {
+    name: 'impact_analysis',
+    description: 'Показывает какие файлы зависят от указанного файла или символа. Используй перед рефакторингом чтобы понять масштаб изменений.',
+    parameters: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', description: 'Путь к файлу (относительный от корня проекта)' },
+        symbol: { type: 'string', description: 'Имя символа (опц.) — если указан, ищет использования конкретного символа в зависимых файлах' }
+      },
+      required: ['file']
+    }
+  },
+  {
     name: 'generate_html',
     description: 'Сохранить артефакт в формате HTML (КП, аудит, отчёт). Файл попадает в .verstak/artifacts/{YYYY-MM-DD}/ и открывается в preview pane. Используй для клиентских артефактов где важна визуальная структура.',
     parameters: {
@@ -416,6 +430,30 @@ export const TOOL_DEFS: ToolDefinition[] = [
     }
   },
   {
+    name: 'screen_capture',
+    description: 'Делает скриншот экрана или активного окна Verstak. Скриншот прикрепляется к следующему сообщению как изображение — провайдеры с vision (Gemini, GPT-4o, Claude) увидят его и смогут проанализировать визуально. Используй для GUI-автоматизации, визуального анализа интерфейса или отладки.',
+    parameters: {
+      type: 'object',
+      properties: {
+        target: {
+          type: 'string',
+          enum: ['screen', 'window'],
+          description: 'screen = весь экран (default), window = активное окно Verstak'
+        }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'screen_info',
+    description: 'Возвращает информацию о подключённых мониторах: разрешение, позиция, масштаб, первичный дисплей.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
     name: 'generate_docx',
     description: 'Сохранить артефакт в формате Word (.docx). Файл попадает в .verstak/artifacts/{YYYY-MM-DD}/. Принимает структуру секций — каждая с heading и параграфами.',
     parameters: {
@@ -451,6 +489,11 @@ export const TOOL_DEFS: ToolDefinition[] = [
   }
 ]
 
+/** SHA-256 hash of a trimmed line, first 8 hex chars. Used for anchor_hash safety check. */
+export function hashLine(line: string): string {
+  return createHash('sha256').update(line.trim()).digest('hex').slice(0, 8)
+}
+
 export interface FileTools {
   execute: (name: string, args: Record<string, unknown>) => Promise<unknown>
   /** Pure execution — used by the IPC layer after user has confirmed the command. */
@@ -465,7 +508,7 @@ export interface FileTools {
  * matches). Throws with a precise error if a block doesn't match or is
  * ambiguous — important so the AI sees feedback and can correct.
  */
-export function applySearchReplaceBlocks(input: string, diff: string): string {
+export function applySearchReplaceBlocks(input: string, diff: string, anchorHash?: string): string {
   const blockRe = /<{7,}\s*SEARCH\s*\n([\s\S]*?)\n={7,}\s*\n([\s\S]*?)\n>{7,}\s*REPLACE\b/g
   let result = input
   let applied = 0
@@ -475,6 +518,14 @@ export function applySearchReplaceBlocks(input: string, diff: string): string {
     const replace = m[2]
     if (!search) {
       throw new Error(`apply_patch: пустой SEARCH блок в позиции ${applied + 1}`)
+    }
+    // Anchor hash check — only on the first block if anchor_hash is provided
+    if (applied === 0 && anchorHash) {
+      const firstLine = search.split('\n')[0]
+      const actual = hashLine(firstLine)
+      if (actual !== anchorHash) {
+        throw new Error(`apply_patch: хэш якоря не совпадает — файл изменился. Ожидалось "${anchorHash}", получено "${actual}". Перечитай файл и составь патч по актуальному содержимому.`)
+      }
     }
     // Primary: exact match
     let first = result.indexOf(search)
@@ -766,8 +817,9 @@ export function createFileTools(root: string, signal?: AbortSignal): FileTools {
         }
         const abs = await safeRealJoin(root, relPath)
         await writeFile(abs, String(args.content), 'utf8')
-        // Invalidate project map cache so the next get_project_map sees this file
+        // Invalidate caches so the next get_project_map / impact_analysis sees this file
         invalidateProjectMap(root)
+        invalidateDependencyMap(root)
         return { ok: true }
       }
       if (name === 'apply_patch') {
@@ -781,9 +833,11 @@ export function createFileTools(root: string, signal?: AbortSignal): FileTools {
         }
         const abs = await safeRealJoin(root, relPath)
         const before = await readFile(abs, 'utf8')
-        const after = applySearchReplaceBlocks(before, String(args.diff))
+        const anchorHash = args.anchor_hash ? String(args.anchor_hash) : undefined
+        const after = applySearchReplaceBlocks(before, String(args.diff), anchorHash)
         await writeFile(abs, after, 'utf8')
         invalidateProjectMap(root)
+        invalidateDependencyMap(root)
         return { ok: true, before, after }
       }
       if (name === 'run_command') {

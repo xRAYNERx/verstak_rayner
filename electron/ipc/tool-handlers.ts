@@ -238,9 +238,10 @@ const applyPatchHandler: ToolHandler = {
   async handle(call, ctx) {
     const path = String(call.args.path)
     const before = await readBeforeContent(ctx, path)
+    const anchorHash = call.args.anchor_hash ? String(call.args.anchor_hash) : undefined
     let after: string
     try {
-      after = applySearchReplaceBlocks(before, String(call.args.diff ?? ''))
+      after = applySearchReplaceBlocks(before, String(call.args.diff ?? ''), anchorHash)
     } catch (err) {
       return { id: call.id, name: call.name, result: '', error: err instanceof Error ? err.message : String(err) }
     }
@@ -1151,6 +1152,229 @@ const convertFileHandler: ToolHandler = {
 }
 
 // ============================================================================
+// impact_analysis — Feature 6: что сломается при изменении файла/символа
+// ============================================================================
+
+const impactAnalysisHandler: ToolHandler = {
+  mode: 'parallel-read',
+  async handle(call, ctx) {
+    try {
+      const { getDependencyMap } = await import('../ai/project-map')
+      const { readFile } = await import('fs/promises')
+      const { safeRealJoin } = await import('../ai/path-policy')
+
+      const file = String(call.args.file ?? '').replace(/\\/g, '/')
+      if (!file) {
+        return { id: call.id, name: call.name, result: '', error: 'impact_analysis: file обязателен' }
+      }
+      const symbol = call.args.symbol ? String(call.args.symbol) : null
+
+      const depMap = await getDependencyMap(ctx.projectPath)
+      const fileInfo = depMap.files[file]
+      if (!fileInfo) {
+        // Try to find a close match (with/without extension)
+        const candidates = Object.keys(depMap.files).filter(k =>
+          k === file || k.startsWith(file + '.') || k.startsWith(file + '/index.')
+        )
+        if (candidates.length === 0) {
+          return { id: call.id, name: call.name, result: `Файл "${file}" не найден в dependency map. Убедись что путь корректный (относительно корня проекта).` }
+        }
+        // Re-run with the first candidate
+        call = { ...call, args: { ...call.args, file: candidates[0] } }
+        return impactAnalysisHandler.handle(call, ctx)
+      }
+
+      const direct = fileInfo.importedBy
+      // Transitive level 2 (max depth 3 total)
+      const level2: Map<string, string[]> = new Map()  // file → via which direct dep
+      for (const d of direct) {
+        const dInfo = depMap.files[d]
+        if (!dInfo) continue
+        for (const d2 of dInfo.importedBy) {
+          if (d2 !== file && !direct.includes(d2)) {
+            if (!level2.has(d2)) level2.set(d2, [])
+            level2.get(d2)!.push(d)
+          }
+        }
+      }
+      const level3: Map<string, string[]> = new Map()  // file → via which l2 dep
+      for (const [l2file] of level2) {
+        const l2Info = depMap.files[l2file]
+        if (!l2Info) continue
+        for (const d3 of l2Info.importedBy) {
+          if (d3 !== file && !direct.includes(d3) && !level2.has(d3)) {
+            if (!level3.has(d3)) level3.set(d3, [])
+            level3.get(d3)!.push(l2file)
+          }
+        }
+      }
+
+      const lines: string[] = [`📁 ${file}`]
+      if (fileInfo.exports.length > 0) {
+        lines.push(`\nЭкспорты: ${fileInfo.exports.join(', ')}`)
+      }
+
+      if (direct.length === 0 && level2.size === 0) {
+        lines.push('\nНет зависимых файлов — файл ни кем не импортируется.')
+      } else {
+        lines.push(`\nПрямые зависимости (импортируют этот файл):`)
+        if (direct.length === 0) {
+          lines.push('  (нет)')
+        } else {
+          for (const d of direct) lines.push(`  → ${d}`)
+        }
+
+        if (level2.size > 0) {
+          lines.push(`\nТранзитивные (2-й уровень):`)
+          for (const [f, vias] of level2) {
+            lines.push(`  → ${f} (через ${vias.join(', ')})`)
+          }
+        }
+
+        if (level3.size > 0) {
+          lines.push(`\nТранзитивные (3-й уровень):`)
+          for (const [f, vias] of level3) {
+            lines.push(`  → ${f} (через ${vias.join(', ')})`)
+          }
+        }
+      }
+
+      // Symbol search — grep for usage in dependent files
+      if (symbol) {
+        const symbolHits: string[] = []
+        const allDeps = [...direct, ...Array.from(level2.keys()), ...Array.from(level3.keys())]
+        for (const dep of allDeps) {
+          try {
+            const abs = await safeRealJoin(ctx.projectPath, dep)
+            const content = await readFile(abs, 'utf8')
+            const depLines = content.split('\n')
+            for (let i = 0; i < depLines.length; i++) {
+              if (depLines[i].includes(symbol)) {
+                const snippet = depLines[i].trim().slice(0, 120)
+                symbolHits.push(`  → ${dep}:${i + 1} — ${snippet}`)
+                break  // one hit per file is enough for overview
+              }
+            }
+          } catch { /* skip unreadable files */ }
+        }
+        if (symbolHits.length > 0) {
+          lines.push(`\nИспользуют символ "${symbol}":`)
+          lines.push(...symbolHits)
+        } else {
+          lines.push(`\nСимвол "${symbol}" не найден в зависимых файлах.`)
+        }
+      }
+
+      emitActivity(ctx, call, 'ok', 'impact_analysis', `${file} · ${direct.length} прямых зависимостей`)
+      return { id: call.id, name: call.name, result: lines.join('\n') }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      emitActivity(ctx, call, 'error', call.name, msg)
+      return { id: call.id, name: call.name, result: '', error: msg }
+    }
+  }
+}
+
+// ============================================================================
+// Screen: screen_capture / screen_info
+// ============================================================================
+
+const screenCaptureHandler: ToolHandler = {
+  mode: 'parallel-read',
+  async handle(call, ctx) {
+    try {
+      // desktopCapturer and screen are Electron main-process APIs — they are
+      // not available in Node.js / vitest environments, so we guard carefully.
+      const { desktopCapturer, screen: electronScreen } = await import('electron')
+      const target = call.args.target === 'window' ? 'window' : 'screen'
+
+      let dataUrl: string | null = null
+      let width = 0
+      let height = 0
+
+      if (target === 'screen') {
+        const sources = await desktopCapturer.getSources({
+          types: ['screen'],
+          thumbnailSize: { width: 1920, height: 1080 }
+        })
+        if (sources.length === 0) {
+          return { id: call.id, name: call.name, result: 'Не удалось захватить экран — источников не найдено' }
+        }
+        const img = sources[0].thumbnail
+        dataUrl = img.toDataURL()
+        const sz = img.getSize()
+        width = sz.width
+        height = sz.height
+      } else {
+        // window — захват окна Verstak через screen source
+        const primary = electronScreen.getPrimaryDisplay()
+        const sources = await desktopCapturer.getSources({
+          types: ['window'],
+          thumbnailSize: { width: primary.size.width, height: primary.size.height }
+        })
+        // Ищем окно Verstak по имени (title содержит 'Verstak' или 'Electron')
+        const win = sources.find(s => /verstak|electron/i.test(s.name)) ?? sources[0]
+        if (!win) {
+          return { id: call.id, name: call.name, result: 'Не найдено окно для захвата' }
+        }
+        const img = win.thumbnail
+        dataUrl = img.toDataURL()
+        const sz = img.getSize()
+        width = sz.width
+        height = sz.height
+      }
+
+      // Attach image to next AI message (same pattern as browser_screenshot)
+      if (dataUrl && dataUrl.startsWith('data:image/')) {
+        const m = /^data:(image\/[\w+-]+);base64,(.+)$/.exec(dataUrl)
+        if (m) {
+          ctx.pendingAttachments.push({
+            name: `screen-${Date.now()}.png`,
+            mimeType: m[1],
+            data: m[2],
+            size: Math.floor(m[2].length * 0.75)
+          })
+        }
+      }
+
+      emitActivity(ctx, call, 'ok', 'screen_capture', `${target} ${width}x${height}`)
+      return {
+        id: call.id,
+        name: call.name,
+        result: { target, width, height, attached: true, timestamp: Date.now() }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      emitActivity(ctx, call, 'error', 'screen_capture', msg)
+      return { id: call.id, name: call.name, result: '', error: `screen_capture недоступен: ${msg}` }
+    }
+  }
+}
+
+const screenInfoHandler: ToolHandler = {
+  mode: 'parallel-read',
+  async handle(call, ctx) {
+    try {
+      const { screen: electronScreen } = await import('electron')
+      const primary = electronScreen.getPrimaryDisplay()
+      const displays = electronScreen.getAllDisplays()
+      const lines = displays.map((d, i) => {
+        const tag = d.id === primary.id ? ' [primary]' : ''
+        return `Monitor ${i + 1}: ${d.size.width}x${d.size.height} (scale ${d.scaleFactor}x) pos=(${d.bounds.x},${d.bounds.y})${tag}`
+      })
+      const result = lines.join('
+')
+      emitActivity(ctx, call, 'ok', 'screen_info', `${displays.length} монитор(ов)`)
+      return { id: call.id, name: call.name, result }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      emitActivity(ctx, call, 'error', 'screen_info', msg)
+      return { id: call.id, name: call.name, result: '', error: `screen_info недоступен: ${msg}` }
+    }
+  }
+}
+
+// ============================================================================
 // Registry — single source of truth for tool dispatch
 // ============================================================================
 
@@ -1181,10 +1405,15 @@ const HANDLER_REGISTRY: Record<string, ToolHandler> = {
   'core_memory_remove': coreMemoryRemoveHandler,
   // Diagnostics — parallel-read, no user confirmation needed
   'check_diagnostics': checkDiagnosticsHandler,
+  // Code intelligence — parallel-read
+  'impact_analysis': impactAnalysisHandler,
   // Conversation history search — parallel-read, FTS5
   'conversation_search': conversationSearchHandler,
   // File conversion — parallel-read, no user confirmation needed
-  'convert_file': convertFileHandler
+  'convert_file': convertFileHandler,
+  // Screen capture — parallel-read, Electron desktopCapturer
+  'screen_capture': screenCaptureHandler,
+  'screen_info': screenInfoHandler
 }
 
 /**
