@@ -13,6 +13,7 @@ import { BrowserView } from './components/BrowserView'
 import { StubView } from './components/StubView'
 import { DiffView } from './components/DiffView'
 import { CommandConfirm } from './components/CommandConfirm'
+import { UpdateNotification } from './components/UpdateNotification'
 import { Terminal } from './components/Terminal'
 import { OnboardingWizard } from './components/OnboardingWizard'
 import { ArtifactPreviewContainer } from './components/ArtifactPreview'
@@ -249,6 +250,7 @@ export function App() {
       <TerminalErrorToast />
       <DiffView />
       <CommandConfirm />
+      <UpdateNotification />
     </div>
     </I18nContext.Provider>
   )

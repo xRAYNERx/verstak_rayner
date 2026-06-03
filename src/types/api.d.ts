@@ -248,6 +248,13 @@ declare global {
       cli: {
         detect(): Promise<DetectedCli[]>
       }
+      updater: {
+        install(): Promise<void>
+        check(): Promise<{ available: boolean; version?: string; error?: string }>
+        onAvailable(cb: (data: { version: string }) => void): void
+        onDownloaded(cb: (data: { version: string }) => void): void
+        onProgress(cb: (data: { percent: number }) => void): void
+      }
     }
   }
 }

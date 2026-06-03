@@ -178,5 +178,19 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.on('term:error-detected', handler)
       return () => { ipcRenderer.off('term:error-detected', handler) }
     }
+  },
+
+  updater: {
+    install: () => ipcRenderer.invoke('update:install'),
+    check: () => ipcRenderer.invoke('update:check'),
+    onAvailable: (cb: (data: { version: string }) => void) => {
+      ipcRenderer.on('update:available', (_, data) => cb(data))
+    },
+    onDownloaded: (cb: (data: { version: string }) => void) => {
+      ipcRenderer.on('update:downloaded', (_, data) => cb(data))
+    },
+    onProgress: (cb: (data: { percent: number }) => void) => {
+      ipcRenderer.on('update:progress', (_, data) => cb(data))
+    },
   }
 })
