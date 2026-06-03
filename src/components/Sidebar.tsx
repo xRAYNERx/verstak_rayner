@@ -1,9 +1,11 @@
 import { useState, type ReactElement } from 'react'
 import { useProject, type ViewId } from '../store/projectStore'
 import { useProvider } from '../hooks/useProvider'
+import { useT } from '../i18n'
 import type { FileNode } from '../types/api'
 
 function ChatNavSection() {
+  const t = useT()
   const { chatSessions, activeChatId, activeView, setActiveView, switchChatSession, newChatSession, refreshChatSessions, chatSnapshots, patchChatSession, cleanupReviewsFor } = useProject()
   const [open, setOpen] = useState(true)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -36,7 +38,7 @@ function ChatNavSection() {
     }
   }
   async function removeSession(id: number) {
-    if (!window.confirm('Удалить этот чат и все его сообщения?')) return
+    if (!window.confirm(t.sidebar.deleteChat)) return
     await window.api.chatSessions.remove(id)
     // Grok audit fix: каскадное удаление review-чатов в БД работало, но в
     // store оставались stale entries и openedReviewId мог указывать на
@@ -61,7 +63,7 @@ function ChatNavSection() {
           style={{ flex: 1 }}
         >
           <span className="gg-nav-icon"><ChatIconNode /></span>
-          <span className="gg-nav-label">Chat</span>
+          <span className="gg-nav-label">{t.sidebar.chat}</span>
           <span className="gg-nav-badge" style={{ background: 'transparent', border: 'none', color: 'var(--text-tertiary)' }}>
             {chatSessions.length}
           </span>
@@ -69,12 +71,12 @@ function ChatNavSection() {
         <button
           className="gg-chat-nav-toggle"
           onClick={() => setOpen(v => !v)}
-          title={open ? 'Свернуть' : 'Развернуть'}
+          title={open ? t.sidebar.collapse : t.sidebar.expand}
         >{open ? '▾' : '▸'}</button>
         <button
           className="gg-chat-nav-new"
           onClick={() => void newChatSession()}
-          title="Новый чат"
+          title={t.sidebar.newChat}
         >+</button>
       </div>
       {open && (
@@ -115,7 +117,7 @@ function ChatNavSection() {
               <button
                 className="gg-chat-nav-x"
                 onClick={() => void removeSession(s.id)}
-                title="Удалить"
+                title={t.sidebar.delete}
               >×</button>
             </div>
           ))}
@@ -147,6 +149,7 @@ function ChatIconNode() {
 }
 
 function FilesSection({ tree }: { tree: FileNode[] }) {
+  const t = useT()
   const [open, setOpen] = useState(false)
   return (
     <>
@@ -156,7 +159,7 @@ function FilesSection({ tree }: { tree: FileNode[] }) {
         onClick={() => setOpen(v => !v)}
       >
         <span className="gg-sidebar-section-caret">{open ? '▾' : '▸'}</span>
-        <span className="gg-sidebar-section-title">Файлы</span>
+        <span className="gg-sidebar-section-title">{t.sidebar.files}</span>
         <span className="gg-sidebar-section-count">{tree.length}</span>
       </button>
       {open && (
@@ -286,16 +289,7 @@ const VideoIcon = (
 
 // Chat is rendered separately above the rest of the nav (expandable section
 // with its own list of chat sessions + create button).
-const NAV: NavItem[] = [
-  { id: 'tasks',    label: 'Tasks',    icon: TasksIcon },
-  { id: 'journal',  label: 'Journal',  icon: JournalIcon },
-  { id: 'plan',     label: 'Plan',     icon: PlanIcon },
-  { id: 'skills',   label: 'Skills',   icon: SkillsIcon },
-  { id: 'browser',  label: 'Browser',  icon: BrowserIcon },
-  { id: 'design',   label: 'Design',   icon: DesignIcon },
-  { id: 'video',    label: 'Video',    icon: VideoIcon },
-  { id: 'feedback', label: 'Feedback', icon: FeedbackIcon }
-]
+// NAV is built inside the component to use translations.
 
 interface SidebarProps {
   onOpenSettings: () => void
@@ -304,6 +298,18 @@ interface SidebarProps {
 export function Sidebar({ onOpenSettings }: SidebarProps) {
   const { path, tree, setProject, activeView, setActiveView } = useProject()
   const provider = useProvider()
+  const t = useT()
+
+  const NAV: NavItem[] = [
+    { id: 'tasks',    label: t.sidebar.tasks,    icon: TasksIcon },
+    { id: 'journal',  label: t.sidebar.journal,  icon: JournalIcon },
+    { id: 'plan',     label: t.sidebar.plan,     icon: PlanIcon },
+    { id: 'skills',   label: t.sidebar.skills,   icon: SkillsIcon },
+    { id: 'browser',  label: t.sidebar.browser,  icon: BrowserIcon },
+    { id: 'design',   label: t.sidebar.design,   icon: DesignIcon },
+    { id: 'video',    label: t.sidebar.video,    icon: VideoIcon },
+    { id: 'feedback', label: t.sidebar.feedback, icon: FeedbackIcon }
+  ]
 
   async function openProject() {
     const picked = await window.api.projects.pick()
@@ -316,7 +322,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
     <aside className="gg-sidebar">
       <div className="gg-sidebar-scroll">
         <div className="gg-sidebar-section">
-          <div className="gg-sidebar-section-title">Проект</div>
+          <div className="gg-sidebar-section-title">{t.sidebar.project}</div>
         </div>
         <button
           className={`gg-project-button ${path ? 'has-project' : ''}`}
@@ -324,7 +330,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
         >
           <span>{path ? '📁' : '＋'}</span>
           <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {shortPath ?? 'Открыть папку'}
+            {shortPath ?? t.sidebar.openFolder}
           </span>
         </button>
         {path && <div className="gg-project-path" title={path}>{path}</div>}
@@ -356,7 +362,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
           <span className={`gg-provider-dot ${provider.id === 'gemini-cli' ? 'cli' : ''}`} />
           <span>{provider.label} · {provider.transport}</span>
         </div>
-        <button className="gg-settings-trigger" onClick={onOpenSettings} title="Настройки">⚙</button>
+        <button className="gg-settings-trigger" onClick={onOpenSettings} title={t.settings.title}>⚙</button>
       </div>
     </aside>
   )

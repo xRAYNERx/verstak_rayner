@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { I18nContext, getTranslations, type Lang } from './i18n'
 import { AuthScreen } from './components/AuthScreen'
 import { ProjectRail } from './components/ProjectRail'
 import { Sidebar } from './components/Sidebar'
@@ -27,6 +28,15 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showTerminal, setShowTerminal] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [lang, setLang] = useState<Lang>('en')
+
+  useEffect(() => {
+    window.api.settings.getKey('app_language').then(v => {
+      if (v === 'ru' || v === 'en') setLang(v)
+    }).catch(() => {})
+  }, [])
+
+  const t = getTranslations(lang)
 
   // ── Auth gate: null = загрузка, false = нужна авторизация, true = готово ──
   const [authDone, setAuthDone] = useState<boolean | null>(null)
@@ -145,9 +155,14 @@ export function App() {
   // Пока проверяем auth — ничего не рендерим
   if (authDone === null) return null
   // Нужна авторизация — показываем AuthScreen поверх всего
-  if (!authDone) return <AuthScreen onComplete={() => setAuthDone(true)} />
+  if (!authDone) return (
+    <I18nContext.Provider value={getTranslations(lang)}>
+      <AuthScreen onComplete={() => setAuthDone(true)} onLangChange={setLang} />
+    </I18nContext.Provider>
+  )
 
   return (
+    <I18nContext.Provider value={getTranslations(lang)}>
     <div className={`gg-app ${sidebarOpen ? '' : 'is-sidebar-collapsed'}`}>
       <ProjectRail
         sidebarOpen={sidebarOpen}
@@ -159,7 +174,7 @@ export function App() {
           <div
             className="gg-sidebar-resize"
             onMouseDown={startDrag}
-            title="Перетащи чтобы изменить ширину"
+            title={t.settings.resizeDrag}
           />
         </>
       )}
@@ -181,36 +196,33 @@ export function App() {
         {activeView === 'skills' && (
           <div className="gg-view-placeholder">
             <div className="gg-view-placeholder-icon">⚡</div>
-            <h2>Skills</h2>
-            <p>AI-навыки расширяют возможности агента. Создавай .md файлы в <code>.verstak/skills/</code> или подключи сервер скиллов.</p>
+            <h2>{t.views.skillsTitle}</h2>
+            <p>{t.views.skillsDesc}</p>
             <div className="gg-view-placeholder-actions">
-              {/* TODO: открыть папку skills через window.api.files.revealInExplorer */}
-              <button onClick={() => void window.api.files.revealInExplorer('.verstak/skills')}>Открыть папку скиллов</button>
-              <button onClick={() => setActiveView('chat')}>Настроить сервер</button>
+              <button onClick={() => void window.api.files.revealInExplorer('.verstak/skills')}>{t.views.skillsOpenFolder}</button>
+              <button onClick={() => setActiveView('chat')}>{t.views.skillsSetupServer}</button>
             </div>
           </div>
         )}
         {activeView === 'design' && (
           <div className="gg-view-placeholder">
             <div className="gg-view-placeholder-icon">🎨</div>
-            <h2>Design Studio</h2>
-            <p>AI-дизайн: макеты, UI-компоненты, лендинги, презентации. Опиши что нужно — агент создаст интерактивный прототип.</p>
-            <p className="gg-view-placeholder-hint">Поддержка: HTML/CSS экспорт, 150+ дизайн-систем, адаптивные макеты</p>
+            <h2>{t.views.designTitle}</h2>
+            <p>{t.views.designDesc}</p>
+            <p className="gg-view-placeholder-hint">{t.views.designHint}</p>
             <div className="gg-view-placeholder-actions">
-              {/* TODO: переключить в chat с предзаполненным сообщением */}
-              <button onClick={() => setActiveView('chat')}>Создать макет</button>
+              <button onClick={() => setActiveView('chat')}>{t.views.designCreate}</button>
             </div>
           </div>
         )}
         {activeView === 'video' && (
           <div className="gg-view-placeholder">
             <div className="gg-view-placeholder-icon">🎬</div>
-            <h2>Video Studio</h2>
-            <p>AI-генерация видео, картинок, анимации. Опиши сцену — агент создаст видео через подключённые модели.</p>
-            <p className="gg-view-placeholder-hint">Модели: Veo, Kling, Seedance, Flux, Midjourney (через API ключи)</p>
+            <h2>{t.views.videoTitle}</h2>
+            <p>{t.views.videoDesc}</p>
+            <p className="gg-view-placeholder-hint">{t.views.videoHint}</p>
             <div className="gg-view-placeholder-actions">
-              {/* TODO: переключить в chat с предзаполненным сообщением */}
-              <button onClick={() => setActiveView('chat')}>Создать видео</button>
+              <button onClick={() => setActiveView('chat')}>{t.views.videoCreate}</button>
             </div>
           </div>
         )}
@@ -218,11 +230,11 @@ export function App() {
           <div className="gg-terminal-wrap">
             <div className="gg-terminal-header">
               <span className="gg-terminal-dot" />
-              <span>Терминал</span>
+              <span>{t.views.terminal}</span>
               <button
                 className="gg-terminal-close"
                 onClick={() => setShowTerminal(false)}
-                title="Скрыть"
+                title={t.views.hide}
               >×</button>
             </div>
             <div className="gg-terminal-body">
@@ -238,5 +250,6 @@ export function App() {
       <DiffView />
       <CommandConfirm />
     </div>
+    </I18nContext.Provider>
   )
 }

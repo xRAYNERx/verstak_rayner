@@ -11,6 +11,7 @@ import {
   IconSSH, IconBitrix, IconYandexDirect, IconYandexDisk,
   IconSkillsServer, IconPlug, IconHTTP, IconGitHub, IconSocialPublish
 } from './ConnectorIcons'
+import { useT } from '../i18n'
 
 interface ProviderConfig {
   id: ProviderId
@@ -219,20 +220,7 @@ const PROVIDERS: ProviderConfig[] = [
 
 type Tab = 'appearance' | 'profiles' | 'providers' | 'models' | 'connectors' | 'autonomous' | 'memory'
 
-// Группы для левой sidebar — повторяет OpenCode Desktop структуру.
-const TAB_GROUPS: ReadonlyArray<{ title: string; tabs: ReadonlyArray<{ id: Tab; label: string; icon: React.ReactNode }> }> = [
-  { title: 'Приложение', tabs: [
-    { id: 'appearance', label: 'Внешний вид',  icon: '🎨' },
-    { id: 'profiles',   label: 'Профили',      icon: '👤' }
-  ] },
-  { title: 'Сервер', tabs: [
-    { id: 'providers',  label: 'Провайдеры',   icon: '🔌' },
-    { id: 'models',     label: 'Модели',       icon: '✨' },
-    { id: 'connectors', label: 'Коннекторы',   icon: <IconPlug size={16} /> },
-    { id: 'autonomous', label: 'Ночной режим', icon: '🌙' },
-    { id: 'memory',     label: 'Память',       icon: '🧠' }
-  ] }
-]
+// TAB_GROUPS is built inside the Settings component to support i18n translations.
 
 function modelKey(providerId: ProviderId, model: string): string {
   return `${providerId}::${model}`
@@ -269,8 +257,24 @@ const CONNECTORS: ConnectorDef[] = [
 ]
 
 export function Settings({ onClose }: { onClose: () => void }) {
+  const t = useT()
   const activeProjectPath = useProject(s => s.path)
   const [tab, setTab] = useState<Tab>('providers')
+
+  // Группы для левой sidebar — повторяет OpenCode Desktop структуру.
+  const TAB_GROUPS: ReadonlyArray<{ title: string; tabs: ReadonlyArray<{ id: Tab; label: string; icon: React.ReactNode }> }> = [
+    { title: t.settings.application, tabs: [
+      { id: 'appearance', label: t.settings.appearance, icon: '🎨' },
+      { id: 'profiles',   label: t.settings.profiles,   icon: '👤' }
+    ] },
+    { title: t.settings.server, tabs: [
+      { id: 'providers',  label: t.settings.providers,  icon: '🔌' },
+      { id: 'models',     label: t.settings.models,     icon: '✨' },
+      { id: 'connectors', label: t.settings.connectors, icon: <IconPlug size={16} /> },
+      { id: 'autonomous', label: t.settings.nightMode,  icon: '🌙' },
+      { id: 'memory',     label: t.settings.memory,     icon: '🧠' }
+    ] }
+  ]
   const [activeProvider, setActiveProvider] = useState<ProviderId>('gemini-api')
   const [keys, setKeys] = useState<Record<string, string>>({})
   const [models, setModels] = useState<Record<string, string>>({})
@@ -313,6 +317,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [coreMemoryText, setCoreMemoryText] = useState('')
   const [coreUserText, setCoreUserText] = useState('')
   const [coreMemorySaved, setCoreMemorySaved] = useState(false)
+  const [currentLang, setCurrentLang] = useState('en')
   const { theme, setTheme } = useTheme()
 
   useEffect(() => {
@@ -379,6 +384,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
       setCostCap((await window.api.settings.getKey('cost_cap_usd_per_session')) ?? '')
       setCustomOpenaiBaseUrl((await window.api.settings.getKey('custom_openai_baseurl')) ?? '')
       setCustomOpenaiModels((await window.api.settings.getKey('custom_openai_models')) ?? '')
+      setCurrentLang((await window.api.settings.getKey('app_language')) ?? 'en')
       // Какие модели «включены» в picker'е. Пусто = все.
       const em = await window.api.settings.getKey('enabled_models')
       if (em) {
@@ -835,7 +841,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
     <div className="gg-modal-backdrop" onClick={onClose}>
       <div className="gg-modal gg-modal-large" onClick={e => e.stopPropagation()}>
         <div className="gg-modal-header">
-          <div className="gg-modal-title">Настройки</div>
+          <div className="gg-modal-title">{t.settings.title}</div>
           <button className="gg-modal-close" onClick={onClose}>×</button>
         </div>
 
@@ -1183,6 +1189,23 @@ export function Settings({ onClose }: { onClose: () => void }) {
           <div className="gg-settings-hint">
             Тема применяется мгновенно. Ширина боковой панели запоминается автоматически — потяни за её правый край.
           </div>
+          <div className="gg-settings-row" style={{ marginTop: 16 }}>
+            <label className="gg-settings-label">{t.settings.language}</label>
+            <select
+              className="gg-input"
+              style={{ maxWidth: 200 }}
+              value={currentLang}
+              onChange={async (e) => {
+                const lang = e.target.value
+                setCurrentLang(lang)
+                await window.api.settings.setKey('app_language', lang)
+                window.location.reload()
+              }}
+            >
+              <option value="en">English</option>
+              <option value="ru">Русский</option>
+            </select>
+          </div>
         </div>
         )}
 
@@ -1190,9 +1213,9 @@ export function Settings({ onClose }: { onClose: () => void }) {
         </div>{/* /gg-settings-shell */}
 
         <div className="gg-modal-footer">
-          <button className="gg-btn gg-btn-ghost" onClick={onClose}>Закрыть</button>
+          <button className="gg-btn gg-btn-ghost" onClick={onClose}>{t.common.close}</button>
           <button className="gg-btn gg-btn-primary" onClick={save}>
-            {saved ? '✓ Сохранено' : 'Сохранить'}
+            {saved ? t.settings.saved : t.settings.save}
           </button>
         </div>
       </div>

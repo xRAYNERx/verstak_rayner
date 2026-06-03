@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useT } from '../i18n'
+import type { Lang } from '../i18n'
 import authBgUrl from '../assets/auth-bg.webp'
 import authVideoUrl from '../assets/auth-bg.mp4'
 import type { DetectedCli } from '../types/api'
@@ -15,6 +17,7 @@ import type { DetectedCli } from '../types/api'
 
 interface Props {
   onComplete: () => void
+  onLangChange: (lang: Lang) => void
 }
 
 type Role = 'developer' | 'designer' | 'manager' | 'student'
@@ -40,7 +43,9 @@ interface Profile {
   isActive?: boolean | null
 }
 
-export function AuthScreen({ onComplete }: Props) {
+export function AuthScreen({ onComplete, onLangChange }: Props) {
+  const t = useT()
+  const [langChosen, setLangChosen] = useState<boolean | null>(null)
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   // 'signup' | 'signin'
@@ -62,6 +67,12 @@ export function AuthScreen({ onComplete }: Props) {
 
   useEffect(() => {
     void (async () => {
+      try {
+        const langVal = await window.api.settings.getKey('app_language')
+        setLangChosen(!!langVal)
+      } catch {
+        setLangChosen(false)
+      }
       try {
         const list: Profile[] = await window.api.userProfiles.list()
         setProfiles(list)
@@ -121,6 +132,25 @@ export function AuthScreen({ onComplete }: Props) {
 
   if (loading) return null
 
+  // Language picker on first launch
+  if (langChosen === false) {
+    return (
+      <div className="gg-lang-picker">
+        <div className="gg-lang-picker-logo">V</div>
+        <h1>Verstak</h1>
+        <p>Choose your language / Выберите язык</p>
+        <div className="gg-lang-buttons">
+          <button onClick={() => { setLangChosen(true); onLangChange('en'); void window.api.settings.setKey('app_language', 'en') }}>
+            English
+          </button>
+          <button onClick={() => { setLangChosen(true); onLangChange('ru'); void window.api.settings.setKey('app_language', 'ru') }}>
+            Русский
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   const hasProfiles = profiles.length > 0
 
   return (
@@ -149,26 +179,26 @@ export function AuthScreen({ onComplete }: Props) {
             <div className="gg-auth-logo-icon">V</div>
             <span className="gg-auth-logo-text">Verstak</span>
           </div>
-          <p className="gg-auth-tagline">AI-ассистент для разработки</p>
+          <p className="gg-auth-tagline">{t.auth.tagline}</p>
 
           <ul className="gg-auth-features">
             <li>
               <span className="gg-auth-feature-dot" />
-              8 AI-провайдеров в одном окне
+              {t.auth.features.providers}
             </li>
             <li>
               <span className="gg-auth-feature-dot" />
-              Память между сессиями
+              {t.auth.features.memory}
             </li>
             <li>
               <span className="gg-auth-feature-dot" />
-              Параллельные агенты
+              {t.auth.features.agents}
             </li>
           </ul>
 
           {clis.length > 0 && (
             <div className="gg-auth-detected">
-              <div className="gg-auth-detected-title">Найдено на компьютере:</div>
+              <div className="gg-auth-detected-title">{t.auth.detected}</div>
               {clis.map(c => (
                 <div key={c.id} className="gg-auth-detected-item">
                   <span className={`gg-auth-detected-dot${c.status === 'found' ? ' is-yellow' : ''}`} />
@@ -192,22 +222,22 @@ export function AuthScreen({ onComplete }: Props) {
                 className={`gg-auth-tab${mode === 'signin' ? ' is-active' : ''}`}
                 onClick={() => { setMode('signin'); setError(null) }}
               >
-                Войти
+                {t.auth.signIn}
               </button>
               <button
                 type="button"
                 className={`gg-auth-tab${mode === 'signup' ? ' is-active' : ''}`}
                 onClick={() => { setMode('signup'); setError(null) }}
               >
-                Новый профиль
+                {t.auth.newProfile}
               </button>
             </div>
           )}
 
           {!hasProfiles && (
             <div className="gg-auth-form-header">
-              <h1 className="gg-auth-form-title">Добро пожаловать</h1>
-              <p className="gg-auth-form-sub">Создай профиль чтобы начать</p>
+              <h1 className="gg-auth-form-title">{t.auth.welcome}</h1>
+              <p className="gg-auth-form-sub">{t.auth.createProfile}</p>
             </div>
           )}
 
@@ -215,7 +245,7 @@ export function AuthScreen({ onComplete }: Props) {
           {mode === 'signin' && hasProfiles && (
             <div className="gg-auth-form">
               <div className="gg-auth-field">
-                <label className="gg-auth-label">Профиль</label>
+                <label className="gg-auth-label">{t.auth.profile}</label>
                 <select
                   className="gg-auth-input gg-auth-select"
                   value={selectedProfileId ?? ''}
@@ -237,7 +267,7 @@ export function AuthScreen({ onComplete }: Props) {
                 onClick={() => void handleSignIn()}
                 disabled={busy || !selectedProfileId}
               >
-                {busy ? 'Вхожу…' : 'Войти →'}
+                {busy ? t.auth.enteringProfile : t.auth.enter}
               </button>
             </div>
           )}
@@ -246,11 +276,11 @@ export function AuthScreen({ onComplete }: Props) {
           {(mode === 'signup' || !hasProfiles) && (
             <div className="gg-auth-form">
               <div className="gg-auth-field">
-                <label className="gg-auth-label">Имя</label>
+                <label className="gg-auth-label">{t.auth.name}</label>
                 <input
                   type="text"
                   className="gg-auth-input"
-                  placeholder="Как тебя зовут?"
+                  placeholder={t.auth.nameHint}
                   value={name}
                   onChange={e => setName(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && name.trim()) void handleSignUp() }}
@@ -259,18 +289,18 @@ export function AuthScreen({ onComplete }: Props) {
               </div>
 
               <div className="gg-auth-field">
-                <label className="gg-auth-label">Email <span className="gg-auth-optional">(необязательно)</span></label>
+                <label className="gg-auth-label">{t.auth.email}</label>
                 <input
                   type="email"
                   className="gg-auth-input"
-                  placeholder="для будущей облачной синхронизации"
+                  placeholder={t.auth.emailHint}
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                 />
               </div>
 
               <div className="gg-auth-field">
-                <label className="gg-auth-label">Роль</label>
+                <label className="gg-auth-label">{t.auth.role}</label>
                 <div className="gg-auth-roles">
                   {ROLES.map(r => (
                     <button
@@ -294,7 +324,7 @@ export function AuthScreen({ onComplete }: Props) {
                 onClick={() => void handleSignUp()}
                 disabled={busy || !name.trim()}
               >
-                {busy ? 'Создаю профиль…' : 'Начать работу →'}
+                {busy ? t.auth.creatingProfile : t.auth.startWorking}
               </button>
             </div>
           )}

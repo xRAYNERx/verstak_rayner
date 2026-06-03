@@ -16,6 +16,7 @@ import { useSkills as useSkillsStore } from '../store/skillStore'
 import { useAgentMode } from '../hooks/useAgentMode'
 import type { Attachment } from '../types/api'
 import iconUrl from '../assets/icon.png'
+import { useT } from '../i18n'
 
 const MAX_BYTES_PER_FILE = 5 * 1024 * 1024  // 5 MB
 const MAX_ATTACHMENTS = 8
@@ -81,6 +82,7 @@ const GOAL_CYCLE_PROMPT = `Запусти цикл self-improvement по это�
 Out of scope: общие best practices, рефакторинги ради красоты, изменения без обоснования в журнале.`
 
 export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatProps) {
+  const t = useT()
   const { messages, addMessage, updateLastAssistant, isStreaming, setStreaming, activity, sessionUsage, path: activePath, chatSessions, activeChatId, effortLevel, setEffortLevel } = useProject()
   const { mode: agentMode, setMode: setAgentMode } = useAgentMode()
   const projectName = activePath ? activePath.replace(/^.*[\\/]/, '') : null
@@ -719,28 +721,28 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
                   onClick={() => setInput('/code-review')}
                   title="Запустить скилл «Code Review» — анализ изменений, поиск багов и регрессий"
                 >
-                  🔍 Code Review
+                  🔍 {t.chat.codeReview}
                 </button>
                 <button
                   className="gg-quick-action"
                   onClick={() => setInput('/git-summary')}
                   title="Запустить скилл «Git Summary» — краткая сводка последних коммитов"
                 >
-                  📝 Git Summary
+                  📝 {t.chat.gitSummary}
                 </button>
                 <button
                   className="gg-quick-action"
                   onClick={() => setInput('/explain')}
                   title="Запустить скилл «Explain Code» — объяснение выбранного кода"
                 >
-                  💡 Explain Code
+                  💡 {t.chat.explainCode}
                 </button>
                 <button
                   className="gg-quick-action"
                   onClick={() => setInput(GOAL_CYCLE_PROMPT)}
                   title="AI прочитает журнал работы, карту проекта и предложит 3 конкретных улучшения с планом"
                 >
-                  💡 Что улучшить в проекте?
+                  💡 {t.chat.whatToImprove}
                 </button>
                 <button
                   className="gg-quick-action"
@@ -933,7 +935,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
                 void stop()
               }
             }}
-            placeholder={isStreaming ? `${provider.label} отвечает… (Esc — остановить)` : 'Опиши задачу. Enter — отправить, Shift+Enter — новая строка. Ctrl+V — вставить скриншот.'}
+            placeholder={isStreaming ? `${provider.label} ${t.chat.streamingPlaceholder}` : t.chat.placeholder}
           />
           <div className="gg-composer-actions">
             <button

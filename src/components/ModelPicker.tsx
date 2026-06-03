@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useProvider, type ProviderId } from '../hooks/useProvider'
 import { useProject } from '../store/projectStore'
+import { useT } from '../i18n'
 
 interface ProviderOption {
   id: ProviderId
@@ -42,6 +43,7 @@ interface Props {
 }
 
 export function ModelPicker({ onOpenSettings }: Props) {
+  const t = useT()
   const provider = useProvider()
   const activeChatId = useProject(s => s.activeChatId)
   const refreshChatSessions = useProject(s => s.refreshChatSessions)
@@ -128,7 +130,7 @@ export function ModelPicker({ onOpenSettings }: Props) {
         type="button"
         className="gg-model-pill"
         onClick={() => setOpen(v => !v)}
-        title="Сменить модель / провайдер"
+        title={t.modelPicker.changeModel}
       >
         <span className={`gg-provider-dot ${provider.id === 'gemini-cli' ? 'cli' : ''}`} />
         <span className="gg-model-pill-name">{provider.label}</span>
@@ -139,13 +141,13 @@ export function ModelPicker({ onOpenSettings }: Props) {
       {open && (
         <div className="gg-mp-popover">
           <div className="gg-mp-section">
-            <div className="gg-mp-section-title">Провайдер</div>
+            <div className="gg-mp-section-title">{t.modelPicker.provider}</div>
             {PROVIDER_OPTIONS.map(p => {
               const isCli = p.id.endsWith('-cli')
               const isConfigured = configuredIds.has(p.id)
               const isActive = provider.id === p.id
               let title: string | undefined
-              if (!isConfigured) title = 'API ключ не задан — нажми чтобы открыть Настройки'
+              if (!isConfigured) title = t.settings.apiKeyNotSet
               else if (isCli) title = CLI_BETA_HINT
               return (
                 <button
@@ -182,17 +184,17 @@ export function ModelPicker({ onOpenSettings }: Props) {
             return (
               <div className="gg-mp-section">
                 <div className="gg-mp-section-title">
-                  Модель
+                  {t.modelPicker.model}
                   {hiddenCount > 0 && (
                     <span className="gg-mp-section-hint" title="Скрыты по toggle в Настройки → Модели">
-                      {' '}· скрыто {hiddenCount}
+                      {' '}· {t.modelPicker.hidden} {hiddenCount}
                     </span>
                   )}
                 </div>
                 {visibleModels.length === 0 && (
                   <div className="gg-mp-row gg-mp-row-empty">
-                    <span className="gg-mp-row-label">Все модели выключены</span>
-                    <span className="gg-mp-row-meta">включи в Настройки → Модели</span>
+                    <span className="gg-mp-row-label">{t.modelPicker.allModelsOff}</span>
+                    <span className="gg-mp-row-meta">{t.modelPicker.enableIn}</span>
                   </div>
                 )}
                 {visibleModels.map(m => {
@@ -227,7 +229,7 @@ export function ModelPicker({ onOpenSettings }: Props) {
               className="gg-mp-row"
               onClick={() => { setOpen(false); onOpenSettings() }}
             >
-              <span className="gg-mp-row-label">⚙ Настройки и ключи…</span>
+              <span className="gg-mp-row-label">{t.settings.settingsAndKeys}</span>
             </button>
           </div>
         </div>
