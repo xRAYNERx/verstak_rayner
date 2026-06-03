@@ -101,8 +101,20 @@ Then open Settings (⚙), pick a provider, paste your API key — or select a CL
 
 ## Download
 
-- **Windows installer:** see [Releases](https://github.com/frolofpavel/verstak/releases) (coming soon)
-- **Build from source:** `npm run dist:win` → produces NSIS installer + portable `.exe` in `release/`
+| Platform | Command | Output |
+|----------|---------|--------|
+| **Windows** | `npm run dist:win` | NSIS installer + portable `.exe` |
+| **Linux** | `npm run dist:linux` | AppImage + `.deb` |
+| **macOS** | `npm run dist:mac` | `.dmg` + `.zip` |
+| **All** | `npm run dist:all` | All platforms |
+
+Pre-built binaries: see [Releases](https://github.com/frolofpavel/verstak/releases)
+
+### Linux notes
+- AppImage: `chmod +x Verstak-*.AppImage && ./Verstak-*.AppImage`
+- If you get a sandbox error, the app handles it automatically (appends `--no-sandbox` for AppImage)
+- For encrypted credential storage, install `libsecret-1-dev` (Ubuntu/Debian) or `libsecret-devel` (Fedora): `sudo apt install libsecret-1-dev gnome-keyring`
+- Without gnome-keyring/KDE Wallet, API keys are stored in base64 (not encrypted) — functional but less secure
 
 ---
 

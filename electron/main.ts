@@ -3,6 +3,15 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { mkdirSync } from 'fs'
 
+// Linux AppImage + Electron sandbox: на некоторых дистрибутивах (Ubuntu 24+, Fedora)
+// AppImage не может создать sandbox namespace. Electron падает с:
+//   "The SUID sandbox helper binary was found, but is not configured correctly"
+// Безопасный workaround: отключаем Chromium sandbox если запущены как AppImage.
+// Наша безопасность обеспечивается через contextIsolation + nodeIntegration:false.
+if (process.platform === 'linux' && process.env.APPIMAGE) {
+  app.commandLine.appendSwitch('no-sandbox')
+}
+
 // In ESM modules __dirname is not a global. Recreate it from import.meta.url.
 const HERE = dirname(fileURLToPath(import.meta.url))
 import { registerProjectIpc } from './ipc/projects'
@@ -41,8 +50,9 @@ import { registerMemoryIpc } from './ipc/memory'
 import { saveMemory, searchMemories, applyMemoryDecay } from './storage/memories'
 import { searchConversations } from './storage/chats'
 import { registerCommandsIpc } from './ipc/commands'
+import { initAutoUpdater } from './updater'
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
   // HERE = out/main in dev and prod
   const iconPath = join(HERE, '../../resources/icon.png')
   const win = new BrowserWindow({
@@ -71,6 +81,7 @@ function createWindow(): void {
   } else {
     win.loadFile(join(HERE, '../renderer/index.html'))
   }
+  return win
 }
 
 /**
@@ -297,6 +308,11 @@ app.whenReady().then(() => {
   registerUserProfilesIpc(userProfiles)
   registerMemoryIpc(db)
   registerCommandsIpc()
-  createWindow()
+  const mainWindow = createWindow()
+
+  if (!process.env.VITE_DEV_SERVER_URL) {
+    // Авто-обновления только в production (не в npm run dev)
+    initAutoUpdater(mainWindow)
+  }
 })
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
