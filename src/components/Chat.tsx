@@ -14,7 +14,7 @@ import { SkillPicker } from './SkillPicker'
 import { SlashCommandPopup, type SlashCommand } from './SlashCommandPopup'
 import { useSkills as useSkillsStore } from '../store/skillStore'
 import { useAgentMode } from '../hooks/useAgentMode'
-import type { Attachment } from '../types/api'
+import type { Attachment, Suggestion } from '../types/api'
 import iconUrl from '../assets/icon.png'
 import { useT } from '../i18n'
 
@@ -107,6 +107,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
   // null = ещё не было; object = последний результат (сбрасывается при новом send).
   const [crossVerify, setCrossVerify] = useState<{ result: string; provider: string; ok: boolean } | null>(null)
   const [cvExpanded, setCvExpanded] = useState(false)
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
 
   function flashWarning(msg: string) {
     setWarning(msg)
@@ -473,6 +474,12 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
     return () => window.clearTimeout(timer)
   }, [input])
 
+  // Proactive suggestions — загружаем при открытии проекта / смене чата
+  useEffect(() => {
+    if (!activePath || messages.length > 0) { setSuggestions([]); return }
+    void window.api.suggestions.get(activePath).then(setSuggestions).catch(() => setSuggestions([]))
+  }, [activePath, activeChatId, messages.length])
+
   function onPaste(e: ClipboardEvent<HTMLTextAreaElement>) {
     const items = e.clipboardData?.items
     if (!items) return
@@ -758,6 +765,20 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
                 >
                   🗺 Карта проекта
                 </button>
+              </div>
+            )}
+            {suggestions.length > 0 && (
+              <div className="gg-suggestions">
+                <div className="gg-suggestions-title">💡 Suggestions</div>
+                {suggestions.map((s, i) => (
+                  <button key={i} className="gg-suggestion-card" onClick={() => setInput(s.title)}>
+                    <span className="gg-suggestion-priority" data-priority={s.priority} />
+                    <div>
+                      <div className="gg-suggestion-title">{s.title}</div>
+                      {s.description && <div className="gg-suggestion-desc">{s.description}</div>}
+                    </div>
+                  </button>
+                ))}
               </div>
             )}
           </div>

@@ -4367,3 +4367,57 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 .gg-toggle input:checked + .gg-toggle-slider::after {
   transform: translateX(16px);
 }
+
+/* ── Proactive Suggestions ────────────────────────────────────────────── */
+.gg-suggestions {
+  margin-top: 16px;
+  width: 100%;
+  max-width: 480px;
+}
+.gg-suggestions-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+.gg-suggestion-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  background: var(--surface-2, rgba(255,255,255,0.04));
+  border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 120ms, background 120ms;
+}
+.gg-suggestion-card:hover {
+  background: var(--surface-3, rgba(255,255,255,0.07));
+  border-color: var(--accent, #60a5fa);
+}
+.gg-suggestion-priority {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 5px;
+  flex-shrink: 0;
+  background: var(--text-muted);
+}
+.gg-suggestion-priority[data-priority="high"]   { background: #f87171; }
+.gg-suggestion-priority[data-priority="medium"] { background: #fbbf24; }
+.gg-suggestion-priority[data-priority="low"]    { background: #4ade80; }
+.gg-suggestion-title {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+}
+.gg-suggestion-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
