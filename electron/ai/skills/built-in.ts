@@ -195,6 +195,100 @@ slash: handoff
 Формат: markdown, копипастится в начало следующей сессии.
 Автоматически сохраняет в core_memory (MEMORY.md) ключевые решения.`
 
+const CLIENT_REPORT_MD = `---
+id: client-report
+name: Client Report
+description: Generate a client performance report from connected data sources
+icon: "📊"
+slash: client-report
+---
+You generate structured client performance reports.
+
+Process:
+1. Ask which client/project to report on
+2. Gather data from available connectors (Yandex Direct, Bitrix, Google Sheets, etc.)
+3. Analyze: budget spent, leads, conversions, ROI, trends
+4. Generate an HTML report artifact with charts and tables
+5. Provide 3-5 actionable recommendations
+
+Format: structured HTML with sections (Summary, Metrics, Trends, Recommendations)
+Use generate_html to create the deliverable.`
+
+const COMPETITOR_ANALYSIS_MD = `---
+id: competitor-analysis
+name: Competitor Analysis
+description: Research competitors and create a comparison report
+icon: "🔍"
+slash: competitor-analysis
+---
+You research and analyze competitors for a business or product.
+
+Process:
+1. Ask about the business/niche and known competitors
+2. Use browser_navigate to research competitor websites
+3. Analyze: positioning, features, pricing, UX, content strategy
+4. Create a structured comparison (strengths/weaknesses matrix)
+5. Suggest differentiation opportunities
+
+Output: HTML report with comparison tables and recommendations via generate_html.`
+
+const AD_AUDIT_MD = `---
+id: ad-audit
+name: Ad Campaign Audit
+description: Audit advertising campaigns and find optimization opportunities
+icon: "📈"
+slash: ad-audit
+---
+You audit digital advertising campaigns (Yandex Direct, Google Ads, VK Ads).
+
+Process:
+1. Connect to ad platform data via connectors (connector_query with id="ydirect" or similar)
+2. Analyze: CTR, CPC, conversions, quality scores, negative keywords
+3. Find wasteful spend, underperforming ads, missing opportunities
+4. Prioritize fixes by potential savings (high/medium/low impact)
+5. Generate actionable checklist
+
+Output: structured findings with priority badges. Use generate_html for the report.`
+
+const PROPOSAL_GENERATOR_MD = `---
+id: proposal-generator
+name: Proposal Generator
+description: Create a commercial proposal (KP) for a potential client
+icon: "📝"
+slash: proposal
+---
+You create professional commercial proposals (КП).
+
+Process:
+1. Ask about the client: company, industry, pain points, budget range
+2. Ask about offered services
+3. Structure: Executive Summary → Pain Points → Solution → Case Studies/Results → Pricing → Next Steps
+4. Generate polished HTML document with branding sections
+5. Optionally export as DOCX via generate_docx
+
+Tone: professional but not robotic. Focus on client's ROI, not features.`
+
+const CONTENT_CALENDAR_MD = `---
+id: content-calendar
+name: Content Calendar
+description: Create a monthly content plan for social media
+icon: "📅"
+slash: content-calendar
+---
+You create content calendars for social media marketing.
+
+Process:
+1. Ask about business, target audience, platforms (Telegram/VK/Instagram/YouTube)
+2. Ask about content pillars and posting frequency
+3. Generate a 30-day calendar with:
+   - Post type (text/video/story/reel)
+   - Topic and hook
+   - Platform-specific notes
+   - Hashtags
+4. Output as HTML table with color-coded categories
+
+Calendar should balance: educational (40%), entertaining (30%), promotional (20%), UGC (10%).`
+
 export const BUILT_IN_SKILLS: Skill[] = [
   parseBuiltIn(CODE_REVIEW_MD, 'code-review'),
   parseBuiltIn(GIT_SUMMARY_MD, 'git-summary'),
@@ -203,7 +297,13 @@ export const BUILT_IN_SKILLS: Skill[] = [
   parseBuiltIn(DIAGNOSE_MD, 'diagnose'),
   parseBuiltIn(TDD_MD, 'tdd'),
   parseBuiltIn(IMPROVE_ARCHITECTURE_MD, 'improve-architecture'),
-  parseBuiltIn(HANDOFF_MD, 'handoff')
+  parseBuiltIn(HANDOFF_MD, 'handoff'),
+  // Agency skills pack
+  parseBuiltIn(CLIENT_REPORT_MD, 'client-report'),
+  parseBuiltIn(COMPETITOR_ANALYSIS_MD, 'competitor-analysis'),
+  parseBuiltIn(AD_AUDIT_MD, 'ad-audit'),
+  parseBuiltIn(PROPOSAL_GENERATOR_MD, 'proposal-generator'),
+  parseBuiltIn(CONTENT_CALENDAR_MD, 'content-calendar')
 ]
 
 import { parseSkillDoc } from './frontmatter'
