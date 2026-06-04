@@ -94,6 +94,9 @@
       "repo": "verstak"
     }
   },
+  "bin": {
+    "verstak": "./scripts/verstak-cli.mjs"
+  },
   "keywords": [],
   "author": "",
   "license": "MIT",
