@@ -15,6 +15,7 @@ import { lookupHandler, type ToolContext, type TaggedSender as HandlerTaggedSend
 import { captureToolObservation } from '../ai/memory-hooks'
 import { pickReviewProvider, buildCrossVerifyPrompt, runCrossVerify, getConfiguredApiProviders, type TurnChange } from '../ai/cross-verify'
 import { shouldFallback, getNextFallback } from '../ai/smart-fallback'
+import { estimateComplexity, recommendModel, complexityLabel } from '../ai/smart-router'
 
 export type { ProviderId } from '../ai/registry'
 
@@ -273,7 +274,31 @@ export function registerAiIpc(deps: AiDeps): void {
       return 0
     }
 
-    const model = (overrides?.model ?? deps.getProviderModel(providerId)) ?? descriptor.defaultModel
+    let model = (overrides?.model ?? deps.getProviderModel(providerId)) ?? descriptor.defaultModel
+
+    // Smart routing: если пользователь не задал модель явно и effort=standard,
+    // выбираем дешёвую/мощную модель по сложности запроса.
+    const smartRoutingEnabled = deps.getSecret('smart_routing') !== 'false'
+    if (
+      smartRoutingEnabled &&
+      !overrides?.model &&
+      !overrides?.providerId &&          // не в Explicit Review
+      (overrides?.effortLevel ?? 'standard') === 'standard' &&
+      descriptor.transport === 'API'
+    ) {
+      const complexity = estimateComplexity(messages, [])
+      const suggested = recommendModel(providerId, complexity)
+      if (suggested && suggested !== model) {
+        model = suggested
+        taggedSender.send('ai:event', {
+          id: sendId,
+          event: {
+            type: 'info',
+            text: `📊 ${complexityLabel(complexity)} → using ${suggested} (smart routing)`
+          }
+        })
+      }
+    }
     // Project Settings system prompt — нужен и для API (через
     // prepareSystemContext выше), и для CLI (через createCliProvider →
     // buildCliPrompt). Читаем один раз. Не пробрасываем при reviewer override —
