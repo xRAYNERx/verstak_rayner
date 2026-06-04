@@ -329,15 +329,22 @@ export function invalidateDependencyMap(root: string): void {
 }
 
 // In-memory cache keyed by project root
-const cache = new Map<string, ProjectMap>()
+interface ProjectMapCacheEntry {
+  map: ProjectMap
+  timestamp: number
+}
+
+const cache = new Map<string, ProjectMapCacheEntry>()
+
+const CACHE_TTL = 30_000 // 30 seconds
 
 export async function getProjectMap(root: string, refresh = false): Promise<ProjectMap> {
   if (!refresh) {
     const cached = cache.get(root)
-    if (cached) return cached
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) return cached.map
   }
   const map = await buildProjectMap(root)
-  cache.set(root, map)
+  cache.set(root, { map, timestamp: Date.now() })
   return map
 }
 
