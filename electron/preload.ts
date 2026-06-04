@@ -192,5 +192,18 @@ contextBridge.exposeInMainWorld('api', {
     onProgress: (cb: (data: { percent: number }) => void) => {
       ipcRenderer.on('update:progress', (_, data) => cb(data))
     },
+  },
+  mcp: {
+    listServers: () => ipcRenderer.invoke('mcp:list-servers'),
+    addServer: (entry: unknown) => ipcRenderer.invoke('mcp:add-server', entry),
+    updateServer: (id: string, patch: unknown) => ipcRenderer.invoke('mcp:update-server', id, patch),
+    removeServer: (id: string) => ipcRenderer.invoke('mcp:remove-server', id),
+    toggleServer: (id: string, enabled: boolean) => ipcRenderer.invoke('mcp:toggle-server', id, enabled),
+    connect: (id: string) => ipcRenderer.invoke('mcp:connect', id),
+    disconnect: (id: string) => ipcRenderer.invoke('mcp:disconnect', id),
+    tools: () => ipcRenderer.invoke('mcp:tools'),
+    connectedServers: () => ipcRenderer.invoke('mcp:connected-servers'),
+    popular: () => ipcRenderer.invoke('mcp:popular'),
+    saveAll: (servers: unknown) => ipcRenderer.invoke('mcp:save-all', servers)
   }
 })

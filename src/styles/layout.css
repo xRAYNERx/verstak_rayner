@@ -4249,3 +4249,121 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   background: rgba(255,255,255,0.3);
 }
 
+
+/* ─── MCP Settings Tab ─── */
+.gg-mcp-tab {}
+.gg-mcp-server-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.gg-mcp-server-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  transition: border-color 120ms;
+}
+.gg-mcp-server-card.is-connected {
+  border-color: var(--success, #4ade80);
+}
+.gg-mcp-server-info { min-width: 0; flex: 1; }
+.gg-mcp-server-name {
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+}
+.gg-mcp-server-cmd {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gg-mcp-server-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.gg-mcp-add-form {
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+}
+.gg-mcp-popular-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+.gg-mcp-popular-item {
+  padding: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.gg-mcp-popular-name {
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+.gg-mcp-popular-desc {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+.gg-mcp-popular-env {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+.gg-mcp-popular-item .gg-btn {
+  margin-top: 6px;
+  align-self: flex-start;
+}
+/* Toggle switch — используется в MCP card */
+.gg-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  width: 36px;
+  height: 20px;
+}
+.gg-toggle input { display: none; }
+.gg-toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--border-subtle);
+  border-radius: 999px;
+  transition: background 160ms;
+}
+.gg-toggle input:checked + .gg-toggle-slider {
+  background: var(--success, #4ade80);
+}
+.gg-toggle-slider::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 16px; height: 16px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 160ms;
+}
+.gg-toggle input:checked + .gg-toggle-slider::after {
+  transform: translateX(16px);
+}

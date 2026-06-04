@@ -50,6 +50,8 @@ import { registerMemoryIpc } from './ipc/memory'
 import { saveMemory, searchMemories, applyMemoryDecay } from './storage/memories'
 import { searchConversations } from './storage/chats'
 import { registerCommandsIpc } from './ipc/commands'
+import { registerMcpIpc } from './ipc/mcp'
+import { mcpClient } from './mcp/client'
 import { initAutoUpdater } from './updater'
 
 function createWindow(): BrowserWindow {
@@ -277,7 +279,9 @@ app.whenReady().then(() => {
         default_model: s.default_model ?? undefined,
         systemPrompt: s.systemPrompt
       }))
-    }
+    },
+    // MCP client — внешние инструменты через Model Context Protocol
+    mcpClient
   })
   registerChatsIpc(chats, chatSessions, db)
   registerTasksIpc(tasks)
@@ -308,6 +312,7 @@ app.whenReady().then(() => {
   registerUserProfilesIpc(userProfiles)
   registerMemoryIpc(db)
   registerCommandsIpc()
+  registerMcpIpc(settings)
   const mainWindow = createWindow()
 
   if (!process.env.VITE_DEV_SERVER_URL) {
@@ -315,4 +320,5 @@ app.whenReady().then(() => {
     initAutoUpdater(mainWindow)
   }
 })
+app.on('before-quit', () => { mcpClient.disconnectAll() })
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })

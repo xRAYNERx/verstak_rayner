@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import { createFileTools, TOOL_DEFS } from '../ai/tools'
 import { createProvider, PROVIDERS, type ProviderId } from '../ai/registry'
+import type { McpClient } from '../mcp/client'
 import { prepareSystemContext } from '../ai/compose-system'
 import { loadCoreMemory } from '../ai/core-memory'
 import { REVIEWER_SYSTEM_PROMPT } from '../ai/review-prompt'
@@ -49,6 +50,8 @@ interface AiDeps {
   skillRegistry?: {
     list: () => Array<{ id: string; name?: string; default_provider?: string; default_model?: string; systemPrompt: string }>
   }
+  /** MCP client — внешние серверы, опционально. */
+  mcpClient?: McpClient
 }
 
 let currentSendId = 0
@@ -368,7 +371,8 @@ export function registerAiIpc(deps: AiDeps): void {
       const tools = createFileTools(projectPath, ctrl.signal)
       const turnsBudget = Math.min(MAX_BUDGET_TURNS, Math.max(DEFAULT_AGENT_TURNS, budget ?? DEFAULT_AGENT_TURNS))
       void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.readJournal, deps.saveMemory, deps.searchMemories, deps.searchConversations, deps.connectors, deps.getAgentMode(), turnsBudget, deps.skillRegistry, deps.getSecret, costGuard, providerId, model,
-        smartFallbackEnabled ? { getNextProvider: makeFallbackProvider, configuredProviders: new Set(getConfiguredApiProviders(deps.getSecret)), triedProviders: new Set([providerId]) } : undefined
+        smartFallbackEnabled ? { getNextProvider: makeFallbackProvider, configuredProviders: new Set(getConfiguredApiProviders(deps.getSecret)), triedProviders: new Set([providerId]) } : undefined,
+        deps.mcpClient
       ).finally(cleanup)
     } else {
       void runPlainConversation(taggedSender, sendId, provider, projectPath, messagesWithSystem, ctrl.signal, deps.recordJournal, costGuard, providerId, model,
@@ -685,7 +689,8 @@ async function runApiConversation(
   costGuard?: ReturnType<typeof createCostGuard>,
   providerId?: ProviderId,
   model?: string,
-  fallbackOpts?: FallbackOpts
+  fallbackOpts?: FallbackOpts,
+  mcpClientRef?: McpClient
 ): Promise<void> {
   const currentMessages = [...initialMessages]
   // Loop detection: per-signature occurrence counter across the whole agent
@@ -733,8 +738,16 @@ async function runApiConversation(
     // случилась ПОСЛЕ первого chunk'а — пробрасываем как было (retry бы
     // продублировал текст).
     const turnNum = turn + 1
+    // MCP tools: добавляем к стандартным TOOL_DEFS если есть подключённые серверы
+    const mcpToolDefs = mcpClientRef ? mcpClientRef.getAllTools().map(t => ({
+      name: t.name,
+      description: t.description,
+      parameters: t.inputSchema
+    })) : []
+    const allToolDefs = mcpToolDefs.length > 0 ? [...TOOL_DEFS, ...mcpToolDefs] : TOOL_DEFS
+
     for await (const event of withInitialRetry(
-      () => provider.send(messagesForProvider, TOOL_DEFS),
+      () => provider.send(messagesForProvider, allToolDefs),
       {
         label: `turn-${turnNum}`,
         signal,
@@ -876,13 +889,14 @@ async function runApiConversation(
       recordWrite, recordPlan, recordJournal, readJournal, saveMemory, searchMemories, searchConversations, connectors,
       pendingAttachments, pendingWrites, pendingCommands, scopedKey,
       agentMode, skillRegistry, getSecretForDelegate,
-      currentProviderId: providerId
+      currentProviderId: providerId,
+      mcpClient: mcpClientRef
     }
     const writePromises: Array<{ idx: number; promise: Promise<ToolResult> }> = []
     const readPromises: Array<{ idx: number; promise: Promise<ToolResult> }> = []
     for (let i = 0; i < toolCalls.length; i++) {
       const call = toolCalls[i]
-      const handler = lookupHandler(call.name)
+      const handler = lookupHandler(call.name, ctx)
       if (handler.mode === 'parallel-read') {
         readPromises.push({ idx: i, promise: handler.handle(call, ctx) })
       } else if (handler.mode === 'confirm-write') {
@@ -1033,7 +1047,7 @@ async function runApiConversation(
           fallbackOpts.triedProviders.add(nextId)
           // Передаём tools из замыкания — они привязаны к projectPath и signal, не к провайдеру.
           const fallbackTools = createFileTools(projectPath, signal)
-          return runApiConversation(sender, sendId, nextProvider, fallbackTools, projectPath, initialMessages, signal, recordWrite, recordPlan, recordJournal, readJournal, saveMemory, searchMemories, searchConversations, connectors, agentMode, turnsBudget, skillRegistry, getSecretForDelegate, costGuard, nextId, model, fallbackOpts)
+          return runApiConversation(sender, sendId, nextProvider, fallbackTools, projectPath, initialMessages, signal, recordWrite, recordPlan, recordJournal, readJournal, saveMemory, searchMemories, searchConversations, connectors, agentMode, turnsBudget, skillRegistry, getSecretForDelegate, costGuard, nextId, model, fallbackOpts, mcpClientRef)
         }
       }
     }

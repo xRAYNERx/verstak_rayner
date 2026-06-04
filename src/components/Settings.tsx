@@ -218,7 +218,7 @@ const PROVIDERS: ProviderConfig[] = [
   }
 ]
 
-type Tab = 'appearance' | 'profiles' | 'providers' | 'models' | 'connectors' | 'autonomous' | 'memory'
+type Tab = 'appearance' | 'profiles' | 'providers' | 'models' | 'connectors' | 'autonomous' | 'memory' | 'mcp'
 
 // TAB_GROUPS is built inside the Settings component to support i18n translations.
 
@@ -256,6 +256,243 @@ const CONNECTORS: ConnectorDef[] = [
   { id: 'social-publish', name: 'Social Publish', description: 'Постинг в Telegram, VK, webhooks', icon: IconSocialPublish, configuredKey: 'social_publish_telegram_channels' },
 ]
 
+// ─── MCP Tab ─────────────────────────────────────────────────────────────────
+
+import type { McpServerEntry, McpTool, PopularMcpServer } from '../types/api'
+
+function McpTab() {
+  const [servers, setServers] = useState<McpServerEntry[]>([])
+  const [connectedIds, setConnectedIds] = useState<Set<string>>(new Set())
+  const [toolCounts, setToolCounts] = useState<Record<string, number>>({})
+  const [showAdd, setShowAdd] = useState(false)
+  const [popular, setPopular] = useState<PopularMcpServer[]>([])
+  const [busy, setBusy] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [newForm, setNewForm] = useState({ name: '', command: '', args: '', env: '' })
+
+  useEffect(() => {
+    void loadAll()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function loadAll() {
+    try {
+      const [svrs, tools, pop] = await Promise.all([
+        window.api.mcp.listServers(),
+        window.api.mcp.tools(),
+        window.api.mcp.popular()
+      ])
+      setServers(svrs)
+      setPopular(pop)
+      const ids = new Set<string>()
+      const counts: Record<string, number> = {}
+      for (const t of tools as McpTool[]) {
+        ids.add(t.serverId)
+        counts[t.serverId] = (counts[t.serverId] ?? 0) + 1
+      }
+      setConnectedIds(ids)
+      setToolCounts(counts)
+    } catch { /* ignore */ }
+  }
+
+  async function handleConnect(id: string) {
+    setBusy(id); setError(null)
+    try {
+      const tools = await window.api.mcp.connect(id) as McpTool[]
+      setConnectedIds(prev => new Set([...prev, id]))
+      setToolCounts(prev => ({ ...prev, [id]: tools.length }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally { setBusy(null) }
+  }
+
+  async function handleDisconnect(id: string) {
+    setBusy(id); setError(null)
+    try {
+      await window.api.mcp.disconnect(id)
+      setConnectedIds(prev => { const s = new Set(prev); s.delete(id); return s })
+      setToolCounts(prev => { const c = { ...prev }; delete c[id]; return c })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally { setBusy(null) }
+  }
+
+  async function handleToggle(id: string, enabled: boolean) {
+    await window.api.mcp.toggleServer(id, enabled)
+    setServers(prev => prev.map(s => s.id === id ? { ...s, enabled } : s))
+  }
+
+  async function handleRemove(id: string) {
+    if (!confirm('Удалить MCP сервер?')) return
+    await window.api.mcp.removeServer(id)
+    setServers(prev => prev.filter(s => s.id !== id))
+    setConnectedIds(prev => { const s = new Set(prev); s.delete(id); return s })
+  }
+
+  async function handleAdd() {
+    if (!newForm.name.trim() || !newForm.command.trim()) return
+    // Validate JSON args/env
+    let argsStr = newForm.args.trim() || '[]'
+    let envStr = newForm.env.trim() || '{}'
+    // If args is a space-separated string, convert to JSON array
+    if (!argsStr.startsWith('[')) {
+      argsStr = JSON.stringify(argsStr.split(/\s+/).filter(Boolean))
+    }
+    try { JSON.parse(argsStr) } catch { argsStr = '[]' }
+    try { JSON.parse(envStr) } catch { envStr = '{}' }
+
+    const entry = await window.api.mcp.addServer({
+      name: newForm.name,
+      command: newForm.command,
+      args: argsStr,
+      env: envStr,
+      enabled: true
+    })
+    setServers(prev => [...prev, entry])
+    setNewForm({ name: '', command: '', args: '', env: '' })
+    setShowAdd(false)
+  }
+
+  function fillFromPopular(p: PopularMcpServer) {
+    setNewForm({
+      name: p.name,
+      command: p.command,
+      args: JSON.stringify(p.args),
+      env: p.envHint ? `{"${p.envHint}": ""}` : '{}'
+    })
+    setShowAdd(true)
+  }
+
+  return (
+    <div className="gg-settings-extra gg-mcp-tab">
+      <div className="gg-settings-section-title">⚡ MCP Серверы — Model Context Protocol</div>
+      <div className="gg-settings-hint" style={{ marginBottom: 16 }}>
+        Подключай внешние MCP-серверы чтобы расширить возможности агента: поиск в интернете,
+        базы данных, GitHub, браузер и многое другое. Инструменты сервера автоматически
+        добавляются в арсенал AI.
+      </div>
+
+      {error && (
+        <div className="gg-settings-hint" style={{ color: 'var(--error, #dc3545)', marginBottom: 12 }}>
+          ⚠ {error}
+        </div>
+      )}
+
+      {/* Список серверов */}
+      {servers.length === 0 ? (
+        <div className="gg-text-tertiary" style={{ padding: '12px 0', fontSize: 'var(--text-sm)' }}>
+          Нет настроенных MCP-серверов. Добавь ниже или выбери из популярных.
+        </div>
+      ) : (
+        <div className="gg-mcp-server-list">
+          {servers.map(s => {
+            const connected = connectedIds.has(s.id)
+            const count = toolCounts[s.id] ?? 0
+            return (
+              <div key={s.id} className={`gg-mcp-server-card ${connected ? 'is-connected' : ''}`}>
+                <div className="gg-mcp-server-info">
+                  <div className="gg-mcp-server-name">
+                    {s.name}
+                    {connected && <span className="gg-badge-connected" style={{ marginLeft: 8 }}>✓ {count} tools</span>}
+                  </div>
+                  <div className="gg-mcp-server-cmd" title={`${s.command} ${JSON.parse(s.args || '[]').join(' ')}`}>
+                    {s.command} {JSON.parse(s.args || '[]').join(' ')}
+                  </div>
+                </div>
+                <div className="gg-mcp-server-actions">
+                  <label className="gg-toggle" title="Включить/отключить сервер">
+                    <input
+                      type="checkbox"
+                      checked={s.enabled}
+                      onChange={e => void handleToggle(s.id, e.target.checked)}
+                    />
+                    <span className="gg-toggle-slider" />
+                  </label>
+                  {connected ? (
+                    <button
+                      className="gg-btn gg-btn-ghost"
+                      onClick={() => void handleDisconnect(s.id)}
+                      disabled={busy === s.id}
+                    >{busy === s.id ? '…' : 'Отключить'}</button>
+                  ) : (
+                    <button
+                      className="gg-btn gg-btn-primary"
+                      onClick={() => void handleConnect(s.id)}
+                      disabled={busy === s.id || !s.enabled}
+                    >{busy === s.id ? '…' : 'Подключить'}</button>
+                  )}
+                  <button
+                    className="gg-btn gg-btn-ghost"
+                    style={{ color: 'var(--error, #dc3545)' }}
+                    onClick={() => void handleRemove(s.id)}
+                    title="Удалить сервер"
+                  >✕</button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Форма добавления */}
+      {showAdd ? (
+        <div className="gg-mcp-add-form">
+          <div className="gg-settings-section-title" style={{ marginTop: 0 }}>Новый MCP сервер</div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Название</label>
+            <input className="gg-input" value={newForm.name} onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))} placeholder="Brave Search" />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Команда</label>
+            <input className="gg-input" value={newForm.command} onChange={e => setNewForm(f => ({ ...f, command: e.target.value }))} placeholder="npx" spellCheck={false} />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Аргументы (JSON)</label>
+            <input className="gg-input" value={newForm.args} onChange={e => setNewForm(f => ({ ...f, args: e.target.value }))} placeholder='["-y", "@anthropic-ai/mcp-server-brave-search"]' spellCheck={false} style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }} />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Env (JSON)</label>
+            <input className="gg-input" value={newForm.env} onChange={e => setNewForm(f => ({ ...f, env: e.target.value }))} placeholder='{"BRAVE_API_KEY": "your-key"}' spellCheck={false} style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button className="gg-btn gg-btn-primary" onClick={() => void handleAdd()}>Добавить</button>
+            <button className="gg-btn gg-btn-ghost" onClick={() => setShowAdd(false)}>Отмена</button>
+          </div>
+        </div>
+      ) : (
+        <button className="gg-btn gg-btn-primary" style={{ marginTop: 12 }} onClick={() => setShowAdd(true)}>
+          + Добавить MCP сервер
+        </button>
+      )}
+
+      {/* Популярные серверы */}
+      {popular.length > 0 && (
+        <>
+          <div className="gg-settings-section-title" style={{ marginTop: 24 }}>Популярные серверы</div>
+          <div className="gg-mcp-popular-list">
+            {popular.map(p => (
+              <div key={p.name} className="gg-mcp-popular-item">
+                <div className="gg-mcp-popular-name">{p.name}</div>
+                <div className="gg-mcp-popular-desc">{p.description}</div>
+                {p.envHint && <div className="gg-mcp-popular-env">Нужен env: <code>{p.envHint}</code></div>}
+                <button className="gg-btn gg-btn-ghost" onClick={() => fillFromPopular(p)}>Использовать</button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <div className="gg-settings-hint" style={{ marginTop: 20 }}>
+        MCP (Model Context Protocol) — открытый стандарт Anthropic для подключения
+        AI к внешним данным и инструментам. Серверы запускаются как дочерние процессы.
+        Подробнее: <code>modelcontextprotocol.io</code>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function Settings({ onClose }: { onClose: () => void }) {
   const t = useT()
   const activeProjectPath = useProject(s => s.path)
@@ -271,6 +508,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
       { id: 'providers',  label: t.settings.providers,  icon: '🔌' },
       { id: 'models',     label: t.settings.models,     icon: '✨' },
       { id: 'connectors', label: t.settings.connectors, icon: <IconPlug size={16} /> },
+      { id: 'mcp',        label: 'MCP',                 icon: '⚡' },
       { id: 'autonomous', label: t.settings.nightMode,  icon: '🌙' },
       { id: 'memory',     label: t.settings.memory,     icon: '🧠' }
     ] }
@@ -957,6 +1195,10 @@ export function Settings({ onClose }: { onClose: () => void }) {
             </div>
           )}
         </div>
+        )}
+
+        {tab === 'mcp' && (
+          <McpTab />
         )}
 
         {tab === 'autonomous' && (

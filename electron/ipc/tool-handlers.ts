@@ -32,6 +32,7 @@ import type { Attachment, ToolCall, ToolResult } from '../ai/types'
 import { applySearchReplaceBlocks, type FileTools } from '../ai/tools'
 import { decide, blockReason, type AgentMode } from '../ai/mode-policy'
 import { getRolePrompt } from '../ai/agent-roles'
+import type { McpClient } from '../mcp/client'
 
 const execFileAsync = promisify(execFile)
 
@@ -88,6 +89,8 @@ export interface ToolContext {
   getSecretForDelegate?: (key: string) => string | null
   /** ID текущего провайдера чата — используется как fallback в delegate_task. */
   currentProviderId?: string
+  /** MCP client для роутинга вызовов внешних MCP-инструментов. */
+  mcpClient?: McpClient
 }
 
 export type ToolMode = 'parallel-read' | 'sequential' | 'confirm-write'
@@ -1374,6 +1377,34 @@ const screenInfoHandler: ToolHandler = {
 }
 
 // ============================================================================
+// MCP tool handler — роутит вызов к mcpClient
+// ============================================================================
+
+const mcpToolHandler: ToolHandler = {
+  mode: 'sequential',
+  async handle(call, ctx) {
+    if (!ctx.mcpClient) {
+      return { id: call.id, name: call.name, result: '', error: 'MCP client not available' }
+    }
+    // Определяем serverId: ищем tool среди всех подключённых серверов по имени
+    const allMcpTools = ctx.mcpClient.getAllTools()
+    const matchedTool = allMcpTools.find(t => t.name === call.name)
+    if (!matchedTool) {
+      return { id: call.id, name: call.name, result: '', error: `MCP tool "${call.name}" not found in connected servers` }
+    }
+    try {
+      emitActivity(ctx, call, 'ok', `mcp:${call.name}`, matchedTool.serverId)
+      const result = await ctx.mcpClient.callTool(matchedTool.serverId, call.name, call.args)
+      return { id: call.id, name: call.name, result: typeof result === 'string' ? result : JSON.stringify(result) }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      emitActivity(ctx, call, 'error', `mcp:${call.name}`, msg)
+      return { id: call.id, name: call.name, result: '', error: msg }
+    }
+  }
+}
+
+// ============================================================================
 // Registry — single source of truth for tool dispatch
 // ============================================================================
 
@@ -1419,7 +1450,20 @@ const HANDLER_REGISTRY: Record<string, ToolHandler> = {
  * Look up the handler for a tool call. Falls back to the generic parallel-read
  * handler (which calls into ctx.tools.execute) for anything not explicitly
  * registered — that's the safe default for new pure-info tools.
+ *
+ * MCP tools: если имя не найдено в registry и передан ctx.mcpClient —
+ * роутим к mcpToolHandler. Так как lookupHandler не имеет ctx, проверка
+ * происходит в mcpToolHandler.handle через поиск в mcpClient.getAllTools().
  */
-export function lookupHandler(name: string): ToolHandler {
-  return HANDLER_REGISTRY[name] ?? readHandler
+export function lookupHandler(name: string, ctx?: { mcpClient?: import('../mcp/client').McpClient }): ToolHandler {
+  const registered = HANDLER_REGISTRY[name]
+  if (registered) return registered
+  // Если есть mcpClient и инструмент среди MCP tools — роутим к MCP handler
+  if (ctx?.mcpClient) {
+    const allMcpTools = ctx.mcpClient.getAllTools()
+    if (allMcpTools.some(t => t.name === name)) {
+      return mcpToolHandler
+    }
+  }
+  return readHandler
 }

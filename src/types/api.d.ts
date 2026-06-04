@@ -255,6 +255,19 @@ declare global {
         onDownloaded(cb: (data: { version: string }) => void): void
         onProgress(cb: (data: { percent: number }) => void): void
       }
+      mcp: {
+        listServers(): Promise<McpServerEntry[]>
+        addServer(entry: Omit<McpServerEntry, 'id'>): Promise<McpServerEntry>
+        updateServer(id: string, patch: Partial<Omit<McpServerEntry, 'id'>>): Promise<McpServerEntry | null>
+        removeServer(id: string): Promise<void>
+        toggleServer(id: string, enabled: boolean): Promise<void>
+        connect(id: string): Promise<McpTool[]>
+        disconnect(id: string): Promise<void>
+        tools(): Promise<McpTool[]>
+        connectedServers(): Promise<Array<{ id: string; name: string; command: string; args: string[]; env?: Record<string, string> }>>
+        popular(): Promise<PopularMcpServer[]>
+        saveAll(servers: McpServerEntry[]): Promise<void>
+      }
     }
   }
 }
@@ -296,6 +309,35 @@ export interface DetectedCli {
   binary: string
   version: string
   status: 'ready' | 'found' | 'error'
+}
+
+/** MCP Server — конфигурация внешнего MCP-сервера. */
+export interface McpServerEntry {
+  id: string
+  name: string
+  command: string
+  /** JSON-строка: string[] */
+  args: string
+  /** JSON-строка: Record<string,string> */
+  env: string
+  enabled: boolean
+}
+
+/** MCP Tool — инструмент, предоставляемый внешним MCP-сервером. */
+export interface McpTool {
+  name: string
+  description: string
+  inputSchema: Record<string, unknown>
+  serverId: string
+}
+
+/** Предустановленный популярный MCP-сервер. */
+export interface PopularMcpServer {
+  name: string
+  command: string
+  args: string[]
+  envHint?: string
+  description: string
 }
 
 export {}
