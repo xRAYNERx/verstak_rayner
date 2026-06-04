@@ -11,6 +11,7 @@ import { PlanView } from './components/PlanView'
 import { FeedbackView } from './components/FeedbackView'
 import { BrowserView } from './components/BrowserView'
 import { StubView } from './components/StubView'
+import { SkillsView } from './components/SkillsView'
 import { DiffView } from './components/DiffView'
 import { CommandConfirm } from './components/CommandConfirm'
 import { UpdateNotification } from './components/UpdateNotification'
@@ -19,6 +20,7 @@ import { OnboardingWizard } from './components/OnboardingWizard'
 import { ArtifactPreviewContainer } from './components/ArtifactPreview'
 import { TerminalErrorToast } from './components/TerminalErrorToast'
 import { useProject } from './store/projectStore'
+import { useSkills as useSkillsStore } from './store/skillStore'
 
 const SIDEBAR_MIN = 200
 const SIDEBAR_MAX = 480
@@ -195,15 +197,15 @@ export function App() {
         {activeView === 'feedback' && <FeedbackView />}
         {activeView === 'browser' && <BrowserView />}
         {activeView === 'skills' && (
-          <div className="gg-view-placeholder">
-            <div className="gg-view-placeholder-icon">⚡</div>
-            <h2>{t.views.skillsTitle}</h2>
-            <p>{t.views.skillsDesc}</p>
-            <div className="gg-view-placeholder-actions">
-              <button onClick={() => void window.api.files.revealInExplorer('.verstak/skills')}>{t.views.skillsOpenFolder}</button>
-              <button onClick={() => setActiveView('chat')}>{t.views.skillsSetupServer}</button>
-            </div>
-          </div>
+          <SkillsView
+            onActivateSkill={slash => {
+              // Активируем скилл по slash-имени, затем переходим в чат
+              const skills = useSkillsStore.getState().skills
+              const skill = skills.find(s => s.slash === slash || s.id === slash)
+              if (skill) useSkillsStore.getState().setActiveSkill(skill.id)
+              setActiveView('chat')
+            }}
+          />
         )}
         {activeView === 'design' && (
           <div className="gg-view-placeholder">
