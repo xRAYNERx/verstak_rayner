@@ -338,11 +338,47 @@ const cache = new Map<string, ProjectMapCacheEntry>()
 
 const CACHE_TTL = 30_000 // 30 seconds
 
+// Tracks files modified since the last full build. Key = project root.
+const dirtyFiles = new Map<string, Set<string>>()
+
+/**
+ * Mark a file as dirty so the next getProjectMap call re-parses only that
+ * file instead of doing a full rebuild (incremental update path).
+ */
+export function markFileDirty(root: string, filePath: string): void {
+  if (!dirtyFiles.has(root)) dirtyFiles.set(root, new Set())
+  dirtyFiles.get(root)!.add(filePath)
+}
+
 export async function getProjectMap(root: string, refresh = false): Promise<ProjectMap> {
-  if (!refresh) {
-    const cached = cache.get(root)
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) return cached.map
+  const cached = cache.get(root)
+  if (!refresh && cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    const dirty = dirtyFiles.get(root)
+    if (!dirty || dirty.size === 0) return cached.map
+
+    // Incremental update: re-parse only dirty files (threshold: ≤10 files)
+    if (dirty.size <= 10) {
+      for (const filePath of dirty) {
+        const relativePath = relative(root, filePath).replace(/\\/g, '/')
+        const entry = cached.map.files.find(f => f.path === relativePath)
+        if (entry) {
+          try {
+            const content = await readFile(filePath, 'utf8')
+            entry.symbols = extractSymbols(content)
+            entry.lines = content.split('\n').length
+          } catch {
+            // Файл удалён или недоступен — оставляем старую запись
+          }
+        }
+      }
+      dirty.clear()
+      cached.timestamp = Date.now()
+      return cached.map
+    }
   }
+
+  // Full rebuild
+  dirtyFiles.delete(root)
   const map = await buildProjectMap(root)
   cache.set(root, { map, timestamp: Date.now() })
   return map
@@ -350,4 +386,5 @@ export async function getProjectMap(root: string, refresh = false): Promise<Proj
 
 export function invalidateProjectMap(root: string): void {
   cache.delete(root)
+  dirtyFiles.delete(root)
 }

@@ -32,7 +32,7 @@ import type { Attachment, ToolCall, ToolResult } from '../ai/types'
 import { applySearchReplaceBlocks, type FileTools } from '../ai/tools'
 import { decide, blockReason, type AgentMode } from '../ai/mode-policy'
 import { getRolePrompt } from '../ai/agent-roles'
-import { invalidateProjectMap } from '../ai/project-map'
+import { invalidateProjectMap, markFileDirty } from '../ai/project-map'
 import type { McpClient } from '../mcp/client'
 
 const execFileAsync = promisify(execFile)
@@ -217,8 +217,8 @@ async function diffConfirmWrite(call: ToolCall, ctx: ToolContext, path: string, 
   try {
     await ctx.tools.execute('write_file', { path, content: after })
     try { ctx.recordWrite(ctx.projectPath, path, before, after) } catch { /* undo not critical */ }
-    // Invalidate project map cache — file tree changed
-    invalidateProjectMap(ctx.projectPath)
+    // Incremental project map update — mark file dirty instead of full rebuild
+    markFileDirty(ctx.projectPath, join(ctx.projectPath, path))
     return { id: call.id, name: call.name, result: `Applied ${call.name === 'apply_patch' ? 'patch' : 'write'} to ${path}` }
   } catch (err) {
     return { id: call.id, name: call.name, result: '', error: err instanceof Error ? err.message : String(err) }
