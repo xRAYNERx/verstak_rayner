@@ -78,13 +78,13 @@ const PROVIDER_META: Record<ProviderId, Omit<ProviderInfo, 'model' | 'id'>> = {
     label: 'YandexGPT',
     transport: 'API',
     models: ['yandexgpt/latest', 'yandexgpt-lite/latest', 'yandexgpt-32k/latest'],
-    supportsTools: false
+    supportsTools: true
   },
   gigachat: {
     label: 'GigaChat',
     transport: 'API',
     models: ['GigaChat', 'GigaChat-Plus', 'GigaChat-Pro', 'GigaChat-Max'],
-    supportsTools: false
+    supportsTools: true
   },
   // OpenAI-compatible extra-провайдеры (зеркало EXTRA_PROVIDERS в main).
   // ВАЖНО: при добавлении сюда — обнови также массив PROVIDERS в Settings.tsx

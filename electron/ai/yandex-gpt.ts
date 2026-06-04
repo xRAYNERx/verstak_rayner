@@ -7,14 +7,17 @@
  *  2. Streaming формат — NDJSON (newline-delimited JSON), не SSE. Каждая
  *     строка — отдельный JSON-объект с ПОЛНЫМ накопленным текстом ответа.
  *     Дельту вычисляем сами (slice от prevText).
- *  3. Tools не поддерживаются нативно — если в запросе есть, игнорируем
- *     (НЕ передаём, НЕ бросаем ошибку).
+ *  3. Function calling поддерживается через поле `tools` в запросе.
+ *     Ответ — toolCallList в assistantMessage. Tool result — role: "function"
+ *     с toolResultList.
  *  4. maxTokens передаётся как строка ('8000'), не number — особенность API.
  *
  * Документация: https://yandex.cloud/ru/docs/foundation-models/text-generation/api-ref/TextGeneration/completion
  */
 
+import { randomUUID } from 'crypto'
 import type { ChatProvider, ChatMessage, ChatEvent, ToolDefinition, ToolResult } from './types'
+import { toYandexTools } from './tool-format'
 
 const COMPLETION_STREAM_URL =
   'https://llm.api.cloud.yandex.net/foundationModels/v1/completionStream'
@@ -39,10 +42,28 @@ export interface YandexGptOptions {
   model?: string
 }
 
+// Внутренний тип сообщения для Yandex API — поддерживает все роли включая function.
+type YandexMessage =
+  | { role: 'system'; text: string }
+  | { role: 'user'; text: string }
+  | { role: 'assistant'; text: string; toolCallList?: { toolCalls: Array<{ functionCall: { name: string; arguments: Record<string, unknown> } }> } }
+  | { role: 'function'; toolResultList: { toolResults: Array<{ functionResult: { name: string; content: string } }> } }
+
 interface YandexChunk {
   result?: {
     alternatives?: Array<{
-      message?: { text?: string; role?: string }
+      message?: {
+        text?: string
+        role?: string
+        toolCallList?: {
+          toolCalls?: Array<{
+            functionCall?: {
+              name?: string
+              arguments?: Record<string, unknown>
+            }
+          }>
+        }
+      }
       status?: string
     }>
     usage?: {
@@ -55,23 +76,61 @@ interface YandexChunk {
 
 /**
  * Преобразует наши ChatMessage в формат Yandex: system-сообщения
- * объединяются в один, остальные идут как user/assistant.
- * Tool-результаты пропускаются (Yandex не поддерживает).
+ * объединяются в один, остальные идут как user/assistant/function.
+ * Tool-результаты конвертируются в role: "function" с toolResultList.
  */
-export function buildYandexMessages(
-  messages: ChatMessage[]
-): Array<{ role: 'system' | 'user' | 'assistant'; text: string }> {
+export function buildYandexMessages(messages: ChatMessage[]): YandexMessage[] {
   const systemParts: string[] = []
-  const rest: Array<{ role: 'user' | 'assistant'; text: string }> = []
+  const rest: YandexMessage[] = []
+
   for (const m of messages) {
     if (m.role === 'system') {
       if (m.content) systemParts.push(m.content)
-    } else if (m.role === 'user' || m.role === 'assistant') {
-      // Не передаём tool-результаты — Yandex про них не знает
-      rest.push({ role: m.role, text: m.content ?? '' })
+    } else if (m.role === 'assistant') {
+      if (m.toolCalls?.length) {
+        // Ассистент вызвал тулзы — передаём toolCallList + текст
+        rest.push({
+          role: 'assistant',
+          text: m.content ?? '',
+          toolCallList: {
+            toolCalls: m.toolCalls.map(tc => ({
+              functionCall: {
+                name: tc.name,
+                arguments: tc.args
+              }
+            }))
+          }
+        })
+      } else {
+        rest.push({ role: 'assistant', text: m.content ?? '' })
+      }
+    } else if (m.role === 'user') {
+      if (m.toolResults?.length) {
+        // User message carrying tool results → role: "function"
+        rest.push({
+          role: 'function',
+          toolResultList: {
+            toolResults: m.toolResults.map(r => ({
+              functionResult: {
+                name: r.name,
+                content: r.error
+                  ? `Error: ${r.error}\n${JSON.stringify(r.result)}`
+                  : (typeof r.result === 'string' ? r.result : JSON.stringify(r.result))
+              }
+            }))
+          }
+        })
+        // Если есть текстовый контент (verifyHint), добавляем следом как user
+        if (m.content) {
+          rest.push({ role: 'user', text: m.content })
+        }
+      } else {
+        rest.push({ role: 'user', text: m.content ?? '' })
+      }
     }
   }
-  const out: Array<{ role: 'system' | 'user' | 'assistant'; text: string }> = []
+
+  const out: YandexMessage[] = []
   if (systemParts.length > 0) {
     out.push({ role: 'system', text: systemParts.join('\n\n') })
   }
@@ -103,14 +162,11 @@ export function createYandexGptProvider(opts: YandexGptOptions): ChatProvider {
 
     async *send(
       messages: ChatMessage[],
-      _tools: ToolDefinition[],
+      tools: ToolDefinition[],
       _results?: ToolResult[]
     ): AsyncIterable<ChatEvent> {
-      // tools игнорируем — Yandex не поддерживает function-calling в API,
-      // совместимом с нашим dispatcher'ом. Тихо пропускаем, как договорились в ТЗ.
-
       const yandexMessages = buildYandexMessages(messages)
-      const body = {
+      const body: Record<string, unknown> = {
         modelUri: buildModelUri(opts.folderId, model),
         completionOptions: {
           stream: true,
@@ -120,9 +176,13 @@ export function createYandexGptProvider(opts: YandexGptOptions): ChatProvider {
         messages: yandexMessages
       }
 
+      // Добавляем tools если они есть
+      if (tools.length > 0) {
+        body.tools = toYandexTools(tools)
+      }
+
       let usageInput = 0
       let usageOutput = 0
-      let modelName = model
 
       try {
         const response = await fetch(COMPLETION_STREAM_URL, {
@@ -154,20 +214,42 @@ export function createYandexGptProvider(opts: YandexGptOptions): ChatProvider {
         let buf = ''
         let prevText = '' // ПОЛНЫЙ накопленный текст из предыдущего chunk'а
 
-        const processChunk = (chunk: YandexChunk): { text?: string } => {
+        // Накапливаем tool calls из NDJSON — последний chunk содержит финальное
+        // состояние. Ключ: имя тула.
+        const toolCallsSeen = new Set<string>()
+
+        const processChunk = (chunk: YandexChunk): { text?: string; toolCalls?: Array<{ name: string; args: Record<string, unknown> }> } => {
           const alt = chunk.result?.alternatives?.[0]
-          const fullText = alt?.message?.text ?? ''
+          const msg = alt?.message
+          const fullText = msg?.text ?? ''
+
           // Yandex возвращает накопленный текст; вычитаем prevText чтобы получить дельту
           const delta = fullText.length > prevText.length ? fullText.slice(prevText.length) : ''
           if (delta) prevText = fullText
+
           // Usage всегда в последних chunk'ах
           if (chunk.result?.usage) {
             const u = chunk.result.usage
             usageInput = parseInt(u.inputTextTokens ?? '0', 10) || 0
             usageOutput = parseInt(u.completionTokens ?? '0', 10) || 0
           }
-          return { text: delta }
+
+          // Tool calls в assistantMessage
+          const rawCalls = msg?.toolCallList?.toolCalls
+          let toolCalls: Array<{ name: string; args: Record<string, unknown> }> | undefined
+          if (rawCalls?.length) {
+            toolCalls = rawCalls
+              .filter(tc => tc.functionCall?.name)
+              .map(tc => ({
+                name: tc.functionCall!.name!,
+                args: tc.functionCall?.arguments ?? {}
+              }))
+          }
+
+          return { text: delta || undefined, toolCalls }
         }
+
+        const pendingToolCalls: Array<{ name: string; args: Record<string, unknown> }> = []
 
         while (true) {
           const { done, value } = await reader.read()
@@ -179,17 +261,42 @@ export function createYandexGptProvider(opts: YandexGptOptions): ChatProvider {
             const t = line.trim()
             if (!t) continue
             try {
-              const { text } = processChunk(JSON.parse(t) as YandexChunk)
+              const { text, toolCalls } = processChunk(JSON.parse(t) as YandexChunk)
               if (text) yield { type: 'text', text }
+              // Обновляем pending tool calls при каждом chunk'е
+              // (Yandex отдаёт финальный список в конце, перезаписываем)
+              if (toolCalls?.length) {
+                pendingToolCalls.length = 0
+                pendingToolCalls.push(...toolCalls)
+              }
             } catch { /* битый chunk — пропускаем */ }
           }
         }
         // Хвост буфера
         if (buf.trim()) {
           try {
-            const { text } = processChunk(JSON.parse(buf) as YandexChunk)
+            const { text, toolCalls } = processChunk(JSON.parse(buf) as YandexChunk)
             if (text) yield { type: 'text', text }
+            if (toolCalls?.length) {
+              pendingToolCalls.length = 0
+              pendingToolCalls.push(...toolCalls)
+            }
           } catch { /* skip */ }
+        }
+
+        // Эмитим tool calls после завершения стрима
+        for (const tc of pendingToolCalls) {
+          if (!toolCallsSeen.has(tc.name)) {
+            toolCallsSeen.add(tc.name)
+            yield {
+              type: 'tool-call',
+              call: {
+                id: randomUUID(),
+                name: tc.name,
+                args: tc.args
+              }
+            }
+          }
         }
 
         if (usageInput > 0 || usageOutput > 0) {
@@ -198,7 +305,7 @@ export function createYandexGptProvider(opts: YandexGptOptions): ChatProvider {
             usage: {
               inputTokens: usageInput,
               outputTokens: usageOutput,
-              model: modelName
+              model
             }
           }
         }

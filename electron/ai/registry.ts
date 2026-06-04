@@ -126,7 +126,7 @@ export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
     secretKey: 'yandex_api_key',
     models: YANDEX_GPT_MODELS,
     defaultModel: 'yandexgpt/latest',
-    supportsTools: false,
+    supportsTools: true,
     shortLabel: 'YandexGPT'
   },
   gigachat: {
@@ -136,7 +136,7 @@ export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
     secretKey: 'gigachat_client_id',
     models: GIGACHAT_MODELS,
     defaultModel: 'GigaChat',
-    supportsTools: false,
+    supportsTools: true,
     shortLabel: 'GigaChat'
   },
   // OpenAI-compatible extra-провайдеры (генерим из EXTRA_PROVIDERS).

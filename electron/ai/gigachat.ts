@@ -7,7 +7,8 @@
  *  2. SSL: Сбер использует свой CA (Russian Trusted Root CA), не в Node trust store.
  *     Обходим через https.Agent({ rejectUnauthorized: false }). V2 — бандлить cert.
  *  3. Chat API OpenAI-compatible (SSE streaming с `data: {...}` строками).
- *  4. Tools не поддерживаем — пропускаем тихо.
+ *  4. Function calling — OpenAI-формат: tools[] в запросе, delta.tool_calls в ответе.
+ *     Tool result — role: "tool" с tool_call_id.
  *  5. 401 на chat → сброс кеша → один retry (race между cached token и server-side expire).
  *
  * Документация: https://developers.sber.ru/docs/ru/gigachat/api/reference/rest/post-chat
@@ -18,6 +19,7 @@ import https from 'https'
 import type { IncomingMessage } from 'http'
 import { URL } from 'url'
 import type { ChatProvider, ChatMessage, ChatEvent, ToolDefinition, ToolResult } from './types'
+import { toOpenAiTools } from './tool-format'
 
 const OAUTH_URL = 'https://ngw.devices.sberbank.ru:9443/api/v2/oauth'
 const CHAT_URL  = 'https://gigachat.devices.sberbank.ru/api/v1/chat/completions'
@@ -199,9 +201,21 @@ async function* streamLines(res: IncomingMessage & { __status: number }): AsyncG
 
 class GigaChatAuthError extends Error {}
 
+interface ToolCallDelta {
+  index?: number
+  id?: string
+  function?: {
+    name?: string
+    arguments?: string
+  }
+}
+
 interface ChatChunk {
   choices?: Array<{
-    delta?: { content?: string }
+    delta?: {
+      content?: string
+      tool_calls?: ToolCallDelta[]
+    }
     finish_reason?: string | null
   }>
   usage?: {
@@ -209,6 +223,51 @@ interface ChatChunk {
     completion_tokens?: number
     total_tokens?: number
   }
+}
+
+/**
+ * Конвертирует ChatMessage[] в сообщения для GigaChat (OpenAI-compatible формат).
+ * Tool results передаются как role: "tool".
+ */
+function buildGigaChatMessages(messages: ChatMessage[]): unknown[] {
+  const result: unknown[] = []
+  for (const m of messages) {
+    if (m.role === 'system' || m.role === 'user' || m.role === 'assistant') {
+      if (m.toolCalls?.length) {
+        // Сообщение ассистента с вызовами тулзов
+        result.push({
+          role: 'assistant',
+          content: m.content ?? '',
+          tool_calls: m.toolCalls.map(tc => ({
+            id: tc.id,
+            type: 'function',
+            function: {
+              name: tc.name,
+              arguments: JSON.stringify(tc.args)
+            }
+          }))
+        })
+      } else if (m.role === 'user' && m.toolResults?.length) {
+        // User message carrying tool results → role: "tool" messages
+        for (const r of m.toolResults) {
+          result.push({
+            role: 'tool',
+            tool_call_id: r.id,
+            content: r.error
+              ? `Error: ${r.error}\n${JSON.stringify(r.result)}`
+              : (typeof r.result === 'string' ? r.result : JSON.stringify(r.result))
+          })
+        }
+        // verifyHint текст идёт следом как user, если есть
+        if (m.content) {
+          result.push({ role: 'user', content: m.content })
+        }
+      } else {
+        result.push({ role: m.role, content: m.content ?? '' })
+      }
+    }
+  }
+  return result
 }
 
 export function createGigaChatProvider(opts: GigaChatOptions): ChatProvider {
@@ -224,17 +283,20 @@ export function createGigaChatProvider(opts: GigaChatOptions): ChatProvider {
 
     async *send(
       messages: ChatMessage[],
-      _tools: ToolDefinition[],
+      tools: ToolDefinition[],
       _results?: ToolResult[]
     ): AsyncIterable<ChatEvent> {
-      const body = {
+      const body: Record<string, unknown> = {
         model,
-        messages: messages
-          .filter(m => m.role === 'system' || m.role === 'user' || m.role === 'assistant')
-          .map(m => ({ role: m.role, content: m.content ?? '' })),
+        messages: buildGigaChatMessages(messages),
         stream: true,
         temperature: 0.7,
         max_tokens: 8000
+      }
+
+      // Добавляем tools если они есть
+      if (tools.length > 0) {
+        body.tools = toOpenAiTools(tools)
       }
 
       let usageIn = 0
@@ -243,17 +305,79 @@ export function createGigaChatProvider(opts: GigaChatOptions): ChatProvider {
 
       async function* runOnce(): AsyncGenerator<ChatEvent, void, void> {
         const token = await getAccessToken(opts.clientId, opts.clientSecret)
+
+        // Накапливаем tool_calls по индексу (приходят дельтами по чанкам)
+        // Структура: index → { id, name, argumentsBuffer }
+        const toolCallAccum = new Map<number, { id: string; name: string; argumentsBuffer: string }>()
+
         for await (const line of chatStream(token, body)) {
           if (!line.startsWith('data:')) continue
           const payload = line.slice(5).trim()
           if (payload === '[DONE]') break
           let chunk: ChatChunk
           try { chunk = JSON.parse(payload) } catch { continue }
-          const delta = chunk.choices?.[0]?.delta?.content
-          if (delta) yield { type: 'text', text: delta }
+
+          const delta = chunk.choices?.[0]?.delta
+
+          // Текстовый контент
+          if (delta?.content) yield { type: 'text', text: delta.content }
+
+          // Tool calls — накапливаем дельты
+          if (delta?.tool_calls) {
+            for (const tc of delta.tool_calls) {
+              const idx = tc.index ?? 0
+              if (!toolCallAccum.has(idx)) {
+                toolCallAccum.set(idx, {
+                  id: tc.id ?? randomUUID(),
+                  name: tc.function?.name ?? '',
+                  argumentsBuffer: ''
+                })
+              }
+              const acc = toolCallAccum.get(idx)!
+              // Имя может прийти в первом чанке, аргументы — дробно
+              if (tc.function?.name) acc.name = tc.function.name
+              if (tc.id) acc.id = tc.id
+              if (tc.function?.arguments) acc.argumentsBuffer += tc.function.arguments
+            }
+          }
+
+          const finishReason = chunk.choices?.[0]?.finish_reason
+          if (finishReason === 'tool_calls' || finishReason === 'stop') {
+            // Эмитим накопленные tool calls
+            for (const [, acc] of toolCallAccum) {
+              if (!acc.name) continue
+              let args: Record<string, unknown> = {}
+              try { args = JSON.parse(acc.argumentsBuffer) } catch { /* некорректный JSON — пустые args */ }
+              yield {
+                type: 'tool-call',
+                call: {
+                  id: acc.id,
+                  name: acc.name,
+                  args
+                }
+              }
+            }
+            toolCallAccum.clear()
+          }
+
           if (chunk.usage) {
             usageIn = chunk.usage.prompt_tokens ?? usageIn
             usageOut = chunk.usage.completion_tokens ?? usageOut
+          }
+        }
+
+        // На случай если finish_reason не пришёл явно, но tool calls накоплены
+        for (const [, acc] of toolCallAccum) {
+          if (!acc.name) continue
+          let args: Record<string, unknown> = {}
+          try { args = JSON.parse(acc.argumentsBuffer) } catch { /* skip */ }
+          yield {
+            type: 'tool-call',
+            call: {
+              id: acc.id,
+              name: acc.name,
+              args
+            }
           }
         }
       }
