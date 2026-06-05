@@ -54,6 +54,7 @@ import { registerMcpIpc } from './ipc/mcp'
 import { mcpClient } from './mcp/client'
 import { registerAuditIpc } from './ipc/audit'
 import { appendAudit } from './storage/audit-log'
+import { trackToolForPatterns } from './ai/procedural-memory'
 import { registerSuggestionsIpc } from './ipc/suggestions'
 import { initAutoUpdater } from './updater'
 
@@ -285,6 +286,10 @@ app.whenReady().then(() => {
     },
     // MCP client — внешние инструменты через Model Context Protocol
     mcpClient,
+    // Процедурная память — детектирует паттерны решения задач
+    trackToolPattern: (projectPath, event) => {
+      trackToolForPatterns(db, projectPath, event)
+    },
     // Audit log — пишем каждое агентное действие
     appendAudit: (projectPath, chatId, action, detail, providerId, model) => {
       appendAudit(db, { timestamp: Date.now(), projectPath, chatId, action, detail, providerId, model })

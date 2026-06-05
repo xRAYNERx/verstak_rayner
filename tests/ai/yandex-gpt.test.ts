@@ -130,7 +130,7 @@ describe('yandex-gpt — streaming send()', () => {
     expect(typeof body.completionOptions.maxTokens).toBe('string')
   })
 
-  it('tools.length > 0 — запрос уходит БЕЗ поля tools', async () => {
+  it('tools.length > 0 — tools передаются в формате YandexGPT', async () => {
     fetchSpy.mockResolvedValue(mockNdjsonResponse([]))
     const provider = createYandexGptProvider({ apiKey: 'k', folderId: 'b1g' })
     await collect(provider.send(
@@ -138,8 +138,10 @@ describe('yandex-gpt — streaming send()', () => {
       [{ name: 'read_file', description: 'read', parameters: {} }]
     ))
     const body = JSON.parse((fetchSpy.mock.calls[0][1]?.body as string) ?? '{}')
-    expect(body.tools).toBeUndefined()
-    expect(body.functions).toBeUndefined()
+    // После добавления function calling tools передаются в формате YandexGPT
+    expect(body.tools).toBeDefined()
+    expect(body.tools[0]).toHaveProperty('function')
+    expect(body.tools[0].function.name).toBe('read_file')
   })
 
   it('HTTP 401 → понятная ошибка', async () => {

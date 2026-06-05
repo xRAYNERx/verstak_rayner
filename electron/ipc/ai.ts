@@ -13,6 +13,7 @@ import type { AgentMode } from '../ai/mode-policy'
 import type { ChatMessage, ToolCall, ToolResult, ChatProvider, Attachment } from '../ai/types'
 import { lookupHandler, type ToolContext, type TaggedSender as HandlerTaggedSender } from './tool-handlers'
 import { captureToolObservation } from '../ai/memory-hooks'
+import { trackToolForPatterns, type ToolEvent } from '../ai/procedural-memory'
 import { pickReviewProvider, buildCrossVerifyPrompt, runCrossVerify, getConfiguredApiProviders, type TurnChange } from '../ai/cross-verify'
 import { shouldFallback, getNextFallback } from '../ai/smart-fallback'
 import { estimateComplexity, recommendModel, complexityLabel } from '../ai/smart-router'
@@ -53,6 +54,8 @@ interface AiDeps {
   }
   /** MCP client — внешние серверы, опционально. */
   mcpClient?: McpClient
+  /** Процедурная память — детектирует паттерны решения задач из tool events. */
+  trackToolPattern?: (projectPath: string, event: ToolEvent) => void
   /** Опциональный аппендер в audit_log — вызывается после каждого tool call. */
   appendAudit?: (projectPath: string, chatId: number | null, action: string, detail: string, providerId: string | null, model: string | null) => void
 }
@@ -123,11 +126,10 @@ function fireCrossVerify(
   sendId: number,
   changes: TurnChange[],
   currentProviderId: ProviderId | undefined,
-  getSecret: ((key: string) => string | null) | undefined
+  getSecret: (key: string) => string | null
 ): void {
   if (!changes.length) return
   if (!currentProviderId) return
-  if (!getSecret) return
   // Проверяем настройку cross_verify (по умолчанию включена)
   if (getSecret('cross_verify') === 'false') return
 
@@ -407,7 +409,8 @@ export function registerAiIpc(deps: AiDeps): void {
       void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.readJournal, deps.saveMemory, deps.searchMemories, deps.searchConversations, deps.connectors, deps.getAgentMode(), turnsBudget, deps.skillRegistry, deps.getSecret, costGuard, providerId, model,
         smartFallbackEnabled ? { getNextProvider: makeFallbackProvider, configuredProviders: new Set(getConfiguredApiProviders(deps.getSecret)), triedProviders: new Set([providerId]) } : undefined,
         deps.mcpClient,
-        auditFn
+        auditFn,
+        deps.trackToolPattern
       ).finally(cleanup)
     } else {
       void runPlainConversation(taggedSender, sendId, provider, projectPath, messagesWithSystem, ctrl.signal, deps.recordJournal, costGuard, providerId, model,
@@ -726,7 +729,8 @@ async function runApiConversation(
   model?: string,
   fallbackOpts?: FallbackOpts,
   mcpClientRef?: McpClient,
-  appendAuditFn?: (action: string, detail: string) => void
+  appendAuditFn?: (action: string, detail: string) => void,
+  trackToolPatternFn?: (projectPath: string, event: ToolEvent) => void
 ): Promise<void> {
   const currentMessages = [...initialMessages]
   // Loop detection: per-signature occurrence counter across the whole agent
@@ -842,7 +846,7 @@ async function runApiConversation(
           sender.send('ai:event', { id: sendId, event })
           // Cross-verify: запускаем асинхронно ПОСЛЕ отправки done,
           // чтобы не блокировать UI. Результат придёт отдельным событием.
-          fireCrossVerify(sender, sendId, sessionChanges, providerId, getSecretForDelegate)
+          if (getSecretForDelegate) fireCrossVerify(sender, sendId, sessionChanges, providerId, getSecretForDelegate)
           return
         }
       } else if (event.type === 'error') {
@@ -855,7 +859,7 @@ async function runApiConversation(
       exitReason = 'completed'
       sender.send('ai:event', { id: sendId, event: { type: 'done' } })
       // Cross-verify: запускаем асинхронно ПОСЛЕ отправки done.
-      fireCrossVerify(sender, sendId, sessionChanges, providerId, getSecretForDelegate)
+      if (getSecretForDelegate) fireCrossVerify(sender, sendId, sessionChanges, providerId, getSecretForDelegate)
       return
     }
 
@@ -988,6 +992,17 @@ async function runApiConversation(
         },
         autoCaptureEnabled
       )
+      // Процедурная память — детектирует паттерны решения задач (fix-pattern и т.п.)
+      if (trackToolPatternFn) {
+        try {
+          trackToolPatternFn(projectPath, {
+            tool: call.name,
+            args: call.args,
+            success: !result.error,
+            timestamp: Date.now()
+          })
+        } catch { /* procedural memory not critical */ }
+      }
     }
     // If user just accepted writes, gently nudge the model on the next turn
     // to verify (run tests / typecheck / lint). The context-pack already
@@ -1084,7 +1099,7 @@ async function runApiConversation(
           fallbackOpts.triedProviders.add(nextId)
           // Передаём tools из замыкания — они привязаны к projectPath и signal, не к провайдеру.
           const fallbackTools = createFileTools(projectPath, signal)
-          return runApiConversation(sender, sendId, nextProvider, fallbackTools, projectPath, initialMessages, signal, recordWrite, recordPlan, recordJournal, readJournal, saveMemory, searchMemories, searchConversations, connectors, agentMode, turnsBudget, skillRegistry, getSecretForDelegate, costGuard, nextId, model, fallbackOpts, mcpClientRef)
+          return runApiConversation(sender, sendId, nextProvider, fallbackTools, projectPath, initialMessages, signal, recordWrite, recordPlan, recordJournal, readJournal, saveMemory, searchMemories, searchConversations, connectors, agentMode, turnsBudget, skillRegistry, getSecretForDelegate, costGuard, nextId, model, fallbackOpts, mcpClientRef, appendAuditFn, trackToolPatternFn)
         }
       }
     }

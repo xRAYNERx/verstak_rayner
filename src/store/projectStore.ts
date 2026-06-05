@@ -1,39 +1,6 @@
 import { create } from 'zustand'
 import type { FileNode, ChatMessage, ProjectMeta, ChatSession } from '../types/api'
-
-/**
- * Sanity check for stored chat-session (providerId, model) pairs.
- * Earlier bug: switching provider in ModelPicker saved the OLD provider's
- * model on the new provider's session entry (e.g. claude-cli + gemini-3.5-flash).
- * This guard rejects such impossible pairs at switch time.
- */
-const PROVIDER_MODEL_MAP: Record<string, string[]> = {
-  'gemini-api': ['gemini-3-pro', 'gemini-3.5-flash', 'gemini-3-flash', 'gemini-2.5-pro', 'gemini-2.5-flash'],
-  'gemini-cli': ['auto', 'gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'],
-  'claude': ['claude-sonnet-4-6', 'claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
-  'claude-cli': ['auto', 'claude-sonnet-4-6', 'claude-opus-4-5', 'claude-haiku-4-5', 'claude-sonnet-4-5'],
-  'grok': ['grok-4', 'grok-4-fast', 'grok-3'],
-  'grok-cli': ['auto', 'grok-4', 'grok-4-fast', 'grok-code-fast-1', 'grok-3'],
-  'openai': ['gpt-5', 'gpt-5-mini', 'gpt-4o', 'gpt-4o-mini', 'o1', 'o1-mini'],
-  'codex-cli': ['auto', 'gpt-5-codex', 'gpt-5', 'gpt-5-mini', 'o3', 'o3-mini', 'gpt-4o'],
-  // Российские провайдеры
-  'yandex-gpt': ['yandexgpt/latest', 'yandexgpt-lite/latest', 'yandexgpt-32k/latest'],
-  'gigachat': ['GigaChat', 'GigaChat-Plus', 'GigaChat-Pro', 'GigaChat-Max'],
-  // OpenAI-compatible extra-провайдеры (зеркало EXTRA_PROVIDERS в main)
-  'openrouter': ['anthropic/claude-opus-4-5', 'anthropic/claude-sonnet-4-6', 'openai/gpt-5', 'openai/gpt-5-mini', 'google/gemini-3-pro', 'google/gemini-3.5-flash', 'x-ai/grok-4', 'deepseek/deepseek-v3', 'meta-llama/llama-3.3-70b-instruct'],
-  'deepseek': ['deepseek-chat', 'deepseek-reasoner', 'deepseek-coder'],
-  'mistral': ['mistral-large-latest', 'mistral-small-latest', 'codestral-latest', 'ministral-8b-latest'],
-  'groq': ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768', 'gemma2-9b-it'],
-  'ollama': ['llama3.3', 'qwen2.5-coder', 'deepseek-r1', 'mistral', 'gemma2'],
-  'custom-openai': []  // Заполняется пользователем — любая модель валидна
-}
-function isModelValidForProvider(providerId: string, model: string): boolean {
-  const allowed = PROVIDER_MODEL_MAP[providerId]
-  if (allowed === undefined) return false
-  // custom-openai: пользователь задаёт модели сам — любая непустая строка валидна
-  if (allowed.length === 0) return model.length > 0
-  return allowed.includes(model)
-}
+import { isModelValidForProvider } from '../hooks/useProvider'
 
 interface PendingWrite {
   callId: string

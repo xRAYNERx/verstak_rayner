@@ -26,7 +26,11 @@ export function registerChatsIpc(chats: Chats, sessions: ChatSessions, db: Datab
     const session = sessions.get(id)
     if (session) {
       const messages = chats.listBySession(id)
-      summarizeAndSaveSession(db, id, session.projectPath, messages)
+      try {
+        summarizeAndSaveSession(db, id, session.projectPath, messages)
+      } catch (err) {
+        console.error('[chats] summarizeAndSaveSession failed, proceeding with deletion:', err instanceof Error ? err.message : err)
+      }
     }
     sessions.remove(id)
     // Clear memory-injection cache so if a new session reuses this id as key,

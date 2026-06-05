@@ -7,6 +7,7 @@
  */
 
 import type { ChatMessage } from './types'
+import { PROVIDERS, type ProviderId } from './registry'
 
 export type TaskComplexity = 'simple' | 'moderate' | 'complex'
 
@@ -50,9 +51,9 @@ export function estimateComplexity(messages: ChatMessage[], toolHistory: string[
 export function recommendModel(providerId: string, complexity: TaskComplexity): string | null {
   const MAP: Record<string, Record<TaskComplexity, string>> = {
     'gemini-api': {
-      simple: 'gemini-2.0-flash',
-      moderate: 'gemini-2.5-flash-preview-05-20',
-      complex: 'gemini-2.5-pro-preview-06-05',
+      simple: 'gemini-3-flash',
+      moderate: 'gemini-3.5-flash',
+      complex: 'gemini-3-pro',
     },
     'claude': {
       simple: 'claude-haiku-4-5',
@@ -62,15 +63,25 @@ export function recommendModel(providerId: string, complexity: TaskComplexity): 
     'openai': {
       simple: 'gpt-4o-mini',
       moderate: 'gpt-4o',
-      complex: 'o3',
+      complex: 'o1',
     },
     'grok': {
-      simple: 'grok-3-mini-fast',
-      moderate: 'grok-3-mini-fast',
-      complex: 'grok-3',
+      simple: 'grok-4-fast',
+      moderate: 'grok-4-fast',
+      complex: 'grok-4',
     },
   }
-  return MAP[providerId]?.[complexity] ?? null
+
+  const model = MAP[providerId]?.[complexity] ?? null
+  if (!model) return null
+
+  // Safety validation: verify model exists in provider registry
+  const descriptor = PROVIDERS[providerId as ProviderId]
+  if (descriptor && !descriptor.models.includes(model)) {
+    return descriptor.defaultModel
+  }
+
+  return model
 }
 
 /** Человекочитаемая метка для info-события. */

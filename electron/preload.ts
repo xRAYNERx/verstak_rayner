@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld('api', {
     getKey: (key: string) => ipcRenderer.invoke('settings:get-key', key),
     setKey: (key: string, value: string) => ipcRenderer.invoke('settings:set-key', key, value)
   },
+  providers: {
+    list: () => ipcRenderer.invoke('providers:list')
+  },
   ai: {
     send: (messages: unknown[], projectPath: string | null, chatId?: string) =>
       ipcRenderer.invoke('ai:send', messages, projectPath, undefined, undefined, chatId),
@@ -184,13 +187,19 @@ contextBridge.exposeInMainWorld('api', {
     install: () => ipcRenderer.invoke('update:install'),
     check: () => ipcRenderer.invoke('update:check'),
     onAvailable: (cb: (data: { version: string }) => void) => {
-      ipcRenderer.on('update:available', (_, data) => cb(data))
+      const handler = (_e: unknown, data: { version: string }) => cb(data)
+      ipcRenderer.on('update:available', handler)
+      return () => { ipcRenderer.off('update:available', handler) }
     },
     onDownloaded: (cb: (data: { version: string }) => void) => {
-      ipcRenderer.on('update:downloaded', (_, data) => cb(data))
+      const handler = (_e: unknown, data: { version: string }) => cb(data)
+      ipcRenderer.on('update:downloaded', handler)
+      return () => { ipcRenderer.off('update:downloaded', handler) }
     },
     onProgress: (cb: (data: { percent: number }) => void) => {
-      ipcRenderer.on('update:progress', (_, data) => cb(data))
+      const handler = (_e: unknown, data: { percent: number }) => cb(data)
+      ipcRenderer.on('update:progress', handler)
+      return () => { ipcRenderer.off('update:progress', handler) }
     },
   },
   audit: {

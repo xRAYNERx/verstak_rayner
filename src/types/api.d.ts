@@ -102,6 +102,9 @@ declare global {
         getKey: (key: string) => Promise<string | null>
         setKey: (key: string, value: string) => Promise<void>
       }
+      providers: {
+        list: () => Promise<ProviderDescriptorDTO[]>
+      }
       ai: {
         send: (messages: ChatMessage[], projectPath: string | null, chatId?: string) => Promise<number>
         sendWithBudget: (messages: ChatMessage[], projectPath: string | null, budget: number, chatId?: string) => Promise<number>
@@ -251,9 +254,9 @@ declare global {
       updater: {
         install(): Promise<void>
         check(): Promise<{ available: boolean; version?: string; error?: string }>
-        onAvailable(cb: (data: { version: string }) => void): void
-        onDownloaded(cb: (data: { version: string }) => void): void
-        onProgress(cb: (data: { percent: number }) => void): void
+        onAvailable(cb: (data: { version: string }) => void): () => void
+        onDownloaded(cb: (data: { version: string }) => void): () => void
+        onProgress(cb: (data: { percent: number }) => void): () => void
       }
       audit: {
         query(projectPath: string, opts?: { limit?: number; action?: string; since?: number }): Promise<AuditEntry[]>
@@ -357,6 +360,18 @@ export interface AuditEntry {
   detail: string
   providerId: string | null
   model: string | null
+}
+
+/** Дескриптор провайдера — единый источник из main process (electron/ai/registry.ts). */
+export interface ProviderDescriptorDTO {
+  id: string
+  name: string
+  transport: 'API' | 'CLI'
+  secretKey: string | null
+  models: string[]
+  defaultModel: string
+  supportsTools: boolean
+  shortLabel: string
 }
 
 /** Предустановленный популярный MCP-сервер. */

@@ -11,17 +11,22 @@ export function UpdateNotification() {
   const [percent, setPercent] = useState(0)
 
   useEffect(() => {
-    window.api.updater.onAvailable(({ version: v }) => {
+    const offAvailable = window.api.updater.onAvailable(({ version: v }) => {
       setVersion(v)
       setState('downloading')
     })
-    window.api.updater.onProgress(({ percent: p }) => {
+    const offProgress = window.api.updater.onProgress(({ percent: p }) => {
       setPercent(p)
     })
-    window.api.updater.onDownloaded(({ version: v }) => {
+    const offDownloaded = window.api.updater.onDownloaded(({ version: v }) => {
       setVersion(v)
       setState('ready')
     })
+    return () => {
+      offAvailable()
+      offProgress()
+      offDownloaded()
+    }
   }, [])
 
   if (state === 'idle') return null
