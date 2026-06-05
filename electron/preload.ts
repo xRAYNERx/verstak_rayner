@@ -21,6 +21,9 @@ contextBridge.exposeInMainWorld('api', {
   providers: {
     list: () => ipcRenderer.invoke('providers:list')
   },
+  doctor: {
+    run: () => ipcRenderer.invoke('doctor:run')
+  },
   ai: {
     send: (messages: unknown[], projectPath: string | null, chatId?: string) =>
       ipcRenderer.invoke('ai:send', messages, projectPath, undefined, undefined, chatId),

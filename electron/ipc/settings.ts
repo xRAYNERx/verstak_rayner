@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import type { Settings } from '../storage/settings'
 import { detectInstalledClis } from '../ai/cli-detect'
 import { PROVIDERS } from '../ai/registry'
+import { runDoctor } from '../ai/doctor'
 
 /** Сериализуемый дескриптор провайдера для renderer (без фабричных функций). */
 export interface ProviderDescriptorDTO {
@@ -36,4 +37,8 @@ export function registerSettingsIpc(settings: Settings): void {
       shortLabel: p.shortLabel
     }))
   })
+
+  // Doctor — health-check настроенных провайдеров и коннекторов (config presence,
+  // без сетевых вызовов). См. electron/ai/doctor.ts.
+  ipcMain.handle('doctor:run', () => runDoctor(settings))
 }

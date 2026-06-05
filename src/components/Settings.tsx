@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react'
 import { useProject } from '../store/projectStore'
-import type { Memory, DetectedCli, AuditEntry } from '../types/api'
+import type { Memory, DetectedCli, AuditEntry, DoctorReport, DoctorItem } from '../types/api'
 import type { ProviderId } from '../hooks/useProvider'
 import { useTheme } from '../hooks/useTheme'
 import type { AutonomousStatus } from '../types/api'
@@ -487,6 +487,67 @@ function McpTab() {
         AI к внешним данным и инструментам. Серверы запускаются как дочерние процессы.
         Подробнее: <code>modelcontextprotocol.io</code>
       </div>
+    </div>
+  )
+}
+
+// ─── Doctor panel ─────────────────────────────────────────────────────────────
+
+/** Иконка/цвет статуса пункта диагностики. */
+function doctorStatusIcon(status: DoctorItem['status']): { icon: string; color: string } {
+  if (status === 'ok') return { icon: '✓', color: 'var(--gg-success, #3fb950)' }
+  if (status === 'no-key') return { icon: '✗', color: 'var(--gg-danger, #f85149)' }
+  return { icon: '—', color: 'var(--gg-text-dim, #8b949e)' } // n-a
+}
+
+function DoctorRow({ item }: { item: DoctorItem }) {
+  const s = doctorStatusIcon(item.status)
+  return (
+    <div className="gg-settings-row" style={{ alignItems: 'baseline', gap: 8 }}>
+      <span style={{ color: s.color, fontWeight: 700, width: 16, display: 'inline-block' }}>{s.icon}</span>
+      <span style={{ minWidth: 140, fontWeight: 600 }}>{item.name}</span>
+      <span className="gg-settings-hint" style={{ margin: 0 }}>{item.detail}</span>
+    </div>
+  )
+}
+
+/** Кнопка «Проверка» + вывод отчёта по провайдерам и коннекторам. */
+function DoctorPanel() {
+  const [report, setReport] = useState<DoctorReport | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  async function run() {
+    setLoading(true)
+    try {
+      const r = await window.api.doctor.run()
+      setReport(r)
+    } catch {
+      setReport(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="gg-doctor-panel" style={{ marginBottom: 16 }}>
+      <div className="gg-settings-row" style={{ alignItems: 'center', gap: 12 }}>
+        <button className="gg-btn gg-btn-primary" onClick={() => void run()} disabled={loading}>
+          {loading ? 'Проверка…' : '🩺 Проверка (Doctor)'}
+        </button>
+        {report && (
+          <span className="gg-settings-hint" style={{ margin: 0 }}>
+            Готово: {report.summary.okCount} · Проблем: {report.summary.problemCount}
+          </span>
+        )}
+      </div>
+      {report && (
+        <div style={{ marginTop: 12 }}>
+          <div className="gg-settings-section-title">Провайдеры</div>
+          {report.providers.map(p => <DoctorRow key={p.id} item={p} />)}
+          <div className="gg-settings-section-title" style={{ marginTop: 12 }}>Коннекторы</div>
+          {report.connectors.map(c => <DoctorRow key={c.id} item={c} />)}
+        </div>
+      )}
     </div>
   )
 }
@@ -1131,6 +1192,8 @@ export function Settings({ onClose }: { onClose: () => void }) {
           <div className="gg-settings-content">
 
         {tab === 'providers' && (
+        <>
+        <DoctorPanel />
         <ProvidersPage
           providers={PROVIDERS}
           keys={keys}
@@ -1142,6 +1205,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
           customOpenaiModels={customOpenaiModels}
           setCustomOpenaiModels={setCustomOpenaiModels}
         />
+        </>
         )}
 
         {tab === 'models' && (

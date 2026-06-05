@@ -105,6 +105,9 @@ declare global {
       providers: {
         list: () => Promise<ProviderDescriptorDTO[]>
       }
+      doctor: {
+        run: () => Promise<DoctorReport>
+      }
       ai: {
         send: (messages: ChatMessage[], projectPath: string | null, chatId?: string) => Promise<number>
         sendWithBudget: (messages: ChatMessage[], projectPath: string | null, budget: number, chatId?: string) => Promise<number>
@@ -372,6 +375,20 @@ export interface ProviderDescriptorDTO {
   defaultModel: string
   supportsTools: boolean
   shortLabel: string
+}
+
+/** Doctor — health-check провайдеров и коннекторов (см. electron/ai/doctor.ts). */
+export type DoctorStatus = 'ok' | 'no-key' | 'n-a'
+export interface DoctorItem {
+  id: string
+  name: string
+  status: DoctorStatus
+  detail: string
+}
+export interface DoctorReport {
+  providers: DoctorItem[]
+  connectors: DoctorItem[]
+  summary: { okCount: number; problemCount: number }
 }
 
 /** Предустановленный популярный MCP-сервер. */
