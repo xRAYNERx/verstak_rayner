@@ -1446,6 +1446,71 @@ const mcpToolHandler: ToolHandler = {
 }
 
 // ============================================================================
+// Office: read_spreadsheet / read_document / edit_spreadsheet — «beyond code»
+// ============================================================================
+
+// Чтение xlsx/docx — pure-info, идёт через generic readHandler (ctx.tools.execute).
+// Здесь только edit_spreadsheet: WRITE-операция, гейтится mode-policy как write_file.
+// Diff текстом не показываем (xlsx бинарный) — подтверждаем через ту же модалку
+// команды (pending-command), показывая список правок ячеек.
+
+const editSpreadsheetHandler: ToolHandler = {
+  mode: 'confirm-write',
+  async handle(call, ctx) {
+    try {
+      const path = String(call.args.path ?? '')
+      if (!path) {
+        return { id: call.id, name: call.name, result: '', error: 'edit_spreadsheet: path обязателен' }
+      }
+      const sheet = call.args.sheet ? String(call.args.sheet) : undefined
+      const rawEdits = Array.isArray(call.args.edits) ? call.args.edits : []
+      const edits = rawEdits
+        .filter((e: unknown): e is Record<string, unknown> => typeof e === 'object' && e !== null)
+        .map((e) => ({ cell: String((e as Record<string, unknown>).cell ?? ''), value: String((e as Record<string, unknown>).value ?? '') }))
+        .filter(e => e.cell.length > 0)
+      if (edits.length === 0) {
+        return { id: call.id, name: call.name, result: '', error: 'edit_spreadsheet: edits обязателен и не должен быть пустым' }
+      }
+
+      // Mode policy — как write_file: ask/accept-edits/auto/bypass/plan
+      const decision = decide('edit_spreadsheet', ctx.agentMode)
+      if (decision === 'block') {
+        const reason = blockReason('edit_spreadsheet', ctx.agentMode)
+        return { id: call.id, name: call.name, result: '', error: reason }
+      }
+      const summary = `Правка таблицы ${path}${sheet ? ` · лист ${sheet}` : ''}: ${edits.map(e => `${e.cell}=${e.value}`).join(', ').slice(0, 300)}`
+      let accepted: boolean
+      if (decision === 'auto-accept') {
+        ctx.sender.send('ai:event', {
+          id: ctx.sendId,
+          event: { type: 'tool-activity', callId: call.id, name: 'edit_spreadsheet', label: 'edit_spreadsheet (авто)', detail: summary, status: 'ok' }
+        })
+        accepted = true
+      } else {
+        ctx.sender.send('ai:event', { id: ctx.sendId, event: { type: 'pending-command', callId: call.id, command: summary } })
+        accepted = await new Promise<boolean>(resolve => {
+          ctx.pendingCommands.set(ctx.scopedKey(ctx.sendId, call.id), { sendId: ctx.sendId, resolve })
+        })
+      }
+      if (!accepted) {
+        ctx.sender.send('ai:event', { id: ctx.sendId, event: { type: 'command-result', callId: call.id, command: summary, status: 'rejected' } })
+        return { id: call.id, name: call.name, result: summary, error: 'User rejected' }
+      }
+
+      const { editSpreadsheet } = await import('../ai/office')
+      const res = await editSpreadsheet(ctx.projectPath, path, sheet, edits)
+      try { ctx.recordJournal(ctx.projectPath, 'tool', `📊 Правка xlsx: ${path}`, `${res.applied} ячеек на листе "${res.sheet}"`) } catch { /* journal not critical */ }
+      emitActivity(ctx, call, 'ok', 'edit_spreadsheet', `${res.applied} ячеек · лист ${res.sheet}`)
+      return { id: call.id, name: call.name, result: `Применено ${res.applied} правок в "${path}" (лист "${res.sheet}").` }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      emitActivity(ctx, call, 'error', call.name, msg)
+      return { id: call.id, name: call.name, result: '', error: msg }
+    }
+  }
+}
+
+// ============================================================================
 // Registry — single source of truth for tool dispatch
 // ============================================================================
 
@@ -1484,7 +1549,11 @@ const HANDLER_REGISTRY: Record<string, ToolHandler> = {
   'convert_file': convertFileHandler,
   // Screen capture — parallel-read, Electron desktopCapturer
   'screen_capture': screenCaptureHandler,
-  'screen_info': screenInfoHandler
+  'screen_info': screenInfoHandler,
+  // Office «beyond code» — чтение parallel-read (через readHandler), правка confirm-write
+  'read_spreadsheet': readHandler,
+  'read_document': readHandler,
+  'edit_spreadsheet': editSpreadsheetHandler
 }
 
 /**

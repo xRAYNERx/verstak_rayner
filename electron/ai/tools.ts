@@ -486,6 +486,48 @@ export const TOOL_DEFS: ToolDefinition[] = [
       },
       required: ['filename', 'sections']
     }
+  },
+  {
+    name: 'read_spreadsheet',
+    description: 'Прочитать Excel-файл (.xlsx) и вернуть содержимое всех листов как текст: имя листа + строки в markdown-таблице. Большие листы обрезаются (до 200 строк / 40 столбцов) с пометкой. Используй когда пользователь просит разобрать таблицу, отчёт, выгрузку, прайс в .xlsx.',
+    parameters: {
+      type: 'object',
+      properties: { path: { type: 'string', description: 'Относительный путь к .xlsx от корня проекта.' } },
+      required: ['path']
+    }
+  },
+  {
+    name: 'read_document',
+    description: 'Прочитать Word-файл (.docx) и вернуть простой текст. Используй когда пользователь просит разобрать договор, ТЗ, бриф, документ в .docx.',
+    parameters: {
+      type: 'object',
+      properties: { path: { type: 'string', description: 'Относительный путь к .docx от корня проекта.' } },
+      required: ['path']
+    }
+  },
+  {
+    name: 'edit_spreadsheet',
+    description: 'Записать значения в ячейки Excel-файла (.xlsx). Читает файл, меняет указанные ячейки, сохраняет на место. Требует подтверждения пользователя как обычный write. Используй для точечной правки таблицы (исправить цену, заполнить столбец, обновить значение).',
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Относительный путь к существующему .xlsx.' },
+        sheet: { type: 'string', description: 'Имя листа. Если не задан — первый лист.' },
+        edits: {
+          type: 'array',
+          description: 'Список правок ячеек.',
+          items: {
+            type: 'object',
+            properties: {
+              cell: { type: 'string', description: 'Ссылка на ячейку в A1-нотации, например "B2".' },
+              value: { type: 'string', description: 'Новое значение. Числовые строки сохраняются числами.' }
+            },
+            required: ['cell', 'value']
+          }
+        }
+      },
+      required: ['path', 'edits']
+    }
   }
 ]
 
@@ -894,6 +936,14 @@ export function createFileTools(root: string, signal?: AbortSignal): FileTools {
         const map = await getProjectMap(root, true)
         const fmt = String(args.format ?? 'text')
         return fmt === 'json' ? map : projectMapToText(map)
+      }
+      if (name === 'read_spreadsheet') {
+        const { readSpreadsheet } = await import('./office')
+        return readSpreadsheet(root, String(args.path ?? ''))
+      }
+      if (name === 'read_document') {
+        const { readDocument } = await import('./office')
+        return readDocument(root, String(args.path ?? ''))
       }
       throw new Error(`Неизвестный tool: ${name}`)
     }

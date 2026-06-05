@@ -36,7 +36,7 @@ export type ToolDecision =
  * в plan-режиме («только чтение») они должны блокироваться, а в ask — подтверждаться.
  */
 export function decide(toolName: string, mode: AgentMode): ToolDecision {
-  const isEdit = toolName === 'write_file' || toolName === 'apply_patch' || toolName === 'propose_edits'
+  const isEdit = toolName === 'write_file' || toolName === 'apply_patch' || toolName === 'propose_edits' || toolName === 'edit_spreadsheet'
   const isCommand = toolName === 'run_command' || toolName === 'connector_query'
 
   if (!isEdit && !isCommand) return 'auto-accept'  // reads always pass
