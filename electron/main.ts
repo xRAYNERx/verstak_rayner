@@ -23,6 +23,7 @@ import { registerSettingsIpc } from './ipc/settings'
 import { registerCliAuthIpc } from './ipc/cli-auth'
 import { registerAiIpc } from './ipc/ai'
 import { registerChatsIpc } from './ipc/chats'
+import { registerHandoffIpc } from './ipc/handoff'
 import { registerTerminalIpc } from './ipc/terminal'
 import { openDb } from './storage/db'
 import { createSettings } from './storage/settings'
@@ -296,6 +297,7 @@ app.whenReady().then(() => {
     }
   })
   registerChatsIpc(chats, chatSessions, db)
+  registerHandoffIpc(chats, chatSessions)
   registerTasksIpc(tasks)
   registerJournalIpc(journal)
   registerUndoIpc(undoStack)

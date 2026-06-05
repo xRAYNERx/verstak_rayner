@@ -70,6 +70,10 @@ contextBridge.exposeInMainWorld('api', {
     append: (sessionId: number, projectPath: string, role: 'user' | 'assistant', content: string) =>
       ipcRenderer.invoke('chats:append', sessionId, projectPath, role, content)
   },
+  handoff: {
+    generate: (sessionId: number, parentId?: string | null) =>
+      ipcRenderer.invoke('handoff:generate', sessionId, parentId) as Promise<string>
+  },
   tasks: {
     list: (projectPath: string) => ipcRenderer.invoke('tasks:list', projectPath),
     add: (projectPath: string, text: string) => ipcRenderer.invoke('tasks:add', projectPath, text),

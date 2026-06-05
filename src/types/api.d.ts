@@ -141,6 +141,9 @@ declare global {
         list: (sessionId: number) => Promise<StoredChatMessage[]>
         append: (sessionId: number, projectPath: string, role: 'user' | 'assistant', content: string) => Promise<void>
       }
+      handoff: {
+        generate: (sessionId: number, parentId?: string | null) => Promise<string>
+      }
       tasks: {
         list: (projectPath: string) => Promise<Task[]>
         add: (projectPath: string, text: string) => Promise<Task>
