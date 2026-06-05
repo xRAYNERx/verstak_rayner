@@ -9,6 +9,8 @@ const FALLBACK_CHAINS: Partial<Record<ProviderId, ProviderId[]>> = {
   'grok':       ['gemini-api', 'claude', 'openai'],
   'openai':     ['claude', 'gemini-api', 'grok'],
   'deepseek':   ['gemini-api', 'claude', 'openai'],
+  'moonshot':   ['deepseek', 'gemini-api', 'claude'],
+  'qwen':       ['deepseek', 'gemini-api', 'claude'],
   'mistral':    ['gemini-api', 'claude', 'openai'],
   'groq':       ['gemini-api', 'claude', 'openai'],
 }

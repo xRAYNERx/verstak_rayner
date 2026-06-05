@@ -29,10 +29,24 @@ export const CONTEXT_LIMITS: Record<string, number> = {
   'gpt-4o-mini': 128_000,
   'o1': 200_000,
   'o1-mini': 128_000,
-  // DeepSeek
-  'deepseek-chat': 64_000,
-  'deepseek-reasoner': 64_000,
-  'deepseek-coder': 64_000,
+  // DeepSeek V4 — 1M context (api-docs.deepseek.com/quick_start/pricing). Legacy-алиасы тоже на V4.
+  'deepseek-v4-flash': 1_000_000,
+  'deepseek-v4-pro': 1_000_000,
+  'deepseek-chat': 1_000_000,
+  'deepseek-reasoner': 1_000_000,
+  // Moonshot Kimi (platform.kimi.ai/docs/models.md)
+  'kimi-k2.6': 256_000,
+  'kimi-k2.5': 256_000,
+  'moonshot-v1-128k': 128_000,
+  'moonshot-v1-32k': 32_000,
+  'moonshot-v1-8k': 8_000,
+  // Qwen / DashScope (alibabacloud.com/help/en/model-studio)
+  'qwen3-max': 256_000,
+  'qwen3-coder-plus': 256_000,
+  'qwen3-coder-flash': 256_000,
+  'qwen-max': 32_000,
+  'qwen-plus': 128_000,
+  'qwen-flash': 1_000_000,
   // Mistral
   'mistral-large-latest': 128_000,
   'mistral-small-latest': 32_000,

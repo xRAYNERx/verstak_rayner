@@ -19,7 +19,7 @@ import type { ChatProvider } from './types'
 
 export interface ExtraProviderSpec {
   /** ID для use в registry. */
-  id: 'openrouter' | 'deepseek' | 'mistral' | 'groq' | 'ollama' | 'custom-openai'
+  id: 'openrouter' | 'deepseek' | 'moonshot' | 'qwen' | 'mistral' | 'groq' | 'ollama' | 'custom-openai'
   /** Человекочитаемое имя. */
   name: string
   /** Описание для UI карточки. */
@@ -63,17 +63,59 @@ export const EXTRA_PROVIDERS: ExtraProviderSpec[] = [
   {
     id: 'deepseek',
     name: 'DeepSeek',
-    description: 'Китайские модели. Reasoner (R1) для сложных задач — копейки за токен. Хороший fallback для бюджета.',
+    description: 'Китайские модели V4 — копейки за токен. v4-flash (быстрый) / v4-pro (reasoning). Лучший fallback для бюджета.',
     secretKey: 'deepseek_api_key',
     keyLink: { url: 'https://platform.deepseek.com/api_keys', label: 'platform.deepseek.com' },
     keyHint: 'sk-...',
+    // Модели подтверждены: https://api-docs.deepseek.com/quick_start/pricing (V4, июнь 2026).
+    // deepseek-chat / deepseek-reasoner — legacy-алиасы V4-Flash, deprecated 2026-07-24 (пока работают).
     models: [
+      'deepseek-v4-flash',
+      'deepseek-v4-pro',
       'deepseek-chat',
-      'deepseek-reasoner',
-      'deepseek-coder'
+      'deepseek-reasoner'
     ],
-    defaultModel: 'deepseek-chat',
+    defaultModel: 'deepseek-v4-flash',
     baseUrl: 'https://api.deepseek.com/v1'
+  },
+  {
+    id: 'moonshot',
+    name: 'Moonshot Kimi',
+    description: 'Китайский Kimi K2.6 — open-source SoTA по агентам и коду. OpenAI-совместим, дёшево, длинный контекст.',
+    secretKey: 'moonshot_api_key',
+    keyLink: { url: 'https://platform.moonshot.ai/console/api-keys', label: 'platform.moonshot.ai' },
+    keyHint: 'sk-...',
+    // Модели подтверждены: https://platform.kimi.ai/docs/models.md (июнь 2026).
+    // kimi-k2.6 — флагман; moonshot-v1-* — длинноконтекстная классика.
+    models: [
+      'kimi-k2.6',
+      'kimi-k2.5',
+      'moonshot-v1-128k',
+      'moonshot-v1-32k',
+      'moonshot-v1-8k'
+    ],
+    defaultModel: 'kimi-k2.6',
+    baseUrl: 'https://api.moonshot.ai/v1'
+  },
+  {
+    id: 'qwen',
+    name: 'Qwen (Alibaba)',
+    description: 'Alibaba Qwen3 через DashScope. qwen3-coder-plus — сильный кодер, qwen3-max — флагман. OpenAI-совместим.',
+    secretKey: 'qwen_api_key',
+    keyLink: { url: 'https://bailian.console.aliyun.com/', label: 'bailian.console.aliyun.com' },
+    keyHint: 'sk-...',
+    // Модели + intl base url подтверждены: https://www.alibabacloud.com/help/en/model-studio/compatibility-of-openai-with-dashscope (июнь 2026).
+    // Endpoint — международный (Singapore); ключи China и Intl не взаимозаменяемы.
+    models: [
+      'qwen3-max',
+      'qwen3-coder-plus',
+      'qwen3-coder-flash',
+      'qwen-max',
+      'qwen-plus',
+      'qwen-flash'
+    ],
+    defaultModel: 'qwen3-coder-plus',
+    baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1'
   },
   {
     id: 'mistral',

@@ -9,7 +9,7 @@ export type ProviderId =
   | 'grok' | 'grok-cli'
   | 'openai' | 'codex-cli'
   | 'yandex-gpt' | 'gigachat'
-  | 'openrouter' | 'deepseek' | 'mistral' | 'groq' | 'ollama' | 'custom-openai'
+  | 'openrouter' | 'deepseek' | 'moonshot' | 'qwen' | 'mistral' | 'groq' | 'ollama' | 'custom-openai'
 
 export interface ProviderInfo {
   id: ProviderId
@@ -91,7 +91,7 @@ export function getProviderSecretKey(id: string): string | null {
 const KNOWN_IDS: ProviderId[] = [
   'gemini-api', 'gemini-cli', 'claude', 'claude-cli', 'grok', 'grok-cli', 'openai', 'codex-cli',
   'yandex-gpt', 'gigachat',
-  'openrouter', 'deepseek', 'mistral', 'groq', 'ollama', 'custom-openai'
+  'openrouter', 'deepseek', 'moonshot', 'qwen', 'mistral', 'groq', 'ollama', 'custom-openai'
 ]
 
 function parseProviderId(v: string | null | undefined): ProviderId {

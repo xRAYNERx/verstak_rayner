@@ -62,10 +62,16 @@ const PRICES: Record<string, { input: number; output: number }> = {
   'grok-4':                      { input: 5.0,  output: 15.0 },
   'grok-4-fast':                 { input: 0.20, output: 0.50 },
   'grok-3':                      { input: 3.0,  output: 15.0 },
-  // DeepSeek (платформенные цены, $ / 1M)
-  'deepseek-chat':               { input: 0.27, output: 1.10 },
-  'deepseek-reasoner':           { input: 0.55, output: 2.19 },
-  'deepseek-coder':              { input: 0.27, output: 1.10 },
+  // DeepSeek V4 (api-docs.deepseek.com/quick_start/pricing, $ / 1M, cache-miss)
+  'deepseek-v4-flash':           { input: 0.14, output: 0.28 },
+  'deepseek-v4-pro':             { input: 0.435, output: 0.87 },
+  'deepseek-chat':               { input: 0.14, output: 0.28 },
+  'deepseek-reasoner':           { input: 0.14, output: 0.28 },
+  // Moonshot Kimi (platform.kimi.ai pricing, $ / 1M)
+  'kimi-k2.6':                   { input: 0.95, output: 4.00 },
+  'kimi-k2.5':                   { input: 0.60, output: 3.00 },
+  // Qwen / DashScope intl (alibabacloud.com/help/en/model-studio/model-pricing, $ / 1M)
+  'qwen3-max':                   { input: 0.78, output: 3.90 },
   // Mistral (mistral.ai/pricing, USD)
   'mistral-large-latest':        { input: 2.00, output: 6.00 },
   'mistral-small-latest':        { input: 0.20, output: 0.60 },

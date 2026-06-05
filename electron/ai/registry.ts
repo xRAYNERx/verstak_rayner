@@ -227,6 +227,8 @@ export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvide
     }
     case 'openrouter':
     case 'deepseek':
+    case 'moonshot':
+    case 'qwen':
     case 'mistral':
     case 'groq':
     case 'ollama':
