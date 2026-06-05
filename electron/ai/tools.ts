@@ -7,7 +7,7 @@ import { createHash } from 'crypto'
 import type { ToolDefinition } from './types'
 import { classifyCommand } from './command-policy'
 import { isForbiddenPath, scanText } from './secret-scanner'
-import { getProjectMap, invalidateProjectMap, projectMapToText, getDependencyMap, invalidateDependencyMap } from './project-map'
+import { getProjectMap, invalidateProjectMap, markFileDirty, projectMapToText, getDependencyMap, invalidateDependencyMap } from './project-map'
 import { safeRealJoin } from './path-policy'
 import { treeKill } from './child-kill'
 
@@ -817,8 +817,11 @@ export function createFileTools(root: string, signal?: AbortSignal): FileTools {
         }
         const abs = await safeRealJoin(root, relPath)
         await writeFile(abs, String(args.content), 'utf8')
-        // Invalidate caches so the next get_project_map / impact_analysis sees this file
-        invalidateProjectMap(root)
+        // Incremental project map update — mark only this file dirty so the next
+        // get_project_map re-parses it instead of doing a full rebuild.
+        markFileDirty(root, abs)
+        // Dependency map has no incremental path — re-resolving imports/importedBy
+        // is non-trivial, so keep the full invalidation here.
         invalidateDependencyMap(root)
         return { ok: true }
       }
@@ -836,7 +839,9 @@ export function createFileTools(root: string, signal?: AbortSignal): FileTools {
         const anchorHash = args.anchor_hash ? String(args.anchor_hash) : undefined
         const after = applySearchReplaceBlocks(before, String(args.diff), anchorHash)
         await writeFile(abs, after, 'utf8')
-        invalidateProjectMap(root)
+        // Incremental project map update — apply_patch only modifies an existing
+        // file, so marking it dirty is enough; no full rebuild needed.
+        markFileDirty(root, abs)
         invalidateDependencyMap(root)
         return { ok: true, before, after }
       }

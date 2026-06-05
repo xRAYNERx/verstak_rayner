@@ -29,6 +29,7 @@ import { join } from 'path'
 import { homedir } from 'os'
 import type { Connector, ConnectorInfo, ConnectorContext } from './types'
 import { scanText } from '../ai/secret-scanner'
+import { classifyCommand } from '../ai/command-policy'
 
 const DEFAULT_TIMEOUT_MS = 60_000
 const MAX_TIMEOUT_MS = 600_000
@@ -79,7 +80,22 @@ async function runRemote(args: Record<string, unknown>, ctx: ConnectorContext): 
   const command = String(args.command ?? '').trim()
   if (!command) return { error: 'bad-args', message: 'command обязателен' }
 
-  const dangerReason = isDangerousCommand(command)
+  // cwd-префикс собираем заранее, чтобы прогнать через классификатор ВСЮ
+  // эффективную команду (например `cd ~/.ssh && cat id_ed25519`), а не только
+  // её хвост.
+  const cwd = args.cwd ? `cd ${shellQuote(String(args.cwd))} && ` : ''
+  const fullCmd = cwd + command
+
+  // Слой 1: тот же классификатор, что и у локального run_command. Ловит
+  // curl|bash, чтение ~/.ssh/id_*, rm -rf ~, форк-бомбы и пр. — чтобы удалённое
+  // выполнение было не слабее локальной политики.
+  const sharedVerdict = classifyCommand(fullCmd)
+  if (!sharedVerdict.allowed) {
+    return { error: 'blocked', message: `Команда отклонена политикой: ${sharedVerdict.reason}. Удалённое выполнение проходит ту же проверку, что и локальный run_command.` }
+  }
+
+  // Слой 2: локальный SSH-denylist (системные области: /etc, /boot, systemctl и т.п.).
+  const dangerReason = isDangerousCommand(fullCmd)
   if (dangerReason) {
     return { error: 'blocked', message: `Команда отклонена политикой: ${dangerReason}. Изменения в системных областях — только вручную.` }
   }
@@ -108,8 +124,6 @@ async function runRemote(args: Record<string, unknown>, ctx: ConnectorContext): 
 
   const keyPath = String(args.key_path ?? ctx.getSecret('ssh_key_path') ?? join(homedir(), '.ssh', 'id_ed25519'))
   const timeoutMs = Math.min(MAX_TIMEOUT_MS, Number(args.timeout_ms ?? DEFAULT_TIMEOUT_MS))
-  const cwd = args.cwd ? `cd ${shellQuote(String(args.cwd))} && ` : ''
-  const fullCmd = cwd + command
 
   const sshArgs = [
     '-i', keyPath,
@@ -130,7 +144,7 @@ async function runPythonScript(args: Record<string, unknown>, ctx: ConnectorCont
   const venv = String(args.venv ?? '/opt/los/venv')
   const scriptArgs = (args.args as string[] | undefined) ?? []
   const formattedArgs = scriptArgs.map(shellQuote).join(' ')
-  const command = `source ${venv}/bin/activate && python ${shellQuote(scriptPath)} ${formattedArgs}`
+  const command = `source ${shellQuote(venv + '/bin/activate')} && python ${shellQuote(scriptPath)} ${formattedArgs}`
   return runRemote({ ...args, command }, ctx)
 }
 

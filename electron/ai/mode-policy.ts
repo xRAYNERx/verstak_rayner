@@ -28,12 +28,16 @@ export type ToolDecision =
  *
  * Logic:
  * - write_file/apply_patch/propose_edits = "edits"
- * - run_command/verify:exec = "commands"
+ * - run_command/connector_query = "commands"
  * - read_file/list_directory/search_project/get_project_map/etc = always allowed
+ *
+ * connector_query гейтится как команда: коннекторы (SSH, HTTP POST/PUT/DELETE,
+ * Telegram, Битрикс24, публикация) дают side-effects на внешних системах, поэтому
+ * в plan-режиме («только чтение») они должны блокироваться, а в ask — подтверждаться.
  */
 export function decide(toolName: string, mode: AgentMode): ToolDecision {
   const isEdit = toolName === 'write_file' || toolName === 'apply_patch' || toolName === 'propose_edits'
-  const isCommand = toolName === 'run_command'
+  const isCommand = toolName === 'run_command' || toolName === 'connector_query'
 
   if (!isEdit && !isCommand) return 'auto-accept'  // reads always pass
 
@@ -49,6 +53,12 @@ export function decide(toolName: string, mode: AgentMode): ToolDecision {
 /** Human-readable rejection message for the model when a tool is blocked by mode. */
 export function blockReason(toolName: string, mode: AgentMode): string {
   if (mode === 'plan') {
+    if (toolName === 'connector_query') {
+      return `Активен режим "Режим планирования" — запросы к коннекторам (внешние системы: SSH, HTTP, Telegram, Битрикс24 и т.п.) запрещены, ` +
+             `так как они могут менять состояние внешних систем. ` +
+             `Сосредоточься на чтении кода (read_file, get_project_map, search_project) и составлении плана через create_plan. ` +
+             `Пользователь сам переключит режим когда захочет выполнить запрос к коннектору.`
+    }
     return `Активен режим "Режим планирования" — изменение файлов и выполнение команд запрещены. ` +
            `Сосредоточься на чтении кода (read_file, get_project_map, search_project) и составлении плана через create_plan. ` +
            `Пользователь сам переключит режим когда захочет применить изменения.`

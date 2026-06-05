@@ -467,6 +467,35 @@ const connectorQueryHandler: ToolHandler = {
       if (!cid) {
         return { id: call.id, name: call.name, result: '', error: 'connector_query: id обязателен' }
       }
+      // Mode policy: коннекторы трогают внешние системы (SSH, HTTP POST, Telegram,
+      // публикация), поэтому гейтятся как команда — plan блокирует, ask подтверждает,
+      // auto/bypass авто-принимают. Описание запроса показываем пользователю в модалке.
+      const entity = call.args.entity ? ` · ${call.args.entity}` : ''
+      const path = call.args.path ? ` · ${call.args.path}` : ''
+      const summary = `Коннектор ${cid}${entity}${path}`
+      const decision = decide('connector_query', ctx.agentMode)
+      if (decision === 'block') {
+        const reason = blockReason('connector_query', ctx.agentMode)
+        ctx.sender.send('ai:event', {
+          id: ctx.sendId,
+          event: { type: 'tool-blocked', callId: call.id, name: 'connector_query', command: summary, reason }
+        })
+        return { id: call.id, name: call.name, result: '', error: reason }
+      }
+      let accepted: boolean
+      if (decision === 'auto-accept') {
+        accepted = true
+      } else {
+        // 'confirm' — переиспользуем pending-command поток (та же модалка подтверждения)
+        ctx.sender.send('ai:event', { id: ctx.sendId, event: { type: 'pending-command', callId: call.id, command: summary } })
+        accepted = await new Promise<boolean>(resolve => {
+          ctx.pendingCommands.set(ctx.scopedKey(ctx.sendId, call.id), { sendId: ctx.sendId, resolve })
+        })
+      }
+      if (!accepted) {
+        ctx.sender.send('ai:event', { id: ctx.sendId, event: { type: 'command-result', callId: call.id, command: summary, status: 'rejected' } })
+        return { id: call.id, name: call.name, result: summary, error: 'User rejected' }
+      }
       const { id: _omit, ...rest } = call.args as Record<string, unknown> & { id?: unknown }
       void _omit
       const result = await ctx.connectors.query(cid, rest, ctx.signal)
