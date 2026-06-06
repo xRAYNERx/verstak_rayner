@@ -5322,3 +5322,57 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   color: var(--text-secondary, var(--text-primary));
   white-space: pre-wrap;
 }
+
+/* === Tier Recommendation === */
+/* Pill рядом с ModelPicker в тулбаре composer'а: рекомендует тир+провайдера+модель
+   под текст задачи. Рекомендация, не autopilot — переключает только «применить». */
+.gg-tier-rec {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  padding: 2px 4px 2px 9px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.01em;
+  background: var(--bg-elevated);
+  animation: gg-fade-in 140ms ease-out;
+  max-width: 280px;
+}
+.gg-tier-rec-text {
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Тиры: эконом = зелёный, топ = акцент, приватно = янтарный. */
+.gg-tier-rec.tier-cheap    { border-color: var(--success); }
+.gg-tier-rec.tier-cheap    .gg-tier-rec-text { color: var(--success); }
+.gg-tier-rec.tier-frontier { border-color: var(--accent-border); }
+.gg-tier-rec.tier-frontier .gg-tier-rec-text { color: var(--accent); }
+.gg-tier-rec.tier-private  { border-color: var(--warning); }
+.gg-tier-rec.tier-private  .gg-tier-rec-text { color: var(--warning); }
+.gg-tier-rec-apply {
+  border: none;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  cursor: pointer;
+  background: var(--accent-muted);
+  color: var(--accent);
+  transition: all 120ms ease;
+  white-space: nowrap;
+}
+.gg-tier-rec-apply:hover {
+  background: var(--accent);
+  color: #fff;
+}
+.gg-tier-rec-ok {
+  color: var(--success);
+  font-size: 10px;
+  white-space: nowrap;
+  padding-right: 4px;
+}

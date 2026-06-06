@@ -4,6 +4,7 @@ import { useProvider } from '../hooks/useProvider'
 import { estimateCost, costSeverity, costBreakdown } from '../lib/pricing'
 import { Markdown } from './Markdown'
 import { ModelPicker } from './ModelPicker'
+import { TierRecommendation } from './TierRecommendation'
 import { ModePicker } from './ModePicker'
 import { VoiceInput } from './VoiceInput'
 import { TimelineBar } from './TimelineBar'
@@ -1188,6 +1189,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
             </div>
             <ModePicker mode={agentMode} onChange={setAgentMode} />
             <ModelPicker onOpenSettings={onOpenSettings} />
+            <TierRecommendation input={input} />
           </div>
         </div>
       </div>

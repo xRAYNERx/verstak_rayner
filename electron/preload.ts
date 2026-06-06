@@ -24,6 +24,9 @@ contextBridge.exposeInMainWorld('api', {
   doctor: {
     run: () => ipcRenderer.invoke('doctor:run')
   },
+  router: {
+    recommend: (taskText: string) => ipcRenderer.invoke('router:recommend', taskText)
+  },
   ai: {
     send: (messages: unknown[], projectPath: string | null, chatId?: string) =>
       ipcRenderer.invoke('ai:send', messages, projectPath, undefined, undefined, chatId),

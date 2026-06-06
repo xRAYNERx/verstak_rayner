@@ -110,6 +110,10 @@ declare global {
       doctor: {
         run: () => Promise<DoctorReport>
       }
+      router: {
+        /** Рекомендует тир+провайдера+модель под текст задачи. null = нет подходящего. */
+        recommend: (taskText: string) => Promise<TierRecommendation | null>
+      }
       ai: {
         send: (messages: ChatMessage[], projectPath: string | null, chatId?: string) => Promise<number>
         sendWithBudget: (messages: ChatMessage[], projectPath: string | null, budget: number, chatId?: string) => Promise<number>
@@ -432,6 +436,16 @@ export interface DoctorReport {
   providers: DoctorItem[]
   connectors: DoctorItem[]
   summary: { okCount: number; problemCount: number }
+}
+
+/** Tier Router — рекомендация тира+провайдера+модели (см. electron/ai/tier-router.ts). */
+export type ModelTier = 'cheap' | 'frontier' | 'private'
+export interface TierRecommendation {
+  tier: ModelTier
+  providerId: string
+  model: string
+  /** Человекочитаемое обоснование выбора (tooltip). */
+  reason: string
 }
 
 /** Предустановленный популярный MCP-сервер. */
