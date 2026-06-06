@@ -2265,6 +2265,141 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   line-height: 1.55;
 }
 
+/* === Agent Run Inspector === */
+.gg-inspector-toolbar {
+  display: flex; gap: 8px;
+  padding: 12px 28px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.gg-run-list { display: flex; flex-direction: column; gap: 10px; }
+
+.gg-run-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.gg-run-card.has-error { border-color: var(--error); }
+
+.gg-run-head {
+  width: 100%;
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+.gg-run-head:hover { background: var(--bg-base); }
+
+.gg-run-caret { color: var(--text-tertiary); width: 12px; flex-shrink: 0; }
+.gg-run-provider {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.gg-run-model {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+.gg-run-time {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+.gg-run-summary {
+  flex: 1;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gg-run-count {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.gg-run-steps {
+  display: flex; flex-direction: column;
+  border-top: 1px solid var(--border-subtle);
+  padding: 6px 0;
+}
+.gg-run-step {
+  display: grid;
+  grid-template-columns: 20px 64px 1fr;
+  align-items: start;
+  gap: 8px;
+  padding: 6px 14px;
+  font-size: var(--text-sm);
+}
+.gg-run-step.is-error { background: var(--error-muted); }
+.gg-run-step-icon { text-align: center; }
+.gg-run-step-clock {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  padding-top: 2px;
+}
+.gg-run-step-action {
+  color: var(--text-primary);
+  padding-top: 1px;
+}
+.gg-run-step-detail {
+  grid-column: 2 / 4;
+  margin: 4px 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.gg-inspector-csv-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+}
+.gg-inspector-csv-modal {
+  width: min(720px, 90vw);
+  max-height: 80vh;
+  display: flex; flex-direction: column;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+.gg-inspector-csv-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+.gg-inspector-csv-actions { display: flex; gap: 8px; }
+.gg-inspector-csv-text {
+  flex: 1;
+  min-height: 320px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  resize: none;
+  white-space: pre;
+}
+
 /* ─── Feedback view ─── */
 .gg-feedback-form {
   padding: 16px;

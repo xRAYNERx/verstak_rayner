@@ -12,6 +12,7 @@ import { FeedbackView } from './components/FeedbackView'
 import { BrowserView } from './components/BrowserView'
 import { StubView } from './components/StubView'
 import { SkillsView } from './components/SkillsView'
+import { AgentRunInspector } from './components/AgentRunInspector'
 import { DiffView } from './components/DiffView'
 import { CommandConfirm } from './components/CommandConfirm'
 import { UpdateNotification } from './components/UpdateNotification'
@@ -191,6 +192,7 @@ export function App() {
         )}
         {activeView === 'tasks' && <TasksView />}
         {activeView === 'journal' && <JournalView />}
+        {activeView === 'inspector' && <AgentRunInspector />}
         {activeView === 'plan' && <PlanView />}
         {activeView === 'workflow' && <StubView title="Workflow" description="Здесь будут пайплайны и цепочки агентов. В работе." />}
         {activeView === 'calendar' && <StubView title="Calendar" description="Здесь будут события и дедлайны проекта. В работе." />}

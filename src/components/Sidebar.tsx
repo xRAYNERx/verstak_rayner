@@ -280,6 +280,12 @@ const DesignIcon = (
     <circle cx="11" cy="11" r="2" />
   </svg>
 )
+const InspectorIcon = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </svg>
+)
 const VideoIcon = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="2" y="4" width="20" height="16" rx="2" />
@@ -303,6 +309,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
   const NAV: NavItem[] = [
     { id: 'tasks',    label: t.sidebar.tasks,    icon: TasksIcon },
     { id: 'journal',  label: t.sidebar.journal,  icon: JournalIcon },
+    { id: 'inspector', label: 'Инспектор',       icon: InspectorIcon },
     { id: 'plan',     label: t.sidebar.plan,     icon: PlanIcon },
     { id: 'skills',   label: t.sidebar.skills,   icon: SkillsIcon },
     { id: 'browser',  label: t.sidebar.browser,  icon: BrowserIcon },
