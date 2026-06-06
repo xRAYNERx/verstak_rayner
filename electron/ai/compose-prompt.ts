@@ -27,7 +27,10 @@ export function composeSystemPrompt(userLayer: UserLayer, contextPack = '', skil
   const skillBlock = trimmedSkill
     ? `\n\n<skill_layer>\n${trimmedSkill}\n</skill_layer>`
     : ''
-  const system = `${SYSTEM_LAYER_PROMPT}${userBlock}${packBlock}${skillBlock}`
+  // Мягкий nudge: перед сложной/многофайловой/деструктивной задачей объявить
+  // план через preflight. НЕ для тривиальных одиночных правок — иначе раздражает.
+  const preflightHint = '\n\n<preflight_hint>\nПеред сложной, многофайловой или деструктивной задачей сначала вызови preflight (план: затронутые зоны, уровень риска, что проверить после, что вне scope / запреты), затем выполняй. Для тривиальной одиночной правки preflight не нужен.\n</preflight_hint>'
+  const system = `${SYSTEM_LAYER_PROMPT}${userBlock}${packBlock}${skillBlock}${preflightHint}`
 
   return {
     system,

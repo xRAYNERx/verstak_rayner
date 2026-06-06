@@ -866,6 +866,44 @@ const createPlanHandler: ToolHandler = {
 }
 
 // ============================================================================
+// preflight — объявление плана перед сложной/деструктивной задачей
+// ============================================================================
+
+function toStringList(v: unknown): string[] {
+  return Array.isArray(v) ? v.map(String).map(s => s.trim()).filter(Boolean) : []
+}
+
+const preflightHandler: ToolHandler = {
+  mode: 'sequential',
+  async handle(call, ctx) {
+    try {
+      const summary = String(call.args.summary ?? '').trim()
+      if (!summary) {
+        return { id: call.id, name: call.name, result: '', error: 'preflight: summary обязателен' }
+      }
+      const rawRisk = String(call.args.risk ?? '').trim()
+      const risk: 'low' | 'medium' | 'high' = rawRisk === 'high' || rawRisk === 'medium' ? rawRisk : 'low'
+      const affectedZones = toStringList(call.args.affectedZones)
+      const verifyAfter = toStringList(call.args.verifyAfter)
+      const outOfScope = toStringList(call.args.outOfScope)
+      const riskReason = String(call.args.riskReason ?? '').trim()
+
+      ctx.sender.send('ai:event', {
+        id: ctx.sendId,
+        event: { type: 'preflight', callId: call.id, summary, affectedZones, risk, riskReason, verifyAfter, outOfScope }
+      })
+      try { ctx.recordJournal(ctx.projectPath, 'note', `🛫 Preflight (${risk}): ${summary.slice(0, 120)}`, affectedZones.join(', ') || null) } catch { /* journal not critical */ }
+      emitActivity(ctx, call, 'ok', 'preflight', `${risk} · ${summary.slice(0, 60)}`)
+      return { id: call.id, name: call.name, result: 'preflight shown — продолжай выполнение задачи по объявленному плану.' }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      emitActivity(ctx, call, 'error', call.name, msg)
+      return { id: call.id, name: call.name, result: '', error: msg }
+    }
+  }
+}
+
+// ============================================================================
 // Memory: memory_save / memory_search
 // ============================================================================
 
@@ -1527,6 +1565,7 @@ const HANDLER_REGISTRY: Record<string, ToolHandler> = {
   'list_connectors': listConnectorsHandler,
   'connector_query': connectorQueryHandler,
   'create_plan': createPlanHandler,
+  'preflight': preflightHandler,
   'read_journal': readJournalHandler,
   'generate_html': generateHtmlHandler,
   'generate_docx': generateDocxHandler,

@@ -73,6 +73,7 @@ export type ChatEvent =
   | { type: 'turns-exhausted'; used: number; maxBudget: number; canContinue: boolean; suggestedAdd: number }
   | { type: 'tool-activity'; callId: string; name: string; label: string; detail: string; status: 'ok' | 'error' }
   | { type: 'plan-created'; planId: number; title: string; stepCount: number }
+  | { type: 'preflight'; callId: string; summary: string; affectedZones: string[]; risk: 'low' | 'medium' | 'high'; riskReason: string; verifyAfter: string[]; outOfScope: string[] }
   | { type: 'artifact-created'; callId: string; kind: 'html' | 'docx'; filename: string; path: string; sizeBytes: number }
   | { type: 'usage'; usage: UsageDelta }
   | { type: 'info'; text: string }

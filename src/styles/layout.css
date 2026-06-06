@@ -4803,3 +4803,52 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   color: var(--text-tertiary);
   font-size: var(--text-sm, 13px);
 }
+
+/* === Preflight === */
+/* Карточка «план перед действием» — агент объявляет план до правок. */
+.gg-preflight {
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-subtle);
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  max-width: 100%;
+}
+.gg-preflight.is-low { border-left-color: var(--success); }
+.gg-preflight.is-medium { border-left-color: var(--warning); }
+.gg-preflight.is-high { border-left-color: var(--error); }
+.gg-preflight-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 8px;
+}
+.gg-preflight-title { font-weight: 600; color: var(--text-primary); font-size: var(--text-sm, 13px); }
+.gg-preflight-pill {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.gg-preflight-pill.is-low { background: var(--success-muted); color: var(--success); }
+.gg-preflight-pill.is-medium { background: rgba(229, 192, 123, 0.18); color: var(--warning); }
+.gg-preflight-pill.is-high { background: rgba(224, 108, 117, 0.18); color: var(--error); }
+.gg-preflight-summary { color: var(--text-primary); font-size: var(--text-sm, 13px); line-height: 1.45; }
+.gg-preflight-reason { color: var(--text-tertiary); font-size: 12px; margin-top: 4px; font-style: italic; }
+.gg-preflight-section { margin-top: 10px; }
+.gg-preflight-label {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+.gg-preflight-ul {
+  margin: 0; padding-left: 18px;
+  color: var(--text-secondary, var(--text-primary));
+  font-size: 12px; line-height: 1.5;
+}
+.gg-preflight-ul li { margin: 1px 0; }

@@ -33,6 +33,18 @@ interface ActivityEntry {
  * has touched it during the current session. Priority: write > read > list.
  * Recorded per project-relative path so the Sidebar can render a small badge.
  */
+/** Preflight-карточка: агент объявил план перед сложной/деструктивной задачей.
+ *  Эфемерное — живёт только в активной сессии, чистится как activity. */
+export interface PreflightCard {
+  callId: string
+  summary: string
+  affectedZones: string[]
+  risk: 'low' | 'medium' | 'high'
+  riskReason: string
+  verifyAfter: string[]
+  outOfScope: string[]
+}
+
 export type TouchKind = 'read' | 'write' | 'list'
 const TOUCH_PRIORITY: Record<TouchKind, number> = { write: 3, read: 2, list: 1 }
 
@@ -117,6 +129,8 @@ interface ProjectState {
   pendingWrites: PendingWrite[]
   pendingCommand: PendingCommand | null
   activity: ActivityEntry[]
+  /** Preflight-карточки текущей сессии. Эфемерные — чистятся на новом send. */
+  preflights: PreflightCard[]
   /** Per-session "the AI has touched these files" map — feeds Sidebar markers
    *  (Gemini Ultra audit: Context Depth Visualizer). Keyed by project-relative
    *  path; value is the highest-priority kind observed. */
@@ -174,6 +188,8 @@ interface ProjectState {
   pushActivity: (entry: ActivityEntry) => void
   updateActivity: (id: string, patch: Partial<ActivityEntry>) => void
   clearActivity: () => void
+  /** Добавить preflight-карточку (агент объявил план). */
+  pushPreflight: (card: PreflightCard) => void
   /** Record that the AI just touched a file (read / write / list). Upgrades
    *  the marker if a higher-priority kind is observed. */
   markFileTouched: (path: string, kind: TouchKind) => void
@@ -251,6 +267,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   pendingWrites: [],
   pendingCommand: null,
   activity: [],
+  preflights: [],
   touchedFiles: {},
   checkpointId: null,
   activeView: 'chat',
@@ -404,7 +421,8 @@ export const useProject = create<ProjectState>((set, get) => ({
   updateActivity: (id, patch) => set(s => ({
     activity: s.activity.map(a => a.id === id ? { ...a, ...patch } : a)
   })),
-  clearActivity: () => set({ activity: [] }),
+  clearActivity: () => set({ activity: [], preflights: [] }),
+  pushPreflight: (card) => set(s => ({ preflights: [...s.preflights, card] })),
   markFileTouched: (path, kind) => set(s => {
     if (!path) return {}
     const existing = s.touchedFiles[path]

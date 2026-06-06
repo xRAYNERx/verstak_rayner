@@ -237,6 +237,22 @@ export const TOOL_DEFS: ToolDefinition[] = [
     }
   },
   {
+    name: 'preflight',
+    description: 'Объяви план ПЕРЕД началом сложной, многофайловой или деструктивной задачи. Ничего не меняет — только показывает пользователю карточку «что я собираюсь сделать»: затронутые зоны, уровень риска, что проверить после, что вне scope / запрещено. Вызывай ДО первой правки/команды на такой задаче. Для тривиальных одиночных правок не нужен.',
+    parameters: {
+      type: 'object',
+      properties: {
+        summary: { type: 'string', description: 'Одна-две строки: что собираюсь сделать и зачем.' },
+        affectedZones: { type: 'array', items: { type: 'string' }, description: 'Файлы / папки / подсистемы, которые будут затронуты.' },
+        risk: { type: 'string', enum: ['low', 'medium', 'high'], description: 'Уровень риска изменения.' },
+        riskReason: { type: 'string', description: 'Почему именно такой риск (1 строка).' },
+        verifyAfter: { type: 'array', items: { type: 'string' }, description: 'Чем проверить результат после: команды, тесты, ручные шаги.' },
+        outOfScope: { type: 'array', items: { type: 'string' }, description: 'Что НЕ трогаю / запреты / границы scope.' }
+      },
+      required: ['summary', 'risk']
+    }
+  },
+  {
     name: 'render_chart',
     description: 'Сгенерировать SVG-диаграмму (bar / line / pie) для встройки в HTML/DOCX артефакт. Сохраняется в .verstak/artifacts/{date}/. Возвращает путь — далее его можно вставить как <img src> в HTML или использовать в DOCX. Идеально для аудитов Я.Директ, отчётов по конверсиям, разбивке источников.',
     parameters: {
