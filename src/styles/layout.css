@@ -5376,3 +5376,77 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   white-space: nowrap;
   padding-right: 4px;
 }
+
+/* === Provider Health Matrix === */
+.gg-health-matrix {
+  margin-top: 4px;
+}
+.gg-health-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.gg-health-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-default);
+  white-space: nowrap;
+}
+.gg-health-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+.gg-health-table tr:last-child td {
+  border-bottom: none;
+}
+.gg-health-provider {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.gg-health-transport {
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-default);
+  color: var(--text-tertiary);
+}
+.gg-health-transport.is-cli {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.gg-health-status {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.gg-health-status.is-ok { color: var(--success); }
+.gg-health-status.is-missing { color: var(--warning, #facc15); }
+.gg-health-status.is-na { color: var(--text-tertiary); }
+.gg-health-price {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.gg-health-na {
+  color: var(--text-tertiary);
+}
+.gg-health-tier {
+  white-space: nowrap;
+}
+.gg-health-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+.gg-health-legend .gg-health-status {
+  margin-right: 4px;
+}
