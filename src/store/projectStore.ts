@@ -1,38 +1,18 @@
 import { create } from 'zustand'
 import type { FileNode, ChatMessage, ProjectMeta, ChatSession } from '../types/api'
 import { isModelValidForProvider } from '../hooks/useProvider'
+import {
+  freshSnapshot,
+  TOUCH_PRIORITY,
+  type PendingWrite,
+  type PendingCommand,
+  type ActivityEntry,
+  type TouchKind,
+  type SessionUsage,
+  type RunningPlanStep,
+  type SessionSnapshot
+} from './session-snapshot'
 
-interface PendingWrite {
-  callId: string
-  path: string
-  before: string
-  after: string
-  /** sendId of the ai:send that produced this write — used for strict
-   *  resolveWrite lookup in main (avoids endsWith-based collisions). */
-  sendId?: number
-}
-
-interface PendingCommand {
-  callId: string
-  command: string
-  /** sendId for strict resolve lookup. */
-  sendId?: number
-}
-
-interface ActivityEntry {
-  id: string
-  kind: 'read' | 'list' | 'write' | 'command' | 'blocked'
-  label: string
-  detail?: string
-  status: 'pending' | 'ok' | 'rejected' | 'error' | 'blocked'
-  timestamp: number
-}
-
-/**
- * Marker shown next to a file in the project tree to indicate that the AI
- * has touched it during the current session. Priority: write > read > list.
- * Recorded per project-relative path so the Sidebar can render a small badge.
- */
 /** Preflight-карточка: агент объявил план перед сложной/деструктивной задачей.
  *  Эфемерное — живёт только в активной сессии, чистится как activity. */
 export interface PreflightCard {
@@ -58,47 +38,7 @@ export interface SubagentRunCard {
   result?: string
 }
 
-export type TouchKind = 'read' | 'write' | 'list'
-const TOUCH_PRIORITY: Record<TouchKind, number> = { write: 3, read: 2, list: 1 }
-
 export type ViewId = 'chat' | 'tasks' | 'journal' | 'plan' | 'workflow' | 'calendar' | 'feedback' | 'browser' | 'skills' | 'design' | 'video' | 'inspector' | 'memory-gov'
-
-export interface SessionUsage {
-  inputTokens: number
-  outputTokens: number
-  cachedInputTokens: number
-}
-
-interface RunningPlanStep {
-  planId: number
-  stepId: number
-  title: string
-}
-
-interface SessionSnapshot {
-  messages: ChatMessage[]
-  isStreaming: boolean
-  pendingWrites: PendingWrite[]
-  pendingCommand: PendingCommand | null
-  activity: ActivityEntry[]
-  sessionUsage: SessionUsage
-  runningPlanStep: RunningPlanStep | null
-  /** True when bg session got new content since user last viewed it. */
-  hasUnread: boolean
-}
-
-function freshSnapshot(): SessionSnapshot {
-  return {
-    messages: [],
-    isStreaming: false,
-    pendingWrites: [],
-    pendingCommand: null,
-    activity: [],
-    sessionUsage: { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 },
-    runningPlanStep: null,
-    hasUnread: false
-  }
-}
 
 /**
  * Owner для in-flight sendId. Заменил собой 2 параллельных мапа
@@ -859,4 +799,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   })
 }))
 
-export type { ActivityEntry, PendingCommand }
+// Re-export pure session types из нового модуля, чтобы публичная поверхность
+// projectStore не менялась (ActivityEntry/PendingCommand/SessionUsage/TouchKind
+// раньше экспортировались отсюда).
+export type { ActivityEntry, PendingCommand, SessionUsage, TouchKind }
