@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react'
 import { useProject } from '../store/projectStore'
-import type { Memory, DetectedCli, AuditEntry, DoctorReport, DoctorItem, DoctorStatus, ProviderDescriptorDTO } from '../types/api'
+import type { Memory, DetectedCli, AuditEntry, DoctorReport, DoctorItem, DoctorStatus, ProviderDescriptorDTO, PolicyMatrixDTO, PolicyDecision, AgentModeId } from '../types/api'
 import type { ProviderId } from '../hooks/useProvider'
 import { useTheme, THEMES } from '../hooks/useTheme'
 import type { AutonomousStatus } from '../types/api'
@@ -243,7 +243,7 @@ const PROVIDERS: ProviderConfig[] = [
   }
 ]
 
-type Tab = 'appearance' | 'profiles' | 'providers' | 'models' | 'connectors' | 'autonomous' | 'memory' | 'mcp' | 'audit'
+type Tab = 'appearance' | 'profiles' | 'providers' | 'models' | 'connectors' | 'autonomous' | 'memory' | 'mcp' | 'audit' | 'policy'
 
 // TAB_GROUPS is built inside the Settings component to support i18n translations.
 
@@ -326,6 +326,114 @@ function parseEnvRequirements(envJson: string): Array<{ key: string; empty: bool
   } catch {
     return []
   }
+}
+
+// === Policy Center ===
+// Read-only экран «что разрешено агенту»: матрица decide(tool, mode) по 5 режимам
+// + опасные команды. Логика НЕ дублируется — данные приходят из policy:matrix.
+
+const POLICY_CATEGORY_LABELS: Record<string, string> = {
+  read: 'Чтение',
+  edit: 'Правка файлов',
+  command: 'Команды',
+  connector: 'Коннекторы'
+}
+
+const POLICY_DECISION_META: Record<PolicyDecision, { label: string; cls: string }> = {
+  'auto-accept': { label: 'авто',   cls: 'auto' },
+  'confirm':     { label: 'спросит', cls: 'confirm' },
+  'block':       { label: 'блок',   cls: 'block' }
+}
+
+function PolicyTab() {
+  const [matrix, setMatrix] = useState<PolicyMatrixDTO | null>(null)
+  const [currentMode, setCurrentMode] = useState<AgentModeId | null>(null)
+
+  useEffect(() => {
+    void (async () => {
+      const m = await window.api.policy.matrix()
+      setMatrix(m)
+      const mode = await window.api.settings.getKey('agent_mode')
+      setCurrentMode((mode as AgentModeId) || 'ask')
+    })()
+  }, [])
+
+  if (!matrix) {
+    return <div className="gg-settings-extra"><div className="gg-settings-hint">Загрузка политики…</div></div>
+  }
+
+  return (
+    <div className="gg-settings-extra gg-policy">
+      <div className="gg-settings-section-title">🛡 Что разрешено агенту</div>
+      <div className="gg-settings-hint" style={{ marginBottom: 14 }}>
+        Единое окно контроля: как разрешается каждое действие агента в зависимости от активного режима.
+        Чтение всегда разрешено. Правки файлов и команды гейтятся режимом. Текущий режим подсвечен.
+      </div>
+
+      <div className="gg-policy-matrix-wrap">
+        <table className="gg-policy-matrix">
+          <thead>
+            <tr>
+              <th className="gg-policy-cat-head">Действие</th>
+              {matrix.modes.map(m => (
+                <th
+                  key={m.id}
+                  className={m.id === currentMode ? 'gg-policy-mode-current' : undefined}
+                  title={m.description}
+                >
+                  <span className="gg-policy-mode-icon">{m.icon}</span>
+                  <span className="gg-policy-mode-label">{m.label}</span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.rows.map(row => (
+              <tr key={row.tool}>
+                <td className="gg-policy-cat">
+                  <span className="gg-policy-cat-name">{POLICY_CATEGORY_LABELS[row.category] || row.category}</span>
+                  <code className="gg-policy-tool">{row.tool}</code>
+                </td>
+                {matrix.modes.map(m => {
+                  const dec = row.decisions[m.id]
+                  const meta = POLICY_DECISION_META[dec]
+                  return (
+                    <td
+                      key={m.id}
+                      className={m.id === currentMode ? 'gg-policy-mode-current' : undefined}
+                    >
+                      <span className={`gg-policy-chip ${meta.cls}`}>{meta.label}</span>
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="gg-policy-legend">
+        <span className="gg-policy-chip auto">авто</span> — выполняется сразу, без диалога
+        <span className="gg-policy-chip confirm">спросит</span> — покажет diff / команду и ждёт подтверждения
+        <span className="gg-policy-chip block">блок</span> — действие запрещено активным режимом
+      </div>
+
+      <div className="gg-settings-section-title" style={{ marginTop: 22 }}>⛔ Опасные команды</div>
+      <div className="gg-settings-hint" style={{ marginBottom: 10 }}>
+        Эти команды блокируются <strong>всегда</strong> — даже с подтверждением и в режиме «Без подтверждений».
+        Денилист — последний предохранитель.
+      </div>
+      <ul className="gg-policy-danger">
+        {matrix.commandDanger.map((d, i) => (
+          <li key={i}>{d}</li>
+        ))}
+      </ul>
+
+      <div className="gg-policy-note">
+        Риск по конкретным MCP-инструментам (per-server) — на вкладке <strong>MCP</strong>. Здесь он не дублируется.
+      </div>
+    </div>
+  )
 }
 
 function McpTab() {
@@ -869,6 +977,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
       { id: 'models',     label: t.settings.models,     icon: '✨' },
       { id: 'connectors', label: t.settings.connectors, icon: <IconPlug size={16} /> },
       { id: 'mcp',        label: 'MCP',                 icon: '⚡' },
+      { id: 'policy',     label: 'Что разрешено',       icon: '🛡' },
       { id: 'autonomous', label: t.settings.nightMode,  icon: '🌙' },
       { id: 'memory',     label: t.settings.memory,     icon: '🧠' },
       { id: 'audit',      label: 'Audit Log',            icon: '📋' }
@@ -1585,6 +1694,10 @@ export function Settings({ onClose }: { onClose: () => void }) {
 
         {tab === 'mcp' && (
           <McpTab />
+        )}
+
+        {tab === 'policy' && (
+          <PolicyTab />
         )}
 
         {tab === 'autonomous' && (

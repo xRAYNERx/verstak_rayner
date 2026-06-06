@@ -114,6 +114,10 @@ declare global {
         /** Рекомендует тир+провайдера+модель под текст задачи. null = нет подходящего. */
         recommend: (taskText: string) => Promise<TierRecommendation | null>
       }
+      policy: {
+        /** Снимок политики разрешений агента: матрица decide() × режимы + опасные команды. */
+        matrix: () => Promise<PolicyMatrixDTO>
+      }
       ai: {
         send: (messages: ChatMessage[], projectPath: string | null, chatId?: string) => Promise<number>
         sendWithBudget: (messages: ChatMessage[], projectPath: string | null, budget: number, chatId?: string) => Promise<number>
@@ -446,6 +450,21 @@ export interface TierRecommendation {
   model: string
   /** Человекочитаемое обоснование выбора (tooltip). */
   reason: string
+}
+
+/** Policy Center — снимок политики разрешений агента (см. electron/ipc/settings.ts). */
+export type AgentModeId = 'ask' | 'accept-edits' | 'plan' | 'auto' | 'bypass'
+export type PolicyDecision = 'confirm' | 'auto-accept' | 'block'
+export type PolicyCategory = 'read' | 'edit' | 'command' | 'connector'
+export interface PolicyMatrixRow {
+  tool: string
+  category: PolicyCategory
+  decisions: Record<AgentModeId, PolicyDecision>
+}
+export interface PolicyMatrixDTO {
+  modes: Array<{ id: AgentModeId; label: string; description: string; icon: string }>
+  rows: PolicyMatrixRow[]
+  commandDanger: string[]
 }
 
 /** Предустановленный популярный MCP-сервер. */

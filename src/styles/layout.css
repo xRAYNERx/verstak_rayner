@@ -5473,3 +5473,105 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 .gg-health-legend .gg-health-status {
   margin-right: 4px;
 }
+
+/* === Policy Center === */
+.gg-policy-matrix-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.gg-policy-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.gg-policy-matrix th,
+.gg-policy-matrix td {
+  padding: 8px 10px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+.gg-policy-matrix thead th {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.gg-policy-matrix tbody tr:last-child td {
+  border-bottom: none;
+}
+.gg-policy-cat-head,
+.gg-policy-cat {
+  text-align: left !important;
+}
+.gg-policy-mode-icon {
+  display: block;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.gg-policy-mode-label {
+  display: block;
+  font-size: 11px;
+}
+.gg-policy-mode-current {
+  background: color-mix(in srgb, var(--accent, #3b82f6) 12%, transparent) !important;
+  box-shadow: inset 2px 0 0 var(--accent, #3b82f6);
+}
+.gg-policy-cat-name {
+  display: block;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.gg-policy-tool {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+.gg-policy-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.gg-policy-chip.auto {
+  background: color-mix(in srgb, var(--success) 18%, transparent);
+  color: var(--success);
+}
+.gg-policy-chip.confirm {
+  background: color-mix(in srgb, var(--warning) 20%, transparent);
+  color: var(--warning);
+}
+.gg-policy-chip.block {
+  background: color-mix(in srgb, var(--error) 16%, transparent);
+  color: var(--error);
+}
+.gg-policy-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+.gg-policy-legend .gg-policy-chip {
+  margin-left: 6px;
+}
+.gg-policy-danger {
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+.gg-policy-note {
+  margin-top: 18px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  font-size: 12px;
+  color: var(--text-tertiary);
+}

@@ -59,6 +59,24 @@ function normalize(s: string): string {
   return s.replace(/[\t ]+/g, ' ').trim()
 }
 
+/**
+ * Человекочитаемый список того, что денилист команд блокирует НАВСЕГДА
+ * (даже с подтверждением пользователя). Используется Policy Center для показа
+ * правил «опасных команд» — единый источник истины, без дублирования паттернов.
+ */
+export function dangerousCommandLabels(): string[] {
+  // Уникализируем reason'ы (некоторые правила делят формулировку), сохраняя порядок.
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const rule of DENY_RULES) {
+    if (!seen.has(rule.reason)) {
+      seen.add(rule.reason)
+      out.push(rule.reason)
+    }
+  }
+  return out
+}
+
 export function classifyCommand(command: string): CommandClassification {
   const trimmed = normalize(command)
   if (!trimmed) return { allowed: false, reason: 'Пустая команда' }
