@@ -13,6 +13,7 @@ import { BrowserView } from './components/BrowserView'
 import { StubView } from './components/StubView'
 import { SkillsView } from './components/SkillsView'
 import { AgentRunInspector } from './components/AgentRunInspector'
+import { WorkflowView } from './components/WorkflowView'
 import { MemoryGovernance } from './components/MemoryGovernance'
 import { DiffView } from './components/DiffView'
 import { CommandConfirm } from './components/CommandConfirm'
@@ -196,7 +197,7 @@ export function App() {
         {activeView === 'inspector' && <AgentRunInspector />}
         {activeView === 'memory-gov' && <MemoryGovernance />}
         {activeView === 'plan' && <PlanView />}
-        {activeView === 'workflow' && <StubView title="Workflow" description="Здесь будут пайплайны и цепочки агентов. В работе." />}
+        {activeView === 'workflow' && <WorkflowView />}
         {activeView === 'calendar' && <StubView title="Calendar" description="Здесь будут события и дедлайны проекта. В работе." />}
         {activeView === 'feedback' && <FeedbackView />}
         {activeView === 'browser' && <BrowserView />}

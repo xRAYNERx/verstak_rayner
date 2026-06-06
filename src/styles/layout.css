@@ -2400,6 +2400,140 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   white-space: pre;
 }
 
+/* === Workflow Pipelines === */
+.gg-wf-list { display: flex; flex-direction: column; gap: 14px; }
+
+.gg-wf-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+}
+.gg-wf-card.is-running { border-color: var(--accent); }
+.gg-wf-card.is-cancelled { opacity: 0.7; }
+
+.gg-wf-card-head {
+  display: flex; align-items: center; gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.gg-wf-card-title {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.gg-wf-badge {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-base);
+  color: var(--text-tertiary);
+}
+.gg-wf-badge.is-running { background: var(--accent); color: var(--bg-base); }
+.gg-wf-badge.is-done { color: var(--success); }
+.gg-wf-badge.is-cancelled { color: var(--error); }
+.gg-wf-card-count {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+.gg-wf-card-time {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-left: auto;
+}
+.gg-wf-card-time + .gg-wf-card-time { margin-left: 0; }
+
+.gg-wf-pipeline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 4px;
+}
+.gg-wf-empty-steps { font-size: var(--text-xs); color: var(--text-tertiary); }
+.gg-wf-segment { display: flex; align-items: center; gap: 4px; }
+.gg-wf-connector { color: var(--text-tertiary); font-family: var(--font-mono); }
+
+.gg-wf-node-wrap { display: flex; flex-direction: column; gap: 6px; }
+.gg-wf-node {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 11px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: default;
+  text-align: left;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  max-width: 280px;
+}
+.gg-wf-node.is-open { border-color: var(--border-strong); }
+.gg-wf-node-idx {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+.gg-wf-node-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-tertiary);
+}
+.gg-wf-node-title {
+  flex: 1;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gg-wf-node-status {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+/* Status colors mirror PlanView STEP_COLOR mapping. */
+.gg-wf-node.is-pending .gg-wf-node-dot { background: var(--text-tertiary); }
+.gg-wf-node.is-running .gg-wf-node-dot { background: var(--accent); animation: gg-wf-pulse 1.2s ease-in-out infinite; }
+.gg-wf-node.is-running { border-color: var(--accent); cursor: pointer; }
+.gg-wf-node.is-done .gg-wf-node-dot { background: var(--success); }
+.gg-wf-node.is-done { cursor: pointer; }
+.gg-wf-node.is-skipped { opacity: 0.6; }
+.gg-wf-node.is-skipped .gg-wf-node-dot { background: var(--text-disabled); }
+.gg-wf-node.is-failed .gg-wf-node-dot { background: var(--error); }
+.gg-wf-node.is-failed { border-color: var(--error); cursor: pointer; }
+
+@keyframes gg-wf-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.gg-wf-node-detail {
+  max-width: 280px;
+  padding: 8px 11px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.gg-wf-node-detail-text { color: var(--text-secondary); white-space: pre-wrap; word-break: break-word; }
+.gg-wf-node-result {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
 /* === Memory Governance === */
 .gg-memgov-list { display: flex; flex-direction: column; gap: 10px; }
 
