@@ -632,8 +632,15 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
         ? skillProvider
         : undefined
       const overrideModel = overrideProvider ? (activeSkill.default_model ?? null) : null
+      // Anti-stall guard: некоторые скиллы — оркестраторы/штабы (los-hq, bos-hq,
+      // навигаторы) с протоколом «жди пакет задачи / маршрутизируй / ✋ СТОП».
+      // Когда такой скилл активирован как обычный чат, его systemPrompt ПОЛНОСТЬЮ
+      // заменяет базовый system-layer (см. ipc/ai.ts: effectiveSystemPrompt path),
+      // и агент зависает в режиме «дай конкретное ТЗ» вместо выполнения ясной
+      // прямой просьбы. Дописываем короткий nudge: ясный запрос = действуй.
+      const antiStallNudge = '\n\n---\nВАЖНО (Verstak): если пользователь дал ясный прямой запрос — выполни его прямо в этом чате и выдай результат. Не зацикливайся, прося оформить «пакет задачи», «одну фразу цели» или ждать отдельного «ок», если намерение уже понятно.'
       sendId = await window.api.ai.sendWithOverrides(allMessages, path, {
-        systemPrompt: activeSkill.systemPrompt,
+        systemPrompt: activeSkill.systemPrompt + antiStallNudge,
         ...(overrideProvider ? { providerId: overrideProvider } : {}),
         ...(overrideModel !== null ? { model: overrideModel } : {}),
         effortLevel: useProject.getState().effortLevel
