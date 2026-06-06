@@ -2400,6 +2400,29 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 }
 .gg-debug-meta { margin-top: 14px; font-size: var(--text-xs); color: var(--text-tertiary); }
 
+/* === Context Budget === */
+.gg-budget { margin-bottom: 6px; }
+.gg-budget-rows { display: flex; flex-direction: column; gap: 6px; }
+.gg-budget-row {
+  display: grid;
+  grid-template-columns: 160px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--text-xs);
+}
+.gg-budget-label { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gg-budget-bar {
+  height: 8px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.gg-budget-bar-fill { display: block; height: 100%; background: var(--accent); }
+.gg-budget-tokens { color: var(--text-tertiary); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.gg-budget-total { margin-top: 8px; font-size: var(--text-xs); color: var(--text-secondary); font-weight: 600; }
+.gg-budget-note { margin-top: 4px; font-size: var(--text-xs); color: var(--warning); }
+
 .gg-run-head {
   width: 100%;
   display: flex; align-items: center; gap: 10px;

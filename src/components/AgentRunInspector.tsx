@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useProject } from '../store/projectStore'
 import type { AuditEntry, DebugPacket } from '../types/api'
+import { computeContextBudget } from '../lib/context-budget'
 
 /**
  * Agent Run Inspector — flagship transparency screen.
@@ -218,6 +219,38 @@ function RunCard({ run, onShowPacket }: { run: Run; onShowPacket: (runId: string
   )
 }
 
+// Бюджет контекста — разбивка composed system-промпта по слоям с оценкой токенов.
+function ContextBudgetView({ packet }: { packet: DebugPacket }) {
+  const budget = useMemo(() => {
+    if (!packet.input) return null
+    return computeContextBudget(packet.input.systemPrompt, packet.input.userMessage, packet.messages)
+  }, [packet])
+
+  if (!budget || budget.sections.length === 0) return null
+
+  return (
+    <div className="gg-budget">
+      <div className="gg-debug-section-title">Бюджет контекста</div>
+      <div className="gg-budget-rows">
+        {budget.sections.map(s => {
+          const pct = budget.totalTokens > 0 ? Math.round((s.tokens / budget.totalTokens) * 100) : 0
+          return (
+            <div key={s.label} className="gg-budget-row">
+              <span className="gg-budget-label">{s.label}</span>
+              <span className="gg-budget-bar"><span className="gg-budget-bar-fill" style={{ width: `${pct}%` }} /></span>
+              <span className="gg-budget-tokens">≈{s.tokens.toLocaleString('ru-RU')} ток · {pct}%</span>
+            </div>
+          )
+        })}
+      </div>
+      <div className="gg-budget-total">≈ {budget.totalTokens.toLocaleString('ru-RU')} токенов суммарно</div>
+      {budget.compacted && (
+        <div className="gg-budget-note">⚠️ часть истории сжата (sliding window)</div>
+      )}
+    </div>
+  )
+}
+
 export function AgentRunInspector() {
   const { path } = useProject()
   const [entries, setEntries] = useState<AuditEntry[]>([])
@@ -324,6 +357,7 @@ export function AgentRunInspector() {
               )}
               {packet.input && (
                 <>
+                  <ContextBudgetView packet={packet} />
                   <div className="gg-debug-section-title">Системный промпт — что реально ушло в модель</div>
                   <pre className="gg-debug-pre">{packet.input.systemPrompt}</pre>
                   <div className="gg-debug-section-title">Сообщение пользователя</div>
