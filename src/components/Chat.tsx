@@ -83,7 +83,7 @@ Out of scope: общие best practices, рефакторинги ради кр�
 
 export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatProps) {
   const t = useT()
-  const { messages, addMessage, updateLastAssistant, isStreaming, setStreaming, activity, preflights, sessionUsage, path: activePath, chatSessions, activeChatId, effortLevel, setEffortLevel } = useProject()
+  const { messages, addMessage, updateLastAssistant, isStreaming, setStreaming, activity, preflights, subagentRuns, sessionUsage, path: activePath, chatSessions, activeChatId, effortLevel, setEffortLevel } = useProject()
   const { mode: agentMode, setMode: setAgentMode } = useAgentMode()
   const projectName = activePath ? activePath.replace(/^.*[\\/]/, '') : null
   const activeChatTitle = chatSessions.find(s => s.id === activeChatId)?.title ?? null
@@ -358,6 +358,17 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
           riskReason: event.riskReason,
           verifyAfter: event.verifyAfter,
           outOfScope: event.outOfScope
+        })
+      }
+      else if (event.type === 'subagent-run') {
+        store.upsertSubagentRun({
+          callId: event.callId,
+          label: event.label,
+          provider: event.provider,
+          skill: event.skill,
+          task: event.task,
+          status: event.status,
+          result: event.result
         })
       }
       else if (event.type === 'cross-verify') {
@@ -807,6 +818,7 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
           // Render activity rows just before the (last) assistant message
           const showActivity = isLast && m.role === 'assistant' && activity.length > 0
           const showPreflights = isLast && m.role === 'assistant' && preflights.length > 0
+          const showSubagents = isLast && m.role === 'assistant' && subagentRuns.length > 0
           const changedFiles = isLast && m.role === 'assistant' && !isStreaming
             ? activity.filter(a => a.kind === 'write' && a.status === 'ok').map(a => a.detail ?? '')
             : []
@@ -856,6 +868,28 @@ export function Chat({ onOpenSettings, onToggleTerminal, terminalOpen }: ChatPro
                           {pf.outOfScope.map((o, oi) => <li key={oi}>{o}</li>)}
                         </ul>
                       </div>
+                    )}
+                  </div>
+                )
+              })}
+              {showSubagents && subagentRuns.map(sa => {
+                const statusLabel = sa.status === 'running' ? 'выполняется' : sa.status === 'done' ? 'готово' : 'ошибка'
+                return (
+                  <div key={sa.callId} className={`gg-subagent is-${sa.status}`}>
+                    <div className="gg-subagent-head">
+                      <span className="gg-subagent-title">🤖 Sub-agent: {sa.label}</span>
+                      <span className={`gg-subagent-pill is-${sa.status}`}>{statusLabel}</span>
+                    </div>
+                    <div className="gg-subagent-meta">
+                      {sa.skill && <span className="gg-subagent-tag">скилл: {sa.skill}</span>}
+                      {sa.provider && <span className="gg-subagent-tag">провайдер: {sa.provider}</span>}
+                    </div>
+                    <div className="gg-subagent-task">{sa.task}</div>
+                    {sa.result && (
+                      <details className="gg-subagent-result">
+                        <summary>{sa.status === 'error' ? 'Ошибка' : 'Результат'}</summary>
+                        <div className="gg-subagent-result-body">{sa.result}</div>
+                      </details>
                     )}
                   </div>
                 )

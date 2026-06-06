@@ -80,6 +80,9 @@ export type ChatEvent =
   /** Preflight: агент объявил план перед сложной/деструктивной задачей.
    *  Эфемерное — карточка в чате, в БД не пишется. */
   | { type: 'preflight'; callId: string; summary: string; affectedZones: string[]; risk: 'low' | 'medium' | 'high'; riskReason: string; verifyAfter: string[]; outOfScope: string[] }
+  /** Sub-agent run: delegate_task делегировал подзадачу другому скиллу/модели.
+   *  Эфемерное — карточка в чате для видимости fan-out. В БД не пишется. */
+  | { type: 'subagent-run'; callId: string; label: string; provider?: string; skill?: string; task: string; status: 'running' | 'done' | 'error'; result?: string }
   | { type: 'artifact-created'; callId: string; kind: 'html' | 'docx'; filename: string; path: string; sizeBytes: number }
   | { type: 'usage'; usage: UsageDelta }
   /** Информационное сообщение для UI (тост). Не блокирует сессию. */

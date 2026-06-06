@@ -5134,3 +5134,74 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   font-size: 12px; line-height: 1.5;
 }
 .gg-preflight-ul li { margin: 1px 0; }
+
+/* === Subagent Runs === */
+/* Карточка делегированной подзадачи (fan-out V1) — видимость sub-agent run. */
+.gg-subagent {
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-subtle);
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  max-width: 100%;
+}
+.gg-subagent.is-running {
+  border-left-color: var(--warning);
+  animation: gg-subagent-pulse 1.4s ease-in-out infinite;
+}
+.gg-subagent.is-done { border-left-color: var(--success); }
+.gg-subagent.is-error { border-left-color: var(--error); }
+@keyframes gg-subagent-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+.gg-subagent-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 6px;
+}
+.gg-subagent-title { font-weight: 600; color: var(--text-primary); font-size: var(--text-sm, 13px); }
+.gg-subagent-pill {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.gg-subagent-pill.is-running { background: rgba(229, 192, 123, 0.18); color: var(--warning); }
+.gg-subagent-pill.is-done { background: var(--success-muted); color: var(--success); }
+.gg-subagent-pill.is-error { background: rgba(224, 108, 117, 0.18); color: var(--error); }
+.gg-subagent-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px;
+}
+.gg-subagent-tag {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  background: var(--bg-subtle, rgba(255, 255, 255, 0.04));
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.gg-subagent-task {
+  color: var(--text-secondary, var(--text-primary));
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+.gg-subagent-result { margin-top: 8px; }
+.gg-subagent-result summary {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.gg-subagent-result-body {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary, var(--text-primary));
+  white-space: pre-wrap;
+}

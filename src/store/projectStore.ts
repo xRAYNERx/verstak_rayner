@@ -45,6 +45,19 @@ export interface PreflightCard {
   outOfScope: string[]
 }
 
+/** Sub-agent run card (fan-out V1): delegate_task делегировал подзадачу.
+ *  Эфемерное — чистится на новом send как preflights. Upsert по callId
+ *  (running → done/error). */
+export interface SubagentRunCard {
+  callId: string
+  label: string
+  provider?: string
+  skill?: string
+  task: string
+  status: 'running' | 'done' | 'error'
+  result?: string
+}
+
 export type TouchKind = 'read' | 'write' | 'list'
 const TOUCH_PRIORITY: Record<TouchKind, number> = { write: 3, read: 2, list: 1 }
 
@@ -131,6 +144,8 @@ interface ProjectState {
   activity: ActivityEntry[]
   /** Preflight-карточки текущей сессии. Эфемерные — чистятся на новом send. */
   preflights: PreflightCard[]
+  /** Sub-agent runs текущей сессии (fan-out V1). Эфемерные — чистятся на send. */
+  subagentRuns: SubagentRunCard[]
   /** Per-session "the AI has touched these files" map — feeds Sidebar markers
    *  (Gemini Ultra audit: Context Depth Visualizer). Keyed by project-relative
    *  path; value is the highest-priority kind observed. */
@@ -190,6 +205,8 @@ interface ProjectState {
   clearActivity: () => void
   /** Добавить preflight-карточку (агент объявил план). */
   pushPreflight: (card: PreflightCard) => void
+  /** Upsert sub-agent run card по callId (running → done/error). */
+  upsertSubagentRun: (card: SubagentRunCard) => void
   /** Record that the AI just touched a file (read / write / list). Upgrades
    *  the marker if a higher-priority kind is observed. */
   markFileTouched: (path: string, kind: TouchKind) => void
@@ -268,6 +285,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   pendingCommand: null,
   activity: [],
   preflights: [],
+  subagentRuns: [],
   touchedFiles: {},
   checkpointId: null,
   activeView: 'chat',
@@ -421,8 +439,15 @@ export const useProject = create<ProjectState>((set, get) => ({
   updateActivity: (id, patch) => set(s => ({
     activity: s.activity.map(a => a.id === id ? { ...a, ...patch } : a)
   })),
-  clearActivity: () => set({ activity: [], preflights: [] }),
+  clearActivity: () => set({ activity: [], preflights: [], subagentRuns: [] }),
   pushPreflight: (card) => set(s => ({ preflights: [...s.preflights, card] })),
+  upsertSubagentRun: (card) => set(s => {
+    const idx = s.subagentRuns.findIndex(r => r.callId === card.callId)
+    if (idx === -1) return { subagentRuns: [...s.subagentRuns, card] }
+    const next = s.subagentRuns.slice()
+    next[idx] = { ...next[idx], ...card }
+    return { subagentRuns: next }
+  }),
   markFileTouched: (path, kind) => set(s => {
     if (!path) return {}
     const existing = s.touchedFiles[path]

@@ -584,19 +584,42 @@ const delegateTaskHandler: ToolHandler = {
         }
       })
 
+      // subagent-run visibility (fan-out V1) — additive card в чате. label/skill/
+      // provider/task + status running → done/error. Не влияет на tool_result.
+      const subLabel = skill?.name ?? skillId ?? 'sub-agent'
+      const emitSubagent = (status: 'running' | 'done' | 'error', result?: string) => {
+        ctx.sender.send('ai:event', {
+          id: ctx.sendId,
+          event: {
+            type: 'subagent-run',
+            callId: call.id,
+            label: subLabel,
+            provider: subProvider ?? undefined,
+            skill: skillId ?? undefined,
+            task: prompt,
+            status,
+            result
+          }
+        })
+      }
+      emitSubagent('running')
+
       // Внутренний one-shot call — реализуем через прямой вызов provider'а,
       // без новой ipc-сессии (никаких дополнительных sendId, событий, и т.п.).
       const { createProvider, PROVIDERS } = await import('../ai/registry')
       const fallbackProvider = subProvider ?? ctx.currentProviderId ?? null
       if (!fallbackProvider) {
+        emitSubagent('error', 'нет провайдера')
         return { id: call.id, name: call.name, result: '', error: 'delegate_task: provider_id не задан и у текущего чата нет провайдера. Укажи provider_id явно.' }
       }
       const descriptor = PROVIDERS[fallbackProvider as keyof typeof PROVIDERS]
       if (!descriptor) {
+        emitSubagent('error', `неизвестный provider ${fallbackProvider}`)
         return { id: call.id, name: call.name, result: '', error: `delegate_task: неизвестный provider ${fallbackProvider}` }
       }
       const apiKey = descriptor.secretKey ? ctx.getSecretForDelegate?.(descriptor.secretKey) ?? null : null
       if (descriptor.secretKey && !apiKey) {
+        emitSubagent('error', `нет API key для ${fallbackProvider}`)
         return { id: call.id, name: call.name, result: '', error: `delegate_task: нет API key для ${fallbackProvider}` }
       }
       const provider = createProvider(fallbackProvider as keyof typeof PROVIDERS, {
@@ -615,16 +638,21 @@ const delegateTaskHandler: ToolHandler = {
           if (ctx.signal.aborted) break
           if (event.type === 'text' && typeof event.text === 'string') collected += event.text
           else if (event.type === 'error') {
+            emitSubagent('error', event.message)
             return { id: call.id, name: call.name, result: '', error: `delegate_task error: ${event.message}` }
           } else if (event.type === 'done') break
         }
       } catch (err) {
-        return { id: call.id, name: call.name, result: '', error: `delegate_task crashed: ${err instanceof Error ? err.message : String(err)}` }
+        const msg = err instanceof Error ? err.message : String(err)
+        emitSubagent('error', msg)
+        return { id: call.id, name: call.name, result: '', error: `delegate_task crashed: ${msg}` }
       }
       const trimmed = collected.trim()
       if (!trimmed) {
+        emitSubagent('error', 'sub-agent вернул пустой ответ')
         return { id: call.id, name: call.name, result: '', error: 'delegate_task: sub-agent вернул пустой ответ' }
       }
+      emitSubagent('done', trimmed.length > 1200 ? trimmed.slice(0, 1200) + '…' : trimmed)
       // Логируем в journal — для аудита
       try {
         ctx.recordJournal(ctx.projectPath, 'note',
