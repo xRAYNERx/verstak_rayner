@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron'
+import { randomUUID } from 'crypto'
 import { createFileTools, TOOL_DEFS } from '../ai/tools'
 import { createProvider, PROVIDERS, type ProviderId } from '../ai/registry'
 import type { McpClient } from '../mcp/client'
@@ -57,8 +58,9 @@ interface AiDeps {
   mcpClient?: McpClient
   /** Процедурная память — детектирует паттерны решения задач из tool events. */
   trackToolPattern?: (projectPath: string, event: ToolEvent) => void
-  /** Опциональный аппендер в audit_log — вызывается после каждого tool call. */
-  appendAudit?: (projectPath: string, chatId: number | null, action: string, detail: string, providerId: string | null, model: string | null) => void
+  /** Опциональный аппендер в audit_log — вызывается после каждого tool call.
+   *  runId — ID агентного запуска (один ai:send = один run); group-by в инспекторе. */
+  appendAudit?: (projectPath: string, chatId: number | null, action: string, detail: string, providerId: string | null, model: string | null, runId: string | null) => void
 }
 
 let currentSendId = 0
@@ -182,6 +184,10 @@ export function registerAiIpc(deps: AiDeps): void {
     const providerId = overrides?.providerId ?? deps.getProviderId()
     const descriptor = PROVIDERS[providerId]
     const sendId = ++currentSendId
+    // runId — стабильный идентификатор этого агентного запуска (один ai:send =
+    // один run). Штампуется на audit-записи, чтобы инспектор группировал run'ы
+    // явно, а не по эвристике (gap/chatId). Закладка под Debug Packet / Workflow.
+    const runId = randomUUID()
     const ctrl = new AbortController()
     activeAborts.set(sendId, ctrl)
     /**
@@ -425,10 +431,14 @@ export function registerAiIpc(deps: AiDeps): void {
       const auditFn = deps.appendAudit
         ? (action: string, detail: string) => {
             try {
-              deps.appendAudit!(projectPath, chatId ? Number(chatId) : null, action, detail, providerId, model ?? null)
+              deps.appendAudit!(projectPath, chatId ? Number(chatId) : null, action, detail, providerId, model ?? null, runId)
             } catch { /* audit not critical */ }
           }
         : undefined
+      // Run-start маркер: одна audit-запись на старте run'а с самим runId.
+      // Инспектор группирует по runId; этот маркер также даёт точку отсчёта run'а
+      // (и сохраняет совместимость с эвристикой session_start для легаси-строк).
+      if (auditFn) auditFn('session_start', JSON.stringify({ runId, sendId }))
       void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.readJournal, deps.saveMemory, deps.searchMemories, deps.searchConversations, deps.connectors, deps.getAgentMode(), turnsBudget, deps.skillRegistry, deps.getSecret, costGuard, providerId, model,
         smartFallbackEnabled ? { getNextProvider: makeFallbackProvider, configuredProviders: new Set(getConfiguredApiProviders(deps.getSecret)), triedProviders: new Set([providerId]) } : undefined,
         deps.mcpClient,

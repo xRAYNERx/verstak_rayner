@@ -49,39 +49,62 @@ interface Run {
   model: string | null
 }
 
+// Собрать Run из набора записей (общий хвост для обеих веток группировки).
+function buildRun(entries: AuditEntry[], key: string): Run {
+  const first = entries[0]
+  const last = entries[entries.length - 1]
+  // Provider/model: take the last non-null seen in the run (reflects the
+  // provider actually doing the work after any switch).
+  let providerId: string | null = first.providerId
+  let model: string | null = first.model
+  for (const e of entries) {
+    if (e.providerId) providerId = e.providerId
+    if (e.model) model = e.model
+  }
+  return {
+    key,
+    entries,
+    start: first.timestamp,
+    end: last.timestamp,
+    providerId,
+    model
+  }
+}
+
 /**
- * Group entries into runs. There is no explicit runId, so split heuristically:
- * sort by time, then break into a new run whenever the gap exceeds RUN_GAP_MS,
- * the chatId changes, or a session_start marker appears.
+ * Group entries into runs. Записи начиная с миграции 9 несут явный runId —
+ * по нему и группируем (одна карточка = один runId). Легаси-строки без runId
+ * группируются прежней эвристикой: сортировка по времени, разрыв при gap >
+ * RUN_GAP_MS, смене chatId или маркере session_start.
  */
 function groupRuns(entries: AuditEntry[]): Run[] {
-  const sorted = [...entries].sort((a, b) => a.timestamp - b.timestamp)
-  const runs: Run[] = []
-  let current: AuditEntry[] = []
+  const withRunId = entries.filter(e => e.runId)
+  const legacy = entries.filter(e => !e.runId)
 
+  const runs: Run[] = []
+
+  // Ветка с явным runId — группируем по нему, внутри run'а сортируем по времени.
+  const byRunId = new Map<string, AuditEntry[]>()
+  for (const e of withRunId) {
+    const list = byRunId.get(e.runId!) ?? []
+    list.push(e)
+    byRunId.set(e.runId!, list)
+  }
+  for (const [rid, list] of byRunId) {
+    const sorted = [...list].sort((a, b) => a.timestamp - b.timestamp)
+    runs.push(buildRun(sorted, `run-${rid}`))
+  }
+
+  // Легаси-ветка — прежняя эвристика для строк до миграции 9.
+  const sorted = [...legacy].sort((a, b) => a.timestamp - b.timestamp)
+  let current: AuditEntry[] = []
   const flush = () => {
     if (current.length === 0) return
     const first = current[0]
     const last = current[current.length - 1]
-    // Provider/model: take the last non-null seen in the run (reflects the
-    // provider actually doing the work after any switch).
-    let providerId: string | null = first.providerId
-    let model: string | null = first.model
-    for (const e of current) {
-      if (e.providerId) providerId = e.providerId
-      if (e.model) model = e.model
-    }
-    runs.push({
-      key: `${first.id}-${last.id}`,
-      entries: current,
-      start: first.timestamp,
-      end: last.timestamp,
-      providerId,
-      model
-    })
+    runs.push(buildRun(current, `${first.id}-${last.id}`))
     current = []
   }
-
   for (const e of sorted) {
     if (current.length > 0) {
       const prev = current[current.length - 1]
@@ -95,8 +118,8 @@ function groupRuns(entries: AuditEntry[]): Run[] {
   }
   flush()
 
-  // Newest run first.
-  return runs.reverse()
+  // Newest run first — сортируем все run'ы (обе ветки) по времени старта.
+  return runs.sort((a, b) => b.start - a.start)
 }
 
 function summarize(entries: AuditEntry[]): string {

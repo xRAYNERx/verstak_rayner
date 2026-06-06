@@ -292,8 +292,8 @@ app.whenReady().then(() => {
       trackToolForPatterns(db, projectPath, event)
     },
     // Audit log — пишем каждое агентное действие
-    appendAudit: (projectPath, chatId, action, detail, providerId, model) => {
-      appendAudit(db, { timestamp: Date.now(), projectPath, chatId, action, detail, providerId, model })
+    appendAudit: (projectPath, chatId, action, detail, providerId, model, runId) => {
+      appendAudit(db, { timestamp: Date.now(), projectPath, chatId, action, detail, providerId, model, runId })
     }
   })
   registerChatsIpc(chats, chatSessions, db)

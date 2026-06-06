@@ -275,6 +275,16 @@ const MIGRATIONS: Array<{ version: number; description: string; run: (db: DB) =>
         CREATE INDEX IF NOT EXISTS idx_audit_project ON audit_log(project_path);
       `)
     }
+  },
+  {
+    version: 9,
+    description: 'audit_log.run_id — явный ID агентного запуска (один ai:send = один run). Старые строки → null.',
+    run: (db: DB) => {
+      db.exec(`
+        ALTER TABLE audit_log ADD COLUMN run_id TEXT;
+        CREATE INDEX IF NOT EXISTS idx_audit_run ON audit_log(run_id);
+      `)
+    }
   }
 ]
 

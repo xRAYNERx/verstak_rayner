@@ -9,6 +9,8 @@ export interface AuditEntry {
   detail: string  // JSON stringified details, max 500 chars
   providerId: string | null
   model: string | null
+  // runId — явный ID агентного запуска (один ai:send = один run). Старые строки → null.
+  runId: string | null
 }
 
 interface AuditRow {
@@ -20,6 +22,7 @@ interface AuditRow {
   detail: string
   provider_id: string | null
   model: string | null
+  run_id: string | null
 }
 
 function rowToEntry(row: AuditRow): AuditEntry {
@@ -31,7 +34,9 @@ function rowToEntry(row: AuditRow): AuditEntry {
     action: row.action,
     detail: row.detail,
     providerId: row.provider_id,
-    model: row.model
+    model: row.model,
+    // run_id отсутствует у строк до миграции 9 — нормализуем undefined → null.
+    runId: row.run_id ?? null
   }
 }
 
@@ -42,8 +47,8 @@ export function appendAudit(
   // Cap detail to 500 chars
   const detail = entry.detail.length > 500 ? entry.detail.slice(0, 500) : entry.detail
   db.prepare(
-    `INSERT INTO audit_log (timestamp, project_path, chat_id, action, detail, provider_id, model)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO audit_log (timestamp, project_path, chat_id, action, detail, provider_id, model, run_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     entry.timestamp,
     entry.projectPath,
@@ -51,7 +56,8 @@ export function appendAudit(
     entry.action,
     detail,
     entry.providerId ?? null,
-    entry.model ?? null
+    entry.model ?? null,
+    entry.runId ?? null
   )
 }
 
@@ -88,7 +94,7 @@ export function queryAudit(
 
 export function exportAuditCsv(db: Database, projectPath: string): string {
   const entries = queryAudit(db, projectPath, { limit: 1000 })
-  const header = 'id,timestamp,project_path,chat_id,action,detail,provider_id,model'
+  const header = 'id,timestamp,project_path,chat_id,action,detail,provider_id,model,run_id'
   const esc = (v: string | number | null) => {
     if (v == null) return ''
     const s = String(v)
@@ -97,7 +103,7 @@ export function exportAuditCsv(db: Database, projectPath: string): string {
     return s
   }
   const rows = entries.map(e =>
-    [e.id, e.timestamp, e.projectPath, e.chatId, e.action, e.detail, e.providerId, e.model]
+    [e.id, e.timestamp, e.projectPath, e.chatId, e.action, e.detail, e.providerId, e.model, e.runId]
       .map(esc)
       .join(',')
   )

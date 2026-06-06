@@ -380,6 +380,8 @@ export interface AuditEntry {
   detail: string
   providerId: string | null
   model: string | null
+  /** ID агентного запуска (один ai:send = один run). null у строк до миграции 9. */
+  runId: string | null
 }
 
 /** Дескриптор провайдера — единый источник из main process (electron/ai/registry.ts). */
