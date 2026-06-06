@@ -32,9 +32,22 @@ function formatTime(ts: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+// Verification chip: status текстом + знаком. Неизвестные значения показываем как есть.
+function verificationChip(status: string): { sign: string; cls: string } {
+  const s = status.toLowerCase()
+  if (s === 'passed' || s === 'pass' || s === 'ok') return { sign: '✓', cls: 'is-pass' }
+  if (s === 'failed' || s === 'fail' || s === 'error') return { sign: '✗', cls: 'is-fail' }
+  return { sign: '—', cls: 'is-unknown' }
+}
+
 function StepNode({ step, index }: { step: PlanStep; index: number }) {
   const [open, setOpen] = useState(false)
   const hasDetail = Boolean(step.detail || step.result)
+  // Execution-trace бейджи показываем только когда данные реально есть (старые шаги → null).
+  const runId = step.runId ?? null
+  const verification = step.verificationStatus ?? null
+  const changedFiles = step.changedFilesCount ?? null
+  const chip = verification ? verificationChip(verification) : null
   return (
     <div className="gg-wf-node-wrap">
       <button
@@ -47,6 +60,25 @@ function StepNode({ step, index }: { step: PlanStep; index: number }) {
         <span className="gg-wf-node-title">{step.title}</span>
         <span className="gg-wf-node-status">{STEP_LABEL[step.status]}</span>
       </button>
+      {(runId || chip || (changedFiles !== null && changedFiles > 0)) && (
+        <div className="gg-wf-node-trace">
+          {runId && (
+            <span className="gg-wf-trace-run" title={`run: ${runId}`}>
+              🔗 {runId.length > 8 ? `${runId.slice(0, 8)}…` : runId}
+            </span>
+          )}
+          {chip && (
+            <span className={`gg-wf-trace-verify ${chip.cls}`} title={`Верификация: ${verification}`}>
+              {chip.sign} {verification}
+            </span>
+          )}
+          {changedFiles !== null && changedFiles > 0 && (
+            <span className="gg-wf-trace-files" title={`Изменено файлов: ${changedFiles}`}>
+              {changedFiles} файлов
+            </span>
+          )}
+        </div>
+      )}
       {open && hasDetail && (
         <div className="gg-wf-node-detail">
           {step.detail && <div className="gg-wf-node-detail-text">{step.detail}</div>}

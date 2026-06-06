@@ -11,6 +11,10 @@ export interface PlanStep {
   detail: string | null
   status: StepStatus
   result: string | null
+  // Execution-trace: какой run выполнил шаг, прошла ли верификация, сколько файлов изменилось.
+  runId: string | null
+  verificationStatus: string | null
+  changedFilesCount: number | null
 }
 
 export interface Plan {
@@ -32,7 +36,7 @@ export interface Plans {
   get: (id: number) => Plan | null
   create: (projectPath: string, title: string, steps: NewStep[]) => Plan
   updatePlanStatus: (id: number, status: PlanStatus) => void
-  updateStep: (id: number, patch: { status?: StepStatus; result?: string | null }) => void
+  updateStep: (id: number, patch: { status?: StepStatus; result?: string | null; runId?: string | null; verificationStatus?: string | null; changedFilesCount?: number | null }) => void
   remove: (id: number) => void
 }
 
@@ -52,12 +56,16 @@ interface StepRow {
   detail: string | null
   status: StepStatus
   result: string | null
+  runId: string | null
+  verificationStatus: string | null
+  changedFilesCount: number | null
 }
 
 export function createPlans(db: Database): Plans {
   function getSteps(planId: number): PlanStep[] {
     return db.prepare(`
-      SELECT id, plan_id as planId, idx, title, detail, status, result
+      SELECT id, plan_id as planId, idx, title, detail, status, result,
+             run_id as runId, verification_status as verificationStatus, changed_files_count as changedFilesCount
       FROM plan_steps WHERE plan_id = ? ORDER BY idx ASC
     `).all(planId) as StepRow[]
   }
@@ -109,6 +117,9 @@ export function createPlans(db: Database): Plans {
       const params: unknown[] = []
       if (patch.status !== undefined) { fields.push('status = ?'); params.push(patch.status) }
       if (patch.result !== undefined) { fields.push('result = ?'); params.push(patch.result) }
+      if (patch.runId !== undefined) { fields.push('run_id = ?'); params.push(patch.runId) }
+      if (patch.verificationStatus !== undefined) { fields.push('verification_status = ?'); params.push(patch.verificationStatus) }
+      if (patch.changedFilesCount !== undefined) { fields.push('changed_files_count = ?'); params.push(patch.changedFilesCount) }
       if (fields.length === 0) return
       params.push(id)
       db.prepare(`UPDATE plan_steps SET ${fields.join(', ')} WHERE id = ?`).run(...params)

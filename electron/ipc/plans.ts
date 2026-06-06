@@ -10,7 +10,7 @@ export function registerPlansIpc(plans: Plans): void {
   ipcMain.handle('plans:set-status', (_e, id: number, status: PlanStatus) => {
     plans.updatePlanStatus(id, status)
   })
-  ipcMain.handle('plans:update-step', (_e, id: number, patch: { status?: StepStatus; result?: string | null }) => {
+  ipcMain.handle('plans:update-step', (_e, id: number, patch: { status?: StepStatus; result?: string | null; runId?: string | null; verificationStatus?: string | null; changedFilesCount?: number | null }) => {
     plans.updateStep(id, patch)
   })
   ipcMain.handle('plans:remove', (_e, id: number) => plans.remove(id))

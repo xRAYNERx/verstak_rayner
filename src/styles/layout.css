@@ -2654,6 +2654,28 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   50% { opacity: 0.35; }
 }
 
+/* Execution-trace бейджи под узлом: какой run выполнил шаг, верификация, кол-во файлов. */
+.gg-wf-node-trace {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding-left: 2px;
+}
+.gg-wf-node-trace > span {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-base);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.gg-wf-trace-verify.is-pass { color: var(--success); border-color: var(--success); }
+.gg-wf-trace-verify.is-fail { color: var(--error); border-color: var(--error); }
+.gg-wf-trace-verify.is-unknown { color: var(--text-tertiary); }
+.gg-wf-trace-files { color: var(--text-secondary); }
+
 .gg-wf-node-detail {
   max-width: 280px;
   padding: 8px 11px;

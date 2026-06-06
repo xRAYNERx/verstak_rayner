@@ -304,6 +304,17 @@ const MIGRATIONS: Array<{ version: number; description: string; run: (db: DB) =>
         CREATE INDEX IF NOT EXISTS idx_run_inputs_project ON run_inputs(project_path);
       `)
     }
+  },
+  {
+    version: 11,
+    description: 'plan_steps execution-trace: run_id / verification_status / changed_files_count. Старые шаги → null.',
+    run: (db: DB) => {
+      // Три отдельных ADD COLUMN — превращают статичный план в трейс выполнения:
+      // какой run выполнил шаг, прошла ли верификация, сколько файлов изменилось.
+      db.exec('ALTER TABLE plan_steps ADD COLUMN run_id TEXT')
+      db.exec('ALTER TABLE plan_steps ADD COLUMN verification_status TEXT')
+      db.exec('ALTER TABLE plan_steps ADD COLUMN changed_files_count INTEGER')
+    }
   }
 ]
 

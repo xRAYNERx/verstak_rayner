@@ -138,7 +138,7 @@ contextBridge.exposeInMainWorld('api', {
     create: (projectPath: string, title: string, steps: Array<{ title: string; detail?: string | null }>) =>
       ipcRenderer.invoke('plans:create', projectPath, title, steps),
     setStatus: (id: number, status: string) => ipcRenderer.invoke('plans:set-status', id, status),
-    updateStep: (id: number, patch: { status?: string; result?: string | null }) =>
+    updateStep: (id: number, patch: { status?: string; result?: string | null; runId?: string | null; verificationStatus?: string | null; changedFilesCount?: number | null }) =>
       ipcRenderer.invoke('plans:update-step', id, patch),
     remove: (id: number) => ipcRenderer.invoke('plans:remove', id)
   },
