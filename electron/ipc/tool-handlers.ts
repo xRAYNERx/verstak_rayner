@@ -699,12 +699,35 @@ const delegateParallelHandler: ToolHandler = {
       const results = await Promise.allSettled(
         tasks.map(async (task) => {
           const providerId = task.provider_id ?? ctx.currentProviderId ?? 'gemini-api'
+
+          // subagent-run visibility (fan-out V2) — каждая параллельная задача
+          // показывается как своя карточка. Distinct callId `${call.id}:${task.id}`
+          // → upsert по callId, обновление status running → done/error в месте.
+          const subCallId = `${call.id}:${task.id}`
+          const emitSubagent = (status: 'running' | 'done' | 'error', result?: string) => {
+            ctx.sender.send('ai:event', {
+              id: ctx.sendId,
+              event: {
+                type: 'subagent-run',
+                callId: subCallId,
+                label: task.role ?? task.id,
+                provider: providerId,
+                task: task.prompt,
+                status,
+                result
+              }
+            })
+          }
+          emitSubagent('running')
+
           const descriptor = PROVIDERS[providerId as keyof typeof PROVIDERS]
           if (!descriptor) {
+            emitSubagent('error', `неизвестный provider ${providerId}`)
             throw new Error(`неизвестный provider ${providerId}`)
           }
           const apiKey = descriptor.secretKey ? ctx.getSecretForDelegate?.(descriptor.secretKey) ?? null : null
           if (descriptor.secretKey && !apiKey) {
+            emitSubagent('error', `нет API key для ${providerId}`)
             throw new Error(`нет API key для ${providerId}`)
           }
 
@@ -740,7 +763,13 @@ const delegateParallelHandler: ToolHandler = {
             }
             const trimmed = collected.trim()
             if (!trimmed) throw new Error('sub-agent вернул пустой ответ')
+            emitSubagent('done', trimmed.length > 1200 ? trimmed.slice(0, 1200) + '…' : trimmed)
             return { id: task.id, result: trimmed }
+          } catch (taskErr) {
+            // Любой неожиданный throw (createProvider, abort/timeout) — карточка
+            // не должна застрять на 'running'. Rethrow → Promise.allSettled reject.
+            emitSubagent('error', taskErr instanceof Error ? taskErr.message : String(taskErr))
+            throw taskErr
           } finally {
             clearTimeout(timeoutId)
             ctx.signal.removeEventListener('abort', parentAbortHandler)
