@@ -257,6 +257,9 @@ declare global {
       cli: {
         detect(): Promise<DetectedCli[]>
       }
+      localModels: {
+        scan(): Promise<DetectedLocalServer[]>
+      }
       updater: {
         install(): Promise<void>
         check(): Promise<{ available: boolean; version?: string; error?: string }>
@@ -326,6 +329,15 @@ export interface DetectedCli {
   binary: string
   version: string
   status: 'ready' | 'found' | 'error'
+}
+
+/** Локальный OpenAI-compatible сервер моделей, найденный на компьютере. */
+export interface DetectedLocalServer {
+  id: 'ollama' | 'lmstudio' | 'llamacpp' | 'jan'
+  name: string
+  baseUrl: string
+  running: boolean
+  models: string[]
 }
 
 /** MCP Server — конфигурация внешнего MCP-сервера. */

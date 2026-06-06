@@ -3,7 +3,7 @@ import { useT } from '../i18n'
 import type { Lang } from '../i18n'
 import authBgUrl from '../assets/auth-bg.webp'
 import authVideoUrl from '../assets/auth-bg.mp4'
-import type { DetectedCli } from '../types/api'
+import type { DetectedCli, DetectedLocalServer } from '../types/api'
 
 /**
  * AuthScreen — экран регистрации/входа. Показывается ПЕРЕД основным приложением
@@ -64,6 +64,9 @@ export function AuthScreen({ onComplete, onLangChange }: Props) {
   // fade-out animation при успешном входе
   const [leaving, setLeaving] = useState(false)
   const [clis, setClis] = useState<DetectedCli[]>([])
+  const [localServers, setLocalServers] = useState<DetectedLocalServer[]>([])
+  const [scanLoading, setScanLoading] = useState(true)
+  const [connectingId, setConnectingId] = useState<string | null>(null)
 
   useEffect(() => {
     void (async () => {
@@ -84,8 +87,80 @@ export function AuthScreen({ onComplete, onLangChange }: Props) {
       } catch { /* первый запуск */ }
       setLoading(false)
     })()
-    window.api.cli.detect().then(setClis).catch(() => {})
+    Promise.all([
+      window.api.cli.detect().catch(() => [] as DetectedCli[]),
+      window.api.localModels.scan().catch(() => [] as DetectedLocalServer[])
+    ]).then(([cliList, serverList]) => {
+      setClis(cliList)
+      setLocalServers(serverList)
+    }).finally(() => setScanLoading(false))
   }, [])
+
+  async function ensureProfile(provider: string, model: string) {
+    const list: Profile[] = await window.api.userProfiles.list()
+    if (list.length === 0) {
+      const profile = await window.api.userProfiles.create({
+        name: name.trim() || 'User',
+        role,
+        defaultProvider: provider,
+        defaultModel: model,
+      })
+      await window.api.userProfiles.setActive(profile.id)
+      return
+    }
+    const active = list.find(p => p.isActive) ?? list[0]
+    await window.api.userProfiles.setActive(active.id)
+  }
+
+  async function activateProvider(provider: string, model: string) {
+    await window.api.settings.setKey('provider', provider)
+    await window.api.settings.setKey(`model_${provider}`, model)
+    await window.api.settings.setKey('auth_completed', 'true')
+    await window.api.settings.setKey('onboarding_completed', '1')
+  }
+
+  async function connectCli(cli: DetectedCli) {
+    const supported = ['claude-cli', 'codex-cli', 'gemini-cli', 'grok-cli']
+    if (!supported.includes(cli.id)) return
+    setBusy(true)
+    setConnectingId(cli.id)
+    setError(null)
+    try {
+      await ensureProfile(cli.id, 'auto')
+      await activateProvider(cli.id, 'auto')
+      doLeave()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+      setBusy(false)
+      setConnectingId(null)
+    }
+  }
+
+  async function connectLocalServer(server: DetectedLocalServer) {
+    const model = server.models[0] ?? ''
+    if (!model) {
+      setError(`${server.name}: сервер найден, но список моделей пуст`)
+      return
+    }
+
+    const provider = server.id === 'ollama' ? 'ollama' : 'custom-openai'
+    setBusy(true)
+    setConnectingId(server.id)
+    setError(null)
+    try {
+      if (provider === 'custom-openai') {
+        await window.api.settings.setKey('custom_openai_baseurl', server.baseUrl)
+        await window.api.settings.setKey('custom_openai_models', server.models.join(', '))
+      }
+      await ensureProfile(provider, model)
+      await activateProvider(provider, model)
+      doLeave()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+      setBusy(false)
+      setConnectingId(null)
+    }
+  }
 
   async function handleSignUp() {
     if (!name.trim()) return
@@ -196,14 +271,50 @@ export function AuthScreen({ onComplete, onLangChange }: Props) {
             </li>
           </ul>
 
-          {clis.length > 0 && (
+          {(scanLoading || clis.length > 0 || localServers.length > 0) && (
             <div className="gg-auth-detected">
-              <div className="gg-auth-detected-title">{t.auth.detected}</div>
+              <div className="gg-auth-detected-title">
+                {scanLoading ? 'Сканирую ПК...' : 'Найдено на твоём ПК'}
+              </div>
               {clis.map(c => (
                 <div key={c.id} className="gg-auth-detected-item">
                   <span className={`gg-auth-detected-dot${c.status === 'found' ? ' is-yellow' : ''}`} />
-                  <span>{c.name}</span>
-                  <span className="gg-auth-detected-version">{c.version}</span>
+                  <span className="gg-auth-detected-main">
+                    <span>{c.name}</span>
+                    <span className="gg-auth-detected-version">{c.version}</span>
+                  </span>
+                  {['claude-cli', 'codex-cli', 'gemini-cli', 'grok-cli'].includes(c.id) && (
+                    <button
+                      type="button"
+                      className="gg-auth-connect"
+                      onClick={() => void connectCli(c)}
+                      disabled={busy}
+                    >
+                      {connectingId === c.id ? '...' : 'Подключить'}
+                    </button>
+                  )}
+                </div>
+              ))}
+              {localServers.map(server => (
+                <div key={server.id} className="gg-auth-detected-item">
+                  <span className="gg-auth-detected-dot is-local" />
+                  <span className="gg-auth-detected-main">
+                    <span>
+                      {server.name}
+                      <span className="gg-auth-local-badge">LOCAL</span>
+                    </span>
+                    <span className="gg-auth-detected-version">
+                      {server.models.length} моделей · {server.models.slice(0, 2).join(', ')}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="gg-auth-connect"
+                    onClick={() => void connectLocalServer(server)}
+                    disabled={busy || server.models.length === 0}
+                  >
+                    {connectingId === server.id ? '...' : 'Подключить'}
+                  </button>
                 </div>
               ))}
             </div>

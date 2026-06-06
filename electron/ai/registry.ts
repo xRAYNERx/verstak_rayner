@@ -239,7 +239,7 @@ export function createProvider(id: ProviderId, opts: CreateOptions): ChatProvide
     case 'custom-openai': {
       // Для Ollama (local) ключ необязателен; для остальных — нужен.
       const spec = EXTRA_PROVIDERS.find(p => p.id === id)!
-      if (spec.secretKey && !opts.apiKey) {
+      if (spec.secretKey && id !== 'custom-openai' && !opts.apiKey) {
         throw new Error(`${spec.name}: API ключ не задан`)
       }
       if (id === 'custom-openai' && !opts.customBaseUrl) {

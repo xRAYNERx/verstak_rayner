@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import type { Settings } from '../storage/settings'
 import { detectInstalledClis } from '../ai/cli-detect'
+import { scanLocalModelServers } from '../ai/local-models'
 import { PROVIDERS } from '../ai/registry'
 import { runDoctor } from '../ai/doctor'
 
@@ -22,6 +23,7 @@ export function registerSettingsIpc(settings: Settings): void {
     settings.setSecret(key, value)
   })
   ipcMain.handle('cli:detect', () => detectInstalledClis())
+  ipcMain.handle('local-models:scan', () => scanLocalModelServers())
 
   // Единый источник истины для списка провайдеров и моделей — electron/ai/registry.ts.
   // Renderer получает данные через этот канал, а не хардкодит копию.
