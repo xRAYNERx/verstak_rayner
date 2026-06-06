@@ -186,11 +186,29 @@ export function App() {
       )}
       <main className="gg-main">
         {activeView === 'chat' && (
-          <Chat
-            onOpenSettings={() => setShowSettings(true)}
-            onToggleTerminal={() => setShowTerminal(t => !t)}
-            terminalOpen={showTerminal}
-          />
+          <div className="gg-chat-area">
+            <Chat
+              onOpenSettings={() => setShowSettings(true)}
+              onToggleTerminal={() => setShowTerminal(t => !t)}
+              terminalOpen={showTerminal}
+            />
+            {canShowTerminal && (
+              <div className="gg-terminal-wrap">
+                <div className="gg-terminal-header">
+                  <span className="gg-terminal-dot" />
+                  <span>{t.views.terminal}</span>
+                  <button
+                    className="gg-terminal-close"
+                    onClick={() => setShowTerminal(false)}
+                    title={t.views.hide}
+                  >×</button>
+                </div>
+                <div className="gg-terminal-body">
+                  <Terminal />
+                </div>
+              </div>
+            )}
+          </div>
         )}
         {activeView === 'tasks' && <TasksView />}
         {activeView === 'journal' && <JournalView />}
@@ -231,22 +249,6 @@ export function App() {
             <p className="gg-view-placeholder-hint">{t.views.videoHint}</p>
             <div className="gg-view-placeholder-actions">
               <button onClick={() => setActiveView('chat')}>{t.views.videoCreate}</button>
-            </div>
-          </div>
-        )}
-        {activeView === 'chat' && canShowTerminal && (
-          <div className="gg-terminal-wrap">
-            <div className="gg-terminal-header">
-              <span className="gg-terminal-dot" />
-              <span>{t.views.terminal}</span>
-              <button
-                className="gg-terminal-close"
-                onClick={() => setShowTerminal(false)}
-                title={t.views.hide}
-              >×</button>
-            </div>
-            <div className="gg-terminal-body">
-              <Terminal />
             </div>
           </div>
         )}

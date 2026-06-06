@@ -73,21 +73,29 @@
   --space-5: 20px;
   --space-6: 24px;
 
-  /* Radii */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
+  /* Radii — consistent scale. data-radius="square" zeroes these out below. */
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 11px;
+  --radius-xl: 15px;
+  --radius-pill: 999px;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
-  --shadow-lg: 0 16px 48px rgba(0,0,0,0.5);
+  /* Elevation — layered for a softer, more "expensive" depth. The hairline ring
+   * (inset) gives surfaces a crisp edge that reads as premium on dark UIs. */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.32);
+  --shadow-md: 0 6px 20px rgba(0,0,0,0.40), 0 1px 3px rgba(0,0,0,0.28);
+  --shadow-lg: 0 20px 56px rgba(0,0,0,0.52), 0 2px 8px rgba(0,0,0,0.30);
   --shadow-glow: 0 0 24px rgba(91, 141, 255, 0.15);
+  --ring-inset: inset 0 0 0 1px rgba(255,255,255,0.04);
 }
+
+/* ─── Dark theme alias — :root above is the dark default; this lets the picker
+ * set data-theme="dark" explicitly without changing anything visually. ─── */
+html[data-theme="dark"] { color-scheme: dark; }
 
 /* ─── Light theme — applied when html[data-theme="light"] ─── */
 html[data-theme="light"] {
+  color-scheme: light;
   /* Surfaces — warm paper tones */
   --bg-base: #ffffff;
   --bg-elevated: #f7f8fa;
@@ -128,9 +136,10 @@ html[data-theme="light"] {
 
   /* Shadows softer on light */
   --shadow-sm: 0 1px 2px rgba(15, 25, 40, 0.06);
-  --shadow-md: 0 4px 16px rgba(15, 25, 40, 0.08);
-  --shadow-lg: 0 16px 48px rgba(15, 25, 40, 0.12);
+  --shadow-md: 0 6px 20px rgba(15, 25, 40, 0.08), 0 1px 3px rgba(15, 25, 40, 0.05);
+  --shadow-lg: 0 20px 56px rgba(15, 25, 40, 0.12), 0 2px 8px rgba(15, 25, 40, 0.06);
   --shadow-glow: 0 0 24px rgba(58, 110, 232, 0.10);
+  --ring-inset: inset 0 0 0 1px rgba(15, 25, 40, 0.03);
 
   /* Inline-code chips on light — deep purple-ink on a pale lavender wash so
    * the chip is legible AND visually distinct from running prose. The dark-
@@ -138,6 +147,196 @@ html[data-theme="light"] {
   --bg-code: #eef1ff;
   --text-code: #3d3996;
   --border-code: #c9d0f5;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+ * Curated palettes. Each block is a COMPLETE set of variable overrides — no
+ * layout touched, every component already reads these vars. Colour values are
+ * taken from the canonical palettes (Dracula, Nord, Tokyo Night, Gruvbox).
+ * ════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Dracula ─── */
+html[data-theme="dracula"] {
+  color-scheme: dark;
+  --bg-base: #21222c;
+  --bg-elevated: #282a36;
+  --bg-overlay: #343746;
+  --bg-input: #1e1f29;
+  --bg-hover: #343746;
+  --bg-active: #3c3f51;
+
+  --border-subtle: #2b2d3a;
+  --border-default: #383b4a;
+  --border-strong: #4a4d61;
+  --border-focus: #bd93f9;
+
+  --text-primary: #f8f8f2;
+  --text-secondary: #c3c4d3;
+  --text-tertiary: #8b8da3;
+  --text-disabled: #5a5c70;
+  --text-on-accent: #21222c;
+
+  --accent: #bd93f9;
+  --accent-hover: #cba9fb;
+  --accent-muted: rgba(189, 147, 249, 0.14);
+  --accent-border: rgba(189, 147, 249, 0.38);
+
+  --success: #50fa7b;
+  --success-muted: rgba(80, 250, 123, 0.12);
+  --warning: #f1fa8c;
+  --error: #ff5555;
+  --error-muted: rgba(255, 85, 85, 0.14);
+  --diff-add: #50fa7b;
+  --diff-add-bg: rgba(80, 250, 123, 0.08);
+  --diff-remove: #ff5555;
+  --diff-remove-bg: rgba(255, 85, 85, 0.08);
+
+  --bg-code: rgba(189, 147, 249, 0.10);
+  --text-code: #d6bcff;
+  --border-code: rgba(189, 147, 249, 0.22);
+
+  --shadow-glow: 0 0 24px rgba(189, 147, 249, 0.18);
+  --ring-inset: inset 0 0 0 1px rgba(255,255,255,0.04);
+}
+
+/* ─── Nord ─── */
+html[data-theme="nord"] {
+  color-scheme: dark;
+  --bg-base: #2e3440;
+  --bg-elevated: #353c4a;
+  --bg-overlay: #3b4252;
+  --bg-input: #2b313c;
+  --bg-hover: #3b4252;
+  --bg-active: #434c5e;
+
+  --border-subtle: #353c4a;
+  --border-default: #434c5e;
+  --border-strong: #4c566a;
+  --border-focus: #88c0d0;
+
+  --text-primary: #eceff4;
+  --text-secondary: #d8dee9;
+  --text-tertiary: #97a1b5;
+  --text-disabled: #61697b;
+  --text-on-accent: #2e3440;
+
+  --accent: #88c0d0;
+  --accent-hover: #9fd0de;
+  --accent-muted: rgba(136, 192, 208, 0.14);
+  --accent-border: rgba(136, 192, 208, 0.38);
+
+  --success: #a3be8c;
+  --success-muted: rgba(163, 190, 140, 0.14);
+  --warning: #ebcb8b;
+  --error: #bf616a;
+  --error-muted: rgba(191, 97, 106, 0.16);
+  --diff-add: #a3be8c;
+  --diff-add-bg: rgba(163, 190, 140, 0.10);
+  --diff-remove: #bf616a;
+  --diff-remove-bg: rgba(191, 97, 106, 0.10);
+
+  --bg-code: rgba(136, 192, 208, 0.10);
+  --text-code: #b0dce8;
+  --border-code: rgba(136, 192, 208, 0.22);
+
+  --shadow-glow: 0 0 24px rgba(136, 192, 208, 0.16);
+  --ring-inset: inset 0 0 0 1px rgba(255,255,255,0.04);
+}
+
+/* ─── Tokyo Night ─── */
+html[data-theme="tokyo-night"] {
+  color-scheme: dark;
+  --bg-base: #1a1b26;
+  --bg-elevated: #1f2335;
+  --bg-overlay: #24283b;
+  --bg-input: #16161e;
+  --bg-hover: #24283b;
+  --bg-active: #2f3450;
+
+  --border-subtle: #20222f;
+  --border-default: #2a2e42;
+  --border-strong: #3b4261;
+  --border-focus: #7aa2f7;
+
+  --text-primary: #c0caf5;
+  --text-secondary: #9aa5ce;
+  --text-tertiary: #6b7394;
+  --text-disabled: #444b6a;
+  --text-on-accent: #1a1b26;
+
+  --accent: #7aa2f7;
+  --accent-hover: #9ab8ff;
+  --accent-muted: rgba(122, 162, 247, 0.14);
+  --accent-border: rgba(122, 162, 247, 0.38);
+
+  --success: #9ece6a;
+  --success-muted: rgba(158, 206, 106, 0.12);
+  --warning: #e0af68;
+  --error: #f7768e;
+  --error-muted: rgba(247, 118, 142, 0.14);
+  --diff-add: #9ece6a;
+  --diff-add-bg: rgba(158, 206, 106, 0.08);
+  --diff-remove: #f7768e;
+  --diff-remove-bg: rgba(247, 118, 142, 0.08);
+
+  --bg-code: rgba(122, 162, 247, 0.10);
+  --text-code: #b4c6ff;
+  --border-code: rgba(122, 162, 247, 0.22);
+
+  --shadow-glow: 0 0 24px rgba(122, 162, 247, 0.18);
+  --ring-inset: inset 0 0 0 1px rgba(255,255,255,0.04);
+}
+
+/* ─── Gruvbox (dark, medium) ─── */
+html[data-theme="gruvbox"] {
+  color-scheme: dark;
+  --bg-base: #282828;
+  --bg-elevated: #32302f;
+  --bg-overlay: #3c3836;
+  --bg-input: #232323;
+  --bg-hover: #3c3836;
+  --bg-active: #504945;
+
+  --border-subtle: #353230;
+  --border-default: #423d39;
+  --border-strong: #5a524b;
+  --border-focus: #fabd2f;
+
+  --text-primary: #ebdbb2;
+  --text-secondary: #d5c4a1;
+  --text-tertiary: #a89984;
+  --text-disabled: #7c6f64;
+  --text-on-accent: #282828;
+
+  --accent: #fabd2f;
+  --accent-hover: #fdd35e;
+  --accent-muted: rgba(250, 189, 47, 0.14);
+  --accent-border: rgba(250, 189, 47, 0.38);
+
+  --success: #b8bb26;
+  --success-muted: rgba(184, 187, 38, 0.14);
+  --warning: #fe8019;
+  --error: #fb4934;
+  --error-muted: rgba(251, 73, 52, 0.14);
+  --diff-add: #b8bb26;
+  --diff-add-bg: rgba(184, 187, 38, 0.10);
+  --diff-remove: #fb4934;
+  --diff-remove-bg: rgba(251, 73, 52, 0.10);
+
+  --bg-code: rgba(250, 189, 47, 0.10);
+  --text-code: #fbd28a;
+  --border-code: rgba(250, 189, 47, 0.22);
+
+  --shadow-glow: 0 0 24px rgba(250, 189, 47, 0.14);
+  --ring-inset: inset 0 0 0 1px rgba(255,255,255,0.04);
+}
+
+/* ─── Squared corners toggle (data-radius="square"). Opt-in, additive. ─── */
+html[data-radius="square"] {
+  --radius-sm: 0px;
+  --radius-md: 2px;
+  --radius-lg: 3px;
+  --radius-xl: 4px;
 }
 
 /* ─── Reset ─── */

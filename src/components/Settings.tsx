@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react'
 import { useProject } from '../store/projectStore'
 import type { Memory, DetectedCli, AuditEntry, DoctorReport, DoctorItem } from '../types/api'
 import type { ProviderId } from '../hooks/useProvider'
-import { useTheme } from '../hooks/useTheme'
+import { useTheme, THEMES } from '../hooks/useTheme'
 import type { AutonomousStatus } from '../types/api'
 import { ProfilesTab } from './ProfilesTab'
 import { buildCatalog, connectionStatus, type ConnectionStatus } from '../lib/model-catalog'
@@ -781,7 +781,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [coreUserText, setCoreUserText] = useState('')
   const [coreMemorySaved, setCoreMemorySaved] = useState(false)
   const [currentLang, setCurrentLang] = useState('en')
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme, squareCorners, setSquareCorners } = useTheme()
   // Audit log
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
   const [auditPath, setAuditPath] = useState<string | null>(null)
@@ -1662,22 +1662,32 @@ export function Settings({ onClose }: { onClose: () => void }) {
         {tab === 'appearance' && (
         <div className="gg-settings-extra">
           <div className="gg-settings-section-title">Тема оформления</div>
-          <div className="gg-theme-toggle" role="group" style={{ marginBottom: 12 }}>
-            <button
-              type="button"
-              className={`gg-theme-btn ${theme === 'dark' ? 'is-active' : ''}`}
-              onClick={() => void setTheme('dark')}
-            >
-              <span aria-hidden>🌙</span> Тёмная
-            </button>
-            <button
-              type="button"
-              className={`gg-theme-btn ${theme === 'light' ? 'is-active' : ''}`}
-              onClick={() => void setTheme('light')}
-            >
-              <span aria-hidden>☀</span> Светлая
-            </button>
+          <div className="gg-theme-grid" role="group" style={{ marginBottom: 12 }}>
+            {THEMES.map(meta => (
+              <button
+                key={meta.id}
+                type="button"
+                className={`gg-theme-card ${theme === meta.id ? 'is-active' : ''}`}
+                onClick={() => void setTheme(meta.id)}
+                aria-pressed={theme === meta.id}
+                title={meta.label}
+              >
+                <span className="gg-theme-swatch" aria-hidden style={{ background: meta.swatch[0] }}>
+                  <span style={{ background: meta.swatch[1] }} />
+                  <span style={{ background: meta.swatch[2] }} />
+                </span>
+                <span className="gg-theme-name">{meta.label}</span>
+              </button>
+            ))}
           </div>
+          <label className="gg-theme-square" style={{ marginBottom: 12 }}>
+            <input
+              type="checkbox"
+              checked={squareCorners}
+              onChange={(e) => void setSquareCorners(e.target.checked)}
+            />
+            <span>Прямые углы (без скруглений)</span>
+          </label>
           <div className="gg-settings-hint">
             Тема применяется мгновенно. Ширина боковой панели запоминается автоматически — потяни за её правый край.
           </div>

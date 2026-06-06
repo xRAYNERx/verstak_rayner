@@ -871,15 +871,22 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   color: var(--text-secondary);
   flex-shrink: 0;
 }
+/* Кнопка-действие в хедере (тоггл терминала) — прижата в правый верхний угол. */
+.gg-chat-project-action { margin-left: auto; }
 .gg-chat-project-icon { font-size: 14px; opacity: 0.85; }
 .gg-chat-project-name { font-weight: 600; color: var(--text-primary); }
 .gg-chat-project-sep { color: var(--text-disabled); }
 .gg-chat-project-chat { color: var(--text-tertiary); }
 
 /* ─── Chat ─── */
+/* Чат + терминал в одну строку: чат слева (растягивается), терминал справа. */
+.gg-chat-area {
+  flex: 1; min-height: 0; min-width: 0;
+  display: flex; flex-direction: row;
+}
 .gg-chat {
   display: flex; flex-direction: column;
-  flex: 1; min-height: 0;
+  flex: 1; min-width: 0; min-height: 0;
 }
 /*
  * Scroll container takes the FULL panel width so the scrollbar lives at the
@@ -1917,6 +1924,75 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   color: var(--text-primary);
   box-shadow: var(--shadow-sm);
 }
+
+/* ─── Theme picker grid (Settings → appearance) ─── */
+.gg-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.gg-theme-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  text-align: left;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+.gg-theme-card:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+.gg-theme-card.is-active {
+  border-color: var(--accent-border);
+  background: var(--accent-muted);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm), var(--ring-inset);
+}
+.gg-theme-swatch {
+  position: relative;
+  flex-shrink: 0;
+  width: 34px;
+  height: 24px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  overflow: hidden;
+}
+.gg-theme-swatch > span {
+  position: absolute;
+  border-radius: 50%;
+}
+.gg-theme-swatch > span:first-child {
+  left: 5px;
+  bottom: 5px;
+  width: 12px;
+  height: 12px;
+}
+.gg-theme-swatch > span:last-child {
+  right: 4px;
+  bottom: 4px;
+  width: 10px;
+  height: 10px;
+  border: 1px solid rgba(0,0,0,0.2);
+}
+.gg-theme-name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+.gg-theme-square {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+.gg-theme-square input { cursor: pointer; accent-color: var(--accent); }
 
 /* ─── Generic panel (Tasks, Journal, Stub) ─── */
 .gg-panel {
@@ -2957,8 +3033,8 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 /* ─── Terminal ─── */
 .gg-terminal-wrap {
   background: var(--bg-base);
-  border-top: 1px solid var(--border-subtle);
-  height: 220px;
+  border-left: 1px solid var(--border-subtle);
+  width: 460px; flex-shrink: 0;
   display: flex; flex-direction: column;
 }
 .gg-terminal-header {
