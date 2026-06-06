@@ -292,6 +292,12 @@ const VideoIcon = (
     <polygon points="10 9 16 12 10 15 10 9" />
   </svg>
 )
+const MemoryIcon = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2a4 4 0 0 0-4 4 3 3 0 0 0-2 5.5A3 3 0 0 0 8 17a3.5 3.5 0 0 0 4 1 3.5 3.5 0 0 0 4-1 3 3 0 0 0 2-5.5A3 3 0 0 0 16 6a4 4 0 0 0-4-4z" />
+    <path d="M12 2v16" />
+  </svg>
+)
 
 // Chat is rendered separately above the rest of the nav (expandable section
 // with its own list of chat sessions + create button).
@@ -310,6 +316,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
     { id: 'tasks',    label: t.sidebar.tasks,    icon: TasksIcon },
     { id: 'journal',  label: t.sidebar.journal,  icon: JournalIcon },
     { id: 'inspector', label: 'Инспектор',       icon: InspectorIcon },
+    { id: 'memory-gov', label: 'Память',          icon: MemoryIcon },
     { id: 'plan',     label: t.sidebar.plan,     icon: PlanIcon },
     { id: 'skills',   label: t.sidebar.skills,   icon: SkillsIcon },
     { id: 'browser',  label: t.sidebar.browser,  icon: BrowserIcon },
