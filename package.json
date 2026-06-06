@@ -14,8 +14,8 @@
     "rebuild:node": "npm rebuild better-sqlite3 --runtime=node --update-binary",
     "electron-rebuild": "electron-rebuild -f -o better-sqlite3",
     "predev": "npm run electron-rebuild",
-    "dist": "npm run build && electron-builder",
-    "dist:win": "npm run build && electron-builder --win --x64",
+    "dist": "npm run electron-rebuild && npm run build && electron-builder",
+    "dist:win": "npm run electron-rebuild && npm run build && electron-builder --win --x64",
     "dist:linux": "npm run build && electron-builder --linux --x64",
     "dist:mac": "npm run build && electron-builder --mac --x64 --arm64",
     "dist:all": "npm run build && electron-builder --win --linux --mac"
