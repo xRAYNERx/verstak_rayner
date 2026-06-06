@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useProject } from '../store/projectStore'
 import { useProvider } from '../hooks/useProvider'
+import type { ProviderDescriptorDTO } from '../types/api'
 import { Markdown } from './Markdown'
 
 interface SideChatProps {
@@ -33,6 +34,82 @@ export function SideChat({ sideChatId, onClose }: SideChatProps) {
   const streamRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const sendIdRef = useRef<number | null>(null)
+
+  // --- Независимый выбор модели бокового чата ---
+  // Боковой чат держит СВОЙ providerId/model в локальном state и НЕ трогает
+  // глобальный provider (useProvider). Дефолт: сохранённое в side-сессии, иначе
+  // — текущая модель основного чата (читается один раз как стартовая точка).
+  const [sideProviderId, setSideProviderId] = useState<string | null>(null)
+  const [sideModel, setSideModel] = useState<string | null>(null)
+  // Список всех провайдеров (метаданные) + множество «настроенных» (есть ключ
+  // или CLI/локальный) — зеркалит фильтрацию ModelPicker, но локально для панели.
+  const [providers, setProviders] = useState<ProviderDescriptorDTO[]>([])
+  const [configuredIds, setConfiguredIds] = useState<Set<string>>(new Set())
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const pickerRef = useRef<HTMLDivElement>(null)
+
+  // Инициализация выбранной модели: из side-сессии если задана, иначе из
+  // основного чата. Читаем один раз на смену sideChatId — НЕ биндимся к
+  // основному live.
+  useEffect(() => {
+    const session = useProject.getState().chatSessions.find(c => c.id === sideChatId)
+    setSideProviderId(session?.providerId ?? provider.id)
+    setSideModel(session?.model ?? provider.model ?? null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sideChatId])
+
+  // Загружаем список провайдеров + «настроенные» (ключ задан / CLI не требует).
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const list = await window.api.providers.list()
+        if (cancelled) return
+        setProviders(list)
+        // CLI/локальные (secretKey === null) считаем всегда настроенными.
+        const configured = new Set<string>(list.filter(p => p.secretKey === null).map(p => p.id))
+        const withKey = list.filter(p => p.secretKey !== null)
+        const keyVals = await Promise.all(withKey.map(p => window.api.settings.getKey(p.secretKey as string)))
+        if (cancelled) return
+        withKey.forEach((p, i) => { if (keyVals[i]) configured.add(p.id) })
+        setConfiguredIds(configured)
+      } catch { /* IPC недоступен — список останется пустым, пикер просто не покажет опции */ }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  // Закрытие поповера по клику вне.
+  useEffect(() => {
+    if (!pickerOpen) return
+    function onDown(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerOpen(false)
+    }
+    window.addEventListener('mousedown', onDown)
+    return () => window.removeEventListener('mousedown', onDown)
+  }, [pickerOpen])
+
+  const sideProvider = providers.find(p => p.id === sideProviderId)
+  const sideLabel = sideProvider?.shortLabel ?? sideProvider?.name ?? (sideProviderId ?? '—')
+  const sideModelLabel = sideModel ?? sideProvider?.defaultModel ?? 'auto'
+
+  // Выбрать провайдера в боковом чате: ставит дефолтную модель провайдера,
+  // персистит в side-сессию. Основной чат не затрагивается.
+  async function selectProvider(p: ProviderDescriptorDTO) {
+    const nextModel = p.defaultModel || null
+    setSideProviderId(p.id)
+    setSideModel(nextModel)
+    try {
+      await window.api.chatSessions.setModel(sideChatId, p.id, nextModel)
+    } catch { /* не блокируем UX если persist упал */ }
+  }
+
+  // Выбрать конкретную модель текущего провайдера бокового чата.
+  async function selectModel(model: string) {
+    setSideModel(model)
+    try {
+      await window.api.chatSessions.setModel(sideChatId, sideProviderId, model)
+    } catch { /* не блокируем UX */ }
+  }
 
   // На первом открытии подгружаем persisted-историю в снапшот (если он ещё
   // не заполнен живым стримом). Тянем один раз на смену sideChatId.
@@ -80,7 +157,14 @@ export function SideChat({ sideChatId, onClose }: SideChatProps) {
     if (path) {
       void window.api.chats.append(sideChatId, path, 'user', text).catch(() => {})
     }
-    const sendId = await window.api.ai.send([...history, userMsg], path, String(sideChatId))
+    // Отправляем с СОБСТВЕННЫМ провайдером/моделью бокового чата (override).
+    // Основной чат и его выбор модели не затрагиваются.
+    const sendId = await window.api.ai.sendWithOverrides(
+      [...history, userMsg],
+      path,
+      { providerId: sideProviderId ?? undefined, model: sideModel },
+      String(sideChatId)
+    )
     sendIdRef.current = sendId
     // Регистрируем owner как 'chat' с chatId бокового чата — события стрима
     // уйдут в chatSnapshots[sideChatId], НЕ в активный основной чат.
@@ -105,6 +189,58 @@ export function SideChat({ sideChatId, onClose }: SideChatProps) {
     <div className="gg-sidechat">
       <div className="gg-sidechat-header">
         <span>💬 Боковой чат</span>
+        <div className="gg-sidechat-mp" ref={pickerRef}>
+          <button
+            type="button"
+            className="gg-sidechat-mp-pill"
+            onClick={() => setPickerOpen(v => !v)}
+            title="Модель бокового чата (независима от основного)"
+          >
+            <span className="gg-sidechat-mp-name">{sideLabel}</span>
+            <span className="gg-sidechat-mp-sep">·</span>
+            <span className="gg-sidechat-mp-model">{sideModelLabel}</span>
+          </button>
+          {pickerOpen && (
+            <div className="gg-sidechat-mp-popover">
+              <div className="gg-sidechat-mp-section-title">Провайдер</div>
+              {providers.map(p => {
+                const isConfigured = configuredIds.has(p.id)
+                const isActive = p.id === sideProviderId
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`gg-sidechat-mp-row ${isActive ? 'is-active' : ''} ${!isConfigured ? 'is-unconfigured' : ''}`}
+                    disabled={!isConfigured}
+                    title={isConfigured ? undefined : 'API-ключ не задан (Настройки)'}
+                    onClick={() => { if (isConfigured) void selectProvider(p).then(() => setPickerOpen(false)) }}
+                  >
+                    <span className="gg-sidechat-mp-row-label">
+                      {!isConfigured && '🔒 '}{p.shortLabel || p.name}
+                    </span>
+                    <span className="gg-sidechat-mp-row-meta">{p.transport}</span>
+                  </button>
+                )
+              })}
+              {sideProvider && sideProvider.models.length > 1 && (
+                <>
+                  <div className="gg-sidechat-mp-section-title">Модель</div>
+                  {sideProvider.models.map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      className={`gg-sidechat-mp-row ${m === sideModel ? 'is-active' : ''}`}
+                      onClick={() => void selectModel(m).then(() => setPickerOpen(false))}
+                    >
+                      <span className="gg-sidechat-mp-row-label">{m}</span>
+                      {m === sideModel && <span className="gg-sidechat-mp-row-meta">✓</span>}
+                    </button>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
+        </div>
         <button
           className="gg-sidechat-close"
           onClick={onClose}
