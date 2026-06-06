@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useProject } from '../store/projectStore'
-import type { AuditEntry } from '../types/api'
+import type { AuditEntry, DebugPacket } from '../types/api'
 
 /**
  * Agent Run Inspector — flagship transparency screen.
@@ -42,6 +42,7 @@ const ACTION_LABEL: Record<string, string> = {
 
 interface Run {
   key: string
+  runId: string | null
   entries: AuditEntry[]
   start: number
   end: number
@@ -63,6 +64,7 @@ function buildRun(entries: AuditEntry[], key: string): Run {
   }
   return {
     key,
+    runId: entries[0].runId ?? null,
     entries,
     start: first.timestamp,
     end: last.timestamp,
@@ -178,19 +180,28 @@ function formatDetail(detail: string): string {
   return trimmed
 }
 
-function RunCard({ run }: { run: Run }) {
+function RunCard({ run, onShowPacket }: { run: Run; onShowPacket: (runId: string) => void }) {
   const [open, setOpen] = useState(false)
   const hasError = run.entries.some(e => e.action === 'error')
   return (
     <div className={`gg-run-card ${hasError ? 'has-error' : ''}`}>
-      <button className="gg-run-head" onClick={() => setOpen(v => !v)}>
-        <span className="gg-run-caret">{open ? '▾' : '▸'}</span>
-        <span className="gg-run-provider">{run.providerId ?? 'неизвестно'}</span>
-        {run.model && <span className="gg-run-model">{run.model}</span>}
-        <span className="gg-run-time">{formatTime(run.start)}</span>
-        <span className="gg-run-summary">{summarize(run.entries)}</span>
-        <span className="gg-run-count">{run.entries.length} · {formatDuration(run.end - run.start)}</span>
-      </button>
+      <div className="gg-run-head-row">
+        <button className="gg-run-head" onClick={() => setOpen(v => !v)}>
+          <span className="gg-run-caret">{open ? '▾' : '▸'}</span>
+          <span className="gg-run-provider">{run.providerId ?? 'неизвестно'}</span>
+          {run.model && <span className="gg-run-model">{run.model}</span>}
+          <span className="gg-run-time">{formatTime(run.start)}</span>
+          <span className="gg-run-summary">{summarize(run.entries)}</span>
+          <span className="gg-run-count">{run.entries.length} · {formatDuration(run.end - run.start)}</span>
+        </button>
+        {run.runId && (
+          <button
+            className="gg-run-packet-btn"
+            title="Debug Packet — что реально ушло в модель"
+            onClick={() => onShowPacket(run.runId!)}
+          >🐛 Пакет</button>
+        )}
+      </div>
       {open && (
         <div className="gg-run-steps">
           {run.entries.map(e => (
@@ -212,6 +223,7 @@ export function AgentRunInspector() {
   const [entries, setEntries] = useState<AuditEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [csv, setCsv] = useState<string | null>(null)
+  const [packet, setPacket] = useState<DebugPacket | null>(null)
 
   async function refresh() {
     if (!path) return
@@ -245,6 +257,14 @@ export function AgentRunInspector() {
     if (csv) await navigator.clipboard.writeText(csv)
   }
 
+  // Debug Packet — реальный вход запуска (system-промпт + сообщение + audit trail).
+  async function showPacket(runId: string) {
+    try {
+      const p = await window.api.debug.packet(runId)
+      setPacket(p)
+    } catch { /* проглатываем — пакет просто не откроется */ }
+  }
+
   return (
     <div className="gg-panel">
       <div className="gg-panel-header">
@@ -269,7 +289,7 @@ export function AgentRunInspector() {
         )}
 
         <div className="gg-run-list">
-          {runs.map(run => <RunCard key={run.key} run={run} />)}
+          {runs.map(run => <RunCard key={run.key} run={run} onShowPacket={runId => void showPacket(runId)} />)}
         </div>
       </div>
 
@@ -284,6 +304,36 @@ export function AgentRunInspector() {
               </div>
             </div>
             <textarea className="gg-input gg-inspector-csv-text" readOnly value={csv} />
+          </div>
+        </div>
+      )}
+
+      {packet !== null && (
+        <div className="gg-inspector-csv-overlay" onClick={() => setPacket(null)}>
+          <div className="gg-debug-modal" onClick={e => e.stopPropagation()}>
+            <div className="gg-inspector-csv-head">
+              <span>🐛 Debug Packet{packet.input ? ` — ${packet.input.providerId ?? '?'} · ${packet.input.model ?? '?'}` : ''}</span>
+              <div className="gg-inspector-csv-actions">
+                <button className="gg-btn gg-btn-ghost" onClick={() => void navigator.clipboard.writeText(JSON.stringify(packet, null, 2))}>Скопировать JSON</button>
+                <button className="gg-btn gg-btn-ghost" onClick={() => setPacket(null)}>Закрыть</button>
+              </div>
+            </div>
+            <div className="gg-debug-body">
+              {!packet.input && (
+                <div className="gg-panel-empty">Снапшот входа не сохранён для этого запуска (до миграции или CLI-провайдер).</div>
+              )}
+              {packet.input && (
+                <>
+                  <div className="gg-debug-section-title">Системный промпт — что реально ушло в модель</div>
+                  <pre className="gg-debug-pre">{packet.input.systemPrompt}</pre>
+                  <div className="gg-debug-section-title">Сообщение пользователя</div>
+                  <pre className="gg-debug-pre">{packet.input.userMessage}</pre>
+                </>
+              )}
+              <div className="gg-debug-section-title">Трейл действий ({packet.audit.length})</div>
+              <pre className="gg-debug-pre">{packet.audit.map(a => `${formatClock(a.timestamp)}  ${a.action}  ${a.detail ?? ''}`).join('\n') || '—'}</pre>
+              <div className="gg-debug-meta">Сообщений чата в пакете: {packet.messages.length}</div>
+            </div>
           </div>
         </div>
       )}

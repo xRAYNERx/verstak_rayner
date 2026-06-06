@@ -285,6 +285,25 @@ const MIGRATIONS: Array<{ version: number; description: string; run: (db: DB) =>
         CREATE INDEX IF NOT EXISTS idx_audit_run ON audit_log(run_id);
       `)
     }
+  },
+  {
+    version: 10,
+    description: 'run_inputs — снапшот реального входа агентного запуска (provider/model/system/user) для Debug Packet',
+    run: (db: DB) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS run_inputs (
+          run_id TEXT PRIMARY KEY,
+          project_path TEXT,
+          chat_id INTEGER,
+          timestamp INTEGER,
+          provider_id TEXT,
+          model TEXT,
+          system_prompt TEXT,
+          user_message TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_run_inputs_project ON run_inputs(project_path);
+      `)
+    }
   }
 ]
 

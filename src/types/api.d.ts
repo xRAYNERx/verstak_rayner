@@ -274,6 +274,9 @@ declare global {
         export(projectPath: string): Promise<string>
         clear(projectPath: string, olderThan?: number): Promise<number>
       }
+      debug: {
+        packet(runId: string): Promise<DebugPacket>
+      }
       suggestions: {
         get(projectPath: string): Promise<Suggestion[]>
       }
@@ -382,6 +385,27 @@ export interface AuditEntry {
   model: string | null
   /** ID агентного запуска (один ai:send = один run). null у строк до миграции 9. */
   runId: string | null
+}
+
+/** Снапшот реального входа агентного запуска — основа Debug Packet. */
+export interface RunInput {
+  runId: string
+  projectPath: string | null
+  chatId: number | null
+  timestamp: number
+  providerId: string | null
+  model: string | null
+  /** Точная system-строка, ушедшая модели (composed.system). */
+  systemPrompt: string
+  /** Контент последнего user-сообщения запроса. */
+  userMessage: string
+}
+
+/** Replay-пакет одного run'а: реальный вход + audit trail + сообщения чата. */
+export interface DebugPacket {
+  input: RunInput | null
+  audit: AuditEntry[]
+  messages: StoredChatMessage[]
 }
 
 /** Дескриптор провайдера — единый источник из main process (electron/ai/registry.ts). */

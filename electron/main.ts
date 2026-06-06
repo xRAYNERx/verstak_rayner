@@ -55,6 +55,8 @@ import { registerMcpIpc } from './ipc/mcp'
 import { mcpClient } from './mcp/client'
 import { registerAuditIpc } from './ipc/audit'
 import { appendAudit } from './storage/audit-log'
+import { registerDebugIpc } from './ipc/debug'
+import { saveRunInput } from './storage/run-inputs'
 import { trackToolForPatterns } from './ai/procedural-memory'
 import { registerSuggestionsIpc } from './ipc/suggestions'
 import { initAutoUpdater } from './updater'
@@ -294,6 +296,10 @@ app.whenReady().then(() => {
     // Audit log — пишем каждое агентное действие
     appendAudit: (projectPath, chatId, action, detail, providerId, model, runId) => {
       appendAudit(db, { timestamp: Date.now(), projectPath, chatId, action, detail, providerId, model, runId })
+    },
+    // Debug Packet — снапшот реального входа run'а (provider/model/system/user)
+    saveRunInput: (input) => {
+      saveRunInput(db, input)
     }
   })
   registerChatsIpc(chats, chatSessions, db)
@@ -328,6 +334,7 @@ app.whenReady().then(() => {
   registerCommandsIpc()
   registerMcpIpc(settings)
   registerAuditIpc(db)
+  registerDebugIpc(db, chats)
   registerSuggestionsIpc(db)
   const mainWindow = createWindow()
 

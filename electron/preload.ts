@@ -218,6 +218,9 @@ contextBridge.exposeInMainWorld('api', {
     export: (projectPath: string) => ipcRenderer.invoke('audit:export', projectPath),
     clear: (projectPath: string, olderThan?: number) => ipcRenderer.invoke('audit:clear', projectPath, olderThan)
   },
+  debug: {
+    packet: (runId: string) => ipcRenderer.invoke('debug:packet', runId)
+  },
   suggestions: {
     get: (projectPath: string) => ipcRenderer.invoke('suggestions:get', projectPath)
   },

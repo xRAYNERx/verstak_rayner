@@ -61,6 +61,9 @@ interface AiDeps {
   /** Опциональный аппендер в audit_log — вызывается после каждого tool call.
    *  runId — ID агентного запуска (один ai:send = один run); group-by в инспекторе. */
   appendAudit?: (projectPath: string, chatId: number | null, action: string, detail: string, providerId: string | null, model: string | null, runId: string | null) => void
+  /** Опциональный снапшот реального входа run'а для Debug Packet. Вызывается на
+   *  старте run'а в API-пути, где собран композитный system prompt. */
+  saveRunInput?: (input: { runId: string; projectPath: string | null; chatId: number | null; timestamp: number; providerId: string | null; model: string | null; systemPrompt: string; userMessage: string }) => void
 }
 
 let currentSendId = 0
@@ -243,6 +246,11 @@ export function registerAiIpc(deps: AiDeps): void {
     }
 
     let messagesWithSystem = messages
+    // composedSystem — точная system-строка, ушедшая модели в API-пути. Захватываем
+    // для Debug Packet (снапшот реального входа run'а). Остаётся null для CLI-пути
+    // (CLI строит свой промпт внутри buildCliPrompt — снапшот там пока не делаем) и
+    // для reviewer override.
+    let composedSystem: string | null = null
     // Reviewer override (Explicit Review) — ПОЛНАЯ ЗАМЕНА системного промпта.
     // Ревьюер не является агентом проекта: он читает работу другого AI и даёт
     // независимый разбор. Давать ему system-layer + user-layer = заставить
@@ -272,6 +280,7 @@ export function registerAiIpc(deps: AiDeps): void {
         coreMemory,
         skillPrompt: overrides?.systemPrompt
       })
+      composedSystem = composed.system
       messagesWithSystem = [{ role: 'system', content: composed.system }, ...messages]
     } else if (overrides?.systemPrompt) {
       // Не-API (CLI) транспорт со скилл-override. CLI-провайдеры строят свой
@@ -324,6 +333,26 @@ export function registerAiIpc(deps: AiDeps): void {
         })
       }
     }
+
+    // Debug Packet: снапшот реального входа run'а. Только API-путь, где собран
+    // композитный system prompt (composedSystem != null). model уже финализирован
+    // smart-routing'ом выше. Берём контент последнего user-сообщения как user_message.
+    if (composedSystem != null && deps.saveRunInput) {
+      const lastUser = [...messages].reverse().find(m => m.role === 'user')
+      try {
+        deps.saveRunInput({
+          runId,
+          projectPath,
+          chatId: chatId ? Number(chatId) : null,
+          timestamp: Date.now(),
+          providerId,
+          model: model ?? null,
+          systemPrompt: composedSystem,
+          userMessage: lastUser?.content ?? ''
+        })
+      } catch { /* snapshot not critical */ }
+    }
+
     // Project Settings system prompt — нужен и для API (через
     // prepareSystemContext выше), и для CLI (через createCliProvider →
     // buildCliPrompt). Читаем один раз. Не пробрасываем при reviewer override —

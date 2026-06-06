@@ -2359,6 +2359,47 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 }
 .gg-run-card.has-error { border-color: var(--error); }
 
+/* === Debug Packet === */
+.gg-run-head-row { display: flex; align-items: stretch; }
+.gg-run-head-row .gg-run-head { flex: 1; min-width: 0; }
+.gg-run-packet-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  padding: 0 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 120ms ease;
+}
+.gg-run-packet-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.gg-debug-modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  width: min(880px, 92vw);
+  max-height: 86vh;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.gg-debug-body { padding: 14px 18px; overflow: auto; }
+.gg-debug-section-title {
+  font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-tertiary); margin: 14px 0 6px;
+}
+.gg-debug-pre {
+  margin: 0; padding: 10px 12px;
+  background: var(--bg-base); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono); font-size: var(--text-xs);
+  color: var(--text-secondary);
+  white-space: pre-wrap; word-break: break-word;
+  max-height: 320px; overflow: auto;
+}
+.gg-debug-meta { margin-top: 14px; font-size: var(--text-xs); color: var(--text-tertiary); }
+
 .gg-run-head {
   width: 100%;
   display: flex; align-items: center; gap: 10px;

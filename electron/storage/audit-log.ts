@@ -65,6 +65,8 @@ export interface AuditQueryOpts {
   limit?: number
   action?: string
   since?: number
+  /** Фильтр по конкретному агентному запуску (Debug Packet). */
+  runId?: string
 }
 
 export function queryAudit(
@@ -72,7 +74,7 @@ export function queryAudit(
   projectPath: string,
   opts: AuditQueryOpts = {}
 ): AuditEntry[] {
-  const { limit = 100, action, since } = opts
+  const { limit = 100, action, since, runId } = opts
   const conditions: string[] = ['project_path = ?']
   const params: unknown[] = [projectPath]
 
@@ -83,6 +85,10 @@ export function queryAudit(
   if (since != null) {
     conditions.push('timestamp >= ?')
     params.push(since)
+  }
+  if (runId) {
+    conditions.push('run_id = ?')
+    params.push(runId)
   }
 
   params.push(Math.max(1, Math.min(1000, limit)))
