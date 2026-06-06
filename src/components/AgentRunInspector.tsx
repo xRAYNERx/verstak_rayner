@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useProject } from '../store/projectStore'
 import type { AuditEntry, DebugPacket } from '../types/api'
 import { computeContextBudget } from '../lib/context-budget'
+import { diffSections, diffLines, sectionMap, type SectionDiff, type SectionDiffStatus } from '../lib/context-diff'
 
 /**
  * Agent Run Inspector — flagship transparency screen.
@@ -251,6 +252,160 @@ function ContextBudgetView({ packet }: { packet: DebugPacket }) {
   )
 }
 
+// Подписи и стили статусов диффа секции.
+const DIFF_STATUS_LABEL: Record<SectionDiffStatus, string> = {
+  same: 'без изменений',
+  changed: 'изменился',
+  added: 'добавлен',
+  removed: 'удалён'
+}
+
+// Развёрнутый построчный дифф одной изменившейся секции.
+function SectionLineDiff({ from, to }: { from: string; to: string }) {
+  const lines = useMemo(() => diffLines(from, to), [from, to])
+  return (
+    <pre className="gg-diff-lines">
+      {lines.map((l, i) => (
+        <div key={i} className={`gg-diff-line is-${l.type}`}>
+          <span className="gg-diff-sign">{l.type === 'add' ? '+' : l.type === 'remove' ? '−' : ' '}</span>
+          <span className="gg-diff-text">{l.text || ' '}</span>
+        </div>
+      ))}
+    </pre>
+  )
+}
+
+// Одна строка-секция в сводке диффа + разворачиваемая детализация.
+function SectionDiffRow({ diff, textA, textB }: { diff: SectionDiff; textA: string | null; textB: string | null }) {
+  const [open, setOpen] = useState(false)
+  const expandable = diff.status === 'changed'
+  const delta =
+    diff.status === 'changed' || diff.status === 'added' || diff.status === 'removed'
+      ? `+${diff.addedChars} / −${diff.removedChars} симв.`
+      : ''
+  return (
+    <div className={`gg-diff-row is-${diff.status}`}>
+      <button
+        className="gg-diff-row-head"
+        onClick={() => expandable && setOpen(v => !v)}
+        disabled={!expandable}
+      >
+        {expandable && <span className="gg-diff-caret">{open ? '▾' : '▸'}</span>}
+        <span className="gg-diff-label">{diff.label}</span>
+        <span className={`gg-diff-status is-${diff.status}`}>{DIFF_STATUS_LABEL[diff.status]}</span>
+        {delta && <span className="gg-diff-delta">{delta}</span>}
+      </button>
+      {open && expandable && <SectionLineDiff from={textB ?? ''} to={textA ?? ''} />}
+    </div>
+  )
+}
+
+/**
+ * Дифф входов между текущим запуском и выбранным другим. Тянет пакет другого
+ * run'а через тот же window.api.debug.packet — без нового IPC.
+ */
+function RunDiffView({ packet, runs }: { packet: DebugPacket; runs: Run[] }) {
+  const [otherId, setOtherId] = useState<string>('')
+  const [otherPacket, setOtherPacket] = useState<DebugPacket | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  // Кандидаты на сравнение — остальные run'ы с runId, кроме текущего.
+  const currentId = packet.input?.runId ?? null
+  const options = useMemo(
+    () => runs.filter(r => r.runId && r.runId !== currentId),
+    [runs, currentId]
+  )
+
+  // Смена текущего пакета сбрасывает выбор сравнения.
+  useEffect(() => {
+    setOtherId('')
+    setOtherPacket(null)
+  }, [currentId])
+
+  async function pick(id: string) {
+    setOtherId(id)
+    setOtherPacket(null)
+    if (!id) return
+    setLoading(true)
+    try {
+      const p = await window.api.debug.packet(id)
+      setOtherPacket(p)
+    } catch {
+      setOtherPacket(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const diffs = useMemo(() => {
+    if (!packet.input || !otherPacket?.input) return null
+    return diffSections(
+      { systemPrompt: packet.input.systemPrompt, userMessage: packet.input.userMessage },
+      { systemPrompt: otherPacket.input.systemPrompt, userMessage: otherPacket.input.userMessage }
+    )
+  }, [packet, otherPacket])
+
+  // Карты текстов секций обоих запусков — для построчной детализации.
+  const textsA = useMemo(
+    () => (packet.input ? sectionMap({ systemPrompt: packet.input.systemPrompt, userMessage: packet.input.userMessage }) : new Map<string, string>()),
+    [packet]
+  )
+  const textsB = useMemo(
+    () => (otherPacket?.input ? sectionMap({ systemPrompt: otherPacket.input.systemPrompt, userMessage: otherPacket.input.userMessage }) : new Map<string, string>()),
+    [otherPacket]
+  )
+
+  if (!packet.input || options.length === 0) return null
+
+  const changedCount = diffs ? diffs.filter(d => d.status !== 'same').length : 0
+
+  return (
+    <div className="gg-diff">
+      <div className="gg-debug-section-title">Сравнение входов между запусками</div>
+      <div className="gg-diff-picker">
+        <label className="gg-diff-picker-label">Сравнить с запуском…</label>
+        <select
+          className="gg-input gg-diff-select"
+          value={otherId}
+          onChange={e => void pick(e.target.value)}
+        >
+          <option value="">— выбрать —</option>
+          {options.map(r => (
+            <option key={r.runId!} value={r.runId!}>
+              {(r.providerId ?? '?')} · {(r.model ?? '?')} · {formatTime(r.start)}
+            </option>
+          ))}
+        </select>
+        {loading && <span className="gg-diff-loading">Загрузка…</span>}
+      </div>
+
+      {otherId && !loading && otherPacket && !otherPacket.input && (
+        <div className="gg-panel-empty">Снапшот входа не сохранён для выбранного запуска.</div>
+      )}
+
+      {diffs && (
+        <>
+          <div className="gg-diff-summary-meta">
+            {changedCount === 0
+              ? 'Входы идентичны по всем слоям.'
+              : `Изменений по слоям: ${changedCount} из ${diffs.length}`}
+          </div>
+          <div className="gg-diff-rows">
+            {diffs.map(d => (
+              <SectionDiffRow
+                key={d.label}
+                diff={d}
+                textA={textsA.get(d.label) ?? null}
+                textB={textsB.get(d.label) ?? null}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export function AgentRunInspector() {
   const { path } = useProject()
   const [entries, setEntries] = useState<AuditEntry[]>([])
@@ -358,6 +513,7 @@ export function AgentRunInspector() {
               {packet.input && (
                 <>
                   <ContextBudgetView packet={packet} />
+                  <RunDiffView packet={packet} runs={runs} />
                   <div className="gg-debug-section-title">Системный промпт — что реально ушло в модель</div>
                   <pre className="gg-debug-pre">{packet.input.systemPrompt}</pre>
                   <div className="gg-debug-section-title">Сообщение пользователя</div>

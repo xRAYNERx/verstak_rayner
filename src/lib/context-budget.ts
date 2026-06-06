@@ -7,6 +7,12 @@
  * или имена тегов там меняются — обновить TAGS здесь.
  */
 
+/** Именованная секция входа запуска: метка + текст слоя. */
+export interface InputSection {
+  label: string
+  text: string
+}
+
 /** Один слой бюджета: метка для UI + размеры. */
 export interface BudgetSection {
   label: string
@@ -51,6 +57,40 @@ function extractTag(source: string, tag: string): string | null {
 }
 
 /**
+ * Разбирает systemPrompt на именованные слои по тегам + сообщение пользователя.
+ * Если тег найден — берём его контент; системный слой дополнительно ловим как
+ * «голову» до первого тега, когда обёртки <verstak_system_layer> нет
+ * (робастность к смене формата). userMessage — отдельная секция, это не часть
+ * system-строки. Возвращает только непустые секции в порядке сборки.
+ *
+ * Общий сплиттер: используется и бюджетом контекста, и диффом между запусками.
+ */
+export function splitIntoSections(systemPrompt: string, userMessage: string): InputSection[] {
+  const sections: InputSection[] = []
+  const push = (label: string, text: string) => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+    sections.push({ label, text: trimmed })
+  }
+
+  for (const { tag, label } of TAGS) {
+    const content = extractTag(systemPrompt, tag)
+    if (content !== null) {
+      push(label, content)
+    } else if (tag === 'verstak_system_layer') {
+      // Обёртки системного слоя нет — берём голову до первого known-тега.
+      const firstTagIdx = systemPrompt.search(/<[a-z_]+(?:\s[^>]*)?>/i)
+      const head = firstTagIdx >= 0 ? systemPrompt.slice(0, firstTagIdx) : systemPrompt
+      push(label, head)
+    }
+  }
+
+  push('Сообщение пользователя', userMessage)
+
+  return sections
+}
+
+/**
  * Разбирает systemPrompt на слои по тегам. Если тег найден — берём его контент;
  * системный слой дополнительно ловим как «голову» до первого тега, когда
  * обёртки <verstak_system_layer> нет (робастность к смене формата).
@@ -68,19 +108,9 @@ export function computeContextBudget(
     sections.push({ label, chars: trimmed.length, tokens: estimateTokens(trimmed) })
   }
 
-  for (const { tag, label } of TAGS) {
-    const content = extractTag(systemPrompt, tag)
-    if (content !== null) {
-      push(label, content)
-    } else if (tag === 'verstak_system_layer') {
-      // Обёртки системного слоя нет — берём голову до первого known-тега.
-      const firstTagIdx = systemPrompt.search(/<[a-z_]+(?:\s[^>]*)?>/i)
-      const head = firstTagIdx >= 0 ? systemPrompt.slice(0, firstTagIdx) : systemPrompt
-      push(label, head)
-    }
+  for (const part of splitIntoSections(systemPrompt, userMessage)) {
+    push(part.label, part.text)
   }
-
-  push('Сообщение пользователя', userMessage)
 
   const historyText = messages.map(m => m.content ?? '').join('')
   push('История/сообщения', historyText)
