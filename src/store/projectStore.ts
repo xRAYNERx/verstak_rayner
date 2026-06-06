@@ -172,6 +172,13 @@ interface ProjectState {
   /** Apply an ai:event to a background CHAT snapshot (within active project,
    *  but not the active chat). */
   applyEventToChat: (chatId: number, event: { type: string; [k: string]: unknown }) => void
+  /** Replace the message list of a background CHAT snapshot. Used by SideChat
+   *  to seed persisted history on first open without touching the active chat. */
+  seedChatSnapshot: (chatId: number, messages: ChatMessage[]) => void
+  /** Push a user message + empty assistant placeholder into a background CHAT
+   *  snapshot. Used by SideChat's composer — streamed assistant text then lands
+   *  via applyEventToChat (text events append to the last assistant message). */
+  pushUserToChatSnapshot: (chatId: number, content: string) => void
   /** Switch to a different chat session within the active project. */
   switchChatSession: (id: number) => Promise<void>
   /** Refresh the chat sessions list (after create/rename/delete). */
@@ -584,6 +591,24 @@ export const useProject = create<ProjectState>((set, get) => ({
       }
     }
     return { chatSnapshots: { ...s.chatSnapshots, [chatId]: next } }
+  }),
+  seedChatSnapshot: (chatId, messages) => set(s => {
+    const existing = s.chatSnapshots[chatId] ?? freshSnapshot()
+    return { chatSnapshots: { ...s.chatSnapshots, [chatId]: { ...existing, messages } } }
+  }),
+  pushUserToChatSnapshot: (chatId, content) => set(s => {
+    const existing = s.chatSnapshots[chatId] ?? freshSnapshot()
+    return {
+      chatSnapshots: {
+        ...s.chatSnapshots,
+        [chatId]: {
+          ...existing,
+          messages: [...existing.messages, { role: 'user', content }, { role: 'assistant', content: '' }],
+          isStreaming: true,
+          hasUnread: false
+        }
+      }
+    }
   }),
   refreshChatSessions: async () => {
     const s = get()

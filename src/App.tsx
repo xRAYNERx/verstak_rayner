@@ -20,6 +20,7 @@ import { CommandConfirm } from './components/CommandConfirm'
 import { UpdateNotification } from './components/UpdateNotification'
 import { Terminal } from './components/Terminal'
 import { FilesPanel } from './components/FilesPanel'
+import { SideChat } from './components/SideChat'
 import { OnboardingWizard } from './components/OnboardingWizard'
 import { ArtifactPreviewContainer } from './components/ArtifactPreview'
 import { TerminalErrorToast } from './components/TerminalErrorToast'
@@ -33,8 +34,11 @@ const SIDEBAR_WIDTH_KEY = 'gg.sidebarWidth'
 
 export function App() {
   const [showSettings, setShowSettings] = useState(false)
-  // Right docked panel: one of terminal / files / none (Codex-style selector).
-  const [rightPanel, setRightPanel] = useState<'none' | 'terminal' | 'files'>('none')
+  // Right docked panel: one of terminal / files / sidechat / none (Codex-style selector).
+  const [rightPanel, setRightPanel] = useState<'none' | 'terminal' | 'files' | 'sidechat'>('none')
+  // Lazily-created dedicated side-chat session id. Created on first open of the
+  // side-chat panel, reused while the panel stays open within a project.
+  const [sideChatId, setSideChatId] = useState<number | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [lang, setLang] = useState<Lang>('en')
 
@@ -93,6 +97,26 @@ export function App() {
   const { path, activeView, setActiveView, isStreaming, setStreaming, clearPendingWrites, setPendingCommand } = useProject()
   // Panels require an open project (the terminal/file tree are project-scoped).
   const effectiveRightPanel = path ? rightPanel : 'none'
+
+  // Project switch invalidates the side-chat session (chat sessions are
+  // project-scoped). Drop the id and close the panel if it was open.
+  useEffect(() => {
+    setSideChatId(null)
+    setRightPanel(p => (p === 'sidechat' ? 'none' : p))
+  }, [path])
+
+  // Open the side-chat panel — lazily create a dedicated background chat
+  // session the first time (separate from the active left-list chat).
+  async function openSideChat() {
+    if (!path) return
+    if (sideChatId == null) {
+      try {
+        const created = await window.api.chatSessions.create(path, { title: 'Боковой чат' })
+        setSideChatId(created.id)
+      } catch { return }
+    }
+    setRightPanel('sidechat')
+  }
 
   // Ctrl/Cmd+B toggles the project sidebar; Esc cancels active stream (safety
   // net — if the UI ever feels stuck during a long agentic loop, Esc kills it).
@@ -194,6 +218,7 @@ export function App() {
               onOpenSettings={() => setShowSettings(true)}
               rightPanel={effectiveRightPanel}
               onSelectRightPanel={setRightPanel}
+              onOpenSideChat={() => void openSideChat()}
             />
             {effectiveRightPanel === 'terminal' && (
               <div className="gg-terminal-wrap">
@@ -213,6 +238,9 @@ export function App() {
             )}
             {effectiveRightPanel === 'files' && (
               <FilesPanel onClose={() => setRightPanel('none')} />
+            )}
+            {effectiveRightPanel === 'sidechat' && sideChatId != null && (
+              <SideChat sideChatId={sideChatId} onClose={() => setRightPanel('none')} />
             )}
           </div>
         )}

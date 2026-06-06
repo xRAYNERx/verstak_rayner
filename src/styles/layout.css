@@ -3215,6 +3215,100 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 .gg-files-panel-icon { width: 12px; text-align: center; color: var(--text-tertiary); flex-shrink: 0; }
 .gg-files-panel-name { overflow: hidden; text-overflow: ellipsis; }
 
+/* === Side Chat === */
+/* Right-docked parallel chat — mirrors the .gg-terminal-wrap 460px column,
+   with its own scrollable message stream + composer pinned at the bottom. */
+.gg-sidechat {
+  background: var(--bg-base);
+  border-left: 1px solid var(--border-subtle);
+  width: 460px; flex-shrink: 0;
+  display: flex; flex-direction: column;
+  min-height: 0;
+}
+.gg-sidechat-header {
+  padding: 6px 14px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  display: flex; align-items: center; gap: 8px;
+}
+.gg-sidechat-close {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  width: 22px; height: 22px;
+  border-radius: var(--radius-sm);
+  font-size: 16px; line-height: 1;
+}
+.gg-sidechat-close:hover { background: var(--bg-hover); color: var(--text-primary); }
+.gg-sidechat-stream {
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  padding: 12px 12px 4px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.gg-sidechat-empty {
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  text-align: center;
+  padding: 24px 12px;
+}
+.gg-sidechat-msg { display: flex; }
+.gg-sidechat-msg.is-user { justify-content: flex-end; }
+.gg-sidechat-msg.is-assistant { justify-content: flex-start; }
+.gg-sidechat-bubble {
+  max-width: 88%;
+  padding: 8px 11px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.gg-sidechat-msg.is-user .gg-sidechat-bubble {
+  background: var(--accent-soft, var(--bg-hover));
+  color: var(--text-primary);
+}
+.gg-sidechat-msg.is-assistant .gg-sidechat-bubble {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+.gg-sidechat-composer {
+  border-top: 1px solid var(--border-subtle);
+  padding: 8px 10px;
+  display: flex; align-items: flex-end; gap: 8px;
+  background: var(--bg-base);
+}
+.gg-sidechat-textarea {
+  flex: 1; min-width: 0;
+  resize: none;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  padding: 8px 10px;
+  max-height: 160px;
+}
+.gg-sidechat-textarea:focus { outline: none; border-color: var(--border-strong, var(--accent)); }
+.gg-sidechat-send {
+  flex-shrink: 0;
+  width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--accent-fg, #fff);
+  cursor: pointer;
+}
+.gg-sidechat-send:disabled { opacity: 0.4; cursor: default; }
+.gg-sidechat-send.is-stop { background: var(--danger, #c0392b); }
+
 /* ======================================================================
    Tool Execution Timeline — pulse lane between chat stream and composer.
    Source: brainstorm 2026-05-21, idea A.

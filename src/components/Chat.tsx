@@ -24,12 +24,14 @@ const MAX_ATTACHMENTS = 8
 
 const ACCEPTED_MIME_PREFIXES = ['image/', 'text/', 'application/pdf', 'application/json']
 
-type RightPanel = 'none' | 'terminal' | 'files'
+type RightPanel = 'none' | 'terminal' | 'files' | 'sidechat'
 
 interface ChatProps {
   onOpenSettings: () => void
   rightPanel: RightPanel
   onSelectRightPanel: (panel: RightPanel) => void
+  /** Open the right-docked parallel chat (lazily created by App). */
+  onOpenSideChat: () => void
 }
 
 function formatSize(bytes: number): string {
@@ -84,7 +86,7 @@ const GOAL_CYCLE_PROMPT = `Запусти цикл self-improvement по это�
 
 Out of scope: общие best practices, рефакторинги ради красоты, изменения без обоснования в журнале.`
 
-export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel }: ChatProps) {
+export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSideChat }: ChatProps) {
   const t = useT()
   // Codex-style right-panel menu anchored to the top-right header button.
   const [panelMenuOpen, setPanelMenuOpen] = useState(false)
@@ -779,10 +781,11 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel }: ChatPro
                 <button
                   type="button"
                   className="gg-panel-menu-item"
-                  onClick={() => { void useProject.getState().newChatSession(); setPanelMenuOpen(false) }}
+                  onClick={() => { onOpenSideChat(); setPanelMenuOpen(false) }}
                 >
                   <span className="gg-panel-menu-icon">💬</span>
                   <span className="gg-panel-menu-label">Параллельный чат</span>
+                  {rightPanel === 'sidechat' && <span className="gg-panel-menu-check">✓</span>}
                 </button>
               </div>
             )}
