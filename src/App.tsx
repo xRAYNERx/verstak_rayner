@@ -212,8 +212,10 @@ export function App() {
         </>
       )}
       <main className="gg-main">
-        {activeView === 'chat' && (
-          <div className="gg-chat-area">
+        {/* Chat НЕ размонтируется при уходе на другие вкладки — иначе его
+            слушатель ai:event отваливается и фоновый стрим (CLI вроде Codex)
+            теряет ответ. Прячем через display:none, слушатель остаётся жив. */}
+        <div className="gg-chat-area" style={activeView === 'chat' ? undefined : { display: 'none' }}>
             <Chat
               onOpenSettings={() => setShowSettings(true)}
               rightPanel={effectiveRightPanel}
@@ -242,8 +244,7 @@ export function App() {
             {effectiveRightPanel === 'sidechat' && sideChatId != null && (
               <SideChat sideChatId={sideChatId} onClose={() => setRightPanel('none')} />
             )}
-          </div>
-        )}
+        </div>
         {activeView === 'tasks' && <TasksView />}
         {activeView === 'journal' && <JournalView />}
         {activeView === 'inspector' && <AgentRunInspector />}
