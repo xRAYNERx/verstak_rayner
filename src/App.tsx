@@ -10,6 +10,7 @@ import { JournalView } from './components/JournalView'
 import { PlanView } from './components/PlanView'
 import { FeedbackView } from './components/FeedbackView'
 import { BrowserView } from './components/BrowserView'
+import { DesignView } from './components/DesignView'
 import { StubView } from './components/StubView'
 import { SkillsView } from './components/SkillsView'
 import { AgentRunInspector } from './components/AgentRunInspector'
@@ -265,17 +266,7 @@ export function App() {
             }}
           />
         )}
-        {activeView === 'design' && (
-          <div className="gg-view-placeholder">
-            <div className="gg-view-placeholder-icon">🎨</div>
-            <h2>{t.views.designTitle}</h2>
-            <p>{t.views.designDesc}</p>
-            <p className="gg-view-placeholder-hint">{t.views.designHint}</p>
-            <div className="gg-view-placeholder-actions">
-              <button onClick={() => setActiveView('chat')}>{t.views.designCreate}</button>
-            </div>
-          </div>
-        )}
+        {activeView === 'design' && <DesignView onGoToChat={() => setActiveView('chat')} />}
         {activeView === 'video' && (
           <div className="gg-view-placeholder">
             <div className="gg-view-placeholder-icon">🎬</div>
