@@ -376,7 +376,9 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
           skill: event.skill,
           task: event.task,
           status: event.status,
-          result: event.result
+          result: event.result,
+          role: event.role,
+          toolCount: event.toolCount
         })
       }
       else if (event.type === 'cross-verify') {
@@ -948,6 +950,10 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
                     <div className="gg-subagent-meta">
                       {sa.skill && <span className="gg-subagent-tag">скилл: {sa.skill}</span>}
                       {sa.provider && <span className="gg-subagent-tag">провайдер: {sa.provider}</span>}
+                      {sa.role && <span className="gg-subagent-tag">роль: {sa.role}</span>}
+                      {typeof sa.toolCount === 'number' && sa.toolCount > 0 && (
+                        <span className="gg-subagent-tag">🔧 {sa.toolCount} tool-вызовов</span>
+                      )}
                     </div>
                     <div className="gg-subagent-task">{sa.task}</div>
                     {sa.result && (
