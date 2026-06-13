@@ -54,6 +54,7 @@ export const EXTRA_PROVIDERS: ExtraProviderSpec[] = [
       'google/gemini-3-pro',
       'google/gemini-3.5-flash',
       'x-ai/grok-4',
+      'moonshotai/kimi-k2.7-code',
       'deepseek/deepseek-v3',
       'meta-llama/llama-3.3-70b-instruct'
     ],
@@ -81,20 +82,22 @@ export const EXTRA_PROVIDERS: ExtraProviderSpec[] = [
   {
     id: 'moonshot',
     name: 'Moonshot Kimi',
-    description: 'Китайский Kimi K2.6 — open-source SoTA по агентам и коду. OpenAI-совместим, дёшево, длинный контекст.',
+    description: 'Китайский Kimi — open-source SoTA по агентам и коду. K2.7-Code (coding-first, 256K, $0.95/$4) дёшев под рои; K2.6 — общий флагман. OpenAI-совместим.',
     secretKey: 'moonshot_api_key',
     keyLink: { url: 'https://platform.moonshot.ai/console/api-keys', label: 'platform.moonshot.ai' },
     keyHint: 'sk-...',
     // Модели подтверждены: https://platform.kimi.ai/docs/models.md (июнь 2026).
-    // kimi-k2.6 — флагман; moonshot-v1-* — длинноконтекстная классика.
+    // kimi-k2.7-code — coding-first (релиз 12.06.2026, open-source 1T MoE, 256K);
+    // kimi-k2.6 — общий флагман; moonshot-v1-* — длинноконтекстная классика.
     models: [
+      'kimi-k2.7-code',
       'kimi-k2.6',
       'kimi-k2.5',
       'moonshot-v1-128k',
       'moonshot-v1-32k',
       'moonshot-v1-8k'
     ],
-    defaultModel: 'kimi-k2.6',
+    defaultModel: 'kimi-k2.7-code',
     baseUrl: 'https://api.moonshot.ai/v1'
   },
   {

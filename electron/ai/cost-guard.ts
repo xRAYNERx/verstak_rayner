@@ -54,7 +54,8 @@ const PRICES: Record<string, ModelPrice> = {
   'deepseek-v4-pro':       { input: 0.55, output: 2.19 },
   'deepseek-chat':         { input: 0.28, output: 0.42 },
   'deepseek-reasoner':     { input: 0.55, output: 2.19 },
-  // Moonshot Kimi — platform.moonshot.ai (K2.6 флагман; v1-* по контексту).
+  // Moonshot Kimi — platform.moonshot.ai (K2.7-Code coding-first; K2.6 флагман; v1-* по контексту).
+  'kimi-k2.7-code':        { input: 0.95, output: 4.00 },
   'kimi-k2.6':             { input: 0.60, output: 2.50 },
   'kimi-k2.5':             { input: 0.60, output: 2.50 },
   'moonshot-v1-128k':      { input: 2.00, output: 5.00 },
