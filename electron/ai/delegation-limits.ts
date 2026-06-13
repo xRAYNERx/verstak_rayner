@@ -93,4 +93,14 @@ export class SessionAgentCounter {
     if (gate.allowed) this.total += n
     return gate
   }
+
+  /**
+   * Вернуть `n` ранее зарезервированных слотов — суб не стартовал (нет
+   * провайдера/apiKey, отменён в очереди, batchCapped). Без рефанда упавшие на
+   * валидации субы завышали счётчик дерева и могли преждевременно упереться в
+   * MAX_TOTAL_AGENTS_PER_SESSION. Не уходит ниже 0.
+   */
+  release(n: number = 1): void {
+    this.total = Math.max(0, this.total - n)
+  }
 }

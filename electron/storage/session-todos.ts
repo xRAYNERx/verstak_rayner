@@ -85,7 +85,12 @@ export function createSessionTodos(db: Database): SessionTodos {
         }
       })
       tx(opts.titles)
-      return ids.map(id => this.list(opts.projectPath, opts.sessionId).find(t => t.id === id)!).filter(Boolean)
+      // Один list() + Map-индекс по id вместо N полных list()-выборок (было
+      // O(N×M) на горячем пути orchestrate/todo_create). Порядок ids = порядок
+      // вставки = порядок list() (ord ASC), поведение идентично.
+      const listed = this.list(opts.projectPath, opts.sessionId)
+      const byId = new Map(listed.map(t => [t.id, t]))
+      return ids.map(id => byId.get(id)!).filter(Boolean)
     },
     update(id, patch) {
       const sets: string[] = []

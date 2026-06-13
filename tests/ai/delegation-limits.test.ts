@@ -76,6 +76,36 @@ describe('SessionAgentCounter — общий потолок на всё дере
     expect(c.count).toBe(MAX_TOTAL_AGENTS_PER_SESSION)
   })
 
+  it('release возвращает зарезервированные слоты при раннем фейле суба', () => {
+    const c = new SessionAgentCounter()
+    expect(c.tryReserve(0, 5).allowed).toBe(true)
+    expect(c.count).toBe(5)
+    // 2 суба упали на валидации (нет провайдера/apiKey) — возвращаем их слоты.
+    c.release(2)
+    expect(c.count).toBe(3)
+    c.release()  // дефолт n=1
+    expect(c.count).toBe(2)
+  })
+
+  it('release не уходит ниже 0', () => {
+    const c = new SessionAgentCounter()
+    c.tryReserve(0, 1)
+    c.release(5)  // отпустили больше чем зарезервировали
+    expect(c.count).toBe(0)
+  })
+
+  it('refund освобождает квоту для последующих делегирований', () => {
+    const c = new SessionAgentCounter()
+    // забили потолок
+    expect(c.tryReserve(0, MAX_TOTAL_AGENTS_PER_SESSION).allowed).toBe(true)
+    expect(c.tryReserve(0, 1).allowed).toBe(false)  // потолок
+    // вернули 3 слота упавших субов → снова можно
+    c.release(3)
+    expect(c.tryReserve(0, 1).allowed).toBe(true)
+    expect(c.tryReserve(0, 2).allowed).toBe(true)
+    expect(c.tryReserve(0, 1).allowed).toBe(false)  // снова потолок
+  })
+
   it('цикл делегирований не уходит в бесконечность — потолок гасит за конечное число шагов', () => {
     // Симулируем «суб делегирует суба, тот делегирует ещё» по 1 за шаг.
     // Даже если depth каким-то образом оставался бы 0, потолок total обязан

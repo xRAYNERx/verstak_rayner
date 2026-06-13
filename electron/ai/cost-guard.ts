@@ -37,10 +37,80 @@ const PRICES: Record<string, ModelPrice> = {
   'o1-mini':               { input: 3.0,  output: 12.0 },
   'grok-4':                { input: 5.0,  output: 15.0 },
   'grok-4-fast':           { input: 0.20, output: 0.50 },
-  'grok-3':                { input: 3.0,  output: 15.0 }
+  'grok-3':                { input: 3.0,  output: 15.0 },
+  // 🇷🇺 YandexGPT — yandex.cloud/ru/docs/foundation-models/pricing (₽→$ по ~90,
+  //  округлено консервативно вверх). Lite дешевле Pro.
+  'yandexgpt/latest':      { input: 0.50, output: 0.50 },
+  'yandexgpt-32k/latest':  { input: 0.50, output: 0.50 },
+  'yandexgpt-lite/latest': { input: 0.15, output: 0.15 },
+  // 🇷🇺 GigaChat — developers.sber.ru/docs (тарификация в токенах; ₽→$ ~90,
+  //  консервативная оценка). Max/Pro дороже базового.
+  'GigaChat':              { input: 0.30, output: 0.30 },
+  'GigaChat-Plus':         { input: 0.30, output: 0.30 },
+  'GigaChat-Pro':          { input: 1.50, output: 1.50 },
+  'GigaChat-Max':          { input: 2.00, output: 2.00 },
+  // DeepSeek — api-docs.deepseek.com/quick_start/pricing (V4, дёшево).
+  'deepseek-v4-flash':     { input: 0.28, output: 0.42 },
+  'deepseek-v4-pro':       { input: 0.55, output: 2.19 },
+  'deepseek-chat':         { input: 0.28, output: 0.42 },
+  'deepseek-reasoner':     { input: 0.55, output: 2.19 },
+  // Moonshot Kimi — platform.moonshot.ai (K2.6 флагман; v1-* по контексту).
+  'kimi-k2.6':             { input: 0.60, output: 2.50 },
+  'kimi-k2.5':             { input: 0.60, output: 2.50 },
+  'moonshot-v1-128k':      { input: 2.00, output: 5.00 },
+  'moonshot-v1-32k':       { input: 1.00, output: 3.00 },
+  'moonshot-v1-8k':        { input: 0.20, output: 2.00 },
+  // Qwen (Alibaba DashScope) — alibabacloud.com/help/model-studio.
+  'qwen3-max':             { input: 1.60, output: 6.40 },
+  'qwen3-coder-plus':      { input: 1.00, output: 5.00 },
+  'qwen3-coder-flash':     { input: 0.30, output: 1.50 },
+  'qwen-max':              { input: 1.60, output: 6.40 },
+  'qwen-plus':             { input: 0.40, output: 1.20 },
+  'qwen-flash':            { input: 0.05, output: 0.40 },
+  // Mistral — mistral.ai/pricing.
+  'mistral-large-latest':  { input: 2.00, output: 6.00 },
+  'mistral-small-latest':  { input: 0.20, output: 0.60 },
+  'codestral-latest':      { input: 0.30, output: 0.90 },
+  'ministral-8b-latest':   { input: 0.10, output: 0.10 },
+  // Groq — groq.com/pricing (LPU-инференс на open-source моделях, дёшево).
+  'llama-3.3-70b-versatile': { input: 0.59, output: 0.79 },
+  'llama-3.1-8b-instant':    { input: 0.05, output: 0.08 },
+  'mixtral-8x7b-32768':      { input: 0.24, output: 0.24 },
+  'gemma2-9b-it':            { input: 0.20, output: 0.20 },
+  // Ollama (local) — модели крутятся локально, денег не стоят. Явно $0,
+  //  чтобы это была ОСОЗНАННАЯ бесплатность, а не «неизвестная модель».
+  'llama3.3':              { input: 0, output: 0 },
+  'qwen2.5-coder':         { input: 0, output: 0 },
+  'deepseek-r1':           { input: 0, output: 0 },
+  'mistral':               { input: 0, output: 0 },
+  'gemma2':                { input: 0, output: 0 }
 }
 
+// Fail-safe тариф для НЕИЗВЕСТНОЙ модели при ВКЛЮЧЁННОМ cap. Берём как у дорогой
+// модели (claude-sonnet), чтобы рой субов на незнакомой модели не жёг деньги
+// без счёта. Без cap (capCents == null) этот тариф не применяется — поведение
+// прежнее («не считаем»).
+const FALLBACK_PRICE: ModelPrice = { input: 3.0, output: 15.0, cached: 0.3 }
+
 const CLI_FREE: Set<ProviderId> = new Set(['gemini-cli', 'claude-cli', 'grok-cli', 'codex-cli'])
+
+// Провайдеры, где стоимость заведомо $0 (локальный inference / собственный
+// endpoint без известного тарифа). Их неизвестные модели НЕ попадают под
+// fail-safe — они осознанно бесплатные, а не «непосчитанные».
+const ZERO_COST_PROVIDERS: Set<ProviderId> = new Set(['ollama', 'custom-openai'])
+
+/**
+ * Нормализует model id перед lookup в PRICES. OpenRouter раздаёт модели с
+ * префиксом провайдера ('anthropic/claude-sonnet-4-6', 'openai/gpt-5', …) —
+ * срезаем его, чтобы матчить базовое имя из PRICES.
+ */
+function normalizeModelId(providerId: ProviderId, model: string): string {
+  if (providerId === 'openrouter') {
+    const slash = model.indexOf('/')
+    if (slash >= 0) return model.slice(slash + 1)
+  }
+  return model
+}
 
 export interface CostGuard {
   /** Накопить usage и проверить cap. Возвращает true если превышено → abort. */
@@ -59,39 +129,53 @@ export interface CostGuard {
  */
 export function createCostGuard(capUsd: number | null): CostGuard {
   const capCents = capUsd && capUsd > 0 ? Math.round(capUsd * 100) : null
-  let cumulative = 0
+  // Аккумулируем ДРОБНЫЕ центы как float — иначе дешёвые ходы роёв (когда
+  // total*100 < 1) округлялись бы в 0 на каждом событии, и cap не взводился
+  // бы никогда. Округляем только при выдаче наружу (current() / cents).
+  let cumulativeCents = 0
 
   return {
     recordAndCheck(providerId, model, input, output, cached) {
       if (CLI_FREE.has(providerId)) {
         // CLI = подписка, $0
-        return { exceeded: false, cents: cumulative, capCents }
+        return { exceeded: false, cents: Math.round(cumulativeCents), capCents }
       }
-      const price = PRICES[model]
+      if (ZERO_COST_PROVIDERS.has(providerId)) {
+        // Локальный / собственный endpoint без тарифа — осознанно $0.
+        return { exceeded: false, cents: Math.round(cumulativeCents), capCents }
+      }
+      const lookup = normalizeModelId(providerId, model)
+      let price = PRICES[lookup]
       if (!price) {
-        // Неизвестная модель — не считаем, не блокируем
-        return { exceeded: false, cents: cumulative, capCents }
+        // fail-safe: при ВЫКЛЮЧЕННОМ cap неизвестную модель не считаем (прежнее
+        // поведение). При ВКЛЮЧЁННОМ cap считаем по консервативному тарифу,
+        // чтобы рой субов на незнакомой модели не жёг деньги без счёта.
+        if (capCents == null) {
+          return { exceeded: false, cents: Math.round(cumulativeCents), capCents }
+        }
+        price = FALLBACK_PRICE
       }
       const billableInput = Math.max(0, input - cached)
       const inputCost = (billableInput / 1_000_000) * price.input
       const cachedCost = price.cached ? (cached / 1_000_000) * price.cached : 0
       const outputCost = (output / 1_000_000) * price.output
       const total = inputCost + cachedCost + outputCost
-      cumulative += Math.round(total * 100)
+      cumulativeCents += total * 100
 
-      if (capCents != null && cumulative >= capCents) {
+      if (capCents != null && cumulativeCents >= capCents) {
+        const shownCents = Math.round(cumulativeCents)
         return {
           exceeded: true,
-          cents: cumulative,
+          cents: shownCents,
           capCents,
-          message: `Сессия израсходовала $${(cumulative / 100).toFixed(2)} (лимит $${(capCents / 100).toFixed(2)}). ` +
+          message: `Сессия израсходовала $${(cumulativeCents / 100).toFixed(2)} (лимит $${(capCents / 100).toFixed(2)}). ` +
                    `Остановлена hard cost cap'ом из Settings. Подними лимит или начни новую сессию.`
         }
       }
-      return { exceeded: false, cents: cumulative, capCents }
+      return { exceeded: false, cents: Math.round(cumulativeCents), capCents }
     },
     current() {
-      return cumulative
+      return Math.round(cumulativeCents)
     }
   }
 }

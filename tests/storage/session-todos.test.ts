@@ -32,6 +32,18 @@ describe('session-todos (migration 13)', () => {
     db.close()
   })
 
+  it('createBatch возвращает все строки в порядке вставки даже при дубликатах title', () => {
+    // Регресс багу перфоманса: возврат через один list()+Map по id. Дубли title
+    // не должны схлопывать результат (id — уникальный PK, не title).
+    const db = openDb(join(dir, 'test.db'))
+    const todos = createSessionTodos(db)
+    const created = todos.createBatch({ projectPath: '/p', sessionId: 1, titles: ['dup', 'dup', 'dup'] })
+    expect(created).toHaveLength(3)
+    expect(new Set(created.map(t => t.id)).size).toBe(3)  // три РАЗНЫХ id
+    expect(created.map(t => t.ord)).toEqual([0, 1, 2])
+    db.close()
+  })
+
   it('повторный createBatch продолжает ord, а не перетирает', () => {
     const db = openDb(join(dir, 'test.db'))
     const todos = createSessionTodos(db)

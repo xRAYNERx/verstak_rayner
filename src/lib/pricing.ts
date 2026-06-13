@@ -38,10 +38,66 @@ const PRICES: Record<string, ModelPrice> = {
   // xAI — x.ai/api
   'grok-4':                      { input: 5.0,  output: 15.0 },
   'grok-4-fast':                 { input: 0.20, output: 0.50 },
-  'grok-3':                      { input: 3.0,  output: 15.0 }
+  'grok-3':                      { input: 3.0,  output: 15.0 },
+  // 🇷🇺 YandexGPT — yandex.cloud pricing (₽→$ ~90, консервативно вверх)
+  'yandexgpt/latest':            { input: 0.50, output: 0.50 },
+  'yandexgpt-32k/latest':        { input: 0.50, output: 0.50 },
+  'yandexgpt-lite/latest':       { input: 0.15, output: 0.15 },
+  // 🇷🇺 GigaChat — developers.sber.ru (₽→$ ~90, консервативно)
+  'GigaChat':                    { input: 0.30, output: 0.30 },
+  'GigaChat-Plus':               { input: 0.30, output: 0.30 },
+  'GigaChat-Pro':                { input: 1.50, output: 1.50 },
+  'GigaChat-Max':                { input: 2.00, output: 2.00 },
+  // DeepSeek — api-docs.deepseek.com (V4)
+  'deepseek-v4-flash':           { input: 0.28, output: 0.42 },
+  'deepseek-v4-pro':             { input: 0.55, output: 2.19 },
+  'deepseek-chat':               { input: 0.28, output: 0.42 },
+  'deepseek-reasoner':           { input: 0.55, output: 2.19 },
+  // Moonshot Kimi — platform.moonshot.ai
+  'kimi-k2.6':                   { input: 0.60, output: 2.50 },
+  'kimi-k2.5':                   { input: 0.60, output: 2.50 },
+  'moonshot-v1-128k':            { input: 2.00, output: 5.00 },
+  'moonshot-v1-32k':             { input: 1.00, output: 3.00 },
+  'moonshot-v1-8k':              { input: 0.20, output: 2.00 },
+  // Qwen (Alibaba DashScope)
+  'qwen3-max':                   { input: 1.60, output: 6.40 },
+  'qwen3-coder-plus':            { input: 1.00, output: 5.00 },
+  'qwen3-coder-flash':           { input: 0.30, output: 1.50 },
+  'qwen-max':                    { input: 1.60, output: 6.40 },
+  'qwen-plus':                   { input: 0.40, output: 1.20 },
+  'qwen-flash':                  { input: 0.05, output: 0.40 },
+  // Mistral — mistral.ai/pricing
+  'mistral-large-latest':        { input: 2.00, output: 6.00 },
+  'mistral-small-latest':        { input: 0.20, output: 0.60 },
+  'codestral-latest':            { input: 0.30, output: 0.90 },
+  'ministral-8b-latest':         { input: 0.10, output: 0.10 },
+  // Groq — groq.com/pricing
+  'llama-3.3-70b-versatile':     { input: 0.59, output: 0.79 },
+  'llama-3.1-8b-instant':        { input: 0.05, output: 0.08 },
+  'mixtral-8x7b-32768':          { input: 0.24, output: 0.24 },
+  'gemma2-9b-it':                { input: 0.20, output: 0.20 },
+  // Ollama (local) — крутится локально, $0 явно
+  'llama3.3':                    { input: 0, output: 0 },
+  'qwen2.5-coder':               { input: 0, output: 0 },
+  'deepseek-r1':                 { input: 0, output: 0 },
+  'mistral':                     { input: 0, output: 0 },
+  'gemma2':                      { input: 0, output: 0 }
 }
 
 const CLI_FREE: Set<ProviderId> = new Set(['gemini-cli', 'claude-cli', 'grok-cli', 'codex-cli'])
+
+/**
+ * Нормализует model id перед lookup в PRICES. OpenRouter раздаёт модели с
+ * префиксом провайдера ('anthropic/claude-sonnet-4-6') — срезаем его, чтобы
+ * матчить базовое имя из таблицы цен. Должно совпадать с cost-guard.ts.
+ */
+function normalizeModelId(providerId: ProviderId, model: string): string {
+  if (providerId === 'openrouter') {
+    const slash = model.indexOf('/')
+    if (slash >= 0) return model.slice(slash + 1)
+  }
+  return model
+}
 
 export interface CostEstimate {
   /** Total USD, formatted as a string. null when provider is CLI (covered by subscription). */
@@ -58,7 +114,7 @@ export function estimateCost(
   cachedInputTokens: number
 ): CostEstimate {
   if (CLI_FREE.has(providerId)) return { usd: null, cents: 0 }
-  const price = PRICES[model]
+  const price = PRICES[normalizeModelId(providerId, model)]
   if (!price) return { usd: '—', cents: 0 }
   const billableInput = Math.max(0, inputTokens - cachedInputTokens)
   const inputCost = (billableInput / 1_000_000) * price.input
@@ -102,7 +158,7 @@ export function costBreakdown(
   if (CLI_FREE.has(providerId)) {
     return `Провайдер: ${providerId} (CLI, подписка — стоимость = $0)\nТокены input: ${inputTokens}\nТокены output: ${outputTokens}`
   }
-  const price = PRICES[model]
+  const price = PRICES[normalizeModelId(providerId, model)]
   if (!price) {
     return `Модель ${model}: цены неизвестны\nТокены input: ${inputTokens}\nТокены output: ${outputTokens}`
   }

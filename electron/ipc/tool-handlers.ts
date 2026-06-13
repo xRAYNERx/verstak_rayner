@@ -253,10 +253,26 @@ async function diffConfirmWrite(call: ToolCall, ctx: ToolContext, path: string, 
     })
     accepted = true
   } else {
-    // 'confirm' — show diff modal and wait
+    // 'confirm' — show diff modal and wait. Ожидание привязано к ctx.signal:
+    // для суба это taskAc.signal (per-task таймаут/отмена), для главного агента —
+    // ctrl.signal. Раньше Promise не слушал abort → суб-executor с write в
+    // ask-режиме висел, и per-task таймаут его не разрывал (до 50 модалок).
     ctx.sender.send('ai:event', { id: ctx.sendId, event: { type: 'pending-write', callId: call.id, path, before, after } })
+    const key = ctx.scopedKey(ctx.sendId, call.id)
     accepted = await new Promise<boolean>(resolve => {
-      ctx.pendingWrites.set(ctx.scopedKey(ctx.sendId, call.id), { sendId: ctx.sendId, resolve })
+      let settled = false
+      const finish = (v: boolean) => {
+        if (settled) return  // guard от двойного resolve (abort + ai:resolve-write)
+        settled = true
+        ctx.pendingWrites.delete(key)
+        ctx.signal.removeEventListener('abort', onAbort)
+        resolve(v)
+      }
+      // Таймаут/отмена субзадачи (или родителя) → трактуем как reject.
+      const onAbort = () => finish(false)
+      ctx.pendingWrites.set(key, { sendId: ctx.sendId, resolve: finish })
+      if (ctx.signal.aborted) { onAbort(); return }
+      ctx.signal.addEventListener('abort', onAbort, { once: true })
     })
   }
   if (!accepted) {
@@ -640,6 +656,26 @@ function buildSubCreateOptions(
 // delegate_task — мультиагент V1
 // ============================================================================
 
+/**
+ * Нормализует и дедуплицирует поле `id` у элементов батча IN-PLACE. Пустой id →
+ * `<prefix>-N`, повтор → `id#2`, `id#3`… Нужно потому что subCallId строится как
+ * `${call.id}:${item.id}` — дубль id схлопывает карточки субагентов (upsert по
+ * callId) и ломает дерево суб-сессий. id — модельный ввод, программно не уникален.
+ */
+export function dedupeTaskIds(items: Array<{ id: string }>, prefix = 'task'): void {
+  const seen = new Set<string>()
+  items.forEach((item, i) => {
+    let id = String(item.id ?? '').trim() || `${prefix}-${i + 1}`
+    if (seen.has(id)) {
+      let n = 2
+      while (seen.has(`${id}#${n}`)) n++
+      id = `${id}#${n}`
+    }
+    seen.add(id)
+    item.id = id
+  })
+}
+
 const delegateTaskHandler: ToolHandler = {
   mode: 'sequential',
   async handle(call, ctx) {
@@ -746,18 +782,21 @@ const delegateTaskHandler: ToolHandler = {
       const { getRoleToolset } = await import('../ai/role-tools')
       const fallbackProvider = subProvider ?? ctx.currentProviderId ?? null
       if (!fallbackProvider) {
+        ctx.agentCounter?.release(1)  // суб не стартовал — возвращаем слот
         emitSubagent('error', 'нет провайдера')
         finalizeSub('error')
         return { id: call.id, name: call.name, result: '', error: 'delegate_task: provider_id не задан и у текущего чата нет провайдера. Укажи provider_id явно.' }
       }
       const descriptor = PROVIDERS[fallbackProvider as keyof typeof PROVIDERS]
       if (!descriptor) {
+        ctx.agentCounter?.release(1)
         emitSubagent('error', `неизвестный provider ${fallbackProvider}`)
         finalizeSub('error')
         return { id: call.id, name: call.name, result: '', error: `delegate_task: неизвестный provider ${fallbackProvider}` }
       }
       const apiKey = descriptor.secretKey ? ctx.getSecretForDelegate?.(descriptor.secretKey) ?? null : null
       if (descriptor.secretKey && !apiKey) {
+        ctx.agentCounter?.release(1)
         emitSubagent('error', `нет API key для ${fallbackProvider}`)
         finalizeSub('error')
         return { id: call.id, name: call.name, result: '', error: `delegate_task: нет API key для ${fallbackProvider}` }
@@ -780,6 +819,7 @@ const delegateTaskHandler: ToolHandler = {
       } catch {
         clearTimeout(timeoutId)
         ctx.signal.removeEventListener('abort', parentAbortHandler)
+        ctx.agentCounter?.release(1)  // суб не стартовал — возвращаем слот
         emitSubagent('error', 'отменён в очереди')
         finalizeSub('cancelled')
         return { id: call.id, name: call.name, result: '', error: 'delegate_task: задача отменена в очереди' }
@@ -860,6 +900,11 @@ const delegateParallelHandler: ToolHandler = {
       if (tasks.length > MAX_PARALLEL) {
         return { id: call.id, name: call.name, result: '', error: `delegate_parallel: максимум ${MAX_PARALLEL} задач в одном батче` }
       }
+
+      // Нормализация-дедуп task.id: subCallId = `${call.id}:${task.id}` должен быть
+      // уникальным в батче, иначе карточки субагентов сливаются (upsert по callId)
+      // и связь суб-сессий/дерева рушится. Пустой id → task-N, дубль → id#2/#3…
+      dedupeTaskIds(tasks)
 
       // Фаза 4 (Идея 3): гейт глубины + общего числа агентов. Резервируем сразу
       // ВЕСЬ батч (tasks.length) — если квота/глубина не позволяют, не стартуем
@@ -961,12 +1006,14 @@ const delegateParallelHandler: ToolHandler = {
 
         const descriptor = PROVIDERS[providerId as keyof typeof PROVIDERS]
         if (!descriptor) {
+          ctx.agentCounter?.release(1)  // суб не стартовал — возвращаем слот
           emitSubagent('error', `неизвестный provider ${providerId}`)
           finalizeSub('error')
           throw new Error(`неизвестный provider ${providerId}`)
         }
         const apiKey = descriptor.secretKey ? ctx.getSecretForDelegate?.(descriptor.secretKey) ?? null : null
         if (descriptor.secretKey && !apiKey) {
+          ctx.agentCounter?.release(1)
           emitSubagent('error', `нет API key для ${providerId}`)
           finalizeSub('error')
           throw new Error(`нет API key для ${providerId}`)
@@ -987,6 +1034,7 @@ const delegateParallelHandler: ToolHandler = {
         } catch {
           clearTimeout(timeoutId)
           ctx.signal.removeEventListener('abort', parentAbortHandler)
+          ctx.agentCounter?.release(1)  // суб не стартовал — возвращаем слот
           emitSubagent('error', 'отменён в очереди')
           finalizeSub('cancelled')
           throw new Error('отменён в очереди')
@@ -995,6 +1043,7 @@ const delegateParallelHandler: ToolHandler = {
           clearTimeout(timeoutId)
           ctx.signal.removeEventListener('abort', parentAbortHandler)
           queueSlot.release()
+          ctx.agentCounter?.release(1)  // суб не стартовал — возвращаем слот
           emitSubagent('error', 'батч остановлен по cost-cap')
           finalizeSub('cancelled')
           throw new Error('батч остановлен по cost-cap')
@@ -1152,6 +1201,16 @@ export async function decomposeGoal(
   ], [])) {
     if (signal.aborted) break
     if (event.type === 'text' && typeof event.text === 'string') text += event.text
+    else if (event.type === 'usage' && event.usage) {
+      // Токены планировщика — платный API-вызов до старта батча. Учитываем их в
+      // session cost guard, иначе orchestrate недосчитывает стоимость (асимметрия
+      // с runSubAgentLoop, который usage обрабатывает). providerId/model здесь =
+      // baseProviderId/plannerModel из orchestrate, поэтому модель совпадёт с PRICES.
+      const guard = ctx.subCostGuard
+      if (guard) {
+        guard.recordAndCheck(providerId, model, event.usage.inputTokens ?? 0, event.usage.outputTokens ?? 0, event.usage.cachedInputTokens ?? 0)
+      }
+    }
     else if (event.type === 'error') throw new Error(event.message)
     else if (event.type === 'done') break
   }
@@ -1196,6 +1255,9 @@ const orchestrateHandler: ToolHandler = {
       // 1) Декомпозиция через модель-планировщик (дешёвая модель достаточна).
       const plannerModel = recommendModel(baseProviderId, 'moderate') ?? descriptor.defaultModel
       const subtasks = await decomposeGoal(goal, maxSubtasks, baseProviderId, apiKey, plannerModel, ctx, ctx.signal)
+      // Дедуп id подзадач — планировщик-модель может выдать одинаковые id, а
+      // subCallId = `${call.id}:${task.id}` должен быть уникальным (см. dedupeTaskIds).
+      dedupeTaskIds(subtasks)
 
       // 2) Создаём todo-лист из подзадач (TodoGate, Идея 2 — связь).
       if (ctx.sessionTodos) {
@@ -1271,6 +1333,7 @@ const orchestrateHandler: ToolHandler = {
         } catch {
           clearTimeout(timeoutId)
           ctx.signal.removeEventListener('abort', parentAbortHandler)
+          ctx.agentCounter?.release(1)  // суб не стартовал — возвращаем слот
           emitSubagent('error', 'отменён в очереди')
           finalizeSub('cancelled')
           throw new Error('отменён в очереди')
@@ -1279,6 +1342,7 @@ const orchestrateHandler: ToolHandler = {
           clearTimeout(timeoutId)
           ctx.signal.removeEventListener('abort', parentAbortHandler)
           queueSlot.release()
+          ctx.agentCounter?.release(1)  // суб не стартовал — возвращаем слот
           emitSubagent('error', 'остановлен по cost-cap')
           finalizeSub('cancelled')
           throw new Error('остановлен по cost-cap')
@@ -1405,6 +1469,9 @@ const swarmHandler: ToolHandler = {
       }
       const strategy = call.args.strategy ? String(call.args.strategy).trim() : ''
       const roster = buildSwarmRoster(typeof call.args.size === 'number' ? call.args.size : 4)
+      // Дедуп id членов роя — buildSwarmRoster даёт уникальные id по построению,
+      // но subCallId = `${call.id}:${m.id}` требует гарантии (см. dedupeTaskIds).
+      dedupeTaskIds(roster, 'member')
       const batchCapCents = typeof call.args.cost_cap_usd === 'number' && call.args.cost_cap_usd > 0
         ? Math.round(call.args.cost_cap_usd * 100)
         : DEFAULT_BATCH_COST_CAP_CENTS
@@ -1486,11 +1553,13 @@ const swarmHandler: ToolHandler = {
           queueSlot = await subAgentQueue.enter({ group: groupTag, role: m.role, abort: () => taskAc.abort() }, taskAc.signal)
         } catch {
           clearTimeout(timeoutId); ctx.signal.removeEventListener('abort', parentAbortHandler)
+          ctx.agentCounter?.release(1)  // член роя не стартовал — возвращаем слот
           emitSubagent('error', 'отменён в очереди'); finalizeSub('cancelled')
           throw new Error('отменён в очереди')
         }
         if (batchCapped) {
           clearTimeout(timeoutId); ctx.signal.removeEventListener('abort', parentAbortHandler); queueSlot.release()
+          ctx.agentCounter?.release(1)  // член роя не стартовал — возвращаем слот
           emitSubagent('error', 'остановлен по cost-cap'); finalizeSub('cancelled')
           throw new Error('остановлен по cost-cap')
         }
@@ -1545,6 +1614,7 @@ const swarmHandler: ToolHandler = {
         .filter((v): v is { id: string; role: string; angle: string; result: string } => v !== null)
 
       if (variants.length === 0) {
+        ctx.agentCounter?.release(1)  // арбитр (+1 в резерве) не стартует — возвращаем слот
         const errs = settled.map((r, i) => r.status === 'rejected' ? `${roster[i].id}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}` : '').filter(Boolean)
         return { id: call.id, name: call.name, result: '', error: `swarm: ни один агент роя не дал результат. ${errs.join('; ')}` }
       }
@@ -1577,10 +1647,17 @@ const swarmHandler: ToolHandler = {
           ctx.subSessions.appendMessage(arbiterSessionId, ctx.projectPath, 'user', arbiterUser)
         } catch { /* persist не критично */ }
       }
+      // Per-task таймаут арбитра — тот же паттерн, что у членов роя (runMember).
+      // Без него зависший арбитрский провайдер вешал swarm до ручной отмены
+      // всего ai:send: signal === ctx.signal не обрывается по таймауту.
+      const arbAc = new AbortController()
+      const arbTimeoutId = setTimeout(() => arbAc.abort(), SUB_TASK_TIMEOUT_MS)
+      const arbAbortHandler = () => arbAc.abort()
+      ctx.signal.addEventListener('abort', arbAbortHandler, { once: true })
       try {
         const arbiterProvider = createProvider(
           baseProviderId,
-          buildSubCreateOptions(baseProviderId, apiKey, descriptor.defaultModel, ctx.signal, ctx)
+          buildSubCreateOptions(baseProviderId, apiKey, descriptor.defaultModel, arbAc.signal, ctx)
         )
         // Арбитр — read-only (никаких правок при синтезе).
         const res = await runSubAgentLoop({
@@ -1588,7 +1665,7 @@ const swarmHandler: ToolHandler = {
           messages: [{ role: 'system', content: arbiterSystem }, { role: 'user', content: arbiterUser }],
           allowedToolNames: getRoleToolset('critic', { depth: depth + 1 }),
           ctx: { ...ctx, subProviderId: baseProviderId, subModel: descriptor.defaultModel, delegationDepth: depth + 1, parentCallId: arbiterCallId },
-          signal: ctx.signal, role: 'critic'
+          signal: arbAc.signal, role: 'critic'
         })
         consensus = res.text.trim()
         arbiterOk = res.exitReason !== 'error' && consensus.length > 0
@@ -1606,6 +1683,9 @@ const swarmHandler: ToolHandler = {
         if (arbiterSessionId != null && ctx.subSessions) {
           try { ctx.subSessions.update(arbiterSessionId, { status: 'error', endedAt: Date.now() }) } catch { /* */ }
         }
+      } finally {
+        clearTimeout(arbTimeoutId)
+        ctx.signal.removeEventListener('abort', arbAbortHandler)
       }
 
       try {
