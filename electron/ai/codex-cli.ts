@@ -25,18 +25,29 @@ interface CodexCliOptions {
  * Перевести режим Verstak во флаги песочницы `codex exec` (он неинтерактивен,
  * approval-промптов нет — рычаг только sandbox-политика):
  *  ask/plan → read-only · accept-edits/auto → workspace-write · bypass → full bypass.
+ *
+ * Windows: дефолтная (elevated) песочница Codex валится на этапе подготовки
+ * («windows sandbox: spawn setup refresh» — openai/codex#25497, #24098), из-за
+ * чего не выполняется даже read-only команда (агент не может прочитать файл).
+ * Unelevated-вариант рабочий, поэтому на Windows форсим `-c windows.sandbox=unelevated`,
+ * сохраняя семантику режима. Для bypass песочница отключена целиком — фикс не нужен.
  */
-export function sandboxArgsForMode(mode: AgentMode | undefined): string[] {
+export function sandboxArgsForMode(
+  mode: AgentMode | undefined,
+  isWindows: boolean = platform() === 'win32'
+): string[] {
+  if (mode === 'bypass') {
+    return ['--dangerously-bypass-approvals-and-sandbox']
+  }
+  const winFix = isWindows ? ['-c', 'windows.sandbox=unelevated'] : []
   switch (mode) {
-    case 'bypass':
-      return ['--dangerously-bypass-approvals-and-sandbox']
     case 'auto':
     case 'accept-edits':
-      return ['-s', 'workspace-write']
+      return [...winFix, '-s', 'workspace-write']
     case 'plan':
     case 'ask':
     default:
-      return ['-s', 'read-only']
+      return [...winFix, '-s', 'read-only']
   }
 }
 
