@@ -74,7 +74,7 @@ export type ChatEvent =
   | { type: 'tool-activity'; callId: string; name: string; label: string; detail: string; status: 'ok' | 'error' }
   | { type: 'plan-created'; planId: number; title: string; stepCount: number }
   | { type: 'preflight'; callId: string; summary: string; affectedZones: string[]; risk: 'low' | 'medium' | 'high'; riskReason: string; verifyAfter: string[]; outOfScope: string[] }
-  | { type: 'subagent-run'; callId: string; label: string; provider?: string; skill?: string; task: string; status: 'running' | 'done' | 'error'; result?: string; role?: string; toolCount?: number }
+  | { type: 'subagent-run'; callId: string; label: string; provider?: string; skill?: string; task: string; status: 'running' | 'done' | 'error'; result?: string; role?: string; toolCount?: number; swarm?: string }
   | { type: 'artifact-created'; callId: string; kind: 'html' | 'docx'; filename: string; path: string; sizeBytes: number }
   | { type: 'usage'; usage: UsageDelta }
   | { type: 'info'; text: string }
@@ -438,6 +438,10 @@ export interface SubSession {
   callId: string | null
   providerId: string | null
   model: string | null
+  /** Глубина в дереве делегирования (Фаза 4): главный=0, его суб=1, под-суб=2. */
+  depth: number | null
+  /** callId агента-родителя в дереве (Фаза 4) — для иерархии в панели Agents. */
+  parentCallId: string | null
   startedAt: number | null
   endedAt: number | null
   createdAt: number
