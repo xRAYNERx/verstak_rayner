@@ -68,6 +68,8 @@ interface AiDeps {
   /** Фасад персистентных суб-сессий (Фаза 2, Идея 1). Прокидывается в ToolContext,
    *  чтобы delegate_task/delegate_parallel сохраняли историю субагентов в БД. */
   subSessions?: ToolContext['subSessions']
+  /** Фасад TodoGate (Фаза 3, Идея 2) — оркестрационный todo-лист сессии. */
+  sessionTodos?: ToolContext['sessionTodos']
 }
 
 let currentSendId = 0
@@ -513,7 +515,8 @@ export function registerAiIpc(deps: AiDeps): void {
         auditFn,
         deps.trackToolPattern,
         chatId ? Number(chatId) : null,
-        deps.subSessions
+        deps.subSessions,
+        deps.sessionTodos
       ).finally(cleanup)
     } else {
       void runPlainConversation(taggedSender, sendId, provider, projectPath, messagesWithSystem, ctrl.signal, deps.recordJournal, costGuard, providerId, model,
@@ -809,7 +812,8 @@ async function runApiConversation(
   appendAuditFn?: (action: string, detail: string) => void,
   trackToolPatternFn?: (projectPath: string, event: ToolEvent) => void,
   parentChatId?: number | null,
-  subSessions?: AiDeps['subSessions']
+  subSessions?: AiDeps['subSessions'],
+  sessionTodos?: AiDeps['sessionTodos']
 ): Promise<void> {
   const currentMessages = [...initialMessages]
   // Loop detection: per-signature occurrence counter across the whole agent
@@ -1016,7 +1020,9 @@ async function runApiConversation(
       subCostGuard: costGuard,
       // Персистентные суб-сессии (Фаза 2): родитель + фасад БД.
       parentChatId,
-      subSessions
+      subSessions,
+      // TodoGate (Фаза 3): оркестрационный todo-лист сессии.
+      sessionTodos
     }
     const writePromises: Array<{ idx: number; promise: Promise<ToolResult> }> = []
     const readPromises: Array<{ idx: number; promise: Promise<ToolResult> }> = []
@@ -1184,7 +1190,7 @@ async function runApiConversation(
           fallbackOpts.triedProviders.add(nextId)
           // Передаём tools из замыкания — они привязаны к projectPath и signal, не к провайдеру.
           const fallbackTools = createFileTools(projectPath, signal)
-          return runApiConversation(sender, sendId, nextProvider, fallbackTools, projectPath, initialMessages, signal, recordWrite, recordPlan, recordJournal, readJournal, saveMemory, searchMemories, searchConversations, connectors, agentMode, turnsBudget, skillRegistry, getSecretForDelegate, costGuard, nextId, model, fallbackOpts, mcpClientRef, appendAuditFn, trackToolPatternFn, parentChatId, subSessions)
+          return runApiConversation(sender, sendId, nextProvider, fallbackTools, projectPath, initialMessages, signal, recordWrite, recordPlan, recordJournal, readJournal, saveMemory, searchMemories, searchConversations, connectors, agentMode, turnsBudget, skillRegistry, getSecretForDelegate, costGuard, nextId, model, fallbackOpts, mcpClientRef, appendAuditFn, trackToolPatternFn, parentChatId, subSessions, sessionTodos)
         }
       }
     }
