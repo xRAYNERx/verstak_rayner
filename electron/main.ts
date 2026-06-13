@@ -39,6 +39,7 @@ import { createUndoStack } from './storage/undo'
 import { registerUndoIpc } from './ipc/undo'
 import { createPlans } from './storage/plans'
 import { registerPlansIpc } from './ipc/plans'
+import { registerWorkflowsIpc } from './ipc/workflows'
 import { createFeedback } from './storage/feedback'
 import { registerFeedbackIpc } from './ipc/feedback'
 import { registerVerifyIpc } from './ipc/verify'
@@ -328,6 +329,12 @@ app.whenReady().then(() => {
   registerJournalIpc(journal)
   registerUndoIpc(undoStack)
   registerPlansIpc(plans)
+  registerWorkflowsIpc({
+    createPlan: (projectPath, title, steps) => {
+      const plan = plans.create(projectPath, title, steps)
+      return { id: plan.id }
+    }
+  })
   registerFeedbackIpc(feedback)
   registerVerifyIpc(getActiveProjectPath)
   registerAutonomousIpc({

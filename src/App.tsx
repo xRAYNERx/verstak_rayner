@@ -16,6 +16,7 @@ import { SkillsView } from './components/SkillsView'
 import { AgentRunInspector } from './components/AgentRunInspector'
 import { AgentsPanel } from './components/AgentsPanel'
 import { WorkflowView } from './components/WorkflowView'
+import { WorkflowsPanel } from './components/WorkflowsPanel'
 import { MemoryGovernance } from './components/MemoryGovernance'
 import { DiffView } from './components/DiffView'
 import { CommandConfirm } from './components/CommandConfirm'
@@ -253,7 +254,12 @@ export function App() {
         {activeView === 'agents' && <AgentsPanel />}
         {activeView === 'memory-gov' && <MemoryGovernance />}
         {activeView === 'plan' && <PlanView />}
-        {activeView === 'workflow' && <WorkflowView />}
+        {activeView === 'workflow' && (
+          <div className="gg-workflow-scroll">
+            <WorkflowsPanel />
+            <WorkflowView />
+          </div>
+        )}
         {activeView === 'calendar' && <StubView title="Calendar" description="Здесь будут события и дедлайны проекта. В работе." />}
         {activeView === 'feedback' && <FeedbackView />}
         {activeView === 'browser' && <BrowserView />}

@@ -22,6 +22,13 @@ export type PlanStatus = 'draft' | 'running' | 'done' | 'cancelled'
 export type StepStatus = 'pending' | 'running' | 'done' | 'skipped' | 'failed'
 export interface PlanStep { id: number; planId: number; idx: number; title: string; detail: string | null; status: StepStatus; result: string | null; runId?: string | null; verificationStatus?: string | null; changedFilesCount?: number | null }
 export interface Plan { id: number; title: string; status: PlanStatus; createdAt: number; completedAt: number | null; steps: PlanStep[] }
+
+/** Agency Workflows — каталожная карточка workflow'а. */
+export interface WorkflowSummary { id: string; name: string; description: string; icon: string | null; stepCount: number }
+/** Состояние одного прогона workflow. */
+export interface WorkflowRunState { workflowId: string; status: 'pending' | 'running' | 'done' | 'error'; currentStep: number; startedAt: number; planId?: number; brief?: string }
+/** Результат workflows:start — готовый промпт + созданный план + состояние прогона. */
+export interface WorkflowStartResult { prompt: string; planId: number; runState: WorkflowRunState }
 export interface FeedbackEntry { id: number; projectPath: string | null; providerId: string | null; rating: number | null; message: string; createdAt: number }
 export interface ProjectMeta { path: string; name: string; color: string; lastOpenedAt: number }
 
@@ -232,6 +239,10 @@ declare global {
         setStatus: (id: number, status: PlanStatus) => Promise<void>
         updateStep: (id: number, patch: { status?: StepStatus; result?: string | null; runId?: string | null; verificationStatus?: string | null; changedFilesCount?: number | null }) => Promise<void>
         remove: (id: number) => Promise<void>
+      }
+      workflows: {
+        list: () => Promise<WorkflowSummary[]>
+        start: (workflowId: string, projectPath: string, brief: string) => Promise<WorkflowStartResult | { error: string; message: string }>
       }
       memory: {
         save(projectPath: string, type: string, content: string, tags: string[]): Promise<Memory>

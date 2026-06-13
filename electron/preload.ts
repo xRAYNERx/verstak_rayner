@@ -142,6 +142,11 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('plans:update-step', id, patch),
     remove: (id: number) => ipcRenderer.invoke('plans:remove', id)
   },
+  workflows: {
+    list: () => ipcRenderer.invoke('workflows:list'),
+    start: (workflowId: string, projectPath: string, brief: string) =>
+      ipcRenderer.invoke('workflows:start', workflowId, projectPath, brief)
+  },
   memory: {
     save: (projectPath: string, type: string, content: string, tags: string[]) =>
       ipcRenderer.invoke('memory:save', { projectPath, type, content, tags }),

@@ -327,6 +327,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
     { id: 'agents',   label: 'Агенты',           icon: AgentsIcon },
     { id: 'memory-gov', label: 'Память',          icon: MemoryIcon },
     { id: 'plan',     label: t.sidebar.plan,     icon: PlanIcon },
+    { id: 'workflow', label: 'Workflows',        icon: WorkflowIcon },
     { id: 'skills',   label: t.sidebar.skills,   icon: SkillsIcon },
     { id: 'browser',  label: t.sidebar.browser,  icon: BrowserIcon },
     { id: 'design',   label: t.sidebar.design,   icon: DesignIcon },
