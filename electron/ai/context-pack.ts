@@ -17,7 +17,8 @@ import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
-import { getProjectMap, projectMapToText } from './project-map'
+import { getProjectMap, projectMapToText, getDependencyMap, computeDependencyHubs } from './project-map'
+import type { DependencyMap, ProjectMap } from './project-map'
 import { detectCrossProjectPaths } from './grounding'
 // Re-export for backward compatibility — tests still import from here.
 export { detectCrossProjectPaths }
@@ -52,6 +53,44 @@ export interface ContextPackInput {
   /** Core memory (Hermes-style) — всегда в system prompt, обновляется агентом через tools.
    *  Инжектируется ДО архивной памяти, т.к. всегда релевантна. */
   coreMemory?: CoreMemoryBlocks
+  /** Граф зависимостей проекта. Если не передан — context-pack сам подтянет его
+   *  из кэша (getDependencyMap дёшев на тёплом кэше после warm на открытии).
+   *  Передавать явно стоит только чтобы не дёргать кэш дважды. */
+  dependencyMap?: DependencyMap
+}
+
+/**
+ * Архитектурная секция карты: топ-хабы (самые импортируемые файлы) + ключевые
+ * символы этих файлов. Это даёт агенту опоры проекта — он сразу видит не только
+ * пути, но и что внутри центральных модулей, без лишних read_file.
+ *
+ * Бюджет держим узким (символы только для хабов, не для всех файлов), т.к. блок
+ * идёт в КАЖДЫЙ запрос. Возвращает '' если граф пуст (не проект / нет связей).
+ */
+function buildDependencySection(dep: DependencyMap, map: ProjectMap | null): string {
+  const hubs = computeDependencyHubs(dep, 7)
+  if (hubs.length === 0) return ''
+  const lines: string[] = []
+  // Одна сводная строка хабов — опоры архитектуры с числом импортов.
+  lines.push(`dependency_hubs (самые импортируемые): ${hubs.map(h => `${h.path} (×${h.importedBy})`).join(', ')}`)
+  // Ключевые символы для топ-5 хабов — из project map (если доступна), иначе
+  // из exports графа зависимостей. Только хабы, не весь проект — бюджет.
+  const symbolLines: string[] = []
+  for (const hub of hubs.slice(0, 5)) {
+    let syms: string[] = []
+    const entry = map?.files.find(f => f.path === hub.path)
+    if (entry && entry.symbols.length > 0) {
+      syms = entry.symbols.slice(0, 6).map(s => `${s.kind}:${s.name}`)
+    } else {
+      syms = (dep.files[hub.path]?.exports ?? []).slice(0, 6)
+    }
+    if (syms.length > 0) symbolLines.push(`  ${hub.path}: ${syms.join(', ')}`)
+  }
+  if (symbolLines.length > 0) {
+    lines.push('hub_symbols (что внутри ключевых модулей):')
+    lines.push(...symbolLines)
+  }
+  return lines.join('\n')
 }
 
 /**
@@ -103,11 +142,27 @@ export async function buildContextPack(input: ContextPackInput): Promise<string>
   // 4. Project map (compact mode — the formatter knows the budget, no
   //    text re-parsing here). Cache is auto-invalidated on write_file.
   let mapBlock = ''
+  let projectMap: ProjectMap | null = null
   try {
-    const map = await getProjectMap(projectPath, false)
-    mapBlock = projectMapToText(map, { mode: 'compact', maxChars: 1500 })
+    projectMap = await getProjectMap(projectPath, false)
+    // Бюджет поднят 1500 → 2500: компактная карта остаётся «список путей»,
+    // но архитектурная нагрузка (символы хабов) живёт в отдельной dep-секции
+    // ниже со своим узким бюджетом, а не раздувает этот список.
+    mapBlock = projectMapToText(projectMap, { mode: 'compact', maxChars: 2500 })
   } catch {
     /* map build failed — skip silently */
+  }
+
+  // 4b. Dependency hubs + key symbols — архитектурные опоры проекта. Граф
+  //     кэшируется (getDependencyMap дёшев после warm на открытии), поэтому
+  //     инжект почти бесплатен по времени. Бюджет узкий: символы только для
+  //     хабов. Это идёт в каждый запрос — держим компактным.
+  let depBlock = ''
+  try {
+    const dep = input.dependencyMap ?? await getDependencyMap(projectPath, false)
+    depBlock = buildDependencySection(dep, projectMap)
+  } catch {
+    /* dependency map build failed — skip silently */
   }
 
   // 5. Core Memory (Hermes-style) — всегда в system prompt, загружается при каждом turn'е.
@@ -137,12 +192,13 @@ export async function buildContextPack(input: ContextPackInput): Promise<string>
     memorySection = `\n\n## Память агента (из прошлых сессий)\n\n${lines.join('\n')}`
   }
 
-  if (parts.length === 0 && !mapBlock && !coreMemorySection && !memorySection) return ''
+  if (parts.length === 0 && !mapBlock && !depBlock && !coreMemorySection && !memorySection) return ''
 
   const meta = parts.length > 0 ? parts.join('\n') : '(no git, no recent writes)'
   const mapSection = mapBlock ? `\n\nproject_map (compact):\n${mapBlock}` : ''
+  const depSection = depBlock ? `\n\n${depBlock}` : ''
   return `<context_pack generated="auto" project="${escapeAttr(projectPath)}">
-${meta}${mapSection}${coreMemorySection}${memorySection}
+${meta}${mapSection}${depSection}${coreMemorySection}${memorySection}
 </context_pack>`
 }
 

@@ -1,4 +1,18 @@
 export interface FileNode { name: string; path: string; isDirectory: boolean; children?: FileNode[] }
+
+// ── Карта проекта (mirror типов из electron/ai/project-map.ts; renderer не
+//    может импортировать из electron/, поэтому форма продублирована) ──
+export interface ProjectFileSymbolDTO { kind: string; name: string; line: number }
+export interface ProjectFileEntryDTO { path: string; lines: number; symbols: ProjectFileSymbolDTO[] }
+export interface ProjectMapDTO {
+  root: string
+  generatedAt: number
+  files: ProjectFileEntryDTO[]
+  stats: { totalFiles: number; codeFiles: number; totalLines: number; truncated: boolean }
+}
+export interface DependencyMapDTO {
+  files: Record<string, { imports: string[]; importedBy: string[]; exports: string[] }>
+}
 export interface Attachment { name: string; mimeType: string; data: string; size: number }
 export interface ChatMessage { role: 'user' | 'assistant' | 'system'; content: string; attachments?: Attachment[]; thinking?: string }
 export interface StoredChatMessage { id: number; role: 'user' | 'assistant' | 'system'; content: string; createdAt: number }
@@ -106,6 +120,14 @@ declare global {
         revealInExplorer: (path: string) => Promise<{ ok: boolean; error: string | null }>
         /** Конвертация DOCX → HTML body через mammoth.js (для embedded preview). */
         docxToHtml: (path: string) => Promise<{ ok: true; html: string; warnings: string[] } | { ok: false; error: string }>
+      }
+      projectMap: {
+        /** Фоновый прогрев карты+графа (non-blocking). Возвращает сразу. */
+        warm: (root: string) => Promise<{ started: boolean }>
+        /** Дерево файлов + top-level символы. null при ошибке/закрытом проекте. */
+        get: (root: string, refresh?: boolean) => Promise<ProjectMapDTO | null>
+        /** Граф зависимостей: imports / importedBy / exports по файлам. */
+        deps: (root: string, refresh?: boolean) => Promise<DependencyMapDTO | null>
       }
       settings: {
         getKey: (key: string) => Promise<string | null>

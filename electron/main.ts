@@ -15,6 +15,7 @@ if (process.platform === 'linux' && process.env.APPIMAGE) {
 // In ESM modules __dirname is not a global. Recreate it from import.meta.url.
 const HERE = dirname(fileURLToPath(import.meta.url))
 import { registerProjectIpc } from './ipc/projects'
+import { registerProjectMapIpc } from './ipc/project-map'
 import { registerFilesIpc } from './ipc/files'
 import { registerTasksIpc } from './ipc/tasks'
 import { registerJournalIpc } from './ipc/journal'
@@ -238,6 +239,7 @@ app.whenReady().then(() => {
   })
 
   registerProjectIpc(projects)
+  registerProjectMapIpc()
   registerFilesIpc({ getProjectRoot: getActiveProjectPath })
   registerSettingsIpc(settings)
   registerCliAuthIpc(settings)

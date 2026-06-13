@@ -1,6 +1,7 @@
 import { dialog, ipcMain, BrowserWindow } from 'electron'
 import { setActiveProjectPath } from '../state/project-state'
 import { ensureUserLayer } from '../ai/user-layer'
+import { warmProjectMaps } from '../ai/project-map'
 import type { Projects } from '../storage/projects'
 import { forgetMemorizedProject } from './ai'
 
@@ -17,6 +18,9 @@ export function registerProjectIpc(projects: Projects): void {
     projects.upsert(picked)
     setActiveProjectPath(picked)
     void ensureUserLayer(picked).catch(() => { /* non-critical */ })
+    // Фоновый прогрев карты проекта + графа зависимостей — чтобы к первому
+    // ai:send и открытию панели Карта кэш был уже тёплым (non-blocking).
+    void warmProjectMaps(picked).catch(() => { /* non-critical, фон */ })
     return picked
   })
 
@@ -25,6 +29,9 @@ export function registerProjectIpc(projects: Projects): void {
     if (path) {
       projects.touch(path)
       void ensureUserLayer(path).catch(() => { /* non-critical */ })
+      // Открытие/смена активного проекта → фоном строим обе карты. Единая точка
+      // хука: renderer setProject всегда зовёт setCurrent. Идемпотентно.
+      void warmProjectMaps(path).catch(() => { /* non-critical, фон */ })
     }
   })
 

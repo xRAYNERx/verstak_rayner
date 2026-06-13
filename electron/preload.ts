@@ -14,6 +14,11 @@ contextBridge.exposeInMainWorld('api', {
     revealInExplorer: (path: string) => ipcRenderer.invoke('files:reveal', path),
     docxToHtml: (path: string) => ipcRenderer.invoke('files:docx-to-html', path)
   },
+  projectMap: {
+    warm: (root: string) => ipcRenderer.invoke('project-map:warm', root),
+    get: (root: string, refresh?: boolean) => ipcRenderer.invoke('project-map:get', root, refresh),
+    deps: (root: string, refresh?: boolean) => ipcRenderer.invoke('project-map:deps', root, refresh)
+  },
   settings: {
     getKey: (key: string) => ipcRenderer.invoke('settings:get-key', key),
     setKey: (key: string, value: string) => ipcRenderer.invoke('settings:set-key', key, value)

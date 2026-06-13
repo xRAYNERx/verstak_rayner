@@ -6335,3 +6335,118 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   font-family: inherit;
 }
 .gg-wfcat-card-actions { display: flex; justify-content: flex-end; }
+
+/* ===== Project Map panel — фича «Карта проекта» ===== */
+.gg-pmap-section-title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin: 18px 0 10px;
+}
+.gg-pmap-section-title:first-child { margin-top: 0; }
+
+/* Граф зависимостей — горизонтальный скролл если шире панели. */
+.gg-pmap-graph-wrap {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  padding: 8px;
+  overflow: auto;
+  max-height: 360px;
+}
+.gg-pmap-graph { display: block; }
+.gg-pmap-edge {
+  stroke: var(--border-default);
+  stroke-width: 1;
+  opacity: 0.55;
+}
+.gg-pmap-node circle {
+  fill: var(--bg-hover);
+  stroke: var(--border-default);
+  stroke-width: 1.5;
+}
+.gg-pmap-node text {
+  fill: var(--text-secondary);
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+.gg-pmap-node.is-hub circle {
+  fill: var(--accent-muted);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.gg-pmap-node.is-hub text {
+  fill: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Дерево файлов по top-level папкам. */
+.gg-pmap-tree { display: flex; flex-direction: column; gap: 4px; }
+.gg-pmap-folder {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.gg-pmap-folder-head {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border: none;
+  cursor: pointer;
+  color: var(--text-primary);
+  text-align: left;
+  font-size: var(--text-sm);
+}
+.gg-pmap-folder-head:hover { background: var(--bg-hover); }
+.gg-pmap-caret { color: var(--text-tertiary); font-size: 10px; width: 10px; flex-shrink: 0; }
+.gg-pmap-folder-name { font-weight: 600; font-family: var(--font-mono); }
+.gg-pmap-folder-meta {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+.gg-pmap-files {
+  display: flex; flex-direction: column;
+  padding: 4px 8px 8px 22px;
+}
+.gg-pmap-file { display: flex; flex-direction: column; }
+.gg-pmap-file-row { display: flex; align-items: center; gap: 6px; }
+.gg-pmap-file-name {
+  display: flex; align-items: center; gap: 6px;
+  flex: 1; min-width: 0;
+  padding: 3px 4px;
+  background: transparent; border: none; cursor: pointer;
+  color: var(--text-secondary);
+  text-align: left;
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+}
+.gg-pmap-file-name:hover { color: var(--text-primary); }
+.gg-pmap-file-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gg-pmap-file-lines { color: var(--text-tertiary); flex-shrink: 0; }
+.gg-pmap-file-reveal {
+  background: transparent; border: none; cursor: pointer;
+  color: var(--text-tertiary);
+  padding: 2px 6px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.gg-pmap-file-reveal:hover { color: var(--accent); }
+.gg-pmap-symbols {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 4px 0 6px 22px;
+}
+.gg-pmap-symbol {
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+}
+.gg-pmap-symbol-kind { color: var(--accent); }

@@ -306,6 +306,13 @@ const AgentsIcon = (
     <path d="M12 10v3M10 13l-3.5 2M14 13l3.5 2" />
   </svg>
 )
+const ProjectMapIcon = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21 1 6" />
+    <line x1="8" y1="3" x2="8" y2="18" />
+    <line x1="16" y1="6" x2="16" y2="21" />
+  </svg>
+)
 
 // Chat is rendered separately above the rest of the nav (expandable section
 // with its own list of chat sessions + create button).
@@ -324,6 +331,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
     { id: 'tasks',    label: t.sidebar.tasks,    icon: TasksIcon },
     { id: 'journal',  label: t.sidebar.journal,  icon: JournalIcon },
     { id: 'inspector', label: 'Инспектор',       icon: InspectorIcon },
+    { id: 'project-map', label: 'Карта',         icon: ProjectMapIcon },
     { id: 'agents',   label: 'Агенты',           icon: AgentsIcon },
     { id: 'memory-gov', label: 'Память',          icon: MemoryIcon },
     { id: 'plan',     label: t.sidebar.plan,     icon: PlanIcon },

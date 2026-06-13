@@ -328,6 +328,26 @@ export function invalidateDependencyMap(root: string): void {
   depCache.delete(root)
 }
 
+/** Один файл-хаб: путь + сколько раз его импортируют (importedBy). */
+export interface DependencyHub {
+  path: string
+  importedBy: number
+}
+
+/**
+ * Топ-N самых импортируемых файлов проекта — архитектурные опоры.
+ * Используется и Context Pack'ом (инжект в system prompt), и панелью Карта
+ * (визуальное выделение хабов), чтобы ранжирование было единым.
+ */
+export function computeDependencyHubs(dep: DependencyMap, limit = 7): DependencyHub[] {
+  const hubs: DependencyHub[] = []
+  for (const [path, info] of Object.entries(dep.files)) {
+    if (info.importedBy.length > 0) hubs.push({ path, importedBy: info.importedBy.length })
+  }
+  hubs.sort((a, b) => b.importedBy - a.importedBy || a.path.localeCompare(b.path))
+  return hubs.slice(0, limit)
+}
+
 // In-memory cache keyed by project root
 interface ProjectMapCacheEntry {
   map: ProjectMap
@@ -387,4 +407,32 @@ export async function getProjectMap(root: string, refresh = false): Promise<Proj
 export function invalidateProjectMap(root: string): void {
   cache.delete(root)
   dirtyFiles.delete(root)
+}
+
+// Защита от спама warm'а: пока идёт прогрев конкретного root — переиспользуем
+// тот же промис вместо параллельных полных сканов. После завершения запись
+// удаляется, тёплый кэш дальше отдаётся дёшево самими get*-функциями.
+const warming = new Map<string, Promise<void>>()
+
+/**
+ * Фоновый прогрев обеих карт (структура + граф зависимостей) для проекта.
+ * Вызывается при открытии/смене активного проекта, чтобы к первому ai:send
+ * и к открытию панели Карта кэш был уже тёплым, а не строился лениво.
+ *
+ * Идемпотентно: повторный warm при тёплом кэше дёшев (get* вернут кэш);
+ * параллельные вызовы для одного root делят один промис.
+ */
+export function warmProjectMaps(root: string): Promise<void> {
+  const inFlight = warming.get(root)
+  if (inFlight) return inFlight
+  const p = (async () => {
+    // refresh=true чтобы первый warm после открытия точно построил карту даже
+    // если в кэше валялась устаревшая запись от прошлой сессии того же root.
+    await Promise.all([
+      getProjectMap(root, true).catch(() => null),
+      getDependencyMap(root, true).catch(() => null)
+    ])
+  })().finally(() => { warming.delete(root) })
+  warming.set(root, p)
+  return p
 }

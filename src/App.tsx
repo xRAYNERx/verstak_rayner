@@ -15,6 +15,7 @@ import { StubView } from './components/StubView'
 import { SkillsView } from './components/SkillsView'
 import { AgentRunInspector } from './components/AgentRunInspector'
 import { AgentsPanel } from './components/AgentsPanel'
+import { ProjectMapPanel } from './components/ProjectMapPanel'
 import { WorkflowView } from './components/WorkflowView'
 import { WorkflowsPanel } from './components/WorkflowsPanel'
 import { MemoryGovernance } from './components/MemoryGovernance'
@@ -252,6 +253,7 @@ export function App() {
         {activeView === 'journal' && <JournalView />}
         {activeView === 'inspector' && <AgentRunInspector />}
         {activeView === 'agents' && <AgentsPanel />}
+        {activeView === 'project-map' && <ProjectMapPanel />}
         {activeView === 'memory-gov' && <MemoryGovernance />}
         {activeView === 'plan' && <PlanView />}
         {activeView === 'workflow' && (
