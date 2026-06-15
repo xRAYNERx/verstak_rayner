@@ -58,7 +58,8 @@
   align-items: stretch;
   padding: 12px var(--rail-pad-x) 10px;
   gap: 10px;
-  overflow: hidden;
+  overflow-x: clip;
+  overflow-y: hidden;
   min-height: 0;
   width: var(--gg-rail-w);
   transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -66,6 +67,9 @@
 }
 .gg-rail.is-expanded {
   --rail-pad-x: 12px;
+}
+.gg-rail:not(.is-expanded) {
+  --rail-pad-x: 8px;
 }
 .gg-rail-top {
   display: flex;
@@ -252,8 +256,12 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: clip;
   scrollbar-gutter: stable;
+}
+.gg-rail:not(.is-expanded) .gg-rail-list {
+  padding: 4px 2px 6px;
+  gap: 5px;
 }
 .gg-rail.is-expanded .gg-rail-list {
   align-items: stretch;
@@ -265,7 +273,9 @@
   flex-shrink: 0;
 }
 .gg-rail-chip:not(.is-expanded) {
-  width: auto;
+  width: 100%;
+  max-width: 52px;
+  margin: 0 auto;
 }
 .gg-rail-chip-btn {
   display: flex;
@@ -290,22 +300,31 @@
   background: var(--bg-hover);
   border-color: var(--border-subtle);
 }
-.gg-rail-chip.is-expanded.is-active .gg-rail-chip-btn {
-  background: color-mix(in srgb, var(--accent-muted) 85%, var(--bg-elevated));
-  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
-  box-shadow: inset 3px 0 0 var(--accent);
+.gg-rail-chip.is-active .gg-rail-chip-btn {
+  background: color-mix(in srgb, var(--accent-muted) 88%, var(--bg-elevated));
+  border-color: color-mix(in srgb, var(--accent) 42%, transparent);
+  box-shadow:
+    inset 3px 0 0 var(--accent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent),
+    0 0 18px color-mix(in srgb, var(--accent) 32%, transparent);
 }
-.gg-rail-chip:not(.is-expanded).is-active::before {
-  content: '';
-  position: absolute;
-  left: -10px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 28px;
-  border-radius: 0 3px 3px 0;
-  background: linear-gradient(180deg, var(--accent-hover), var(--accent));
-  box-shadow: 0 0 10px var(--accent-muted);
+.gg-rail-chip.is-expanded.is-active .gg-rail-chip-btn {
+  box-shadow:
+    inset 3px 0 0 var(--accent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent),
+    0 0 14px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.gg-rail-chip:not(.is-expanded) .gg-rail-chip-btn {
+  border: 1px solid transparent;
+  padding: 5px;
+  box-sizing: border-box;
+}
+.gg-rail-chip:not(.is-expanded).is-active .gg-rail-chip-btn {
+  box-shadow:
+    inset 3px 0 0 var(--accent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent),
+    0 0 22px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 0 36px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 .gg-rail-avatar-wrap {
   position: relative;
@@ -314,8 +333,8 @@
 }
 .gg-rail-avatar,
 .gg-rail-square {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
   border-radius: 50%;
   border: 2px solid color-mix(in srgb, var(--border-default) 80%, transparent);
@@ -330,8 +349,13 @@
   box-shadow: var(--shadow-sm);
 }
 .gg-rail-chip.is-expanded .gg-rail-avatar {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
+  font-size: var(--text-xs);
+}
+.gg-rail-chip:not(.is-expanded) .gg-rail-avatar {
+  width: 34px;
+  height: 34px;
   font-size: var(--text-xs);
 }
 .gg-project-avatar-img {
@@ -339,13 +363,27 @@
   object-fit: cover;
   border-radius: 50%;
 }
+.gg-rail-chip:not(.is-expanded) .gg-rail-chip-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-subtle);
+}
 .gg-rail-chip:not(.is-expanded) .gg-rail-chip-btn:hover .gg-rail-avatar {
-  transform: scale(1.06);
+  transform: scale(1.04);
   border-color: var(--accent-border);
 }
 .gg-rail-chip.is-active .gg-rail-avatar {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--bg-base) 90%, transparent), 0 0 14px var(--accent-muted);
+  border-width: 2px;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--bg-base) 85%, transparent),
+    0 0 12px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 0 24px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+.gg-rail-chip:not(.is-expanded).is-active .gg-rail-avatar {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--bg-base) 80%, transparent),
+    0 0 14px color-mix(in srgb, var(--accent) 65%, transparent),
+    0 0 28px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 .gg-rail-chip-text {
   flex: 1;
@@ -402,13 +440,14 @@
   transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
 }
 .gg-rail-chip:not(.is-expanded) .gg-rail-settings {
-  right: -6px;
+  right: 0;
   top: auto;
-  bottom: -4px;
+  bottom: 0;
   transform: none;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
+  z-index: 2;
 }
 .gg-rail-settings:hover {
   background: var(--accent);
@@ -712,8 +751,8 @@
 }
 
 .gg-rail-add {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: color-mix(in srgb, var(--bg-overlay) 60%, transparent);
   border: 1.5px dashed color-mix(in srgb, var(--accent) 35%, var(--border-strong));

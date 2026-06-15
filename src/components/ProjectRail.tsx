@@ -60,7 +60,7 @@ function ProjectChip({ project, active, unread, streaming, expanded, onClick, on
         onClick={onClick}
       >
         <span className="gg-rail-avatar-wrap">
-          <ProjectAvatar project={project} className="gg-rail-avatar" size={expanded ? 36 : 40} />
+          <ProjectAvatar project={project} className="gg-rail-avatar" size={34} />
           {status && (
             <span
               className={`gg-rail-status ${status === 'streaming' ? 'is-streaming' : 'is-unread'}`}
