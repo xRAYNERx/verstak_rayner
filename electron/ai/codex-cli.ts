@@ -159,6 +159,29 @@ export function createCodexCliProvider(opts: CodexCliOptions = {}): ChatProvider
       let done = false
       let resolve: (() => void) | null = null
       const wake = () => { if (resolve) { const r = resolve; resolve = null; r() } }
+      // Был ли эмитнут хоть один agent_message с текстом за этот прогон. Если нет
+      // — на завершении турна отдаём reasoning как запасной ответ (см. ниже).
+      let emittedAgentText = false
+      // Последний reasoning-item турна. Codex на повторных ходах / reasoning-
+      // моделях иногда завершает турн БЕЗ финального agent_message — ответ висит
+      // только в reasoning. Раньше это давало пустой ответ в чате при пришедшем
+      // уведомлении («пуш есть, текста нет»). Держим как fallback.
+      let lastReasoning = ''
+      // Гарантия единственного done: turn.completed И close могут оба сработать.
+      let doneEmitted = false
+      function pushDone() {
+        if (doneEmitted) return
+        doneEmitted = true
+        queue.push({ type: 'done' })
+      }
+      // Если за весь турн не было agent_message — выкидываем reasoning как ответ,
+      // чтобы пользователь не остался с пустым пузырём. Вызывается перед done.
+      function flushReasoningFallback() {
+        if (!emittedAgentText && lastReasoning.trim()) {
+          queue.push({ type: 'text', text: lastReasoning.trim() })
+          emittedAgentText = true
+        }
+      }
 
       function processLine(line: string) {
         const trimmed = line.trim()
@@ -167,8 +190,14 @@ export function createCodexCliProvider(opts: CodexCliOptions = {}): ChatProvider
         try { ev = JSON.parse(trimmed) } catch { return }
 
         if (ev.type === 'item.completed' && ev.item?.type === 'agent_message' && ev.item.text) {
+          emittedAgentText = true
           queue.push({ type: 'text', text: ev.item.text })
           wake()
+        } else if (ev.type === 'item.completed' && ev.item?.type === 'reasoning' && ev.item.text) {
+          // Не стримим reasoning сразу — он может быть промежуточным. Запоминаем
+          // последний; используем как ответ только если финального agent_message
+          // так и не пришло (flushReasoningFallback на завершении турна).
+          lastReasoning = ev.item.text
         } else if (ev.type === 'turn.completed') {
           // turn.completed carries final token usage in some Codex versions.
           // Field names vary: `usage.{input,output,cached_input}_tokens` OR
@@ -185,7 +214,8 @@ export function createCodexCliProvider(opts: CodexCliOptions = {}): ChatProvider
               })
             }
           }
-          queue.push({ type: 'done' })
+          flushReasoningFallback()
+          pushDone()
           wake()
         } else if (ev.type === 'error') {
           queue.push({ type: 'error', message: ev.error ?? 'Codex CLI вернул error' })
@@ -212,8 +242,14 @@ export function createCodexCliProvider(opts: CodexCliOptions = {}): ChatProvider
       })
       child.on('close', (code) => {
         if (stdoutBuffer.length > 0) processLine(stdoutBuffer)
-        if (code !== 0 && !queue.some(e => e.type === 'done')) {
+        if (code !== 0 && !doneEmitted && !queue.some(e => e.type === 'done' || e.type === 'error')) {
           queue.push({ type: 'error', message: `Codex CLI exit ${code}. ${stderrBuffer.slice(0, 400)}` })
+        } else if (!doneEmitted && !queue.some(e => e.type === 'error')) {
+          // Чистый выход без turn.completed (некоторые версии codex закрываются
+          // сразу после agent_message). Отдаём reasoning-fallback если ответа не
+          // было и завершаем стрим done — иначе провайдер «зависал» без терминала.
+          flushReasoningFallback()
+          pushDone()
         }
         done = true; wake()
       })
