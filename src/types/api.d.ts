@@ -347,6 +347,11 @@ declare global {
         queueStats(): Promise<{ inFlight: number; queued: number; tracked: number }>
         todos(projectPath: string, sessionId?: number | null): Promise<SessionTodo[]>
       }
+      // Вкладка «Задачи» (Multi-agent Manager Фаза 3) — высокоуровневые прогоны.
+      agentRuns: {
+        list(projectPath: string, opts?: { status?: AgentRunStatus; owner?: AgentRunOwner; limit?: number }): Promise<AgentRun[]>
+        get(runId: string): Promise<AgentRunDetail>
+      }
       suggestions: {
         get(projectPath: string): Promise<Suggestion[]>
       }
@@ -513,6 +518,53 @@ export interface SessionTodo {
   ord: number
   createdAt: number
   updatedAt: number
+}
+
+/**
+ * Прогон агента (Multi-agent Manager V1). Зеркало shape из
+ * electron/storage/agent-runs.ts — renderer не импортит electron/, поэтому
+ * тип дублируется здесь. Один ai:send = одна строка.
+ */
+export type AgentRunOwner = 'main' | 'review' | 'delegate' | 'background'
+export type AgentRunStatus = 'queued' | 'running' | 'waiting_review' | 'done' | 'failed' | 'stopped'
+
+export interface AgentRun {
+  runId: string
+  projectPath: string
+  chatId: number | null
+  owner: AgentRunOwner
+  title: string
+  status: AgentRunStatus
+  providerId: string | null
+  model: string | null
+  sendId: number | null
+  agentsCount: number
+  toolCount: number
+  filesCount: number
+  costCents: number
+  error: string | null
+  startedAt: number
+  endedAt: number | null
+}
+
+/** Событие Timeline прогона (append-only). */
+export interface AgentRunEvent {
+  id: number
+  runId: string
+  kind: string
+  label: string | null
+  detail: string | null
+  ref: string | null
+  status: string | null
+  createdAt: number
+}
+
+/** Агрегат одного прогона для раскрытой карточки (agent-runs:get). */
+export interface AgentRunDetail {
+  run: AgentRun | null
+  events: AgentRunEvent[]
+  subs: SubSession[]
+  todos: SessionTodo[]
 }
 
 /** Дескриптор провайдера — единый источник из main process (electron/ai/registry.ts). */

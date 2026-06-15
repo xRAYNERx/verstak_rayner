@@ -6965,3 +6965,159 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   padding: 1px 6px;
 }
 .gg-pmap-symbol-kind { color: var(--accent); }
+
+/* === Agent Runs Manager === */
+/* Вкладка «Задачи» (Multi-agent Manager Фаза 3) — read-only список прогонов.
+   Переиспользует gg-agent-card / gg-agent-status-dot / gg-todogate из панели
+   Agents; новые gg-run-* — только карточка прогона и 4 секции раскрытия. */
+
+.gg-run-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.gg-run-card.is-running { border-color: var(--accent); }
+.gg-run-card.is-failed { border-color: var(--error); }
+.gg-run-card.is-waiting_review { border-color: var(--warning, #facc15); }
+.gg-run-card.is-stopped { opacity: 0.75; }
+.gg-run-card.is-expanded { box-shadow: 0 0 0 1px var(--border-subtle); }
+
+.gg-run-card-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+}
+.gg-run-card-head:hover { background: var(--bg-hover); }
+.gg-run-card-title {
+  font-weight: 600;
+  font-size: 13px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+/* Owner-бейдж: основной / ревью / делегат / фон. */
+.gg-run-owner {
+  flex-shrink: 0;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--bg-hover);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.gg-run-owner.is-review { color: var(--accent); }
+.gg-run-owner.is-background { color: var(--warning, #facc15); }
+
+.gg-run-card-provider { font-size: 11px; color: var(--text-tertiary); flex-shrink: 0; }
+.gg-run-card-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+.gg-run-stat { white-space: nowrap; }
+.gg-run-stat-cost { color: var(--text-secondary); }
+.gg-run-stat-dur { font-family: var(--font-mono); }
+.gg-run-card-caret { color: var(--text-tertiary); font-size: 11px; }
+
+.gg-run-card-error {
+  padding: 6px 14px;
+  font-size: 11px;
+  color: var(--error);
+  background: var(--error-muted, color-mix(in srgb, var(--error) 8%, transparent));
+  border-top: 1px solid var(--border-subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Раскрытая карточка — 4 секции (Timeline / суб-агенты / файлы / верификация). */
+.gg-run-detail {
+  border-top: 1px solid var(--border-subtle);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--bg-secondary);
+}
+.gg-run-section { display: flex; flex-direction: column; gap: 6px; }
+.gg-run-section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+.gg-run-section-empty { font-size: 12px; color: var(--text-tertiary); }
+
+/* Timeline событий прогона. */
+.gg-run-timeline { display: flex; flex-direction: column; gap: 3px; }
+.gg-run-event {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+.gg-run-event-icon { flex-shrink: 0; }
+.gg-run-event-label { font-weight: 500; flex-shrink: 0; }
+.gg-run-event-detail {
+  min-width: 0;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gg-run-event.is-error .gg-run-event-label { color: var(--error); }
+
+.gg-run-subtree { display: flex; flex-direction: column; gap: 6px; }
+
+/* Затронутые файлы — клик открывает в проводнике. */
+.gg-run-files { display: flex; flex-direction: column; gap: 2px; }
+.gg-run-file {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gg-run-file:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* Верификация — бейджи статуса проверок (заполнит Verification Artifact). */
+.gg-run-verify { display: flex; flex-direction: column; gap: 4px; }
+.gg-run-verify-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.gg-run-verify-status {
+  flex-shrink: 0;
+  font-size: 10px;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--bg-hover);
+  color: var(--text-tertiary);
+}
+.gg-run-verify-row.is-passed .gg-run-verify-status { color: var(--success); }
+.gg-run-verify-row.is-failed .gg-run-verify-status { color: var(--error); }

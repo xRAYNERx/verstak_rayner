@@ -306,6 +306,16 @@ const AgentsIcon = (
     <path d="M12 10v3M10 13l-3.5 2M14 13l3.5 2" />
   </svg>
 )
+const TasksManagerIcon = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="4" rx="1" />
+    <rect x="3" y="10" width="18" height="4" rx="1" />
+    <rect x="3" y="16" width="18" height="4" rx="1" />
+    <line x1="7" y1="6" x2="7" y2="6" />
+    <line x1="7" y1="12" x2="7" y2="12" />
+    <line x1="7" y1="18" x2="7" y2="18" />
+  </svg>
+)
 const ProjectMapIcon = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21 1 6" />
@@ -331,6 +341,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
     { id: 'journal',  label: t.sidebar.journal,  icon: JournalIcon },
     { id: 'inspector', label: 'Инспектор',       icon: InspectorIcon },
     { id: 'project-map', label: 'Карта',         icon: ProjectMapIcon },
+    { id: 'tasks-manager', label: 'Задачи',       icon: TasksManagerIcon },
     { id: 'agents',   label: 'Агенты',           icon: AgentsIcon },
     { id: 'memory-gov', label: 'Память',          icon: MemoryIcon },
     { id: 'plan',     label: t.sidebar.plan,     icon: PlanIcon },

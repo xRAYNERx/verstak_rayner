@@ -41,7 +41,7 @@ export interface SubagentRunCard {
   toolCount?: number
 }
 
-export type ViewId = 'chat' | 'tasks' | 'journal' | 'plan' | 'workflow' | 'calendar' | 'feedback' | 'browser' | 'skills' | 'design' | 'video' | 'inspector' | 'memory-gov' | 'agents' | 'project-map'
+export type ViewId = 'chat' | 'tasks' | 'journal' | 'plan' | 'workflow' | 'calendar' | 'feedback' | 'browser' | 'skills' | 'design' | 'video' | 'inspector' | 'memory-gov' | 'agents' | 'tasks-manager' | 'project-map'
 
 /**
  * Owner для in-flight sendId. Заменил собой 2 параллельных мапа

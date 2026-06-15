@@ -35,6 +35,7 @@ import { createSubSessions } from './storage/sub-sessions'
 import { createSessionTodos } from './storage/session-todos'
 import { createAgentRuns } from './storage/agent-runs'
 import { registerAgentsIpc } from './ipc/agents'
+import { registerAgentRunsIpc } from './ipc/agent-runs'
 import { createTasks } from './storage/tasks'
 import { createJournal } from './storage/journal'
 import { createProjects } from './storage/projects'
@@ -381,6 +382,8 @@ app.whenReady().then(() => {
   })
   registerChatsIpc(chats, chatSessions, db)
   registerAgentsIpc(subSessions, chats, sessionTodos)
+  // Вкладка «Задачи» (Multi-agent Manager Фаза 3) — read-only список прогонов.
+  registerAgentRunsIpc(agentRuns, subSessions, sessionTodos)
   registerHandoffIpc(chats, chatSessions)
   registerTasksIpc(tasks)
   registerJournalIpc(journal)
