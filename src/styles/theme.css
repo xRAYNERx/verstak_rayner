@@ -73,19 +73,19 @@
   --space-5: 20px;
   --space-6: 24px;
 
-  /* Radii — tight, tool-like */
+  /* Radii */
   --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
   --radius-pill: 999px;
 
-  /* Elevation — restrained */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.32);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.38);
-  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.48);
-  --shadow-glow: 0 0 0 1px var(--accent-border);
-  --ring-inset: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  /* Elevation — volumetric (theme-agnostic via color-mix in shell) */
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.34);
+  --shadow-md: 0 6px 22px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 24px color-mix(in srgb, var(--accent) 18%, transparent);
+  --ring-inset: inset 0 1px 0 color-mix(in srgb, var(--text-primary) 6%, transparent);
 
   /* Motion */
   --dur-fast: 160ms;
