@@ -39,21 +39,22 @@ interface ProjectChipProps {
   active: boolean
   unread: boolean
   streaming: boolean
-  expanded: boolean
+  shellExpanded: boolean
+  contentExpanded: boolean
   onClick: () => void
   onSettings: () => void
 }
 
-function ProjectChip({ project, active, unread, streaming, expanded, onClick, onSettings }: ProjectChipProps) {
+function ProjectChip({ project, active, unread, streaming, shellExpanded, contentExpanded, onClick, onSettings }: ProjectChipProps) {
   const [hover, setHover] = useState(false)
   const status = streaming ? 'streaming' : unread ? 'unread' : null
 
   return (
     <div
-      className={`gg-rail-chip ${active ? 'is-active' : ''} ${expanded ? 'is-expanded' : ''}`}
+      className={`gg-rail-chip ${active ? 'is-active' : ''} ${shellExpanded ? 'is-shell-expanded' : ''} ${contentExpanded ? 'is-expanded' : ''}`}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      title={expanded ? project.path : `${project.name}\n${project.path}`}
+      title={contentExpanded ? project.path : `${project.name}\n${project.path}`}
     >
       <button
         type="button"
@@ -69,7 +70,7 @@ function ProjectChip({ project, active, unread, streaming, expanded, onClick, on
             />
           )}
         </span>
-        <span className="gg-rail-chip-text" aria-hidden={!expanded}>
+        <span className="gg-rail-chip-text" aria-hidden={!contentExpanded}>
           <span className="gg-rail-label">{project.name}</span>
         </span>
       </button>
@@ -184,7 +185,7 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings }: Projec
       </div>
 
       <div
-        className={`gg-rail-toolbar ${shellExpanded ? 'is-expanded' : ''} ${contentExpanded ? 'is-row' : ''}`}
+        className={`gg-rail-toolbar ${shellExpanded ? 'is-expanded is-row' : ''}`}
         data-tool-count={showSearch ? 2 : 1}
       >
         <button
@@ -274,7 +275,8 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings }: Projec
               active={path === p.path}
               unread={!!session?.hasUnread}
               streaming={!!session?.isStreaming}
-              expanded={contentExpanded}
+              shellExpanded={shellExpanded}
+              contentExpanded={contentExpanded}
               onClick={() => { if (path !== p.path) void setProject(p.path) }}
               onSettings={() => onOpenProjectSettings(p)}
             />

@@ -25,7 +25,8 @@
   --shell-rail-fill:
     linear-gradient(165deg, color-mix(in srgb, var(--vol-highlight) 80%, transparent) 0%, transparent 38%),
     var(--vol-glass);
-  --shell-rail-edge: color-mix(in srgb, var(--vol-highlight) 70%, var(--vol-glass));
+  --shell-panel-fill: var(--shell-rail-fill);
+  --shell-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 /* Depth backdrop — works with any theme via accent-muted */
@@ -146,13 +147,13 @@ body:has(.gg-app-atelier) {
   transition: transform 160ms ease, border-color 160ms ease, box-shadow 200ms ease;
 }
 
-.gg-app-atelier .gg-rail-chip:not(.is-expanded) .gg-rail-chip-btn:hover .gg-rail-avatar {
+.gg-app-atelier .gg-rail-chip:not(.is-shell-expanded) .gg-rail-chip-btn:hover .gg-rail-avatar {
   transform: scale(1.05);
   border-color: var(--accent-border);
   box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
-.gg-app-atelier .gg-rail-chip.is-expanded.is-active .gg-rail-chip-btn {
+.gg-app-atelier .gg-rail-chip.is-shell-expanded.is-active .gg-rail-chip-btn {
   background: var(--vol-recessed-bg);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -161,19 +162,19 @@ body:has(.gg-app-atelier) {
     inset 3px 0 0 var(--accent);
 }
 
-.gg-app-atelier .gg-rail-chip.is-expanded.is-active .gg-rail-avatar {
+.gg-app-atelier .gg-rail-chip.is-shell-expanded.is-active .gg-rail-avatar {
   border-color: var(--accent);
   box-shadow: var(--shadow-sm);
 }
 
-.gg-app-atelier .gg-rail-chip:not(.is-expanded).is-active .gg-rail-chip-btn {
+.gg-app-atelier .gg-rail-chip:not(.is-shell-expanded).is-active .gg-rail-chip-btn {
   background: var(--vol-recessed-bg);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--vol-shadow-inset);
 }
 
-.gg-app-atelier .gg-rail-chip:not(.is-expanded).is-active .gg-rail-avatar-wrap::after {
+.gg-app-atelier .gg-rail-chip:not(.is-shell-expanded).is-active .gg-rail-avatar-wrap::after {
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--accent) 90%, transparent),
     0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
@@ -245,29 +246,36 @@ body:has(.gg-app-atelier) {
   border-radius: 0 0 var(--radius-xl) var(--radius-xl);
 }
 
-/* ─── Main: градиент из панели проектов ─── */
+/* ─── Main: тот же glass-fill что у rail (без длинного горизонтального градиента) ─── */
 .gg-app-atelier .gg-main {
   position: relative;
   margin: 0;
   border-radius: var(--radius-xl);
   border: 1px solid var(--border-default);
-  background:
-    linear-gradient(
-      90deg,
-      var(--shell-rail-edge) 0%,
-      color-mix(in srgb, var(--vol-glass) 96%, var(--bg-base)) 5%,
-      color-mix(in srgb, var(--vol-glass) 88%, var(--bg-base)) 10%,
-      color-mix(in srgb, var(--vol-glass) 78%, var(--bg-base)) 16%,
-      color-mix(in srgb, var(--vol-glass) 66%, var(--bg-base)) 23%,
-      color-mix(in srgb, var(--vol-glass) 52%, var(--bg-base)) 31%,
-      color-mix(in srgb, var(--vol-glass) 38%, var(--bg-base)) 40%,
-      color-mix(in srgb, var(--vol-glass) 24%, var(--bg-base)) 50%,
-      color-mix(in srgb, var(--vol-glass) 14%, var(--bg-base)) 60%,
-      color-mix(in srgb, var(--vol-glass) 6%, var(--bg-base)) 68%,
-      var(--bg-base) 76%
-    );
+  background: var(--shell-panel-fill);
+  backdrop-filter: var(--vol-blur);
+  -webkit-backdrop-filter: var(--vol-blur);
   box-shadow: var(--vol-shadow-inset);
   overflow: hidden;
+  isolation: isolate;
+}
+
+.gg-app-atelier .gg-main::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.028;
+  mix-blend-mode: overlay;
+  background-image: var(--shell-noise);
+  background-size: 180px 180px;
+}
+
+.gg-app-atelier .gg-main > * {
+  position: relative;
+  z-index: 1;
 }
 
 .gg-app-atelier .gg-chat-area {
