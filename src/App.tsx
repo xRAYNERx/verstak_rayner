@@ -209,8 +209,7 @@ export function App() {
 
   return (
     <I18nContext.Provider value={getTranslations(lang)}>
-    <div className={`gg-app gg-app-luxe ${sidebarOpen ? '' : 'is-sidebar-collapsed'}`}>
-      <div className="gg-app-ambient" aria-hidden="true" />
+    <div className={`gg-app gg-app-atelier ${sidebarOpen ? '' : 'is-sidebar-collapsed'}`}>
       <ProjectRail
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(v => !v)}

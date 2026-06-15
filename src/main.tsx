@@ -3,7 +3,7 @@ import { App } from './App'
 import { bootstrapTheme } from './hooks/useTheme'
 import './styles/theme.css'
 import './styles/layout.css'
-import './styles/shell-luxe.css'
+import './styles/shell-atelier.css'
 import './styles/markdown.css'
 
 void bootstrapTheme()

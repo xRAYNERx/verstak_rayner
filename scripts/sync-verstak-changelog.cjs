@@ -14,12 +14,12 @@ const ENTRIES = [
     version: '1.4.0',
     build: '16.06.2026',
     deployed: '16.06.2026',
-    title: 'Shell Luxe: премиум-редизайн главного экрана',
+    title: 'Shell Atelier: плоский editorial-редизайн главного экрана',
     changes: [
-      'Новая дизайн-система Obsidian Luxe: obsidian-палитра, periwinkle-accent, стеклянные панели.',
-      'shell-luxe.css: rail, sidebar, main, chat, composer — glassmorphism, ambient-градиенты, spring-анимации.',
-      'Плавающий composer с glow-focus; сообщения с плавным появлением; empty-state с float-анимацией.',
-      'Миграция путей БД: скрипты migrate-project-paths.cjs / inspect-db-temp.cjs (.grok/clients → clients).'
+      'Замена Shell Luxe → Shell Atelier: единая плоскость без glass/blur/orbs.',
+      'Палитра warm graphite + champagne gold; тонкие разделители, inset-акцент слева.',
+      'Узкий rail 56px, composer как anchored bar, анимации 240–280ms без spring-bounce.',
+      'Миграция путей БД: скрипты migrate-project-paths.cjs / inspect-db-temp.cjs.'
     ]
   },
   {

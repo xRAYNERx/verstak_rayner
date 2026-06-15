@@ -9,9 +9,9 @@ import { CreateClientModal } from './CreateClientModal'
 import { useT } from '../i18n'
 
 const RAIL_EXPANDED_KEY = 'gg-rail-expanded'
-const RAIL_WIDTH_COLLAPSED = '72px'
-const RAIL_WIDTH_EXPANDED = '256px'
-const SHELL_MS = 420
+const RAIL_WIDTH_COLLAPSED = '56px'
+const RAIL_WIDTH_EXPANDED = '220px'
+const SHELL_MS = 280
 
 function readRailExpanded(): boolean {
   try {
