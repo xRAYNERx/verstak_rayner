@@ -14,6 +14,17 @@ const ENTRIES = [
     version: '1.3.2',
     build: '16.06.2026',
     deployed: '16.06.2026',
+    title: 'Откат UI: до глобального редизайна (rail v1 + layout)',
+    changes: [
+      'Восстановлен дизайн до Rail v2 и Shell v2 (коммит 11d2260).',
+      'Удалены rail.css и shell.css; стили rail снова в layout.css.',
+      'Резерв v2: legacy/rail-v1/, ветка backup/rail-v1.'
+    ]
+  },
+  {
+    version: '1.3.2',
+    build: '16.06.2026',
+    deployed: '16.06.2026',
     title: 'Rail dock: только иконки без подписей',
     changes: [
       'Убраны текстовые подписи у кнопок сворачивания rail, панели и поиска — остались иконки и tooltip.'
