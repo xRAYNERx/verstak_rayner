@@ -11,6 +11,7 @@
 import { mkdir, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { Document, Paragraph, HeadingLevel, TextRun, Packer } from 'docx'
+import { renderVerificationHtml, type VerificationArtifact } from './verification'
 
 export interface ArtifactResult {
   path: string
@@ -28,7 +29,7 @@ export function artifactsDir(projectPath: string): string {
   return join(projectPath, '.verstak', 'artifacts', `${y}-${m}-${d}`)
 }
 
-function sanitizeFilename(name: string): string {
+export function sanitizeFilename(name: string): string {
   // Убираем расширение если случайно дано, и опасные символы.
   return name
     .replace(/\.(html?|docx?|pdf|md|txt)$/i, '')
@@ -142,4 +143,31 @@ function pickHeadingLevel(level: number | undefined): typeof HeadingLevel[keyof 
     case 2:
     default: return HeadingLevel.HEADING_2
   }
+}
+
+// --------------------------------------------------- Verification (DoD)
+
+/**
+ * Пишет verification-артефакт парой файлов в ту же artifactsDir/{date}/:
+ *  - {slug}.verification.json — источник истины (JSON.stringify(art));
+ *  - {slug}.verification.html — рендер для preview.
+ * slug = sanitizeFilename(taskSummary) с fallback 'verification'.
+ * Пути берутся через те же хелперы, что generateHtml — без дублирования логики.
+ * sizeBytes — размер html.
+ */
+export async function writeVerificationArtifact(
+  projectPath: string,
+  art: VerificationArtifact
+): Promise<{ jsonPath: string; htmlPath: string; sizeBytes: number; filename: string }> {
+  const dir = artifactsDir(projectPath)
+  await mkdir(dir, { recursive: true })
+  const slug = sanitizeFilename(art.taskSummary || 'verification') || 'verification'
+  const jsonName = `${slug}.verification.json`
+  const htmlName = `${slug}.verification.html`
+  const jsonPath = join(dir, jsonName)
+  const htmlPath = join(dir, htmlName)
+  const html = renderVerificationHtml(art)
+  await writeFile(jsonPath, JSON.stringify(art, null, 2), 'utf8')
+  await writeFile(htmlPath, html, 'utf8')
+  return { jsonPath, htmlPath, sizeBytes: Buffer.byteLength(html, 'utf8'), filename: htmlName }
 }
