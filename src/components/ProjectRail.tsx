@@ -11,6 +11,7 @@ import { useT } from '../i18n'
 const RAIL_EXPANDED_KEY = 'gg-rail-expanded'
 const RAIL_WIDTH_COLLAPSED = '68px'
 const RAIL_WIDTH_EXPANDED = '248px'
+const SHELL_MS = 360
 
 function readRailExpanded(): boolean {
   try {
@@ -99,6 +100,7 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar, onOpenProjectSetting
   const { path, projectList, sessions, setProject, refreshProjectList } = useProject()
   const [bootstrapped, setBootstrapped] = useState(false)
   const [railExpanded, setRailExpanded] = useState(readRailExpanded)
+  const [toolbarRow, setToolbarRow] = useState(readRailExpanded)
   const [projectQuery, setProjectQuery] = useState('')
   const [showCreateClient, setShowCreateClient] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -120,6 +122,14 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar, onOpenProjectSetting
     try {
       localStorage.setItem(RAIL_EXPANDED_KEY, railExpanded ? '1' : '0')
     } catch { /* ignore */ }
+  }, [railExpanded])
+
+  useEffect(() => {
+    if (railExpanded) {
+      const id = window.setTimeout(() => setToolbarRow(true), SHELL_MS)
+      return () => clearTimeout(id)
+    }
+    setToolbarRow(false)
   }, [railExpanded])
 
   useEffect(() => {
@@ -166,7 +176,7 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar, onOpenProjectSetting
       </div>
 
       <div
-        className={`gg-rail-toolbar ${railExpanded ? 'is-expanded' : ''}`}
+        className={`gg-rail-toolbar ${railExpanded ? 'is-expanded' : ''} ${toolbarRow ? 'is-row' : ''}`}
         data-tool-count={showSearch ? 3 : 2}
       >
         <button
