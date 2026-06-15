@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useProject } from '../store/projectStore'
 import type { ProjectMeta } from '../types/api'
 import iconUrl from '../assets/icon.png'
@@ -54,7 +54,6 @@ function ProjectRow({ project, active, unread, streaming, expanded, onClick, onS
   return (
     <li
       className={`gg-rail-project ${active ? 'is-active' : ''} ${expanded ? 'is-expanded' : ''}`}
-      style={{ '--project-accent': project.color } as CSSProperties}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       title={expanded ? project.path : `${project.name}\n${project.path}`}

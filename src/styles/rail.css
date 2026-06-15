@@ -2,7 +2,6 @@
 
 .gg-rail {
   --rail-pad: 10px;
-  --project-accent: var(--accent);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -417,19 +416,6 @@
   border-color: color-mix(in srgb, var(--border-subtle) 90%, transparent);
 }
 
-.gg-rail.is-expanded .gg-rail-project-btn::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 8px;
-  bottom: 8px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: var(--project-accent);
-  opacity: 0.55;
-  transition: opacity 150ms ease, width 150ms ease;
-}
-
 .gg-rail.is-expanded .gg-rail-project-btn:hover {
   background: var(--bg-hover);
   border-color: var(--border-subtle);
@@ -440,13 +426,8 @@
   background: color-mix(in srgb, var(--accent-muted) 70%, var(--bg-elevated));
   border-color: color-mix(in srgb, var(--accent) 38%, transparent);
   box-shadow:
-    0 8px 20px color-mix(in srgb, var(--project-accent) 18%, transparent),
+    0 8px 20px color-mix(in srgb, var(--accent) 18%, transparent),
     inset 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent);
-}
-
-.gg-rail.is-expanded .gg-rail-project.is-active .gg-rail-project-btn::before {
-  opacity: 1;
-  width: 4px;
 }
 
 .gg-rail:not(.is-expanded) .gg-rail-project-btn:hover {
@@ -492,7 +473,7 @@
   border-color: var(--accent);
   box-shadow:
     0 0 0 2px color-mix(in srgb, var(--bg-base) 82%, transparent),
-    0 0 14px color-mix(in srgb, var(--project-accent) 45%, transparent);
+    0 0 14px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 .gg-rail:not(.is-expanded) .gg-rail-project.is-active .gg-rail-avatar-wrap::after {

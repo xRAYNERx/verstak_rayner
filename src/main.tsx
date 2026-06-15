@@ -4,6 +4,7 @@ import { bootstrapTheme } from './hooks/useTheme'
 import './styles/theme.css'
 import './styles/layout.css'
 import './styles/rail.css'
+import './styles/shell.css'
 import './styles/markdown.css'
 
 void bootstrapTheme()

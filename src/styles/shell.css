@@ -1,0 +1,519 @@
+/* ─── Shell v2 — единый визуальный язык (rail-aligned) ─── */
+
+/* App canvas */
+.gg-app {
+  background: var(--shell-surface-gradient);
+}
+
+.gg-sidebar-resize {
+  border-right-color: color-mix(in srgb, var(--border-subtle) 85%, var(--accent) 15%);
+}
+
+.gg-sidebar-resize:hover {
+  background: color-mix(in srgb, var(--accent-muted) 65%, transparent);
+}
+
+/* ── Sidebar ── */
+
+.gg-sidebar {
+  background: var(--shell-surface-gradient);
+  border-right: 1px solid color-mix(in srgb, var(--border-subtle) 85%, var(--accent) 15%);
+  box-shadow:
+    inset 2px 0 0 color-mix(in srgb, var(--accent) 35%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 4%, transparent);
+}
+
+.gg-sidebar-header {
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 75%, transparent);
+}
+
+.gg-brand-mark {
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border-subtle));
+  box-shadow: var(--shadow-sm), var(--shell-inset-highlight);
+}
+
+.gg-sidebar-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: color-mix(in srgb, var(--accent) 45%, var(--text-tertiary));
+}
+
+.gg-project-button {
+  height: 36px;
+  border-radius: var(--shell-radius);
+  background: var(--shell-card-bg);
+  border: 1px dashed color-mix(in srgb, var(--accent) 35%, var(--border-default));
+  box-shadow: var(--shell-inset-highlight);
+  font-weight: 600;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.gg-project-button:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-border);
+  transform: translateY(-1px);
+}
+
+.gg-project-button.has-project {
+  border-style: solid;
+  border-color: var(--shell-card-border);
+  background: var(--shell-card-bg);
+}
+
+/* Nav items — карточки как в rail */
+.gg-nav {
+  padding: 10px 8px 4px;
+  gap: 4px;
+}
+
+.gg-nav-item {
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--shell-radius);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.gg-nav-item:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-subtle);
+  transform: translateY(-1px);
+}
+
+.gg-nav-item.is-active {
+  background: var(--shell-active-bg);
+  border-color: var(--shell-active-border);
+  color: var(--text-primary);
+  box-shadow:
+    0 6px 16px color-mix(in srgb, var(--accent) 14%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.gg-nav-badge {
+  border: 1px solid var(--border-subtle);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+/* Chat session list */
+.gg-chat-nav-head {
+  padding: 8px 8px 4px;
+}
+
+.gg-chat-nav-toggle,
+.gg-chat-nav-new {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+}
+
+.gg-chat-nav-toggle:hover,
+.gg-chat-nav-new:hover {
+  border-color: var(--border-subtle);
+  background: var(--bg-hover);
+}
+
+.gg-chat-nav-list {
+  padding: 4px 8px 8px 12px;
+  gap: 3px;
+}
+
+.gg-chat-nav-item {
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.gg-chat-nav-item:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-subtle);
+}
+
+.gg-chat-nav-item.is-active {
+  background: var(--shell-active-bg);
+  border-color: var(--shell-active-border);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.gg-chat-nav-pick {
+  padding: 6px 8px;
+  border-radius: 9px;
+  font-weight: 600;
+}
+
+/* ── Main / Chat ── */
+
+.gg-main {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--bg-base) 96%, var(--accent) 4%) 0%,
+      var(--bg-base) 120px);
+}
+
+.gg-chat-project-bar {
+  padding: 10px 24px;
+  background: color-mix(in srgb, var(--bg-elevated) 82%, var(--bg-base));
+  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 80%, transparent);
+  box-shadow: var(--shell-inset-highlight);
+}
+
+.gg-chat-project-name {
+  letter-spacing: -0.02em;
+}
+
+.gg-chat-scroll-down {
+  border-radius: 50%;
+  border-color: var(--border-subtle);
+  background: color-mix(in srgb, var(--bg-elevated) 90%, var(--bg-base));
+  box-shadow: var(--shadow-md), var(--shell-inset-highlight);
+}
+
+.gg-chat-empty-mark,
+.gg-chat-empty-mark-img {
+  border-radius: var(--shell-radius-lg);
+}
+
+.gg-quick-action {
+  border-radius: var(--shell-radius);
+  background: var(--shell-card-bg);
+  border-color: var(--shell-card-border);
+  font-weight: 600;
+  box-shadow: var(--shell-inset-highlight);
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.gg-quick-action:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm), var(--shell-inset-highlight);
+}
+
+/* Messages */
+.gg-msg-user .gg-msg-bubble {
+  border-radius: var(--shell-radius);
+  border: 1px solid var(--shell-active-border);
+  border-left: none;
+  background: var(--shell-active-bg);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.gg-msg-assistant .gg-msg-bubble {
+  border-left-color: color-mix(in srgb, var(--accent) 25%, var(--border-subtle));
+}
+
+.gg-thinking {
+  border-radius: var(--shell-radius);
+  background: var(--shell-card-bg);
+  border-color: var(--shell-card-border);
+}
+
+/* Composer */
+.gg-composer {
+  padding: 14px 28px 20px;
+  border-top: 1px solid color-mix(in srgb, var(--border-subtle) 80%, transparent);
+  background: color-mix(in srgb, var(--bg-base) 92%, var(--bg-elevated));
+}
+
+.gg-composer-inner {
+  border-radius: var(--shell-radius-lg);
+  background: var(--shell-input-bg);
+  border-color: var(--border-subtle);
+  box-shadow:
+    inset 0 1px 3px color-mix(in srgb, var(--bg-base) 35%, transparent),
+    var(--shell-inset-highlight);
+}
+
+.gg-composer-inner:hover {
+  border-color: var(--border-strong);
+}
+
+.gg-composer-inner:focus-within {
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+
+.gg-send-btn {
+  border-radius: 10px;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.gg-model-pill {
+  border-radius: var(--radius-pill);
+  border-color: var(--border-subtle);
+  font-weight: 600;
+}
+
+.gg-model-pill:hover {
+  border-color: var(--accent-border);
+  background: var(--shell-card-bg);
+}
+
+/* Popovers */
+.gg-mp-popover,
+.gg-panel-menu-pop {
+  border-radius: var(--shell-radius);
+  background: color-mix(in srgb, var(--bg-elevated) 94%, var(--bg-base));
+  border-color: color-mix(in srgb, var(--border-subtle) 85%, var(--accent) 15%);
+  box-shadow: var(--shadow-lg), var(--shell-inset-highlight);
+}
+
+/* ── Panels (Tasks, Journal, Plan, …) ── */
+
+.gg-panel {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--bg-base) 96%, var(--accent) 4%) 0%,
+      var(--bg-base) 100px);
+}
+
+.gg-panel-header {
+  padding: 16px 28px 14px;
+  background: color-mix(in srgb, var(--bg-elevated) 70%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 80%, transparent);
+}
+
+.gg-panel-title {
+  letter-spacing: -0.02em;
+}
+
+.gg-panel-meta {
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.gg-task-row {
+  border-radius: var(--shell-radius);
+  border: 1px solid transparent;
+}
+
+.gg-task-row:hover {
+  background: var(--shell-card-bg);
+  border-color: var(--shell-card-border);
+}
+
+.gg-task-check {
+  border-radius: 7px;
+}
+
+/* ── Modals ── */
+
+.gg-modal-backdrop {
+  background: color-mix(in srgb, var(--bg-base) 55%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.gg-modal,
+.gg-project-settings {
+  border-radius: var(--shell-radius-lg);
+  background: var(--shell-surface-gradient);
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 85%, var(--accent) 15%);
+  box-shadow:
+    var(--shadow-lg),
+    inset 2px 0 0 color-mix(in srgb, var(--accent) 40%, transparent),
+    var(--shell-inset-highlight);
+}
+
+.gg-modal-header,
+.gg-ps-header {
+  border-bottom-color: color-mix(in srgb, var(--border-subtle) 75%, transparent);
+}
+
+.gg-modal-footer {
+  background: color-mix(in srgb, var(--bg-base) 88%, var(--bg-elevated));
+  border-top-color: color-mix(in srgb, var(--border-subtle) 75%, transparent);
+}
+
+.gg-modal-close,
+.gg-ps-close {
+  border-radius: 9px;
+  border: 1px solid transparent;
+}
+
+.gg-modal-close:hover,
+.gg-ps-close:hover {
+  border-color: var(--border-subtle);
+}
+
+/* Create project modal */
+.gg-create-client-choice {
+  border-radius: var(--shell-radius);
+  background: var(--shell-card-bg);
+  border-color: var(--shell-card-border);
+  box-shadow: var(--shell-inset-highlight);
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.gg-create-client-choice:hover {
+  border-color: var(--accent-border);
+  transform: translateY(-1px);
+}
+
+.gg-create-client-choice-icon {
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent-muted) 55%, var(--bg-elevated));
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* ── Settings ── */
+
+.gg-settings-nav {
+  background: color-mix(in srgb, var(--bg-base) 88%, var(--bg-elevated));
+  border-right-color: color-mix(in srgb, var(--border-subtle) 85%, var(--accent) 12%);
+  padding: 12px 8px;
+}
+
+.gg-settings-nav-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent) 45%, var(--text-tertiary));
+}
+
+.gg-settings-nav-item {
+  border-radius: var(--shell-radius);
+  font-weight: 600;
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.gg-settings-nav-item:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-subtle);
+  transform: translateY(-1px);
+}
+
+.gg-settings-nav-item.is-active {
+  background: var(--shell-active-bg);
+  border-color: var(--shell-active-border);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.gg-provider-card {
+  border-radius: var(--shell-radius);
+  background: var(--shell-card-bg);
+  border-color: var(--shell-card-border);
+  box-shadow: var(--shell-inset-highlight);
+}
+
+.gg-provider-card.active {
+  border-color: var(--shell-active-border);
+  background: var(--shell-active-bg);
+  box-shadow:
+    0 6px 16px color-mix(in srgb, var(--accent) 12%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.gg-models-cards {
+  border-radius: var(--shell-radius-lg);
+  border-color: color-mix(in srgb, var(--border-subtle) 85%, var(--accent) 12%);
+  background: color-mix(in srgb, var(--bg-elevated) 88%, var(--bg-base));
+  box-shadow: var(--shell-inset-highlight);
+  overflow: hidden;
+}
+
+.gg-models-card {
+  background: transparent;
+  transition: background 150ms ease;
+}
+
+.gg-models-card + .gg-models-card {
+  border-top-color: color-mix(in srgb, var(--border-subtle) 80%, transparent);
+}
+
+.gg-models-card.is-active-provider {
+  background: var(--shell-active-bg);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.gg-prov-onboarding {
+  border-radius: var(--shell-radius);
+}
+
+/* ── Right panels (terminal, files) ── */
+
+.gg-terminal-wrap,
+.gg-files-panel {
+  background: var(--shell-surface-gradient);
+  border-left: 1px solid color-mix(in srgb, var(--border-subtle) 85%, var(--accent) 15%);
+  box-shadow: inset -2px 0 0 color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.gg-terminal-header,
+.gg-files-panel-header {
+  background: color-mix(in srgb, var(--bg-elevated) 82%, var(--bg-base));
+  border-bottom-color: color-mix(in srgb, var(--border-subtle) 75%, transparent);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.gg-panel-menu-item {
+  border-radius: 9px;
+  font-weight: 600;
+}
+
+.gg-files-panel-node {
+  border-radius: 8px;
+  margin: 0 6px;
+}
+
+/* ── Auth screen ── */
+
+.gg-auth-right {
+  background: var(--shell-surface-gradient);
+}
+
+.gg-auth-tabs {
+  border-radius: var(--shell-radius);
+  background: color-mix(in srgb, var(--bg-base) 82%, var(--bg-elevated));
+  border: 1px solid var(--border-subtle);
+  padding: 4px;
+}
+
+.gg-auth-tab {
+  border-radius: 9px;
+  font-weight: 600;
+}
+
+.gg-auth-tab.is-active {
+  background: var(--shell-active-bg);
+  border: 1px solid var(--shell-active-border);
+}
+
+/* Misc */
+.gg-notice {
+  border-radius: var(--shell-radius);
+}
+
+.gg-kbd {
+  border-radius: 7px;
+  background: var(--shell-card-bg);
+  border-color: var(--shell-card-border);
+}
+
+.gg-emergency-stop {
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-lg);
+}
