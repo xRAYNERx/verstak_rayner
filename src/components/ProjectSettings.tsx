@@ -14,7 +14,7 @@ interface ProjectSettingsProps {
 
 export function ProjectSettings({ project, onClose, onProjectUpdated }: ProjectSettingsProps) {
   const t = useT()
-  const { removeProject, setProject, updateProjectMeta, refreshProjectList } = useProject()
+  const { removeProject, updateProjectMeta, refreshProjectList } = useProject()
   const [displayName, setDisplayName] = useState(project.name)
   const [localProject, setLocalProject] = useState(project)
   const [systemPrompt, setSystemPrompt] = useState('')
@@ -137,55 +137,65 @@ export function ProjectSettings({ project, onClose, onProjectUpdated }: ProjectS
         aria-labelledby="gg-ps-title"
       >
         <div className="gg-ps-header">
-          <div className="gg-ps-title" id="gg-ps-title">
-            <ProjectAvatar project={localProject} className="gg-ps-header-avatar" size={28} />
-            <span>{localProject.name}</span>
+          <div className="gg-ps-hero" id="gg-ps-title">
+            <button
+              type="button"
+              className="gg-ps-avatar-btn"
+              onClick={() => void handlePickIcon()}
+              disabled={iconBusy}
+              title="Изменить изображение проекта"
+              aria-label="Изменить изображение проекта"
+            >
+              <ProjectAvatar
+                project={{ ...localProject, name: displayName || localProject.name }}
+                className="gg-rail-avatar"
+                size={48}
+              />
+            </button>
+            <div className="gg-ps-hero-main">
+              <input
+                id="gg-ps-display-name"
+                className="gg-ps-hero-name"
+                value={displayName}
+                onChange={e => setDisplayName(e.target.value)}
+                placeholder="Название проекта"
+                maxLength={80}
+                aria-label="Название проекта"
+              />
+              <div className="gg-ps-hero-actions">
+                <button
+                  type="button"
+                  className="gg-ps-action-btn gg-ps-pick-icon-btn"
+                  onClick={() => void handlePickIcon()}
+                  disabled={iconBusy}
+                >
+                  {iconBusy ? 'Загрузка…' : 'Выбрать изображение'}
+                </button>
+                <button
+                  type="button"
+                  className={`gg-ps-save-btn ${appearanceSaved ? 'is-saved' : ''}`}
+                  onClick={() => void handleSaveAppearance()}
+                  disabled={saving || !displayName.trim() || displayName.trim() === localProject.name}
+                >
+                  {appearanceSaved ? '✓ Сохранено' : 'Сохранить название'}
+                </button>
+                {localProject.iconPath && (
+                  <button
+                    type="button"
+                    className="gg-btn gg-btn-ghost gg-ps-clear-icon-btn"
+                    onClick={() => void handleClearIcon()}
+                    disabled={iconBusy}
+                  >
+                    Убрать иконку
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
           <button className="gg-ps-close" onClick={onClose} title="Закрыть">×</button>
         </div>
 
         <div className="gg-ps-body">
-          <section className="gg-ps-section">
-            <div className="gg-ps-section-label">Отображение в списке</div>
-            <div className="gg-ps-appearance">
-              <div className="gg-ps-appearance-preview">
-                <ProjectAvatar project={{ ...localProject, name: displayName || localProject.name }} className="gg-ps-icon-preview" size={64} />
-              </div>
-              <div className="gg-ps-appearance-fields">
-                <label className="gg-ps-field-label" htmlFor="gg-ps-display-name">Название проекта</label>
-                <input
-                  id="gg-ps-display-name"
-                  className="gg-input"
-                  value={displayName}
-                  onChange={e => setDisplayName(e.target.value)}
-                  placeholder="Любое имя — не связано с папкой на диске"
-                  maxLength={80}
-                />
-                <div className="gg-ps-appearance-actions">
-                  <button
-                    type="button"
-                    className={`gg-ps-save-btn ${appearanceSaved ? 'is-saved' : ''}`}
-                    onClick={() => void handleSaveAppearance()}
-                    disabled={saving || !displayName.trim() || displayName.trim() === localProject.name}
-                  >
-                    {appearanceSaved ? '✓ Сохранено' : 'Сохранить название'}
-                  </button>
-                </div>
-                <div className="gg-ps-icon-actions">
-                  <button type="button" className="gg-ps-action-btn" onClick={() => void handlePickIcon()} disabled={iconBusy}>
-                    {iconBusy ? 'Загрузка…' : 'Выбрать изображение'}
-                  </button>
-                  {localProject.iconPath && (
-                    <button type="button" className="gg-btn gg-btn-ghost" onClick={() => void handleClearIcon()} disabled={iconBusy}>
-                      Убрать иконку
-                    </button>
-                  )}
-                </div>
-                <div className="gg-settings-hint">PNG, JPG, WebP и др. Сохраняется в профиле Verstak — папку на диске не переименовывает.</div>
-              </div>
-            </div>
-          </section>
-
           <section className="gg-ps-section">
             <div className="gg-ps-section-label">Папка на диске</div>
             <div className="gg-ps-path">
@@ -219,18 +229,6 @@ export function ProjectSettings({ project, onClose, onProjectUpdated }: ProjectS
                 disabled={saving}
               >
                 {saved ? '✓ Сохранено' : saving ? 'Сохраняю…' : 'Сохранить'}
-              </button>
-            </div>
-          </section>
-
-          <section className="gg-ps-section">
-            <div className="gg-ps-section-label">Быстрые действия</div>
-            <div className="gg-ps-actions">
-              <button
-                className="gg-ps-action-btn"
-                onClick={() => { void setProject(project.path); onClose() }}
-              >
-                Открыть проект
               </button>
             </div>
           </section>
