@@ -191,6 +191,12 @@ contextBridge.exposeInMainWorld('api', {
   verify: {
     exec: (command: string) => ipcRenderer.invoke('verify:exec', command) as Promise<{ exitCode: number; stdout: string; stderr: string }>
   },
+  // Git READ (Dev Task Flow, Фаза 1) — структурированные status/diff/log активного проекта.
+  git: {
+    status: () => ipcRenderer.invoke('git:status'),
+    diff: (opts?: { base?: string; staged?: boolean; path?: string }) => ipcRenderer.invoke('git:diff', opts),
+    log: (opts?: { limit?: number }) => ipcRenderer.invoke('git:log', opts)
+  },
   autonomous: {
     status: () => ipcRenderer.invoke('autonomous:status') as Promise<{ enabled: boolean; intervalMin: number; lastRunAt: number | null; lastRunSuggestions: number; lastRunError: string | null; nextRunAt: number | null }>,
     runOnce: () => ipcRenderer.invoke('autonomous:run-once') as Promise<{ enabled: boolean; intervalMin: number; lastRunAt: number | null; lastRunSuggestions: number; lastRunError: string | null; nextRunAt: number | null }>,

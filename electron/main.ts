@@ -35,6 +35,8 @@ import { createSubSessions } from './storage/sub-sessions'
 import { createSessionTodos } from './storage/session-todos'
 import { createAgentRuns } from './storage/agent-runs'
 import { createVerifications } from './storage/verifications'
+import { createDevTasks } from './storage/dev-tasks'
+import { registerGitIpc } from './ipc/git'
 import { registerAgentsIpc } from './ipc/agents'
 import { registerAgentRunsIpc } from './ipc/agent-runs'
 import { registerVerificationsIpc } from './ipc/verifications'
@@ -265,6 +267,11 @@ app.whenReady().then(() => {
   // Verification Artifact (Фаза 3) — история DoD поверх файла-артефакта.
   // attest_verification пишет строку, Review подтягивает latest по чату.
   const verifications = createVerifications(db)
+  // Dev Task Flow (Фаза 1) — фасад dev_tasks инстанцируем заранее, фундамент
+  // доступен следующим фазам. В Фазе 1 НЕ используется: оркестратор dev-task.ts
+  // и git-write придут в Фазах 2-5. Поведение приложения не меняется.
+  const devTasks = createDevTasks(db)
+  void devTasks
   const tasks = createTasks(db)
   const journal = createJournal(db)
   const projects = createProjects(db)
@@ -410,6 +417,9 @@ app.whenReady().then(() => {
   })
   registerFeedbackIpc(feedback)
   registerVerifyIpc(getActiveProjectPath)
+  // Git READ IPC (Dev Task Flow, Фаза 1) — структурированные status/diff/log.
+  // ТОЛЬКО чтение; git-write (ветки/commit) добавит Фаза 3.
+  registerGitIpc(getActiveProjectPath)
   registerAutonomousIpc({
     getSecret,
     getProviderId,

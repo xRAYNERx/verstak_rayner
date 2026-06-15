@@ -300,6 +300,12 @@ declare global {
       verify: {
         exec: (command: string) => Promise<{ exitCode: number; stdout: string; stderr: string }>
       }
+      // Git READ (Dev Task Flow, Фаза 1) — структурированные status/diff/log активного проекта.
+      git: {
+        status(): Promise<GitStatus>
+        diff(opts?: { base?: string; staged?: boolean; path?: string }): Promise<GitDiff>
+        log(opts?: { limit?: number }): Promise<GitLogEntry[]>
+      }
       term: {
         spawn: (cwd: string) => Promise<number>
         write: (id: number, data: string) => Promise<void>
@@ -597,6 +603,79 @@ export interface VerificationRow {
   artifactPath: string
   htmlPath: string | null
   taskSummary: string | null
+  createdAt: number
+}
+
+/**
+ * Git READ (Dev Task Flow, Фаза 1) — зеркало shape из electron/ipc/git.ts.
+ * Renderer не импортит electron/, поэтому типы дублируются здесь.
+ */
+export interface GitStatus {
+  branch: string | null
+  ahead: number
+  behind: number
+  staged: string[]
+  unstaged: string[]
+  untracked: string[]
+}
+export interface GitDiffStatEntry {
+  path: string
+  added: number
+  removed: number
+  status: string
+}
+export interface GitDiff {
+  stat: GitDiffStatEntry[]
+  patch?: string
+}
+export interface GitLogEntry {
+  sha: string
+  subject: string
+  author: string
+  date: string
+}
+
+/**
+ * Dev Task Flow (Фаза 1) — зеркало shape из electron/storage/dev-tasks.ts.
+ * В Фазе 1 типы определены, но в UI ещё не используются (storage+git-read доступны).
+ */
+export type DevTaskState =
+  | 'draft'
+  | 'branching'
+  | 'in_progress'
+  | 'review_ready'
+  | 'paused'
+  | 'packaged'
+  | 'committed'
+  | 'cancelled'
+export type DevTaskCheckStatus = 'pending' | 'running' | 'pass' | 'fail' | 'skipped'
+export interface DevTask {
+  id: number
+  projectPath: string
+  chatId: number | null
+  planId: number | null
+  title: string
+  state: DevTaskState
+  baseBranch: string | null
+  baseSha: string | null
+  workBranch: string | null
+  worktreePath: string | null
+  checkpointId: number | null
+  risk: string | null
+  summary: string | null
+  packageJson: string | null
+  createdAt: number
+  updatedAt: number
+}
+export interface DevTaskCheck {
+  id: number
+  devTaskId: number
+  label: string
+  command: string
+  status: DevTaskCheckStatus
+  exitCode: number | null
+  outputTail: string | null
+  ranInWorktree: boolean
   createdAt: number
 }
 

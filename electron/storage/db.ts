@@ -448,6 +448,44 @@ const MIGRATIONS: Array<{ version: number; description: string; run: (db: DB) =>
         CREATE INDEX IF NOT EXISTS idx_verifications_chat ON verifications(chat_id);
       `)
     }
+  },
+  {
+    version: 18,
+    description: 'Dev Task Flow (Фаза 1): dev_tasks (тонкий оркестратор задача→ветка→проверки→пакет) + dev_task_runs (связь с run_id) + dev_task_checks. changed_files НЕ дублируем — источник истины git diff.',
+    run: (db: DB) => {
+      // dev_tasks — один объект агрегирует ветку / run_id'ы / чекпоинт / проверки
+      // / итоговый пакет поверх готовых undo/checkpoint, plans, verify, git.
+      // state — машина состояний draft → branching → in_progress → review_ready →
+      // (paused) → packaged → committed/cancelled. package_json — замороженный
+      // снимок пакета на момент packaged (JSON-текст).
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS dev_tasks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          project_path TEXT NOT NULL, chat_id INTEGER, plan_id INTEGER,
+          title TEXT NOT NULL,
+          state TEXT NOT NULL DEFAULT 'draft'
+            CHECK(state IN ('draft','branching','in_progress','review_ready','paused','packaged','committed','cancelled')),
+          base_branch TEXT, base_sha TEXT, work_branch TEXT, worktree_path TEXT,
+          checkpoint_id INTEGER, risk TEXT, summary TEXT, package_json TEXT,
+          created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_dev_tasks_project ON dev_tasks(project_path, id DESC);
+        CREATE INDEX IF NOT EXISTS idx_dev_tasks_chat ON dev_tasks(chat_id);
+
+        CREATE TABLE IF NOT EXISTS dev_task_runs (
+          dev_task_id INTEGER NOT NULL, run_id TEXT NOT NULL,
+          PRIMARY KEY (dev_task_id, run_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS dev_task_checks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, dev_task_id INTEGER NOT NULL,
+          label TEXT NOT NULL, command TEXT NOT NULL,
+          status TEXT NOT NULL CHECK(status IN ('pending','running','pass','fail','skipped')),
+          exit_code INTEGER, output_tail TEXT, ran_in_worktree INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_dev_task_checks_task ON dev_task_checks(dev_task_id);
+      `)
+    }
   }
 ]
 
