@@ -180,7 +180,7 @@ export function App() {
     function move(ev: MouseEvent) {
       if (!dragRef.current) return
       const dx = ev.clientX - dragRef.current.startX
-      latest = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, dragRef.current.startW - dx))
+      latest = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, dragRef.current.startW + dx))
       setSidebarWidth(latest)
     }
     function up() {
@@ -231,6 +231,16 @@ export function App() {
         onOpenAppSettings={() => setShowSettings(true)}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(v => !v)}
+      />
+      <Sidebar
+        onOpenSettings={() => setShowSettings(true)}
+        aria-hidden={!sidebarOpen}
+      />
+      <div
+        className="gg-sidebar-resize"
+        onMouseDown={sidebarOpen ? startDrag : undefined}
+        title={t.settings.resizeDrag}
+        aria-hidden={!sidebarOpen}
       />
       <main className="gg-main">
         {/* Chat НЕ размонтируется при уходе на другие вкладки — иначе его
@@ -299,16 +309,6 @@ export function App() {
           </div>
         )}
       </main>
-      <div
-        className="gg-sidebar-resize"
-        onMouseDown={sidebarOpen ? startDrag : undefined}
-        title={t.settings.resizeDrag}
-        aria-hidden={!sidebarOpen}
-      />
-      <Sidebar
-        onOpenSettings={() => setShowSettings(true)}
-        aria-hidden={!sidebarOpen}
-      />
       {showSettings && (
         <Settings
           initialTab={settingsInitialTab}

@@ -43,33 +43,14 @@ body:has(.gg-app-atelier) {
   padding: var(--shell-gap);
   column-gap: var(--shell-col-gap);
   row-gap: var(--shell-gap);
-  grid-template-columns: var(--gg-rail-w) 1fr var(--gg-sidebar-resize-w) var(--gg-sidebar-panel-w);
+  grid-template-columns: var(--gg-rail-w) var(--gg-sidebar-panel-w) var(--gg-sidebar-resize-w) 1fr;
   background: transparent;
   box-sizing: border-box;
 }
 
 .gg-app-atelier .gg-sidebar-resize {
-  border-right: none;
-  border-left: 1px solid var(--border-subtle);
   border-radius: var(--radius-pill);
   margin: 8px 0;
-  transition:
-    background 180ms ease,
-    opacity var(--shell-dur) var(--shell-ease),
-    border-color var(--shell-dur) var(--shell-ease);
-}
-
-.gg-app-atelier .gg-sidebar-resize:hover {
-  background: var(--accent-muted);
-}
-
-.gg-app-atelier.is-sidebar-collapsed .gg-sidebar-resize {
-  border-left-color: transparent;
-}
-
-.gg-app-atelier.is-sidebar-collapsed .gg-sidebar {
-  border-left-color: transparent;
-  border-right-color: transparent;
 }
 
 /* ─── Rail: frosted column (expand anim untouched in layout.css) ─── */
@@ -188,20 +169,19 @@ body:has(.gg-app-atelier) {
   margin-top: 10px;
 }
 
-/* ─── Sidebar: docked column справа (как rail слева) ─── */
+/* ─── Sidebar: docked column слева от main (как rail) ─── */
 .gg-app-atelier .gg-sidebar {
   margin: 0;
   border-radius: var(--radius-xl);
   border: 1px solid var(--border-default);
-  border-right: 1px solid var(--border-default);
-  border-left: 1px solid color-mix(in srgb, var(--accent) 8%, transparent);
   background: var(--shell-rail-fill);
   backdrop-filter: var(--vol-blur);
   -webkit-backdrop-filter: var(--vol-blur);
-  box-shadow:
-    -4px 0 24px rgba(0, 0, 0, 0.32),
-    -1px 0 0 color-mix(in srgb, var(--accent) 8%, transparent),
-    var(--ring-inset);
+  box-shadow: var(--vol-shadow-side), var(--ring-inset);
+}
+
+.gg-app-atelier.is-sidebar-collapsed .gg-sidebar {
+  border-right-color: transparent;
 }
 
 .gg-app-atelier .gg-sidebar-header {
@@ -405,44 +385,45 @@ body:has(.gg-app-atelier) {
   box-shadow: var(--vol-lift);
 }
 
-/* ─── Composer: recessed input (как поиск по проектам) ─── */
+/* ─── Composer: компактный, как в базовом layout ─── */
 .gg-app-atelier .gg-composer {
-  padding: 10px 28px 20px;
-  border-top: none;
-  background: linear-gradient(0deg, color-mix(in srgb, var(--bg-elevated) 92%, transparent) 0%, transparent 100%);
+  padding: 12px 28px 18px;
+  border-top: 1px solid color-mix(in srgb, var(--border-subtle) 65%, transparent);
+  background: transparent;
+}
+
+.gg-app-atelier .gg-composer > * {
+  max-width: 920px;
 }
 
 .gg-app-atelier .gg-composer-inner {
-  border-radius: var(--radius-xl);
-  background: var(--vol-recessed-bg);
-  border: 1px solid var(--border-subtle);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow: var(--vol-shadow-inset);
-  transition: border-color 200ms ease, box-shadow 200ms ease;
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
 .gg-app-atelier .gg-composer-inner:hover {
-  border-color: var(--border-default);
+  border-color: var(--border-strong);
 }
 
 .gg-app-atelier .gg-composer-inner:focus-within {
-  border-color: var(--accent-border);
-  box-shadow: var(--vol-shadow-inset), 0 0 0 2px var(--accent-muted);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.gg-app-atelier .gg-composer-textarea {
+  min-height: 44px;
+  padding: 12px 116px 12px 14px;
 }
 
 .gg-app-atelier .gg-send-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-md);
-  background: var(--accent);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent);
-  transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
-}
-
-.gg-app-atelier .gg-send-btn:hover:not(:disabled) {
-  background: var(--accent-hover);
-  box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 42%, transparent);
+  width: 30px;
+  height: 30px;
+  box-shadow: none;
 }
 
 .gg-app-atelier .gg-chat-scroll-down {

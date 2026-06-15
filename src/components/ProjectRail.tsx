@@ -117,8 +117,7 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
   const showSearch = projectList.length >= 2
   const hasActiveFilter = projectQuery.trim().length > 0
   const showSearchTool = !contentExpanded && showSearch
-  const showSidebarTool = contentExpanded || !showSearch
-  const toolbarToolCount = 1 + (showSearchTool || showSidebarTool ? 1 : 0)
+  const toolbarToolCount = 2 + (showSearchTool ? 1 : 0)
 
   function openSearch() {
     setRailExpanded(true)
@@ -229,21 +228,19 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
             </svg>
           </button>
         )}
-        {showSidebarTool && (
-          <button
-            type="button"
-            className={`gg-rail-tool ${sidebarOpen ? 'is-on' : ''}`}
-            onClick={onToggleSidebar}
-            title={sidebarOpen ? t.rail.hideNavPanel : t.rail.showNavPanel}
-            aria-pressed={sidebarOpen}
-            aria-label={sidebarOpen ? t.rail.hideNavPanel : t.rail.showNavPanel}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <rect x="3" y="4" width="18" height="16" rx="2" />
-              <line x1="9" y1="4" x2="9" y2="20" />
-            </svg>
-          </button>
-        )}
+        <button
+          type="button"
+          className={`gg-rail-tool ${sidebarOpen ? 'is-on' : ''}`}
+          onClick={onToggleSidebar}
+          title={sidebarOpen ? t.rail.hideNavPanel : t.rail.showNavPanel}
+          aria-pressed={sidebarOpen}
+          aria-label={sidebarOpen ? t.rail.hideNavPanel : t.rail.showNavPanel}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <line x1="9" y1="4" x2="9" y2="20" />
+          </svg>
+        </button>
       </div>
 
       <div className="gg-rail-expand-panel" aria-hidden={!contentExpanded}>
