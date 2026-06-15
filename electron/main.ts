@@ -67,6 +67,7 @@ import { trackToolForPatterns } from './ai/procedural-memory'
 import { registerSuggestionsIpc } from './ipc/suggestions'
 import { initAutoUpdater } from './updater'
 import { registerNotifyIpc } from './ipc/notify'
+import { isInsideProjectIcons } from './storage/project-icons'
 import { bindUiScaleToWindow } from './ui-scale'
 import {
   mainWindowConstructorOptions,
@@ -167,7 +168,7 @@ if (process.platform === 'win32') {
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'gg-project-icon',
-    privileges: { standard: true, secure: true, supportFetchAPI: true, bypassCSP: true }
+    privileges: { standard: true, secure: true, supportFetchAPI: true }
   }
 ])
 
@@ -176,6 +177,9 @@ app.whenReady().then(() => {
     const prefix = 'gg-project-icon://local/'
     if (!request.url.startsWith(prefix)) return new Response(null, { status: 404 })
     const filePath = decodeURIComponent(request.url.slice(prefix.length))
+    // Отдаём ТОЛЬКО файлы из папки project-icons — иначе через этот протокол
+    // можно прочитать любой локальный файл (gg-project-icon://local/<любой путь>).
+    if (!isInsideProjectIcons(filePath)) return new Response(null, { status: 403 })
     return net.fetch(pathToFileURL(filePath).href)
   })
   installCSP()
@@ -262,9 +266,19 @@ app.whenReady().then(() => {
     console.warn('[skills] initial refresh failed:', err instanceof Error ? err.message : err)
   })
 
+  // knownRoots — корни зарегистрированных проектов + активный путь. Единый
+  // источник для всех root-guard'ов (терминал, files, project-map). Активный
+  // путь добавляем даже если его нет в list() — как в terminal-фиксе.
+  const knownRoots = () => {
+    const roots = projects.list().map(p => p.path)
+    const active = getActiveProjectPath()
+    if (active && !roots.includes(active)) roots.push(active)
+    return roots
+  }
+
   registerProjectIpc(projects)
-  registerProjectMapIpc()
-  registerFilesIpc({ getProjectRoot: getActiveProjectPath })
+  registerProjectMapIpc(knownRoots)
+  registerFilesIpc({ getProjectRoot: getActiveProjectPath, getKnownRoots: knownRoots })
   registerSettingsIpc(settings)
   registerCliAuthIpc(settings)
   registerAiIpc({
@@ -381,13 +395,8 @@ app.whenReady().then(() => {
     getActiveProject: () => getActiveProjectPath()
   })
   // getKnownRoots — корни проектов пользователя для валидации cwd терминала
-  // (см. resolveSafeTerminalCwd). Берём сохранённые проекты + активный путь.
-  registerTerminalIpc(() => {
-    const roots = projects.list().map(p => p.path)
-    const active = getActiveProjectPath()
-    if (active && !roots.includes(active)) roots.push(active)
-    return roots
-  })
+  // (см. resolveSafeTerminalCwd). Та же лямбда, что и для files/project-map.
+  registerTerminalIpc(knownRoots)
   registerSkillsIpc(skillRegistry, { getSecret })
   registerUserProfilesIpc(userProfiles)
   registerMemoryIpc(db)

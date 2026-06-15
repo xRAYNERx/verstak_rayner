@@ -27,13 +27,15 @@ import { randomUUID } from 'crypto'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { existsSync } from 'fs'
-import { join } from 'path'
+import { join, resolve, relative, isAbsolute } from 'path'
 import type { Attachment, ToolCall, ToolResult } from '../ai/types'
 import { applySearchReplaceBlocks, type FileTools } from '../ai/tools'
 import { decide, blockReason, type AgentMode } from '../ai/mode-policy'
 import { classifyMcpToolScope, mcpDecision, mcpBlockReason } from '../ai/mcp-policy'
 import { getRolePrompt } from '../ai/agent-roles'
 import { invalidateProjectMap, markFileDirty } from '../ai/project-map'
+import { scanText, isForbiddenPath } from '../ai/secret-scanner'
+import { safeRealJoin } from '../ai/path-policy'
 import type { McpClient } from '../mcp/client'
 import type { ProviderId, CreateOptions } from '../ai/registry'
 
@@ -317,6 +319,13 @@ const applyPatchHandler: ToolHandler = {
   async handle(call, ctx) {
     const path = String(call.args.path)
     const before = await readBeforeContent(ctx, path)
+    // Anti-redacted-writeback: read_file отдаёт модели [REDACTED:...] вместо
+    // реальных секретов. Если модель строит патч поверх такого «before», она
+    // перепишет реальные значения плейсхолдерами. Блокируем — пусть правит
+    // файл вручную вне приложения.
+    if (before.includes('[REDACTED:')) {
+      return { id: call.id, name: call.name, result: '', error: 'apply_patch заблокирован: файл содержит секреты, скрытые secret-scanner ([REDACTED:...]). Патч переписал бы плейсхолдеры поверх реальных значений. Отредактируй файл вручную вне приложения.' }
+    }
     const anchorHash = call.args.anchor_hash ? String(call.args.anchor_hash) : undefined
     let after: string
     try {
@@ -420,11 +429,16 @@ const runCommandHandler: ToolHandler = {
     }
     try {
       const result = await ctx.tools.runCommand(command)
+      // Редактируем оба потока через secret-scanner ДО отправки в UI и
+      // возврата модели — иначе ключи/токены из stdout/stderr утекают в
+      // контекст и в Timeline.
+      const stdout = scanText(result.stdout).redacted
+      const stderr = scanText(result.stderr).redacted
       ctx.sender.send('ai:event', {
         id: ctx.sendId,
-        event: { type: 'command-result', callId: call.id, command, status: 'ok', exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr }
+        event: { type: 'command-result', callId: call.id, command, status: 'ok', exitCode: result.exitCode, stdout, stderr }
       })
-      return { id: call.id, name: call.name, result }
+      return { id: call.id, name: call.name, result: { stdout, stderr, exitCode: result.exitCode } }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       ctx.sender.send('ai:event', {
@@ -562,6 +576,26 @@ const connectorQueryHandler: ToolHandler = {
       }
       const { id: _omit, ...rest } = call.args as Record<string, unknown> & { id?: unknown }
       void _omit
+      // Я.Диск upload читает локальный файл по local_path. Без guard'а агент мог
+      // выгрузить ЛЮБОЙ файл системы (включая .env/.ssh/creds) в облако клиента.
+      // Загоняем local_path в границы проекта (тем же safeRealJoin, что и tools),
+      // отсекаем выход за корень и секретные файлы. Артефакты в
+      // {project}/.verstak/artifacts проходят автоматически — они внутри корня.
+      if (cid === 'yandex_disk' && rest.local_path != null) {
+        if (!ctx.projectPath) {
+          return { id: call.id, name: call.name, result: '', error: 'Я.Диск upload запрещён без открытого проекта' }
+        }
+        const lp = String(rest.local_path)
+        const relCheck = relative(ctx.projectPath, resolve(ctx.projectPath, lp))
+        if (relCheck.startsWith('..') || isAbsolute(relCheck)) {
+          return { id: call.id, name: call.name, result: '', error: 'Я.Диск upload: путь вне проекта запрещён' }
+        }
+        const safe = await safeRealJoin(ctx.projectPath, lp)  // бросит при symlink-escape
+        if (isForbiddenPath(relative(ctx.projectPath, safe))) {
+          return { id: call.id, name: call.name, result: '', error: 'Я.Диск upload: секретные файлы (.env/.key/creds) запрещены' }
+        }
+        rest.local_path = safe
+      }
       const result = await ctx.connectors.query(cid, rest, ctx.signal)
       const s = summarizeToolCall(call.name, call.args, undefined)
       if (s) emitActivity(ctx, call, 'ok', s.label, s.detail)
@@ -2572,11 +2606,14 @@ const mcpToolHandler: ToolHandler = {
     try {
       emitActivity(ctx, call, 'ok', `mcp:${call.name}`, matchedTool.serverId)
       const result = await ctx.mcpClient.callTool(matchedTool.serverId, call.name, call.args)
-      return { id: call.id, name: call.name, result: typeof result === 'string' ? result : JSON.stringify(result) }
+      // Редактируем вывод внешнего MCP-сервера — он не доверенный, может вернуть
+      // токены/ключи, которые иначе утекут в контекст модели.
+      const raw = typeof result === 'string' ? result : JSON.stringify(result)
+      return { id: call.id, name: call.name, result: scanText(raw).redacted }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      emitActivity(ctx, call, 'error', `mcp:${call.name}`, msg)
-      return { id: call.id, name: call.name, result: '', error: msg }
+      emitActivity(ctx, call, 'error', `mcp:${call.name}`, scanText(msg).redacted)
+      return { id: call.id, name: call.name, result: '', error: scanText(msg).redacted }
     }
   }
 }
