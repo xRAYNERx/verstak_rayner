@@ -3085,7 +3085,10 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 
 .gg-composer-actions {
   position: absolute;
-  right: 8px; bottom: 8px;
+  right: 8px;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
   display: flex; align-items: center; gap: 4px;
 }
 .gg-attach-btn {

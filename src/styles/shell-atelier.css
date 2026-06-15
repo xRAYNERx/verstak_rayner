@@ -171,6 +171,10 @@ body:has(.gg-app-atelier) {
   box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
+.gg-app-atelier .gg-rail-add {
+  margin-top: 10px;
+}
+
 /* ─── Sidebar: raised glass slab ─── */
 .gg-app-atelier .gg-sidebar {
   margin: 0;
@@ -243,11 +247,13 @@ body:has(.gg-app-atelier) {
 
 .gg-app-atelier .gg-chat-project-bar {
   padding: 12px 28px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--vol-glass-deep);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 1px 0 var(--vol-highlight);
+  border-bottom: 1px solid var(--border-default);
+  background:
+    linear-gradient(165deg, color-mix(in srgb, var(--vol-highlight) 80%, transparent) 0%, transparent 38%),
+    var(--vol-glass);
+  backdrop-filter: var(--vol-blur);
+  -webkit-backdrop-filter: var(--vol-blur);
+  box-shadow: var(--ring-inset);
 }
 
 .gg-app-atelier .gg-chat-project-name {
@@ -350,7 +356,6 @@ body:has(.gg-app-atelier) {
 .gg-app-atelier .gg-send-btn:hover:not(:disabled) {
   background: var(--accent-hover);
   box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 42%, transparent);
-  transform: scale(1.04);
 }
 
 .gg-app-atelier .gg-chat-scroll-down {
