@@ -20,6 +20,12 @@ import { useAgentMode } from '../hooks/useAgentMode'
 import type { Attachment, Suggestion } from '../types/api'
 import iconUrl from '../assets/icon.png'
 import { useT } from '../i18n'
+import { notifyResponseReady } from '../lib/response-notify'
+
+function chatLabel(chatId: number): string {
+  const title = useProject.getState().chatSessions.find(s => s.id === chatId)?.title
+  return title ? `Ответ готов — ${title}` : 'Ответ готов'
+}
 
 const MAX_BYTES_PER_FILE = 5 * 1024 * 1024  // 5 MB
 const MAX_ATTACHMENTS = 8
@@ -180,6 +186,11 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         // sendOwners leak fix: stream завершается → удаляем owner, иначе
         // мапа растёт при каждом переключении проекта во время активного
         // стрима в фоне.
+        if (event.type === 'done') {
+          void notifyResponseReady({ body: 'Ответ готов — фоновый проект' })
+        } else if (event.type === 'error') {
+          void notifyResponseReady({ body: 'Ошибка в фоновом проекте', isError: true })
+        }
         if (event.type === 'done' || event.type === 'error') store.forgetSendOwner(id)
         return
       }
@@ -187,6 +198,11 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
       // chat snapshot so the user's stream survives chat-switching.
       if (owner?.kind === 'chat' && owner.chatId !== store.activeChatId) {
         store.applyEventToChat(owner.chatId, event as unknown as { type: string; [k: string]: unknown })
+        if (event.type === 'done') {
+          void notifyResponseReady({ body: chatLabel(owner.chatId) })
+        } else if (event.type === 'error') {
+          void notifyResponseReady({ body: `Ошибка — ${chatLabel(owner.chatId)}`, isError: true })
+        }
         if (event.type === 'done' || event.type === 'error') store.forgetSendOwner(id)
         return
       }
@@ -408,6 +424,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         }
         setStreaming(false)
         store.forgetSendOwner(id)
+        const chatTitle = store.activeChatId != null ? chatLabel(store.activeChatId) : 'Ответ готов'
+        void notifyResponseReady({ body: chatTitle })
       }
       else if (event.type === 'error') {
         // If a plan step was running, mark it failed
@@ -428,6 +446,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         }
         setStreaming(false)
         store.forgetSendOwner(id)
+        const errChat = store.activeChatId != null ? chatLabel(store.activeChatId) : 'Ошибка ответа'
+        void notifyResponseReady({ body: errChat, isError: true })
       }
     })
     return off
@@ -604,12 +624,35 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     }
   }
 
+  async function ensureProjectForChat(): Promise<{ path: string; activeChatId: number } | null> {
+    const store = useProject.getState()
+    if (store.path && store.activeChatId != null) {
+      return { path: store.path, activeChatId: store.activeChatId }
+    }
+    try {
+      const last = await window.api.settings.getKey('last_project_path')
+      const home = await window.api.app.getHomeDir()
+      const target = (last && last.length > 0) ? last : home
+      await store.setProject(target)
+    } catch {
+      return null
+    }
+    const next = useProject.getState()
+    if (!next.path || next.activeChatId == null) return null
+    return { path: next.path, activeChatId: next.activeChatId }
+  }
+
   async function send() {
     const text = input.trim()
     if (!text && attachments.length === 0) return
     if (isStreaming) return
     const store = useProject.getState()
-    const path = store.path
+    const ctx = await ensureProjectForChat()
+    if (!ctx) {
+      flashWarning('Сначала открой папку проекта слева — без неё переписка не сохраняется.')
+      return
+    }
+    const path = ctx.path
     const userAttachments = attachments
     store.clearActivity()
     setExhausted(null)  // new send wipes any pending continue state
@@ -644,7 +687,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
       }
     }
     addMessage({ role: 'user', content: enrichedText, attachments: userAttachments })
-    const activeChatId = store.activeChatId
+    const activeChatId = ctx.activeChatId
     if (path && activeChatId) {
       // В БД сохраняем оригинальный text пользователя (без loader-контекста),
       // чтобы при reload UI не показывал жирный системный блок.

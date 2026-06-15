@@ -141,6 +141,41 @@ export function connectionStatus(
   return keys[secretKey] && keys[secretKey].length > 0 ? 'ready' : 'missing'
 }
 
+export type CliAuthId = 'claude-cli' | 'gemini-cli' | 'grok-cli' | 'codex-cli'
+export type CliAuthStatus = { installed: boolean; loggedIn: boolean; credPath?: string }
+
+/** Сайт подписки / получения доступа для CLI-провайдеров. */
+export const CLI_SUBSCRIPTION_LINKS: Partial<Record<ProviderId, { url: string; label: string }>> = {
+  'grok-cli': { url: 'https://grok.com', label: 'grok.com' },
+  'claude-cli': { url: 'https://claude.ai', label: 'claude.ai' },
+  'gemini-cli': { url: 'https://one.google.com', label: 'Google One AI' },
+  'codex-cli': { url: 'https://chatgpt.com', label: 'chatgpt.com' },
+}
+
+export function providerAuthLink(
+  provider: ProviderLite & { secretKey?: string | null; keyLink?: { url: string; label: string } },
+): { url: string; label: string } | null {
+  if (provider.keyLink) return provider.keyLink
+  return CLI_SUBSCRIPTION_LINKS[provider.id] ?? null
+}
+
+export function isProviderAuthorized(
+  provider: ProviderLite & { id: ProviderId; secretKey?: string | null },
+  keys: Record<string, string>,
+  cliStatus: Partial<Record<CliAuthId, CliAuthStatus>> | null,
+  opts?: { customOpenaiBaseUrl?: string }
+): boolean {
+  if (provider.id === 'ollama') return true
+  if (provider.id === 'custom-openai') return Boolean(opts?.customOpenaiBaseUrl?.trim())
+  const status = connectionStatus(provider.id, provider.secretKey ?? null, keys)
+  if (status === 'ready') return true
+  if (provider.transport === 'CLI') {
+    const cli = cliStatus?.[provider.id as CliAuthId]
+    return Boolean(cli?.loggedIn)
+  }
+  return false
+}
+
 /**
  * Fuzzy-ish search: term должен встретиться как substring в любом из:
  * model name, provider name, tags. Регистронезависимо. Пусто = всё.

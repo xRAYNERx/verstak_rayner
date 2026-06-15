@@ -131,6 +131,7 @@ interface ProjectState {
   setProject: (path: string) => Promise<void>
   closeProject: () => void
   refreshProjectList: () => Promise<void>
+  updateProjectMeta: (path: string, patch: { name?: string; iconPath?: string | null }) => Promise<ProjectMeta | null>
   removeProject: (path: string) => Promise<void>
   setActiveView: (v: ViewId) => void
   addMessage: (msg: ChatMessage) => void
@@ -226,6 +227,14 @@ interface ProjectState {
 // on every await boundary if our token is no longer current.
 let setProjectToken = 0
 
+export const LAST_PROJECT_PATH_KEY = 'last_project_path'
+
+function sortProjectsByName(list: ProjectMeta[]): ProjectMeta[] {
+  return [...list].sort(
+    (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.path.localeCompare(b.path)
+  )
+}
+
 export const useProject = create<ProjectState>((set, get) => ({
   path: null,
   tree: [],
@@ -276,6 +285,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     const tree = await window.api.files.tree(path)
     if (myToken !== setProjectToken) return  // a newer setProject took over
     await window.api.projects.setCurrent(path)
+    void window.api.settings.setKey(LAST_PROJECT_PATH_KEY, path)
     if (myToken !== setProjectToken) return
     const projectList = await window.api.projects.list()
     if (myToken !== setProjectToken) return
@@ -302,10 +312,14 @@ export const useProject = create<ProjectState>((set, get) => ({
     }
     // Pick the most recent active session (top of list)
     const activeChatId = chatSessions[0]?.id ?? null
-    if (activeChatId && !existing) {
+    if (activeChatId) {
       const history = await window.api.chats.list(activeChatId)
       if (myToken !== setProjectToken) return
-      target.messages = history.map(m => ({ role: m.role, content: m.content }))
+      // Always hydrate from DB on project open unless we have a live in-memory
+      // snapshot from this app session (backgrounded project with active stream).
+      if (!existing || existing.messages.length === 0) {
+        target.messages = history.map(m => ({ role: m.role, content: m.content }))
+      }
     }
 
     if (myToken !== setProjectToken) return  // final safety before commit
@@ -353,6 +367,14 @@ export const useProject = create<ProjectState>((set, get) => ({
   refreshProjectList: async () => {
     const projectList = await window.api.projects.list()
     set({ projectList })
+  },
+  updateProjectMeta: async (path, patch) => {
+    const updated = await window.api.projects.updateMeta(path, patch)
+    if (!updated) return null
+    set(s => ({
+      projectList: sortProjectsByName(s.projectList.map(p => (p.path === path ? updated : p)))
+    }))
+    return updated
   },
   removeProject: async (path: string) => {
     await window.api.projects.remove(path)

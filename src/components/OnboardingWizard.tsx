@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { initEmptyEnabledModelsIfUnset, seedEnabledModelsIfUnset } from '../lib/enabled-models'
 
 /**
  * OnboardingWizard — мастер первого запуска.
@@ -65,6 +66,9 @@ export function OnboardingWizard({ onComplete }: Props) {
       // 2) Сохраняем API key (если введён)
       if (apiKey.trim()) {
         await window.api.settings.setKey('anthropic_api_key', apiKey.trim())
+        await seedEnabledModelsIfUnset(preset.defaultProvider, preset.defaultModel)
+      } else {
+        await initEmptyEnabledModelsIfUnset()
       }
 
       // 3) Применяем default provider/model к settings
@@ -96,6 +100,7 @@ export function OnboardingWizard({ onComplete }: Props) {
       } else if (!list.some(p => p.isActive)) {
         await window.api.userProfiles.setActive(list[0].id)
       }
+      await initEmptyEnabledModelsIfUnset()
       await window.api.settings.setKey('onboarding_completed', '1')
       onComplete()
     } catch (err) {

@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { useProject, type ViewId } from '../store/projectStore'
-import { useProvider } from '../hooks/useProvider'
+import { ModelPicker } from './ModelPicker'
 import { useT } from '../i18n'
 import type { FileNode } from '../types/api'
 
@@ -324,7 +324,6 @@ interface SidebarProps {
 
 export function Sidebar({ onOpenSettings }: SidebarProps) {
   const { path, tree, setProject, activeView, setActiveView } = useProject()
-  const provider = useProvider()
   const t = useT()
 
   const NAV: NavItem[] = [
@@ -390,11 +389,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
       </div>
 
       <div className="gg-sidebar-footer">
-        <div className="gg-provider-badge">
-          <span className={`gg-provider-dot ${provider.id === 'gemini-cli' ? 'cli' : ''}`} />
-          <span>{provider.label} · {provider.transport}</span>
-        </div>
-        <button className="gg-settings-trigger" onClick={onOpenSettings} title={t.settings.title}>⚙</button>
+        <ModelPicker variant="footer" onOpenSettings={onOpenSettings} />
       </div>
     </aside>
   )
