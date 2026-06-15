@@ -1,11 +1,23 @@
 /* ─── App shell ─── */
-:root { --gg-sidebar-w: 260px; --gg-rail-w: 68px; }
+@property --gg-rail-w {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 68px;
+}
+:root {
+  --gg-sidebar-w: 260px;
+  --gg-rail-w: 68px;
+}
+html {
+  transition: --gg-rail-w 360ms cubic-bezier(0.33, 1, 0.68, 1);
+}
 .gg-app {
   display: grid;
   grid-template-columns: var(--gg-rail-w) var(--gg-sidebar-w) 4px 1fr;
   height: 100vh;
   background: var(--bg-base);
   overflow: hidden;
+  transition: grid-template-columns 360ms cubic-bezier(0.33, 1, 0.68, 1);
 }
 .gg-app.is-sidebar-collapsed {
   grid-template-columns: var(--gg-rail-w) 1fr;
@@ -62,7 +74,10 @@
   overflow-y: hidden;
   min-height: 0;
   width: var(--gg-rail-w);
-  transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    width 360ms cubic-bezier(0.33, 1, 0.68, 1),
+    padding 360ms cubic-bezier(0.33, 1, 0.68, 1),
+    gap 280ms cubic-bezier(0.33, 1, 0.68, 1);
   box-shadow: inset -1px 0 0 color-mix(in srgb, var(--accent) 6%, transparent);
 }
 .gg-rail.is-expanded {
@@ -117,6 +132,47 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 0;
+  opacity: 0;
+  transition:
+    max-width 360ms cubic-bezier(0.33, 1, 0.68, 1),
+    opacity 220ms ease;
+}
+.gg-rail.is-expanded .gg-rail-brand-name {
+  max-width: 140px;
+  opacity: 1;
+  transition:
+    max-width 360ms cubic-bezier(0.33, 1, 0.68, 1),
+    opacity 280ms ease 70ms;
+}
+.gg-rail-expand-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  margin-top: -2px;
+  transition:
+    grid-template-rows 360ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 180ms ease,
+    margin-top 360ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.gg-rail.is-expanded .gg-rail-expand-panel {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  pointer-events: auto;
+  margin-top: 0;
+  transition:
+    grid-template-rows 360ms cubic-bezier(0.33, 1, 0.68, 1),
+    opacity 280ms ease 90ms,
+    margin-top 360ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+.gg-rail-expand-inner {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 .gg-rail-toolbar {
   display: flex;
@@ -128,6 +184,7 @@
   background: color-mix(in srgb, var(--bg-overlay) 70%, transparent);
   border: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  transition: gap 280ms cubic-bezier(0.33, 1, 0.68, 1), padding 280ms ease;
 }
 .gg-rail-toolbar.is-expanded {
   flex-direction: row;
@@ -292,7 +349,12 @@
   background: transparent;
   cursor: pointer;
   border-radius: var(--radius-lg);
-  transition: background 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  transition:
+    background 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease,
+    padding 360ms cubic-bezier(0.33, 1, 0.68, 1),
+    gap 360ms cubic-bezier(0.33, 1, 0.68, 1);
 }
 .gg-rail-chip.is-expanded .gg-rail-chip-btn {
   justify-content: flex-start;
@@ -404,6 +466,19 @@
   flex: 1;
   min-width: 0;
   text-align: left;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition:
+    max-width 360ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 160ms ease;
+}
+.gg-rail-chip.is-expanded .gg-rail-chip-text {
+  max-width: 180px;
+  opacity: 1;
+  transition:
+    max-width 360ms cubic-bezier(0.33, 1, 0.68, 1),
+    opacity 280ms ease 80ms;
 }
 .gg-rail-label {
   display: block;
@@ -889,7 +964,15 @@
   border: 1.5px dashed color-mix(in srgb, var(--accent) 35%, var(--border-strong));
   color: var(--text-tertiary);
   cursor: pointer;
-  transition: all 160ms ease;
+  transition:
+    width 360ms cubic-bezier(0.33, 1, 0.68, 1),
+    height 280ms ease,
+    border-radius 360ms cubic-bezier(0.33, 1, 0.68, 1),
+    padding 360ms ease,
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -911,6 +994,20 @@
   font-size: var(--text-sm);
   font-weight: 600;
   letter-spacing: -0.01em;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    max-width 360ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 160ms ease;
+}
+.gg-rail.is-expanded .gg-rail-add-label {
+  max-width: 160px;
+  opacity: 1;
+  transition:
+    max-width 360ms cubic-bezier(0.33, 1, 0.68, 1),
+    opacity 280ms ease 90ms;
 }
 .gg-rail-add:hover {
   border-color: var(--accent);
@@ -946,7 +1043,14 @@
   color: var(--text-secondary);
   box-shadow: var(--shadow-sm);
   cursor: pointer;
-  transition: background 150ms ease, color 150ms ease, border-color 150ms ease, transform 150ms ease;
+  transition:
+    width 360ms cubic-bezier(0.33, 1, 0.68, 1),
+    padding 360ms ease,
+    gap 280ms ease,
+    background 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
 }
 .gg-rail.is-expanded .gg-rail-app-settings {
   width: 100%;
@@ -966,6 +1070,34 @@
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-secondary);
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    max-width 360ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 160ms ease;
+}
+.gg-rail.is-expanded .gg-rail-app-settings-label {
+  max-width: 120px;
+  opacity: 1;
+  transition:
+    max-width 360ms cubic-bezier(0.33, 1, 0.68, 1),
+    opacity 280ms ease 90ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  html,
+  .gg-app,
+  .gg-rail,
+  .gg-rail-expand-panel,
+  .gg-rail-brand-name,
+  .gg-rail-chip-text,
+  .gg-rail-add,
+  .gg-rail-add-label,
+  .gg-rail-app-settings,
+  .gg-rail-app-settings-label {
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ─── Sidebar ─── */

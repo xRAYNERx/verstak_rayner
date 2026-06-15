@@ -68,11 +68,9 @@ function ProjectChip({ project, active, unread, streaming, expanded, onClick, on
             />
           )}
         </span>
-        {expanded && (
-          <span className="gg-rail-chip-text">
-            <span className="gg-rail-label">{project.name}</span>
-          </span>
-        )}
+        <span className="gg-rail-chip-text" aria-hidden={!expanded}>
+          <span className="gg-rail-label">{project.name}</span>
+        </span>
       </button>
       {hover && (
         <button
@@ -164,7 +162,7 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar, onOpenProjectSetting
         >
           <img src={iconUrl} alt="Verstak" />
         </button>
-        {railExpanded && <span className="gg-rail-brand-name">Verstak</span>}
+        <span className="gg-rail-brand-name" aria-hidden={!railExpanded}>Verstak</span>
       </div>
 
       <div className={`gg-rail-toolbar ${railExpanded ? 'is-expanded' : ''}`}>
@@ -210,39 +208,42 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar, onOpenProjectSetting
         )}
       </div>
 
-      {railExpanded && (
-        <div className="gg-rail-section-head">
-          <span className="gg-rail-section-title">{t.rail.clients}</span>
-          <span className="gg-rail-section-count">{filteredProjects.length}</span>
-        </div>
-      )}
-
-      {railExpanded && showSearch && (
-        <div className="gg-rail-search-wrap">
-          <svg className="gg-rail-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <circle cx="11" cy="11" r="7" />
-            <line x1="16.5" y1="16.5" x2="21" y2="21" />
-          </svg>
-          <input
-            ref={searchRef}
-            type="search"
-            className="gg-input gg-rail-search"
-            placeholder={t.rail.searchPlaceholder}
-            value={projectQuery}
-            onChange={e => setProjectQuery(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Escape') setProjectQuery('') }}
-            aria-label={t.rail.search}
-          />
-          {hasActiveFilter && (
-            <button
-              type="button"
-              className="gg-rail-search-clear"
-              onClick={() => setProjectQuery('')}
-              title={t.rail.clearSearch}
-            >×</button>
+      <div className="gg-rail-expand-panel" aria-hidden={!railExpanded}>
+        <div className="gg-rail-expand-inner">
+          <div className="gg-rail-section-head">
+            <span className="gg-rail-section-title">{t.rail.clients}</span>
+            <span className="gg-rail-section-count">{filteredProjects.length}</span>
+          </div>
+          {showSearch && (
+            <div className="gg-rail-search-wrap">
+              <svg className="gg-rail-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="11" cy="11" r="7" />
+                <line x1="16.5" y1="16.5" x2="21" y2="21" />
+              </svg>
+              <input
+                ref={searchRef}
+                type="search"
+                className="gg-input gg-rail-search"
+                placeholder={t.rail.searchPlaceholder}
+                value={projectQuery}
+                onChange={e => setProjectQuery(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Escape') setProjectQuery('') }}
+                aria-label={t.rail.search}
+                tabIndex={railExpanded ? 0 : -1}
+              />
+              {hasActiveFilter && (
+                <button
+                  type="button"
+                  className="gg-rail-search-clear"
+                  onClick={() => setProjectQuery('')}
+                  title={t.rail.clearSearch}
+                  tabIndex={railExpanded ? 0 : -1}
+                >×</button>
+              )}
+            </div>
           )}
         </div>
-      )}
+      </div>
 
       <div className="gg-rail-list">
         {filteredProjects.length === 0 && hasActiveFilter && (
@@ -270,7 +271,7 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar, onOpenProjectSetting
           title={t.rail.createClient}
         >
           <span className="gg-rail-add-icon" aria-hidden>+</span>
-          {railExpanded && <span className="gg-rail-add-label">{t.rail.createClient}</span>}
+          <span className="gg-rail-add-label" aria-hidden={!railExpanded}>{t.rail.createClient}</span>
         </button>
       </div>
 
@@ -284,7 +285,7 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar, onOpenProjectSetting
           aria-label={t.settings.title}
         >
           <SettingsGearIcon size={18} />
-          {railExpanded && <span className="gg-rail-app-settings-label">{t.settings.title}</span>}
+          <span className="gg-rail-app-settings-label" aria-hidden={!railExpanded}>{t.settings.title}</span>
         </button>
       </div>
     </div>
