@@ -217,7 +217,7 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
         {showSearchTool && (
           <button
             type="button"
-            className={`gg-rail-tool ${hasActiveFilter ? 'is-on' : ''}`}
+            className={`gg-rail-tool gg-rail-tool-search ${hasActiveFilter ? 'is-on' : ''}`}
             onClick={openSearch}
             title={t.rail.search}
             aria-label={t.rail.search}
@@ -230,7 +230,7 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
         )}
         <button
           type="button"
-          className={`gg-rail-tool ${sidebarOpen ? 'is-on' : ''}`}
+          className={`gg-rail-tool gg-rail-tool-sidebar ${sidebarOpen ? 'is-on' : ''}`}
           onClick={onToggleSidebar}
           title={sidebarOpen ? t.rail.hideNavPanel : t.rail.showNavPanel}
           aria-pressed={sidebarOpen}

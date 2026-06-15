@@ -180,14 +180,6 @@ html[data-theme="light"] {
   --border-code: #c9d0f5;
 }
 
-/* ─── Squared corners toggle (data-radius="square"). Opt-in, additive. ─── */
-html[data-radius="square"] {
-  --radius-sm: 0px;
-  --radius-md: 2px;
-  --radius-lg: 3px;
-  --radius-xl: 4px;
-}
-
 /* ─── Reset ─── */
 *, *::before, *::after { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; padding: 0; }

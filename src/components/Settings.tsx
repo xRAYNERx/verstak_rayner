@@ -1047,7 +1047,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
   const [coreUserText, setCoreUserText] = useState('')
   const [coreMemorySaved, setCoreMemorySaved] = useState(false)
   const [currentLang, setCurrentLang] = useState('en')
-  const { theme, setTheme, squareCorners, setSquareCorners } = useTheme()
+  const { theme, setTheme } = useTheme()
   const { uiScalePercent, setUiScalePercent } = useUiScale()
   const {
     notifyPrefs,
@@ -1999,15 +1999,6 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
               </button>
             ))}
           </div>
-          <label className="gg-theme-square" style={{ marginBottom: 12 }}>
-            <input
-              type="checkbox"
-              checked={squareCorners}
-              onChange={(e) => void setSquareCorners(e.target.checked)}
-            />
-            <span>Прямые углы (без скруглений)</span>
-          </label>
-
           <div className="gg-settings-section-title" style={{ marginTop: 8 }}>{t.settings.uiScale}</div>
           <div className="gg-ui-scale-block">
             <div className="gg-ui-scale-head">
@@ -2825,7 +2816,7 @@ function ModelsPage(props: ModelsPageProps) {
                     const enabled = enabledModels.has(e.key)
                     const isDefault = activeProvider === p.id && (models[p.id] ?? p.defaultModel) === e.model
                     return (
-                      <div key={e.key} className={`gg-models-row ${enabled ? 'is-on' : ''}`}>
+                      <div key={e.key} className={`gg-models-row ${enabled ? 'is-on' : ''} ${isDefault ? 'is-default' : ''}`}>
                         <button
                           type="button"
                           className="gg-models-row-main"
