@@ -4,6 +4,7 @@ import type { ProjectMeta } from '../types/api'
 import iconUrl from '../assets/icon.png'
 import { ProjectAvatar } from './ProjectAvatar'
 import { SettingsGearIcon } from './SettingsGearIcon'
+import { UpdateNotification } from './UpdateNotification'
 import { useT } from '../i18n'
 
 const RAIL_EXPANDED_KEY = 'gg-rail-expanded'
@@ -240,6 +241,7 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar, onOpenProjectSetting
           </button>
         </div>
         <div className="gg-rail-footer">
+          <UpdateNotification railExpanded={railExpanded} />
           <button
             type="button"
             className="gg-rail-app-settings"

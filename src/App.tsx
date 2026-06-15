@@ -20,7 +20,7 @@ import { WorkflowView } from './components/WorkflowView'
 import { MemoryGovernance } from './components/MemoryGovernance'
 import { DiffView } from './components/DiffView'
 import { CommandConfirm } from './components/CommandConfirm'
-import { UpdateNotification } from './components/UpdateNotification'
+
 import { UpdateAvailableModal } from './components/UpdateAvailableModal'
 import { Terminal } from './components/Terminal'
 import { FilesPanel } from './components/FilesPanel'
@@ -324,7 +324,6 @@ export function App() {
       <DiffView />
       <CommandConfirm />
       <UpdateAvailableModal />
-      <UpdateNotification />
     </div>
     </I18nContext.Provider>
   )

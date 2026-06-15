@@ -457,12 +457,15 @@
   margin-top: auto;
   padding: 8px 0 6px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
   justify-content: center;
   border-top: 1px solid var(--border-subtle);
 }
 .gg-rail.is-expanded .gg-rail-footer {
-  justify-content: stretch;
+  padding-left: 6px;
+  padding-right: 6px;
 }
 .gg-rail-app-settings {
   flex-shrink: 0;
@@ -1163,9 +1166,45 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
  * висел в воздухе между текстом и краем, теперь прижат). Content stays
  * narrow via .gg-chat-stream-inner — same 980px max-width as the composer.
  */
+.gg-chat-stream-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 .gg-chat-stream {
   flex: 1; overflow-y: auto;
   width: 100%;
+  min-height: 0;
+}
+.gg-chat-scroll-down {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-md, 0 4px 14px rgba(0, 0, 0, 0.28));
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+.gg-chat-scroll-down:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-muted, var(--border-strong));
+  background: var(--bg-hover);
+  transform: translateX(-50%) translateY(-1px);
+}
+.gg-chat-scroll-down:active {
+  transform: translateX(-50%) scale(0.96);
 }
 .gg-chat-stream-inner {
   display: flex; flex-direction: column; gap: 16px;
@@ -2099,6 +2138,45 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   cursor: pointer;
   transition: all 120ms ease;
 }
+.gg-auto-scroll-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+.gg-auto-scroll-btn.is-on {
+  color: var(--accent);
+  border-color: var(--accent-muted, var(--accent));
+  background: var(--accent-muted, rgba(88, 101, 242, 0.12));
+}
+.gg-auto-scroll-btn.is-off {
+  color: var(--text-tertiary);
+  opacity: 0.85;
+}
+.gg-auto-scroll-btn.is-off .gg-auto-scroll-off-mark {
+  display: block;
+}
+.gg-auto-scroll-btn.is-on .gg-auto-scroll-off-mark {
+  display: none;
+}
+.gg-auto-scroll-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+.gg-auto-scroll-off-mark {
+  display: none;
+  stroke: var(--text-tertiary);
+}
+
 .gg-undo-btn:hover {
   background: var(--bg-hover);
   color: var(--warning);
@@ -5678,40 +5756,80 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 }
 .gg-lang-buttons button:hover { border-color: #5865f2; background: rgba(88,101,242,0.1); }
 
-/* ─── Auto-updater notification bar ─── */
-.gg-update-bar {
-  position: fixed;
-  bottom: 0; left: 0; right: 0;
-  height: 32px;
-  background: var(--accent);
-  color: white;
+/* ─── Auto-updater: компактный индикатор в rail над «Настройки» ─── */
+.gg-update-rail {
+  width: 100%;
+  padding: 5px 6px 6px;
+  border-radius: var(--radius-md);
+  background: var(--accent-muted, rgba(88, 101, 242, 0.12));
+  border: 1px solid var(--accent-muted, rgba(88, 101, 242, 0.28));
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+.gg-update-rail-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  font-size: 13px;
+  gap: 4px;
+  min-width: 0;
+}
+.gg-update-rail-icon {
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.85;
+}
+.gg-update-rail-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
   font-weight: 500;
-  z-index: 9999;
+  line-height: 1.25;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gg-update-rail:not(.is-expanded) .gg-update-rail-label {
+  text-align: center;
+}
+.gg-update-rail-install {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.gg-update-rail-install:hover {
+  filter: brightness(1.08);
+}
+.gg-update-rail-track {
+  position: relative;
+  height: 3px;
+  margin-top: 5px;
+  border-radius: 2px;
+  background: var(--border-subtle, rgba(255, 255, 255, 0.08));
+  overflow: hidden;
+}
+.gg-update-rail-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: inherit;
+  background: var(--accent, #5865f2);
+  transition: width 300ms ease;
 }
 .gg-update-progress {
   position: absolute;
-  left: 0; top: 0; bottom: 0;
-  background: rgba(255,255,255,0.15);
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--accent, #5865f2);
   transition: width 300ms ease;
-}
-.gg-update-bar button {
-  padding: 3px 14px;
-  border-radius: 4px;
-  border: 1px solid rgba(255,255,255,0.4);
-  background: rgba(255,255,255,0.15);
-  color: white;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-}
-.gg-update-bar button:hover {
-  background: rgba(255,255,255,0.3);
 }
 
 .gg-update-modal-progress {

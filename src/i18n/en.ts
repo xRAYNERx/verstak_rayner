@@ -110,6 +110,8 @@ export const en = {
     readyBar: 'Update v{version} is ready',
     install: 'Install',
     openReleases: 'Open Releases',
+    railPercent: '{percent}%',
+    railReadyShort: 'Ready',
   },
 
   // Model picker
@@ -140,6 +142,9 @@ export const en = {
     gitSummary: 'Git Summary',
     explainCode: 'Explain Code',
     whatToImprove: 'What to improve in the project?',
+    scrollToBottom: 'Jump to latest messages',
+    autoScrollOn: 'Auto-scroll on — click to keep your scroll position while the agent replies',
+    autoScrollOff: 'Auto-scroll off — the chat will not jump to new messages',
   },
 
   // Effort control

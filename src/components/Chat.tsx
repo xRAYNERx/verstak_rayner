@@ -27,6 +27,16 @@ function chatLabel(chatId: number): string {
 
 const MAX_BYTES_PER_FILE = 5 * 1024 * 1024  // 5 MB
 const MAX_ATTACHMENTS = 8
+const CHAT_AUTO_SCROLL_KEY = 'gg.chatAutoScroll'
+
+function readAutoScrollPref(): boolean {
+  try {
+    const v = localStorage.getItem(CHAT_AUTO_SCROLL_KEY)
+    if (v === '0') return false
+    if (v === '1') return true
+  } catch { /* private mode */ }
+  return true
+}
 
 const ACCEPTED_MIME_PREFIXES = ['image/', 'text/', 'application/pdf', 'application/json']
 
@@ -111,6 +121,10 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
   const [dragOver, setDragOver] = useState(false)
   const [warning, setWarning] = useState<string | null>(null)
   const streamRef = useRef<HTMLDivElement>(null)
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(readAutoScrollPref)
+  /** Пока true и автопрокрутка вкл — новые сообщения тянут чат вниз. */
+  const stickToBottomRef = useRef(true)
+  const [showScrollDown, setShowScrollDown] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const screenshotCounter = useRef(0)
@@ -449,10 +463,63 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     return off
   }, [updateLastAssistant, setStreaming])
 
-  // Autoscroll on new content
+  const SCROLL_STICK_THRESHOLD = 72
+
+  function isNearBottom(el: HTMLElement): boolean {
+    return el.scrollHeight - el.scrollTop - el.clientHeight <= SCROLL_STICK_THRESHOLD
+  }
+
+  function scrollChatToBottom(behavior: ScrollBehavior = 'smooth') {
+    const el = streamRef.current
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior })
+    if (autoScrollEnabled) stickToBottomRef.current = true
+    setShowScrollDown(false)
+  }
+
+  function toggleAutoScroll() {
+    setAutoScrollEnabled(prev => {
+      const next = !prev
+      try { localStorage.setItem(CHAT_AUTO_SCROLL_KEY, next ? '1' : '0') } catch { /* ignore */ }
+      if (!next) {
+        stickToBottomRef.current = false
+      } else {
+        const el = streamRef.current
+        stickToBottomRef.current = el ? isNearBottom(el) : true
+      }
+      return next
+    })
+  }
+
   useEffect(() => {
-    if (streamRef.current) streamRef.current.scrollTop = streamRef.current.scrollHeight
-  }, [messages])
+    if (autoScrollEnabled) {
+      stickToBottomRef.current = true
+      setShowScrollDown(false)
+      const el = streamRef.current
+      if (el) el.scrollTop = el.scrollHeight
+    } else {
+      stickToBottomRef.current = false
+    }
+  }, [activeChatId, activePath, autoScrollEnabled])
+
+  useEffect(() => {
+    const el = streamRef.current
+    if (!el) return
+    function onScroll() {
+      const atBottom = isNearBottom(el)
+      if (autoScrollEnabled) stickToBottomRef.current = atBottom
+      setShowScrollDown(!atBottom && messages.length > 0)
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [messages.length, autoScrollEnabled])
+
+  useEffect(() => {
+    if (!autoScrollEnabled || !stickToBottomRef.current) return
+    const el = streamRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [messages, autoScrollEnabled])
 
   // Refresh undo count when project changes / after each assistant turn settles
   useEffect(() => {
@@ -845,7 +912,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         </div>
       )}
 
-      <div className="gg-chat-stream" ref={streamRef}>
+      <div className="gg-chat-stream-area">
+        <div className="gg-chat-stream" ref={streamRef}>
         <div className="gg-chat-stream-inner">
         {!hasMessages && (
           <div className="gg-chat-empty">
@@ -1085,6 +1153,20 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
           )
         })}
         </div>
+        </div>
+        {showScrollDown && (
+          <button
+            type="button"
+            className="gg-chat-scroll-down"
+            onClick={() => scrollChatToBottom('smooth')}
+            title={t.chat.scrollToBottom}
+            aria-label={t.chat.scrollToBottom}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+        )}
       </div>
 
       <TimelineBar />
@@ -1268,6 +1350,19 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
                 <span className="gg-undo-count">{undoCount}</span>
               </button>
             )}
+            <button
+              type="button"
+              className={`gg-auto-scroll-btn ${autoScrollEnabled ? 'is-on' : 'is-off'}`}
+              onClick={toggleAutoScroll}
+              title={autoScrollEnabled ? t.chat.autoScrollOn : t.chat.autoScrollOff}
+              aria-pressed={autoScrollEnabled}
+              aria-label={autoScrollEnabled ? t.chat.autoScrollOn : t.chat.autoScrollOff}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <polyline points="6 9 12 15 18 9" />
+                <line x1="5" y1="5" x2="19" y2="19" className="gg-auto-scroll-off-mark" />
+              </svg>
+            </button>
             <SkillPicker />
             <CheckpointButton />
             <ReviewButton />

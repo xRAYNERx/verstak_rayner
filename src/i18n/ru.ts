@@ -107,6 +107,8 @@ export const ru: Translations = {
     readyBar: 'Доступно обновление v{version}',
     install: 'Установить',
     openReleases: 'Открыть Releases',
+    railPercent: '{percent}%',
+    railReadyShort: 'Готово',
   },
   modelPicker: {
     changeModel: 'Сменить модель / провайдер',
@@ -132,6 +134,9 @@ export const ru: Translations = {
     gitSummary: 'Git Summary',
     explainCode: 'Explain Code',
     whatToImprove: 'Что улучшить в проекте?',
+    scrollToBottom: 'К последним сообщениям',
+    autoScrollOn: 'Автопрокрутка включена — нажми, чтобы чат не прыгал к новым сообщениям',
+    autoScrollOff: 'Автопрокрутка выключена — чат остаётся на месте при ответе агента',
   },
   effort: {
     quick: 'Быстро — короткие ответы',
