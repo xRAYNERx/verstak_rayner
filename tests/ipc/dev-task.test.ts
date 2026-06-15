@@ -47,7 +47,11 @@ describe('dev-task ipc (Фаза 2)', () => {
     db = openDb(join(dir, 'test.db'))
     const tasks = createDevTasks(db)
     const undoStack = createUndoStack(db)
-    registerDevTaskIpc({ tasks, getProjectRoot: () => dir, undoStack })
+    // runCheck-заглушка — exit 0 (фаза 2 тесты не гоняют buildPackage с проверками).
+    registerDevTaskIpc({
+      tasks, getProjectRoot: () => dir, undoStack,
+      runCheck: async () => ({ exitCode: 0, stdout: '', stderr: '' })
+    })
   })
   afterEach(() => {
     db.close()

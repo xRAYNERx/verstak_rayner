@@ -300,16 +300,24 @@ declare global {
       verify: {
         exec: (command: string) => Promise<{ exitCode: number; stdout: string; stderr: string }>
       }
-      // Git READ (Dev Task Flow, Фаза 1) — структурированные status/diff/log активного проекта.
+      // Git READ + WRITE (Dev Task Flow). WRITE (Фаза 3) — argv-форма + денилист.
       git: {
         status(): Promise<GitStatus>
         diff(opts?: { base?: string; staged?: boolean; path?: string }): Promise<GitDiff>
         log(opts?: { limit?: number }): Promise<GitLogEntry[]>
+        /** Создать и переключиться на ветку (checkout -b). */
+        branchCreate(opts: { name: string; from?: string }): Promise<{ ok: boolean; branch?: string; error?: string }>
+        /** Переключиться на verstak/* или существующую ветку (force запрещён). */
+        checkout(opts: { ref: string }): Promise<{ ok: boolean; error?: string }>
+        /** Поставить пути в индекс (внутри проекта). */
+        add(opts: { paths: string[] }): Promise<{ ok: boolean; error?: string }>
+        /** Закоммитить (+ опц. add paths). Без --no-verify/--amend. */
+        commit(opts: { message: string; paths?: string[] }): Promise<{ ok: boolean; sha?: string; error?: string }>
       }
-      // Dev Task Flow (Фаза 2) — оркестратор открытия задачи + наблюдение + откат.
+      // Dev Task Flow (Фазы 2-4) — оркестратор открытия/наблюдения/отката/пакета.
       devtask: {
-        /** Открыть задачу: снять checkpoint, зафиксировать base_branch/sha. */
-        open(opts: { chatId?: number | null; title: string; summary?: string | null; risk?: string | null }): Promise<DevTask | null>
+        /** Открыть задачу: снять checkpoint, зафиксировать base. useBranch → ветка. */
+        open(opts: { chatId?: number | null; title: string; summary?: string | null; risk?: string | null; useBranch?: boolean }): Promise<DevTask | null>
         /** Открыть задачу из объявленного preflight-плана. */
         openFromPreflight(opts: { chatId?: number | null; preflight: { summary: string; risk?: string; riskReason?: string; affectedZones?: string[] } }): Promise<DevTask | null>
         /** Задача + её проверки. */
@@ -320,6 +328,12 @@ declare global {
         linkRun(id: number, runId: string): Promise<void>
         /** Откатить файловые правки задачи к её чекпоинту. true = успех. */
         revert(id: number): Promise<boolean>
+        /** Закоммитить правки задачи (git add+commit), state→committed. */
+        commit(id: number, opts: { message: string; paths?: string[] }): Promise<{ ok: boolean; sha?: string; error?: string }>
+        /** Собрать пакет: прогнать проверки + diff + commit-planner, state→packaged. */
+        buildPackage(id: number, opts?: { runChecks?: boolean; checks?: string[] }): Promise<DevTaskPackage | null>
+        /** Открыть PR через github (нужен github_token + work_branch). */
+        createPr(id: number, opts: { repo: string; base: string; draft?: boolean }): Promise<{ ok: boolean; url?: string; number?: number; error?: string }>
       }
       term: {
         spawn: (cwd: string) => Promise<number>
@@ -697,6 +711,25 @@ export interface DevTaskCheck {
 export interface DevTaskDetail {
   task: DevTask | null
   checks: DevTaskCheck[]
+}
+
+/** Conventional-группа коммита (commit-planner, Фаза 4). */
+export type CommitType = 'feat' | 'fix' | 'chore' | 'test' | 'docs' | 'refactor'
+export interface CommitGroup {
+  type: CommitType
+  scope: string
+  subject: string
+  files: string[]
+}
+
+/** Замороженный пакет задачи (devtask:buildPackage, Фаза 4). */
+export interface DevTaskPackage {
+  changedFiles: { path: string; added: number; removed: number; status: string }[]
+  checks: { label: string; command: string; status: string; exitCode: number | null }[]
+  commitGroups: CommitGroup[]
+  commitMessage: string
+  prSummary: string
+  risks: string[]
 }
 
 /** Дескриптор провайдера — единый источник из main process (electron/ai/registry.ts). */

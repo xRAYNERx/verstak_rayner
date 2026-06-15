@@ -6346,6 +6346,85 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 .gg-devtask-revert:hover:not(:disabled) { background: var(--error); color: #fff; }
 .gg-devtask-revert:disabled { opacity: 0.45; cursor: not-allowed; }
 
+/* === Dev Task Flow Фазы 3-4: проверки + пакет + commit === */
+.gg-devtask-notice {
+  margin: 8px 16px 0; padding: 7px 10px; border-radius: 6px;
+  font-size: 12px; background: var(--bg-overlay);
+  border: 1px solid var(--border-subtle); color: var(--text-secondary, var(--text-primary));
+}
+.gg-devtask-checks-counter { font-weight: 500; color: var(--text-tertiary); text-transform: none; letter-spacing: 0; }
+.gg-devtask-checks { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.gg-devtask-check {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 9px; border-radius: 6px; font-size: 12px;
+  background: var(--bg-overlay); border: 1px solid var(--border-subtle);
+  font-family: var(--mono, monospace); cursor: default;
+}
+.gg-devtask-check.is-pass { background: var(--success-muted); color: var(--success); border-color: transparent; }
+.gg-devtask-check.is-fail { background: var(--error-muted); color: var(--error); border-color: transparent; }
+.gg-devtask-check.is-running { background: var(--accent-muted); color: var(--accent); }
+.gg-devtask-check-code { opacity: 0.8; }
+.gg-devtask-run-checks { margin-top: 4px; }
+
+.gg-commitplan { display: flex; flex-direction: column; gap: 8px; }
+.gg-commitplan-groups { display: flex; flex-direction: column; gap: 6px; }
+.gg-commitplan-group {
+  padding: 7px 9px; border-radius: 6px;
+  background: var(--bg-overlay); border: 1px solid var(--border-subtle);
+}
+.gg-commitplan-group-head {
+  display: flex; align-items: center; gap: 6px; font-size: 12px; flex-wrap: wrap;
+}
+.gg-commitplan-type {
+  padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.03em;
+  background: var(--accent-muted); color: var(--accent);
+  font-family: var(--mono, monospace);
+}
+.gg-commitplan-type.is-fix { background: var(--error-muted); color: var(--error); }
+.gg-commitplan-type.is-test { background: rgba(229, 192, 123, 0.18); color: var(--warning); }
+.gg-commitplan-type.is-docs { background: var(--bg-overlay); color: var(--text-tertiary); }
+.gg-commitplan-type.is-chore { background: var(--bg-overlay); color: var(--text-tertiary); }
+.gg-commitplan-type.is-refactor { background: var(--success-muted); color: var(--success); }
+.gg-commitplan-scope { color: var(--text-tertiary); font-family: var(--mono, monospace); font-size: 11px; }
+.gg-commitplan-subject { color: var(--text-secondary, var(--text-primary)); flex: 1; }
+.gg-commitplan-count {
+  flex-shrink: 0; padding: 0 6px; border-radius: 999px; font-size: 10px;
+  background: var(--bg-elevated, var(--bg-overlay)); color: var(--text-tertiary);
+}
+.gg-commitplan-files { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.gg-commitplan-file {
+  font-size: 10px; padding: 1px 5px; border-radius: 4px;
+  background: var(--bg-elevated, var(--bg-overlay)); color: var(--text-tertiary);
+  font-family: var(--mono, monospace);
+  max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.gg-commitplan-label {
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+}
+.gg-commitplan-message {
+  width: 100%; resize: vertical; min-height: 60px;
+  padding: 8px 10px; border-radius: 6px;
+  background: var(--bg-input, var(--bg-overlay)); border: 1px solid var(--border-subtle);
+  color: var(--text-primary); font-size: 12px; font-family: var(--mono, monospace);
+  line-height: 1.5;
+}
+.gg-commitplan-message:focus { outline: none; border-color: var(--accent); }
+
+.gg-devtask-pr-summary { margin-top: 8px; font-size: 12px; }
+.gg-devtask-pr-summary summary {
+  cursor: pointer; color: var(--text-tertiary); font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;
+}
+.gg-devtask-pr-summary pre {
+  margin-top: 6px; padding: 8px 10px; border-radius: 6px;
+  background: var(--bg-overlay); border: 1px solid var(--border-subtle);
+  font-size: 11px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+  max-height: 220px; overflow: auto;
+}
+.gg-devtask-package-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
 /* Бейдж активной задачи в composer-строке. */
 .gg-devtask-badge {
   display: inline-flex; align-items: center; gap: 6px;

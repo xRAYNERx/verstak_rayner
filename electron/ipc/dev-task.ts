@@ -4,6 +4,9 @@ import { promisify } from 'util'
 import type { DevTasks, DevTask, DevTaskCheck } from '../storage/dev-tasks'
 import type { UndoStack } from '../storage/undo'
 import { revertToCheckpoint } from './undo'
+import { gitBranchCreate, gitCommit, gitAdd, readDiffStat } from './git'
+import { buildCommitPlan, type CommitGroup } from '../ai/commit-planner'
+import { detectVerifyScriptsForHint } from '../ai/session-journal'
 
 const execFileAsync = promisify(execFile)
 
@@ -27,10 +30,22 @@ const execFileAsync = promisify(execFile)
 
 const GIT_TIMEOUT = 15_000
 
+/** Результат прогона одной проверки (зеркало verify:exec). */
+export interface CheckResult { exitCode: number; stdout: string; stderr: string }
+
 export interface DevTaskDeps {
   tasks: DevTasks
   getProjectRoot: () => string | null
   undoStack: UndoStack
+  /**
+   * Прогон проверочной команды (та же семантика, что verify:exec — денилист +
+   * secret-scanner внутри). Инжектится из main, чтобы не дублировать shell-логику.
+   */
+  runCheck: (command: string) => Promise<CheckResult>
+  /** Доступ к коннекторам (для createPr → github create_pr). Опц. */
+  connectorQuery?: (id: string, args: Record<string, unknown>) => Promise<unknown>
+  /** Чтение секрета (например github_token). Опц. — нужен только для createPr. */
+  getSecret?: (key: string) => string | null
 }
 
 /** Снимок git-базы на момент открытия задачи. */
@@ -71,8 +86,31 @@ export interface DevTaskDetail {
   checks: DevTaskCheck[]
 }
 
+/** Замороженный пакет задачи (package_json) — снимок на момент packaged. */
+export interface DevTaskPackage {
+  changedFiles: { path: string; added: number; removed: number; status: string }[]
+  checks: { label: string; command: string; status: string; exitCode: number | null }[]
+  commitGroups: CommitGroup[]
+  commitMessage: string
+  prSummary: string
+  risks: string[]
+}
+
+/**
+ * slug из заголовка задачи для имени ветки: латиница/цифры/дефис, маленькими,
+ * пробелы → дефис, кириллица/символы отбрасываются. Пусто → 'task'.
+ */
+function slugify(title: string): string {
+  const s = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-+|-+$)/g, '')
+    .slice(0, 32)
+  return s || 'task'
+}
+
 export function registerDevTaskIpc(deps: DevTaskDeps): void {
-  const { tasks, getProjectRoot, undoStack } = deps
+  const { tasks, getProjectRoot, undoStack, runCheck, connectorQuery, getSecret } = deps
 
   /**
    * Снять checkpoint текущего топа undo-стека — ТА ЖЕ семантика, что и
@@ -85,15 +123,29 @@ export function registerDevTaskIpc(deps: DevTaskDeps): void {
     return list.length > 0 ? list[0].id : 0
   }
 
+  /**
+   * Опц. создать рабочую ветку verstak/<slug>-<ts> на старте задачи (Фаза 3).
+   * Возвращает имя ветки при успехе, иначе null (dirty-in-place fallback —
+   * задача продолжает работать без ветки, не блокируем открытие).
+   */
+  async function maybeCreateBranch(projectPath: string, useBranch: boolean | undefined, title: string): Promise<string | null> {
+    if (!useBranch) return null
+    const name = `verstak/${slugify(title)}-${Date.now().toString(36)}`
+    const res = await gitBranchCreate(projectPath, name)
+    return res.ok ? (res.branch ?? name) : null
+  }
+
   // devtask:open — открыть задачу: снять checkpoint, зафиксировать git-базу,
-  // создать строку dev_tasks (state='draft', ветку НЕ создаём — Фаза 2).
-  ipcMain.handle('devtask:open', async (_e, opts: { chatId?: number | null; title: string; summary?: string | null; risk?: string | null }): Promise<DevTask | null> => {
+  // создать строку dev_tasks. useBranch=true → создаём ветку verstak/<slug>-<ts>
+  // и переходим в 'in_progress'; иначе dirty-in-place (state='draft').
+  ipcMain.handle('devtask:open', async (_e, opts: { chatId?: number | null; title: string; summary?: string | null; risk?: string | null; useBranch?: boolean }): Promise<DevTask | null> => {
     const projectPath = getProjectRoot()
     if (!projectPath) return null
     const title = String(opts?.title ?? '').trim()
     if (!title) return null
     const checkpointId = snapCheckpoint(projectPath)
     const base = await readGitBase(projectPath)
+    const workBranch = await maybeCreateBranch(projectPath, opts.useBranch, title)
     const task = tasks.create({
       projectPath,
       chatId: opts.chatId ?? null,
@@ -102,10 +154,12 @@ export function registerDevTaskIpc(deps: DevTaskDeps): void {
       risk: opts.risk ?? null,
       baseBranch: base.branch,
       baseSha: base.sha,
-      workBranch: null, // Фаза 2: dirty-in-place, ветку создаст Фаза 3.
+      workBranch, // Фаза 3: ветка по запросу, иначе dirty-in-place (null).
       checkpointId
     })
-    return task
+    // Если ветку создали — задача сразу 'in_progress' (ветвление состоялось).
+    if (workBranch) tasks.setState(task.id, 'in_progress')
+    return tasks.get(task.id)
   })
 
   // devtask:openFromPreflight — открыть задачу из объявленного preflight-плана.
@@ -173,5 +227,140 @@ export function registerDevTaskIpc(deps: DevTaskDeps): void {
     // кнопка «Откатить сессию» — тот же UndoStack, общая функция, не дублируем.
     const result = await revertToCheckpoint(undoStack, projectPath, task.checkpointId)
     return result.ok
+  })
+
+  /**
+   * devtask:buildPackage — собрать пакет задачи (Фаза 4):
+   *   1) прогнать проверки (runChecks): из detectVerifyScriptsForHint если не
+   *      переданы явно, иначе opts.checks. Статус pass/fail ставит ХЕНДЛЕР по
+   *      exitCode (не модель) — пишем в dev_task_checks (addCheck);
+   *   2) git diff (base..HEAD если есть base_sha, иначе worktree) → changedFiles;
+   *   3) commit-planner → группы + commitMessage + prSummary;
+   *   4) заморозить package_json (tasks.setPackage → state='packaged').
+   * Возвращает собранный Package.
+   */
+  ipcMain.handle('devtask:buildPackage', async (_e, id: number, opts?: { runChecks?: boolean; checks?: string[] }): Promise<DevTaskPackage | null> => {
+    const projectPath = getProjectRoot()
+    if (!projectPath) return null
+    const task = tasks.get(id)
+    if (!task) return null
+
+    // --- 1) Проверки ---
+    const checkResults: DevTaskPackage['checks'] = []
+    if (opts?.runChecks) {
+      let commands = (opts.checks ?? []).filter(c => typeof c === 'string' && c.trim())
+      if (commands.length === 0) {
+        // Автодетект из package.json/tsconfig (та же эвристика, что hint после write).
+        commands = await detectVerifyScriptsForHint(projectPath)
+      }
+      for (const command of commands) {
+        let res: CheckResult
+        try {
+          res = await runCheck(command)
+        } catch (err) {
+          res = { exitCode: 1, stdout: '', stderr: err instanceof Error ? err.message : String(err) }
+        }
+        const status = res.exitCode === 0 ? 'pass' : 'fail'
+        // tail вывода — для UI; обрезаем до 2КБ чтобы не раздувать БД.
+        const combined = `${res.stdout}\n${res.stderr}`.trim()
+        const tail = combined.length > 2048 ? combined.slice(-2048) : combined
+        tasks.addCheck(id, { label: command, command, status, exitCode: res.exitCode, outputTail: tail })
+        checkResults.push({ label: command, command, status, exitCode: res.exitCode })
+      }
+    } else {
+      // Без прогона — берём уже записанные проверки (если были).
+      for (const c of tasks.listChecks(id)) {
+        checkResults.push({ label: c.label, command: c.command, status: c.status, exitCode: c.exitCode })
+      }
+    }
+
+    // --- 2) Изменённые файлы (git diff) ---
+    // base_sha зафиксирован на open → сравниваем base..HEAD (правки в коммитах).
+    // Если базы нет (не git) — diff рабочего дерева.
+    const changedFiles = await readDiffStat(projectPath, task.baseSha ?? undefined)
+
+    // --- 3) commit-planner ---
+    const risks = task.risk ? [task.risk] : []
+    const plan = buildCommitPlan({
+      diffStat: changedFiles,
+      summary: task.summary ?? task.title,
+      affectedZones: undefined
+    })
+
+    // --- 4) Заморозить пакет ---
+    const pkg: DevTaskPackage = {
+      changedFiles,
+      checks: checkResults,
+      commitGroups: plan.groups,
+      commitMessage: plan.commitMessage,
+      prSummary: plan.prSummary,
+      risks
+    }
+    tasks.setPackage(id, JSON.stringify(pkg)) // → state='packaged'
+    return pkg
+  })
+
+  /**
+   * devtask:commit — закоммитить правки задачи (Фаза 3). git add (changed paths
+   * или все из diff) + git commit -m. Записываем sha, state→'committed'.
+   * Денилист (push/force/--no-verify) гарантирован gitCommit → assertGitAllowed.
+   */
+  ipcMain.handle('devtask:commit', async (_e, id: number, opts: { message: string; paths?: string[] }): Promise<{ ok: boolean; sha?: string; error?: string }> => {
+    const projectPath = getProjectRoot()
+    if (!projectPath) return { ok: false, error: 'no-project' }
+    const task = tasks.get(id)
+    if (!task) return { ok: false, error: 'no-task' }
+    const message = String(opts?.message ?? '').trim()
+    if (!message) return { ok: false, error: 'empty-message' }
+    // paths: явные или из текущего diff рабочего дерева (только новые правки).
+    let paths = Array.isArray(opts?.paths) ? opts.paths.filter(p => typeof p === 'string' && p.trim()) : []
+    if (paths.length === 0) {
+      const stat = await readDiffStat(projectPath)
+      paths = stat.map(s => s.path)
+    }
+    if (paths.length > 0) {
+      const added = await gitAdd(projectPath, paths)
+      if (!added.ok) return { ok: false, error: added.error }
+    }
+    const res = await gitCommit(projectPath, message)
+    if (!res.ok) return res
+    tasks.setState(id, 'committed')
+    return res
+  })
+
+  /**
+   * devtask:createPr — открыть PR через github-коннектор (Фаза 4, опц.).
+   * Доступно если есть github_token + work_branch. head = work_branch, body =
+   * prSummary из замороженного пакета. Авто-push НЕ делаем — пользователь сам
+   * пушит ветку; коннектор лишь создаёт PR из уже запушенной ветки.
+   */
+  ipcMain.handle('devtask:createPr', async (_e, id: number, opts: { repo: string; base: string; draft?: boolean }): Promise<{ ok: boolean; url?: string; number?: number; error?: string }> => {
+    if (!connectorQuery || !getSecret) return { ok: false, error: 'connectors-unavailable' }
+    if (!getSecret('github_token')) return { ok: false, error: 'no-github-token' }
+    const task = tasks.get(id)
+    if (!task) return { ok: false, error: 'no-task' }
+    if (!task.workBranch) return { ok: false, error: 'no-work-branch' }
+    const repo = String(opts?.repo ?? '').trim()
+    const base = String(opts?.base ?? '').trim()
+    if (!repo || !base) return { ok: false, error: 'repo-and-base-required' }
+    // Тело PR — prSummary из пакета, заголовок — из плана/заголовка задачи.
+    let body = task.summary ?? task.title
+    let title = task.title
+    if (task.packageJson) {
+      try {
+        const pkg = JSON.parse(task.packageJson) as DevTaskPackage
+        if (pkg.prSummary) body = pkg.prSummary
+        if (pkg.commitMessage) title = pkg.commitMessage.split('\n')[0]
+      } catch { /* битый пакет — оставляем дефолт */ }
+    }
+    try {
+      const result = await connectorQuery('github', {
+        op: 'create_pr', repo, head: task.workBranch, base, title, body, draft: opts?.draft === true
+      }) as { created?: boolean; number?: number; url?: string; error?: string; message?: string }
+      if (result?.error) return { ok: false, error: result.message ?? result.error }
+      return { ok: true, url: result.url, number: result.number }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
   })
 }

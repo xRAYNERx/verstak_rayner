@@ -26,6 +26,140 @@ const MAX_BUFFER = 8 * 1024 * 1024
 // Кап патча ~50КБ — чтобы тяжёлый diff не раздул IPC / UI.
 const PATCH_CAP = 50 * 1024
 
+/**
+ * Денилист git-write (Dev Task Flow, Фаза 3). Жёсткий запрет деструктива и
+ * сетевых операций на уровне обёртки git-вызова — НЕ доверяем валидации выше.
+ * Любой argv, попадающий под правило ниже, отклоняется до запуска процесса.
+ *
+ * Блокируем:
+ *   - push / fetch / pull / remote — никакой сети (авто-push не делаем, см. roadmap §9);
+ *   - reset --hard, clean -fd, checkout --force / -f — деструктив рабочего дерева;
+ *   - rebase, filter-branch, filter-repo — переписывание истории;
+ *   - --no-verify — обход хуков (CLAUDE.md: commit без --no-verify);
+ *   - --amend — переписывание существующего коммита;
+ *   - -f / --force в любом виде — форсирование.
+ *
+ * Безопасные subcommand'ы (status/diff/log/add/commit/branch/checkout/rev-parse)
+ * проходят, если их argv не содержит запрещённых токенов.
+ */
+const FORBIDDEN_SUBCOMMANDS = new Set([
+  'push', 'fetch', 'pull', 'remote',
+  'rebase', 'filter-branch', 'filter-repo',
+  'reflog', 'gc', 'prune'
+])
+const FORBIDDEN_FLAGS = new Set(['--force', '-f', '--no-verify', '--amend', '--hard', '-D'])
+
+/**
+ * Бросает Error если argv содержит запрещённую операцию. Проверяется:
+ *   1) первый токен (subcommand) — против FORBIDDEN_SUBCOMMANDS;
+ *   2) любой токен — против FORBIDDEN_FLAGS;
+ *   3) опасные пары: reset --hard, clean -f/-fd, checkout --force.
+ * Тест на это обязателен (tests/ipc/git-denylist.test.ts).
+ */
+export function assertGitAllowed(argv: string[]): void {
+  const sub = argv[0] ?? ''
+  if (FORBIDDEN_SUBCOMMANDS.has(sub)) {
+    throw new Error(`git-write денилист: subcommand «${sub}» запрещён`)
+  }
+  for (const tok of argv) {
+    if (FORBIDDEN_FLAGS.has(tok)) {
+      throw new Error(`git-write денилист: флаг «${tok}» запрещён`)
+    }
+  }
+  // reset --hard — деструктивный сброс рабочего дерева.
+  if (sub === 'reset' && argv.includes('--hard')) {
+    throw new Error('git-write денилист: reset --hard запрещён')
+  }
+  // clean -f / -fd / --force — удаление неотслеженных файлов.
+  if (sub === 'clean') {
+    if (argv.some(a => a === '-f' || a === '-fd' || a === '-df' || a === '--force')) {
+      throw new Error('git-write денилист: clean -fd запрещён')
+    }
+    // Любой clean считаем опасным (даже dry-run не нужен агенту).
+    throw new Error('git-write денилист: git clean запрещён')
+  }
+  // checkout --force / -f — потеря локальных правок.
+  if (sub === 'checkout' && argv.some(a => a === '--force' || a === '-f')) {
+    throw new Error('git-write денилист: checkout --force запрещён')
+  }
+}
+
+/** Имя ветки: только [\w./-], без '..' (traversal/ref-обман) и пробелов. */
+export function isValidBranchName(name: string): boolean {
+  if (!name || /\s/.test(name)) return false
+  if (name.includes('..')) return false
+  return /^[\w./-]+$/.test(name)
+}
+
+// ----------------------------------------------------------- git-write helpers
+// Экспортируемые операции записи — переиспользуются и IPC-хендлерами (ниже), и
+// оркестратором Dev Task Flow (ipc/dev-task.ts). Единая точка через runGit →
+// assertGitAllowed гарантирует денилист push/force/reset для всех вызовов.
+
+export interface GitWriteResult { ok: boolean; error?: string }
+
+/** Создать и переключиться на ветку (checkout -b name [from]). */
+export async function gitBranchCreate(cwd: string, name: string, from?: string): Promise<{ ok: boolean; branch?: string; error?: string }> {
+  if (!isValidBranchName(name)) return { ok: false, error: 'invalid-branch-name' }
+  if (from && !isValidBranchName(from) && !/^[\w./@^~-]+$/.test(from)) return { ok: false, error: 'invalid-from' }
+  const argv = ['checkout', '-b', name]
+  if (from) argv.push(from)
+  try {
+    await runGit(cwd, argv)
+    return { ok: true, branch: name }
+  } catch (err) {
+    return { ok: false, error: scanText(err instanceof Error ? err.message : String(err)).redacted }
+  }
+}
+
+/** Переключиться на ветку: verstak/* ИЛИ уже существующую (force запрещён). */
+export async function gitCheckout(cwd: string, ref: string): Promise<GitWriteResult> {
+  if (!isValidBranchName(ref)) return { ok: false, error: 'invalid-ref' }
+  try {
+    if (!ref.startsWith('verstak/')) {
+      const { stdout } = await runGit(cwd, ['branch', '--list', ref])
+      if (!stdout.trim()) return { ok: false, error: 'ref-not-allowed' }
+    }
+    await runGit(cwd, ['checkout', ref])
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: scanText(err instanceof Error ? err.message : String(err)).redacted }
+  }
+}
+
+/** Поставить пути в индекс. Каждый path — через safeRealJoin (внутри проекта). */
+export async function gitAdd(cwd: string, paths: string[]): Promise<GitWriteResult> {
+  const clean = paths.filter(p => typeof p === 'string' && p.trim())
+  if (clean.length === 0) return { ok: false, error: 'no-paths' }
+  for (const rel of clean) {
+    try { await safeRealJoin(cwd, rel) } catch { return { ok: false, error: `path-outside-project: ${rel}` } }
+  }
+  try {
+    await runGit(cwd, ['add', '--', ...clean])
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: scanText(err instanceof Error ? err.message : String(err)).redacted }
+  }
+}
+
+/** Закоммитить (+ опц. add paths). --no-verify/--amend невозможны (денилист). */
+export async function gitCommit(cwd: string, message: string, paths?: string[]): Promise<{ ok: boolean; sha?: string; error?: string }> {
+  const msg = String(message ?? '').trim()
+  if (!msg) return { ok: false, error: 'empty-message' }
+  const clean = Array.isArray(paths) ? paths.filter(p => typeof p === 'string' && p.trim()) : []
+  if (clean.length > 0) {
+    const added = await gitAdd(cwd, clean)
+    if (!added.ok) return { ok: false, error: added.error }
+  }
+  try {
+    await runGit(cwd, ['commit', '-m', msg])
+    const { stdout } = await runGit(cwd, ['rev-parse', 'HEAD'])
+    return { ok: true, sha: stdout.trim() }
+  } catch (err) {
+    return { ok: false, error: scanText(err instanceof Error ? err.message : String(err)).redacted }
+  }
+}
+
 export interface GitStatus {
   branch: string | null
   ahead: number
@@ -60,6 +194,9 @@ function isTopFrame(e: Electron.IpcMainInvokeEvent): boolean {
 }
 
 async function runGit(cwd: string, argv: string[]): Promise<{ stdout: string; stderr: string }> {
+  // Денилист — единая точка для READ и WRITE. read-команды его проходят
+  // (status/diff/log/add/commit/branch не в FORBIDDEN), деструктив отсекается.
+  assertGitAllowed(argv)
   const { stdout, stderr } = await execFileAsync('git', argv, {
     cwd, timeout: GIT_TIMEOUT, maxBuffer: MAX_BUFFER, windowsHide: true
   })
@@ -119,6 +256,24 @@ function parseNumstat(stdout: string): GitDiffStatEntry[] {
     entries.push({ path, added, removed, status: parts[0] === '-' ? 'binary' : 'modified' })
   }
   return entries
+}
+
+/**
+ * Прочитать diff-stat (numstat) рабочего дерева — для оркестратора Dev Task Flow
+ * (buildPackage). base опц.: сравнивает base..HEAD, иначе worktree. Не-git → [].
+ * Read-only, проходит денилист (diff безопасен).
+ */
+export async function readDiffStat(cwd: string, base?: string): Promise<GitDiffStatEntry[]> {
+  const args = ['diff', '--numstat']
+  if (base && /^[\w./@^~-]+$/.test(base) && !base.startsWith('-')) {
+    args.splice(1, 0, `${base}..HEAD`)
+  }
+  try {
+    const { stdout } = await runGit(cwd, args)
+    return parseNumstat(scanText(stdout).redacted)
+  } catch {
+    return []
+  }
 }
 
 export function registerGitIpc(getProjectRoot: () => string | null): void {
@@ -203,5 +358,42 @@ export function registerGitIpc(getProjectRoot: () => string | null): void {
     } catch {
       return []
     }
+  })
+
+  // --------------------------------------------------------------- git-write
+  // Все write-операции (Фаза 3): argv-форма + денилист (runGit → assertGitAllowed)
+  // + top-frame guard. Push/force/reset/clean/rebase/--no-verify невозможны на
+  // уровне обёртки. git-write доступен ТОЛЬКО за явными кнопками UI.
+
+  // git:branchCreate — создать и переключиться на ветку (checkout -b).
+  ipcMain.handle('git:branchCreate', async (e, opts: { name: string; from?: string }): Promise<{ ok: boolean; branch?: string; error?: string }> => {
+    if (!isTopFrame(e)) return { ok: false, error: 'forbidden-frame' }
+    const cwd = getProjectRoot()
+    if (!cwd) return { ok: false, error: 'no-project' }
+    return gitBranchCreate(cwd, String(opts?.name ?? '').trim(), opts?.from ? String(opts.from).trim() : undefined)
+  })
+
+  // git:checkout — переключиться на verstak/* или существующую ветку.
+  ipcMain.handle('git:checkout', async (e, opts: { ref: string }): Promise<GitWriteResult> => {
+    if (!isTopFrame(e)) return { ok: false, error: 'forbidden-frame' }
+    const cwd = getProjectRoot()
+    if (!cwd) return { ok: false, error: 'no-project' }
+    return gitCheckout(cwd, String(opts?.ref ?? '').trim())
+  })
+
+  // git:add — поставить пути в индекс (каждый через safeRealJoin).
+  ipcMain.handle('git:add', async (e, opts: { paths: string[] }): Promise<GitWriteResult> => {
+    if (!isTopFrame(e)) return { ok: false, error: 'forbidden-frame' }
+    const cwd = getProjectRoot()
+    if (!cwd) return { ok: false, error: 'no-project' }
+    return gitAdd(cwd, Array.isArray(opts?.paths) ? opts.paths : [])
+  })
+
+  // git:commit — закоммитить (+ опц. add paths). --no-verify/--amend невозможны.
+  ipcMain.handle('git:commit', async (e, opts: { message: string; paths?: string[] }): Promise<{ ok: boolean; sha?: string; error?: string }> => {
+    if (!isTopFrame(e)) return { ok: false, error: 'forbidden-frame' }
+    const cwd = getProjectRoot()
+    if (!cwd) return { ok: false, error: 'no-project' }
+    return gitCommit(cwd, String(opts?.message ?? ''), opts?.paths)
   })
 }

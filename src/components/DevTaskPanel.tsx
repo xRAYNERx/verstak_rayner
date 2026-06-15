@@ -1,17 +1,22 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useProject } from '../store/projectStore'
-import type { DevTaskState, GitDiffStatEntry } from '../types/api'
+import type { DevTaskState, GitDiffStatEntry, DevTaskCheck, DevTaskPackage } from '../types/api'
+import { CommitPlanEditor } from './CommitPlanEditor'
 
 /**
- * Вкладка «Задача» (Dev Task Flow, Фаза 2) — read-only состояние активной
- * dev_task + откат одной кнопкой.
+ * Вкладка «Задача» (Dev Task Flow, Фазы 2-4) — состояние активной dev_task +
+ * откат + сборка пакета + commit/PR.
  *
  * Шапка: заголовок + state-бейдж + ветка (work_branch || 'in-place') + risk.
- * Тело: секция «Изменения» — список изменённых файлов из window.api.git.diff
- * (статус, +added/-removed), клик → reveal в проводнике. Кнопка «↩ Откатить
- * задачу» (devtask:revert, с confirm) и «Обновить».
+ * Секции:
+ *   - «Изменения» — изменённые файлы (window.api.git.diff), клик → reveal.
+ *   - «Проверки» — чипы pass/fail из dev_task_checks + кнопка «Прогнать проверки»
+ *     (devtask:buildPackage с runChecks).
+ *   - «Пакет» — CommitPlanEditor (группы коммитов + редактируемое сообщение) +
+ *     PR summary + кнопки «Commit» (devtask:commit) и «Создать PR».
+ *   - откат к чекпоинту.
  *
- * Фаза 2 — только наблюдение + revert. git-write / commit / пакет — Фазы 3-5.
+ * git-write идёт ТОЛЬКО по явным кнопкам (Commit / Создать ветку / Создать PR).
  */
 
 const STATE_LABEL: Record<DevTaskState, string> = {
@@ -41,7 +46,14 @@ export function DevTaskPanel() {
   const refreshDevTask = useProject(s => s.refreshDevTask)
   const closeDevTask = useProject(s => s.closeDevTask)
   const [diff, setDiff] = useState<GitDiffStatEntry[]>([])
+  const [checks, setChecks] = useState<DevTaskCheck[]>([])
   const [loading, setLoading] = useState(false)
+  const [building, setBuilding] = useState(false)
+  const [committing, setCommitting] = useState(false)
+  const [creatingPr, setCreatingPr] = useState(false)
+  const [pkg, setPkg] = useState<DevTaskPackage | null>(null)
+  const [commitMessage, setCommitMessage] = useState('')
+  const [notice, setNotice] = useState<string | null>(null)
 
   const loadDiff = useCallback(async () => {
     setLoading(true)
@@ -52,9 +64,24 @@ export function DevTaskPanel() {
     setLoading(false)
   }, [])
 
-  // refresh = снимок задачи (state мог обновиться) + git diff изменений.
+  // refresh = снимок задачи (state + проверки) + git diff изменений.
   const refresh = useCallback(async () => {
     await refreshDevTask()
+    const id = useProject.getState().activeDevTaskId
+    if (id != null) {
+      try {
+        const detail = await window.api.devtask.get(id)
+        setChecks(detail.checks)
+        // Если пакет уже заморожен в задаче — гидрируем редактор из него.
+        if (detail.task?.packageJson) {
+          try {
+            const frozen = JSON.parse(detail.task.packageJson) as DevTaskPackage
+            setPkg(frozen)
+            setCommitMessage(prev => prev || frozen.commitMessage)
+          } catch { /* битый пакет — игнорируем */ }
+        }
+      } catch { /* IPC недоступен — оставляем текущее */ }
+    }
     await loadDiff()
   }, [refreshDevTask, loadDiff])
 
@@ -83,6 +110,81 @@ export function DevTaskPanel() {
     await refresh()
   }, [activeDevTaskId, path, refresh])
 
+  // Прогнать проверки → собрать пакет (devtask:buildPackage с runChecks).
+  const handleBuildPackage = useCallback(async () => {
+    if (activeDevTaskId == null) return
+    setBuilding(true)
+    setNotice(null)
+    try {
+      const built = await window.api.devtask.buildPackage(activeDevTaskId, { runChecks: true })
+      if (built) {
+        setPkg(built)
+        setCommitMessage(built.commitMessage)
+      }
+    } catch {
+      setNotice('Не удалось собрать пакет.')
+    }
+    setBuilding(false)
+    await refresh()
+  }, [activeDevTaskId, refresh])
+
+  // Создать рабочую ветку verstak/... для задачи (git:branchCreate под капотом
+  // делает devtask:open useBranch, но задача уже открыта — используем git:branchCreate
+  // напрямую и привязываем не нужно, work_branch проставит следующий refresh не сам).
+  const handleCreateBranch = useCallback(async () => {
+    if (!devTask) return
+    const slug = devTask.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-+|-+$)/g, '').slice(0, 32) || 'task'
+    const name = `verstak/${slug}-${Date.now().toString(36)}`
+    setNotice(null)
+    try {
+      const res = await window.api.git.branchCreate({ name })
+      if (res.ok) setNotice(`Ветка создана: ${res.branch}`)
+      else setNotice(`Не удалось создать ветку: ${res.error ?? 'ошибка'}`)
+    } catch {
+      setNotice('Не удалось создать ветку.')
+    }
+    await refresh()
+  }, [devTask, refresh])
+
+  // Закоммитить правки задачи (devtask:commit) с текущим сообщением редактора.
+  const handleCommit = useCallback(async () => {
+    if (activeDevTaskId == null) return
+    const msg = commitMessage.trim()
+    if (!msg) { setNotice('Заполни сообщение коммита.'); return }
+    setCommitting(true)
+    setNotice(null)
+    try {
+      const res = await window.api.devtask.commit(activeDevTaskId, { message: msg })
+      if (res.ok) setNotice(`Коммит создан: ${res.sha?.slice(0, 8)}`)
+      else setNotice(`Коммит не прошёл: ${res.error ?? 'ошибка'}`)
+    } catch {
+      setNotice('Коммит не прошёл.')
+    }
+    setCommitting(false)
+    await refresh()
+  }, [activeDevTaskId, commitMessage, refresh])
+
+  // Создать PR через github-коннектор. repo/base спрашиваем простым prompt'ом
+  // (V1 — без отдельной формы). Доступно только при наличии work_branch; токен
+  // и пуш ветки на стороне пользователя (коннектор лишь открывает PR).
+  const handleCreatePr = useCallback(async () => {
+    if (activeDevTaskId == null) return
+    const repo = window.prompt('Репозиторий (owner/repo):')?.trim()
+    if (!repo) return
+    const base = window.prompt('Базовая ветка (например main):', 'main')?.trim()
+    if (!base) return
+    setCreatingPr(true)
+    setNotice(null)
+    try {
+      const res = await window.api.devtask.createPr(activeDevTaskId, { repo, base })
+      if (res.ok) setNotice(`PR создан: ${res.url ?? `#${res.number}`}`)
+      else setNotice(`PR не создан: ${res.error ?? 'ошибка'}`)
+    } catch {
+      setNotice('PR не создан.')
+    }
+    setCreatingPr(false)
+  }, [activeDevTaskId])
+
   if (!path) {
     return (
       <div className="gg-panel">
@@ -110,6 +212,8 @@ export function DevTaskPanel() {
   }
 
   const branch = devTask.workBranch || (devTask.baseBranch ? `${devTask.baseBranch} · in-place` : 'in-place')
+  const passCount = checks.filter(c => c.status === 'pass').length
+  const failCount = checks.filter(c => c.status === 'fail').length
 
   return (
     <div className="gg-panel">
@@ -124,13 +228,16 @@ export function DevTaskPanel() {
         <div className="gg-devtask-title" title={devTask.title}>{devTask.title}</div>
         <div className="gg-devtask-tags">
           <span className={`gg-devtask-state is-${devTask.state}`}>{STATE_LABEL[devTask.state] ?? devTask.state}</span>
-          <span className="gg-devtask-branch" title="Рабочая ветка (Фаза 2 — правки in-place)">⎇ {branch}</span>
+          <span className="gg-devtask-branch" title="Рабочая ветка">⎇ {branch}</span>
           {devTask.risk && <span className={`gg-devtask-risk is-${devTask.risk}`}>риск: {devTask.risk}</span>}
         </div>
         {devTask.summary && <div className="gg-devtask-summary">{devTask.summary}</div>}
       </div>
 
       <div className="gg-panel-body">
+        {notice && <div className="gg-devtask-notice">{notice}</div>}
+
+        {/* === Изменения === */}
         <div className="gg-devtask-section">
           <div className="gg-devtask-section-title">Изменения ({diff.length})</div>
           {diff.length === 0 ? (
@@ -156,6 +263,82 @@ export function DevTaskPanel() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* === Проверки === */}
+        <div className="gg-devtask-section">
+          <div className="gg-devtask-section-title">
+            Проверки {checks.length > 0 && <span className="gg-devtask-checks-counter">({passCount} ✓ / {failCount} ✗)</span>}
+          </div>
+          {checks.length === 0 ? (
+            <div className="gg-devtask-section-empty">Проверки ещё не прогонялись.</div>
+          ) : (
+            <div className="gg-devtask-checks">
+              {checks.map(c => (
+                <span
+                  key={c.id}
+                  className={`gg-devtask-check is-${c.status}`}
+                  title={c.outputTail ? c.outputTail.slice(-600) : c.command}
+                >
+                  {c.status === 'pass' ? '✓' : c.status === 'fail' ? '✗' : '•'} {c.label}
+                  {c.exitCode != null && c.status === 'fail' && <span className="gg-devtask-check-code"> (exit {c.exitCode})</span>}
+                </span>
+              ))}
+            </div>
+          )}
+          <button
+            className="gg-btn gg-btn-secondary gg-devtask-run-checks"
+            onClick={() => void handleBuildPackage()}
+            disabled={building}
+            title="Прогнать проверки (npm test / tsc / lint) и собрать пакет"
+          >
+            {building ? 'Прогоняю…' : '▶ Прогнать проверки'}
+          </button>
+        </div>
+
+        {/* === Пакет === */}
+        <div className="gg-devtask-section">
+          <div className="gg-devtask-section-title">Пакет</div>
+          <CommitPlanEditor
+            groups={pkg?.commitGroups ?? []}
+            message={commitMessage}
+            onMessageChange={setCommitMessage}
+          />
+          {pkg?.prSummary && (
+            <details className="gg-devtask-pr-summary">
+              <summary>PR summary</summary>
+              <pre>{pkg.prSummary}</pre>
+            </details>
+          )}
+          <div className="gg-devtask-package-actions">
+            <button
+              className="gg-btn gg-btn-primary"
+              onClick={() => void handleCommit()}
+              disabled={committing || !commitMessage.trim()}
+              title="git add + commit (без --no-verify / push)"
+            >
+              {committing ? 'Коммичу…' : '✓ Commit'}
+            </button>
+            {!devTask.workBranch && (
+              <button
+                className="gg-btn gg-btn-ghost"
+                onClick={() => void handleCreateBranch()}
+                title="Создать рабочую ветку verstak/..."
+              >
+                ⎇ Создать ветку
+              </button>
+            )}
+            {devTask.workBranch && (
+              <button
+                className="gg-btn gg-btn-ghost"
+                onClick={() => void handleCreatePr()}
+                disabled={creatingPr}
+                title="Создать PR через GitHub (нужен github_token + запушенная ветка)"
+              >
+                {creatingPr ? 'Создаю PR…' : '⇡ Создать PR'}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="gg-devtask-actions">

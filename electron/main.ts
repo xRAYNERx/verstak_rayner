@@ -51,7 +51,7 @@ import { registerPlansIpc } from './ipc/plans'
 import { registerWorkflowsIpc } from './ipc/workflows'
 import { createFeedback } from './storage/feedback'
 import { registerFeedbackIpc } from './ipc/feedback'
-import { registerVerifyIpc } from './ipc/verify'
+import { registerVerifyIpc, execVerifyCommand } from './ipc/verify'
 import { registerAutonomousIpc } from './ipc/autonomous'
 import { createConnectorRegistry } from './connectors/registry'
 import { PROVIDERS, type ProviderId } from './ai/registry'
@@ -427,9 +427,22 @@ app.whenReady().then(() => {
   // Git READ IPC (Dev Task Flow, Фаза 1) — структурированные status/diff/log.
   // ТОЛЬКО чтение; git-write (ветки/commit) добавит Фаза 3.
   registerGitIpc(getActiveProjectPath)
-  // Dev Task Flow IPC (Фаза 2) — оркестратор open/openFromPreflight/get/list/
-  // linkRun/revert. Откат переиспользует undoStack (тот же стек, что undo:*).
-  registerDevTaskIpc({ tasks: devTasks, getProjectRoot: getActiveProjectPath, undoStack })
+  // Dev Task Flow IPC (Фазы 2-4) — оркестратор open/openFromPreflight/get/list/
+  // linkRun/revert/commit/buildPackage/createPr. Откат переиспользует undoStack
+  // (тот же стек, что undo:*); runCheck = execVerifyCommand (денилист внутри);
+  // git-write (ветки/commit) через ipc/git helpers (денилист push/force/reset).
+  registerDevTaskIpc({
+    tasks: devTasks,
+    getProjectRoot: getActiveProjectPath,
+    undoStack,
+    runCheck: (command) => {
+      const cwd = getActiveProjectPath()
+      if (!cwd) return Promise.resolve({ exitCode: 1, stdout: '', stderr: 'Проект не открыт' })
+      return execVerifyCommand(cwd, command)
+    },
+    connectorQuery: (id, args) => connectorRegistry.query(id, args, { getSecret: (k) => settings.getSecret(k), signal: new AbortController().signal }),
+    getSecret: (k) => settings.getSecret(k)
+  })
   registerAutonomousIpc({
     getSecret,
     getProviderId,

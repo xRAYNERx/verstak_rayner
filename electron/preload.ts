@@ -191,22 +191,30 @@ contextBridge.exposeInMainWorld('api', {
   verify: {
     exec: (command: string) => ipcRenderer.invoke('verify:exec', command) as Promise<{ exitCode: number; stdout: string; stderr: string }>
   },
-  // Git READ (Dev Task Flow, Фаза 1) — структурированные status/diff/log активного проекта.
+  // Git READ + WRITE (Dev Task Flow). READ: status/diff/log. WRITE (Фаза 3,
+  // argv-форма + денилист push/force/reset): branchCreate/checkout/add/commit.
   git: {
     status: () => ipcRenderer.invoke('git:status'),
     diff: (opts?: { base?: string; staged?: boolean; path?: string }) => ipcRenderer.invoke('git:diff', opts),
-    log: (opts?: { limit?: number }) => ipcRenderer.invoke('git:log', opts)
+    log: (opts?: { limit?: number }) => ipcRenderer.invoke('git:log', opts),
+    branchCreate: (opts: { name: string; from?: string }) => ipcRenderer.invoke('git:branchCreate', opts),
+    checkout: (opts: { ref: string }) => ipcRenderer.invoke('git:checkout', opts),
+    add: (opts: { paths: string[] }) => ipcRenderer.invoke('git:add', opts),
+    commit: (opts: { message: string; paths?: string[] }) => ipcRenderer.invoke('git:commit', opts)
   },
-  // Dev Task Flow (Фаза 2) — оркестратор open/наблюдение/откат активной задачи.
+  // Dev Task Flow (Фазы 2-4) — оркестратор open/наблюдение/откат/commit/пакет/PR.
   devtask: {
-    open: (opts: { chatId?: number | null; title: string; summary?: string | null; risk?: string | null }) =>
+    open: (opts: { chatId?: number | null; title: string; summary?: string | null; risk?: string | null; useBranch?: boolean }) =>
       ipcRenderer.invoke('devtask:open', opts),
     openFromPreflight: (opts: { chatId?: number | null; preflight: { summary: string; risk?: string; riskReason?: string; affectedZones?: string[] } }) =>
       ipcRenderer.invoke('devtask:openFromPreflight', opts),
     get: (id: number) => ipcRenderer.invoke('devtask:get', id),
     list: (projectPath: string, opts?: { state?: string }) => ipcRenderer.invoke('devtask:list', projectPath, opts),
     linkRun: (id: number, runId: string) => ipcRenderer.invoke('devtask:linkRun', id, runId),
-    revert: (id: number) => ipcRenderer.invoke('devtask:revert', id)
+    revert: (id: number) => ipcRenderer.invoke('devtask:revert', id),
+    commit: (id: number, opts: { message: string; paths?: string[] }) => ipcRenderer.invoke('devtask:commit', id, opts),
+    buildPackage: (id: number, opts?: { runChecks?: boolean; checks?: string[] }) => ipcRenderer.invoke('devtask:buildPackage', id, opts),
+    createPr: (id: number, opts: { repo: string; base: string; draft?: boolean }) => ipcRenderer.invoke('devtask:createPr', id, opts)
   },
   autonomous: {
     status: () => ipcRenderer.invoke('autonomous:status') as Promise<{ enabled: boolean; intervalMin: number; lastRunAt: number | null; lastRunSuggestions: number; lastRunError: string | null; nextRunAt: number | null }>,
