@@ -21,7 +21,7 @@
   --vol-lift: 0 14px 40px rgba(0, 0, 0, 0.48), 0 0 0 1px var(--border-default);
   --vol-recessed-bg: color-mix(in srgb, var(--bg-base) 60%, transparent);
   --shell-gap: 5px;
-  --shell-col-gap: 5px;
+  --shell-col-gap: 2px;
   --shell-rail-fill:
     linear-gradient(165deg, color-mix(in srgb, var(--vol-highlight) 80%, transparent) 0%, transparent 38%),
     var(--vol-glass);
@@ -46,6 +46,10 @@ body:has(.gg-app-atelier) {
   grid-template-columns: var(--gg-rail-w) var(--gg-sidebar-panel-w) var(--gg-sidebar-resize-w) 1fr;
   background: transparent;
   box-sizing: border-box;
+}
+
+.gg-app-atelier.gg-app {
+  --gg-sidebar-resize-w: 2px;
 }
 
 .gg-app-atelier .gg-sidebar-resize {
@@ -145,7 +149,7 @@ body:has(.gg-app-atelier) {
 
 .gg-app-atelier .gg-rail-chip.is-shell-expanded.is-active .gg-rail-avatar {
   border-color: var(--accent);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
 .gg-app-atelier .gg-rail-chip:not(.is-shell-expanded).is-active .gg-rail-chip-btn {
@@ -156,9 +160,12 @@ body:has(.gg-app-atelier) {
 }
 
 .gg-app-atelier .gg-rail-chip:not(.is-shell-expanded).is-active .gg-rail-avatar-wrap::after {
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 90%, transparent),
-    0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+  content: none;
+  display: none;
+}
+
+.gg-app-atelier .gg-rail-chip:not(.is-shell-expanded).is-active .gg-rail-avatar {
+  box-shadow: none;
 }
 
 .gg-app-atelier .gg-rail-status.is-unread {
@@ -385,11 +392,11 @@ body:has(.gg-app-atelier) {
   box-shadow: var(--vol-lift);
 }
 
-/* ─── Composer: компактный, как в базовом layout ─── */
+/* ─── Composer: углублённый, компактный ─── */
 .gg-app-atelier .gg-composer {
   padding: 12px 28px 18px;
-  border-top: 1px solid color-mix(in srgb, var(--border-subtle) 65%, transparent);
-  background: transparent;
+  border-top: none;
+  background: linear-gradient(0deg, color-mix(in srgb, var(--bg-elevated) 92%, transparent) 0%, transparent 100%);
 }
 
 .gg-app-atelier .gg-composer > * {
@@ -398,21 +405,21 @@ body:has(.gg-app-atelier) {
 
 .gg-app-atelier .gg-composer-inner {
   border-radius: var(--radius-md);
-  background: var(--bg-input);
-  border: 1px solid var(--border-default);
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  background: var(--vol-recessed-bg);
+  border: 1px solid var(--border-subtle);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: var(--vol-shadow-inset);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
 }
 
 .gg-app-atelier .gg-composer-inner:hover {
-  border-color: var(--border-strong);
+  border-color: var(--border-default);
 }
 
 .gg-app-atelier .gg-composer-inner:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+  border-color: var(--accent-border);
+  box-shadow: var(--vol-shadow-inset), 0 0 0 2px var(--accent-muted);
 }
 
 .gg-app-atelier .gg-composer-textarea {
