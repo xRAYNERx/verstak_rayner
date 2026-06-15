@@ -19,7 +19,9 @@
     inset 0 2px 12px rgba(0, 0, 0, 0.38),
     inset 0 1px 0 color-mix(in srgb, var(--text-primary) 3%, transparent);
   --vol-lift: 0 14px 40px rgba(0, 0, 0, 0.48), 0 0 0 1px var(--border-default);
-  --shell-gap: 6px;
+  --vol-recessed-bg: color-mix(in srgb, var(--bg-base) 60%, transparent);
+  --shell-gap: 5px;
+  --shell-col-gap: 2px;
 }
 
 /* Depth backdrop — works with any theme via accent-muted */
@@ -34,7 +36,8 @@ body:has(.gg-app-atelier) {
 .gg-app-atelier.gg-app {
   height: 100vh;
   padding: var(--shell-gap);
-  gap: var(--shell-gap);
+  column-gap: var(--shell-col-gap);
+  row-gap: var(--shell-gap);
   grid-template-columns: var(--gg-rail-w) var(--gg-sidebar-panel-w) var(--gg-sidebar-resize-w) 1fr;
   background: transparent;
   box-sizing: border-box;
@@ -110,12 +113,15 @@ body:has(.gg-app-atelier) {
 .gg-app-atelier .gg-rail-search {
   height: 32px;
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--bg-base) 60%, transparent);
+  background: var(--vol-recessed-bg);
+  border-color: var(--border-subtle);
   backdrop-filter: blur(8px);
+  box-shadow: var(--vol-shadow-inset);
 }
 
 .gg-app-atelier .gg-rail-search:focus {
-  box-shadow: 0 0 0 2px var(--accent-muted), var(--vol-shadow-inset);
+  border-color: var(--accent-border);
+  box-shadow: var(--vol-shadow-inset), 0 0 0 2px var(--accent-muted);
 }
 
 /* Round project avatars + volumetric active ring */
@@ -135,26 +141,30 @@ body:has(.gg-app-atelier) {
 }
 
 .gg-app-atelier .gg-rail-chip.is-expanded.is-active .gg-rail-chip-btn {
-  background: var(--accent-muted);
+  background: var(--vol-recessed-bg);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow:
-    inset 3px 0 0 var(--accent),
-    0 4px 16px color-mix(in srgb, var(--accent) 18%, transparent),
-    inset 0 1px 0 var(--vol-highlight);
+    var(--vol-shadow-inset),
+    inset 3px 0 0 var(--accent);
 }
 
 .gg-app-atelier .gg-rail-chip.is-expanded.is-active .gg-rail-avatar {
   border-color: var(--accent);
-  box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--bg-base) 88%, transparent),
-    0 0 16px color-mix(in srgb, var(--accent) 40%, transparent);
+  box-shadow: var(--shadow-sm);
+}
+
+.gg-app-atelier .gg-rail-chip:not(.is-expanded).is-active .gg-rail-chip-btn {
+  background: var(--vol-recessed-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--vol-shadow-inset);
 }
 
 .gg-app-atelier .gg-rail-chip:not(.is-expanded).is-active .gg-rail-avatar-wrap::after {
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--accent) 90%, transparent),
-    0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent),
-    0 0 18px color-mix(in srgb, var(--accent) 45%, transparent);
+    0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
 .gg-app-atelier .gg-rail-status.is-unread {
@@ -302,7 +312,7 @@ body:has(.gg-app-atelier) {
   box-shadow: var(--vol-lift);
 }
 
-/* ─── Composer: lifted glass card ─── */
+/* ─── Composer: recessed input (как поиск по проектам) ─── */
 .gg-app-atelier .gg-composer {
   padding: 10px 28px 20px;
   border-top: none;
@@ -311,26 +321,21 @@ body:has(.gg-app-atelier) {
 
 .gg-app-atelier .gg-composer-inner {
   border-radius: var(--radius-xl);
-  background:
-    linear-gradient(160deg, color-mix(in srgb, var(--vol-highlight) 70%, transparent) 0%, transparent 42%),
-    var(--vol-glass-deep);
-  border: 1px solid var(--border-default);
-  backdrop-filter: var(--vol-blur);
-  -webkit-backdrop-filter: var(--vol-blur);
-  box-shadow: var(--vol-shadow-up);
+  background: var(--vol-recessed-bg);
+  border: 1px solid var(--border-subtle);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: var(--vol-shadow-inset);
   transition: border-color 200ms ease, box-shadow 200ms ease;
 }
 
 .gg-app-atelier .gg-composer-inner:hover {
-  border-color: var(--border-strong);
+  border-color: var(--border-default);
 }
 
 .gg-app-atelier .gg-composer-inner:focus-within {
-  border-color: var(--accent);
-  box-shadow:
-    var(--vol-shadow-up),
-    0 0 0 1px var(--accent-muted),
-    0 0 28px color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: var(--accent-border);
+  box-shadow: var(--vol-shadow-inset), 0 0 0 2px var(--accent-muted);
 }
 
 .gg-app-atelier .gg-send-btn {
