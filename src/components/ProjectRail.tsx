@@ -185,7 +185,7 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
         >
           <img src={iconUrl} alt="Verstak" />
         </button>
-        <span className="gg-rail-brand-name" aria-hidden={!contentExpanded}>Verstak</span>
+        <span className="gg-rail-brand-name" aria-hidden={!contentExpanded}>VERSTAK</span>
       </div>
 
       <div

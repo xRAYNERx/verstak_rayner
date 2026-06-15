@@ -86,7 +86,9 @@ body:has(.gg-app-atelier) {
 
 .gg-app-atelier .gg-rail-brand-name {
   font-weight: 600;
-  letter-spacing: -0.02em;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   color: var(--text-primary);
 }
 
