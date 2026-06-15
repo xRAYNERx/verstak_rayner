@@ -259,6 +259,14 @@ app.whenReady().then(() => {
   // Реконсайл зависших прогонов: строки running/queued без ended_at — это
   // прогоны, прерванные крахом/выходом приложения (без живого процесса).
   // Помечаем их failed один раз на старте, чтобы они не висели «в работе».
+  //
+  // Crash-resume (P1): метку реконсайла фиксируем ДО reconcileStale, чтобы
+  // отличить «прерванные именно этим стартом» от упавших раньше по реальной
+  // ошибке. reconcileStale ставит ended_at=now (>= reconciledAt); findResumable
+  // отбирает failed-прогоны с ended_at >= этой метки для баннера «сессия
+  // прервана». Так Manager-поведение (running→failed) не меняется, а crash-
+  // resume получает данные из той же таблицы без in-memory снапшота.
+  const agentRunsReconciledAt = Date.now()
   try {
     const staleCount = agentRuns.reconcileStale()
     if (staleCount > 0) console.log(`[agent-runs] reconciled ${staleCount} stale run(s) → failed`)
@@ -408,7 +416,10 @@ app.whenReady().then(() => {
   registerAgentsIpc(subSessions, chats, sessionTodos)
   // Вкладка «Задачи» (Multi-agent Manager) — список прогонов + stop/resume (Фаза 4).
   // abortSend переиспользует ядро ai:stop; db — для getRunInput при resume.
-  registerAgentRunsIpc(agentRuns, subSessions, sessionTodos, db, abortSend)
+  // agentRunsReconciledAt — метка реконсайла этого старта для ai:list-resumable
+  // (Crash-resume): findResumable отбирает прогоны, помеченные failed ИМЕННО на
+  // этом старте.
+  registerAgentRunsIpc(agentRuns, subSessions, sessionTodos, db, abortSend, agentRunsReconciledAt)
   // История Verification Artifact (Фаза 3) — list/latest/get для Review DoD и панели.
   registerVerificationsIpc(verifications)
   registerHandoffIpc(chats, chatSessions)

@@ -3,7 +3,8 @@ import { mkdtempSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { openDb } from '../../electron/storage/db'
-import { createAgentRuns } from '../../electron/storage/agent-runs'
+import { createAgentRuns, isAutoResumable } from '../../electron/storage/agent-runs'
+import { saveRunInput } from '../../electron/storage/run-inputs'
 
 /**
  * Тесты storage-слоя Multi-agent Manager (Фаза 1) + миграции 16.
@@ -219,6 +220,134 @@ describe('agent-runs (migration 16)', () => {
     expect(reconciled).toBe(1)                       // только из /p1
     expect(runs.get('a')!.status).toBe('failed')
     expect(runs.get('b')!.status).toBe('running')    // /p2 не тронут
+    db.close()
+  })
+})
+
+/**
+ * Crash-resume (P1) — миграция 19 (ALTER agent_runs) + tick + findResumable
+ * + гард деструктива isAutoResumable.
+ */
+describe('crash-resume (migration 19)', () => {
+  let dir: string
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'gg-resume-')) })
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }) })
+
+  it('миграция 19 добавляет колонки живого прогресса в agent_runs', () => {
+    const db = openDb(join(dir, 'test.db'))
+    const cols = (db.prepare('PRAGMA table_info(agent_runs)').all() as Array<{ name: string }>).map(c => c.name)
+    expect(cols).toContain('turn_index')
+    expect(cols).toContain('last_tool_name')
+    expect(cols).toContain('last_checkpoint_id')
+    expect(cols).toContain('agent_mode')
+    expect(cols).toContain('updated_at')
+    db.close()
+  })
+
+  it('create пишет agent_mode + начальный turn_index=0 + updated_at', () => {
+    const db = openDb(join(dir, 'test.db'))
+    const runs = createAgentRuns(db)
+    runs.create({ runId: 'r1', projectPath: '/p', title: 'A', agentMode: 'ask' })
+    const row = runs.get('r1')!
+    expect(row.agentMode).toBe('ask')
+    expect(row.turnIndex).toBe(0)
+    expect(row.updatedAt).not.toBeNull()
+    db.close()
+  })
+
+  it('tick пишет живой прогресс только для незавершённого прогона', () => {
+    const db = openDb(join(dir, 'test.db'))
+    const runs = createAgentRuns(db)
+    runs.create({ runId: 'r1', projectPath: '/p', title: 'A', agentMode: 'ask' })
+    runs.tick('r1', { turnIndex: 3, lastToolName: 'read_file', lastCheckpointId: 42 })
+    const row = runs.get('r1')!
+    expect(row.turnIndex).toBe(3)
+    expect(row.lastToolName).toBe('read_file')
+    expect(row.lastCheckpointId).toBe(42)
+    // После finish тик-«догон» не воскрешает прогон (ended_at IS NULL guard).
+    runs.finish('r1', 'done')
+    runs.tick('r1', { turnIndex: 99, lastToolName: 'write_file' })
+    const after = runs.get('r1')!
+    expect(after.turnIndex).toBe(3)                 // не изменился
+    expect(after.lastToolName).toBe('read_file')
+    db.close()
+  })
+
+  it('isAutoResumable: read-only последний tool + безопасный режим → true', () => {
+    expect(isAutoResumable({ lastToolName: 'read_file', agentMode: 'ask' })).toBe(true)
+    expect(isAutoResumable({ lastToolName: null, agentMode: 'accept-edits' })).toBe(true)
+    expect(isAutoResumable({ lastToolName: 'get_project_map', agentMode: 'plan' })).toBe(true)
+  })
+
+  it('isAutoResumable: деструктивный последний tool → false (не доигрываем)', () => {
+    expect(isAutoResumable({ lastToolName: 'write_file', agentMode: 'ask' })).toBe(false)
+    expect(isAutoResumable({ lastToolName: 'apply_patch', agentMode: 'ask' })).toBe(false)
+    expect(isAutoResumable({ lastToolName: 'run_command', agentMode: 'ask' })).toBe(false)
+    expect(isAutoResumable({ lastToolName: 'ssh', agentMode: 'accept-edits' })).toBe(false)
+    expect(isAutoResumable({ lastToolName: 'delegate_task', agentMode: 'ask' })).toBe(false)
+    expect(isAutoResumable({ lastToolName: 'connector_query', agentMode: 'ask' })).toBe(false)
+  })
+
+  it('isAutoResumable: режим auto/bypass → false даже при read-only tool', () => {
+    expect(isAutoResumable({ lastToolName: 'read_file', agentMode: 'auto' })).toBe(false)
+    expect(isAutoResumable({ lastToolName: 'read_file', agentMode: 'bypass' })).toBe(false)
+    expect(isAutoResumable({ lastToolName: null, agentMode: 'bypass' })).toBe(false)
+  })
+
+  it('findResumable: возвращает зависшие на этом старте + гард деструктива + только с run_inputs', () => {
+    const db = openDb(join(dir, 'test.db'))
+    const runs = createAgentRuns(db)
+    // safe — read-only последний tool, режим ask, есть run_input → autoResumable.
+    runs.create({ runId: 'safe', projectPath: '/p', chatId: 1, title: 'Безопасная', agentMode: 'ask' })
+    runs.tick('safe', { turnIndex: 2, lastToolName: 'read_file' })
+    saveRunInput(db, { runId: 'safe', projectPath: '/p', chatId: 1, timestamp: Date.now(), providerId: 'grok', model: 'g', systemPrompt: 's', userMessage: 'почини баг X' })
+    // destr — write_file последний → autoResumable=false (показать что было).
+    runs.create({ runId: 'destr', projectPath: '/p', chatId: 1, title: 'Деструктив', agentMode: 'ask' })
+    runs.tick('destr', { turnIndex: 5, lastToolName: 'write_file' })
+    saveRunInput(db, { runId: 'destr', projectPath: '/p', chatId: 1, timestamp: Date.now(), providerId: 'grok', model: 'g', systemPrompt: 's', userMessage: 'перепиши модуль Y' })
+    // noinput — без run_inputs → не предлагается (re-send невозможен).
+    runs.create({ runId: 'noinput', projectPath: '/p', chatId: 1, title: 'Без ввода', agentMode: 'ask' })
+    runs.tick('noinput', { turnIndex: 1, lastToolName: 'read_file' })
+
+    // Метка реконсайла фиксируется ДО reconcileStale (как в main.ts).
+    const reconciledAt = Date.now()
+    runs.reconcileStale('/p')   // running → failed, ended_at >= reconciledAt
+
+    const getUserReq = (runId: string) => {
+      const r = db.prepare('SELECT user_message FROM run_inputs WHERE run_id = ?').get(runId) as { user_message: string | null } | undefined
+      return r?.user_message || null
+    }
+    const list = runs.findResumable('/p', reconciledAt, getUserReq)
+    const byId = Object.fromEntries(list.map(r => [r.runId, r]))
+    // noinput отсеян (нет run_inputs).
+    expect(byId['noinput']).toBeUndefined()
+    // safe — предлагается с autoResumable=true.
+    expect(byId['safe']).toBeDefined()
+    expect(byId['safe'].autoResumable).toBe(true)
+    expect(byId['safe'].lastUserRequest).toBe('почини баг X')
+    expect(byId['safe'].turnIndex).toBe(2)
+    // destr — предлагается, но autoResumable=false (деструктив не доигрываем).
+    expect(byId['destr']).toBeDefined()
+    expect(byId['destr'].autoResumable).toBe(false)
+    expect(byId['destr'].lastToolName).toBe('write_file')
+    db.close()
+  })
+
+  it('findResumable: прогон, упавший РАНЬШЕ этого старта (ended_at < reconciledAt), не предлагается', () => {
+    const db = openDb(join(dir, 'test.db'))
+    const runs = createAgentRuns(db)
+    // Прогон реально упал с ошибкой ДО текущего старта app.
+    runs.create({ runId: 'old', projectPath: '/p', chatId: 1, title: 'Старый', agentMode: 'ask' })
+    runs.finish('old', 'failed', { error: 'boom' })
+    saveRunInput(db, { runId: 'old', projectPath: '/p', chatId: 1, timestamp: Date.now(), providerId: 'g', model: 'g', systemPrompt: 's', userMessage: 'старый запрос' })
+    // Текущий старт реконсайлит ПОЗЖЕ — old.ended_at < reconciledAt.
+    const reconciledAt = Date.now() + 1000
+    const getUserReq = (runId: string) => {
+      const r = db.prepare('SELECT user_message FROM run_inputs WHERE run_id = ?').get(runId) as { user_message: string | null } | undefined
+      return r?.user_message || null
+    }
+    const list = runs.findResumable('/p', reconciledAt, getUserReq)
+    expect(list.find(r => r.runId === 'old')).toBeUndefined()
     db.close()
   })
 })

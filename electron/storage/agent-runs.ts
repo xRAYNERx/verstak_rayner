@@ -37,6 +37,72 @@ export interface AgentRun {
   error: string | null
   startedAt: number
   endedAt: number | null
+  // Crash-resume (P1, миграция 19): живой прогресс. NULL/0 у прогонов,
+  // запущенных до миграции.
+  turnIndex: number
+  lastToolName: string | null
+  lastCheckpointId: number | null
+  agentMode: string | null
+  updatedAt: number | null
+}
+
+/**
+ * Снапшот зависшего после краха прогона для баннера «сессия прервана».
+ * Собирается на старте app ДО reconcileStale (см. findResumable).
+ */
+export interface ResumableRun {
+  runId: string
+  projectPath: string
+  chatId: number | null
+  title: string
+  /** Текст последнего user-запроса (из run_inputs) — для re-send и подписи баннера. */
+  lastUserRequest: string
+  turnIndex: number
+  lastToolName: string | null
+  agentMode: string | null
+  startedAt: number
+  /** Можно ли предлагать авто-возобновление (read-only последний tool + безопасный режим). */
+  autoResumable: boolean
+}
+
+/**
+ * Инструменты с побочными эффектами — после них авто-доигрывание запрещено
+ * (деструктив не доигрывается сам). write_file/apply_patch правят файлы,
+ * run_command/ssh выполняют команды, connector-* мутируют внешние системы.
+ * Имена сверяются с tools.ts (TOOL_DEFS) и connector-обёртками.
+ */
+const MUTATING_TOOLS = new Set<string>([
+  'write_file',
+  'apply_patch',
+  'run_command',
+  'ssh',
+  'delegate_task',
+  'delegate_parallel'
+])
+
+/** Режимы, в которых мог пройти незаметный деструктив без подтверждения. */
+const UNSAFE_MODES = new Set<string>(['auto', 'bypass'])
+
+/**
+ * Чистый гард безопасности крэш-резюма (юнит-тестируемый, без БД).
+ * Авто-возобновление РАЗРЕШЕНО только когда последний инструмент НЕ
+ * деструктивный И режим безопасный (ask/accept-edits/plan). Любой мутирующий
+ * tool, любой connector-* (мутирующий коннектор), режим auto/bypass → false:
+ * деструктив никогда не доигрывается сам, пользователю предлагается лишь
+ * «показать что было сделано» + ручной ре-промпт.
+ */
+export function isAutoResumable(run: { lastToolName: string | null; agentMode: string | null }): boolean {
+  const mode = run.agentMode
+  if (mode != null && UNSAFE_MODES.has(mode)) return false
+  const tool = run.lastToolName
+  if (tool != null) {
+    if (MUTATING_TOOLS.has(tool)) return false
+    // Любой коннектор трактуем как потенциально мутирующий (1С запись, Bitrix,
+    // Telegram send, Я.Директ и т.п.) — точную read/write-классификацию не
+    // вводим, безопаснее не доигрывать.
+    if (tool.startsWith('connector')) return false
+  }
+  return true
 }
 
 export interface AgentRunEvent {
@@ -64,7 +130,16 @@ export interface AgentRuns {
     providerId?: string | null
     model?: string | null
     sendId?: number | null
+    /** Crash-resume: режим прогона (ask/accept-edits/plan/auto/bypass). */
+    agentMode?: string | null
   }) => void
+  /**
+   * Crash-resume: записать ЖИВОЙ прогресс прогона (на каждом turn агентного
+   * цикла). Обновляет turn_index/last_tool_name/last_checkpoint_id + updated_at.
+   * Пишет только для ЕЩЁ живых прогонов (ended_at IS NULL) — завершённый не
+   * воскрешаем. Best-effort: переданы только не-undefined поля.
+   */
+  tick: (runId: string, patch: { turnIndex?: number; lastToolName?: string | null; lastCheckpointId?: number | null }) => void
   /** Добавить событие в Timeline прогона. detail кап до 500 симв. */
   appendEvent: (runId: string, kind: string, opts?: {
     label?: string | null
@@ -94,6 +169,22 @@ export interface AgentRuns {
    * projectPath опционален: без него реконсайлятся все проекты.
    */
   reconcileStale: (projectPath?: string) => number
+  /**
+   * Crash-resume: зависшие прогоны проекта для баннера «сессия прервана».
+   *
+   * ВАЖНО (согласование с reconcileStale): reconcileStale на старте app бьёт
+   * running/queued → failed (Manager-поведение оставлено как есть). Поэтому
+   * findResumable ищет НЕ по текущему status='running' (его уже нет), а по
+   * признакам «был прерван крахом»: status='failed' + ended_at почти == то
+   * время, когда мы реконсайлили (reconcile ставит ended_at=now на старте),
+   * иначе говоря — НЕ имеет нормального завершения. Чтобы не зависеть от
+   * хрупкой эвристики времени, main.ts передаёт reconciledAt (метку реконсайла
+   * этого старта): findResumable отбирает failed-прогоны, чей ended_at >=
+   * reconciledAt (т.е. помечены именно ЭТИМ реконсайлом, а не упали раньше по
+   * реальной ошибке). lastUserRequest берётся из run_inputs (нужен для re-send);
+   * без снапшота прогон не предлагается. autoResumable — гард деструктива.
+   */
+  findResumable: (projectPath: string, reconciledAt: number, getUserRequest: (runId: string) => string | null) => ResumableRun[]
 }
 
 const SELECT_RUN = `
@@ -101,7 +192,10 @@ const SELECT_RUN = `
          owner, title, status, provider_id as providerId, model, send_id as sendId,
          agents_count as agentsCount, tool_count as toolCount,
          files_count as filesCount, cost_cents as costCents,
-         error, started_at as startedAt, ended_at as endedAt
+         error, started_at as startedAt, ended_at as endedAt,
+         turn_index as turnIndex, last_tool_name as lastToolName,
+         last_checkpoint_id as lastCheckpointId, agent_mode as agentMode,
+         updated_at as updatedAt
   FROM agent_runs
 `
 
@@ -115,11 +209,12 @@ const DETAIL_CAP = 500
 export function createAgentRuns(db: Database): AgentRuns {
   return {
     create(opts) {
+      const now = Date.now()
       db.prepare(
         `INSERT INTO agent_runs
           (run_id, project_path, chat_id, owner, title, status,
-           provider_id, model, send_id, started_at)
-         VALUES (?, ?, ?, ?, ?, 'running', ?, ?, ?, ?)`
+           provider_id, model, send_id, agent_mode, turn_index, updated_at, started_at)
+         VALUES (?, ?, ?, ?, ?, 'running', ?, ?, ?, ?, 0, ?, ?)`
       ).run(
         opts.runId,
         opts.projectPath,
@@ -129,8 +224,21 @@ export function createAgentRuns(db: Database): AgentRuns {
         opts.providerId ?? null,
         opts.model ?? null,
         opts.sendId ?? null,
-        Date.now()
+        opts.agentMode ?? null,
+        now,
+        now
       )
+    },
+    tick(runId, patch) {
+      const sets: string[] = ['updated_at = ?']
+      const vals: unknown[] = [Date.now()]
+      if (patch.turnIndex !== undefined) { sets.push('turn_index = ?'); vals.push(patch.turnIndex) }
+      if (patch.lastToolName !== undefined) { sets.push('last_tool_name = ?'); vals.push(patch.lastToolName) }
+      if (patch.lastCheckpointId !== undefined) { sets.push('last_checkpoint_id = ?'); vals.push(patch.lastCheckpointId) }
+      vals.push(runId)
+      // ended_at IS NULL — тикаем только живой прогон. Завершённый (finish уже
+      // прошёл / stop) не воскрешаем поздним тиком из догоняющего turn'а.
+      db.prepare(`UPDATE agent_runs SET ${sets.join(', ')} WHERE run_id = ? AND ended_at IS NULL`).run(...vals)
     },
     appendEvent(runId, kind, opts) {
       const detail = opts?.detail != null ? opts.detail.slice(0, DETAIL_CAP) : null
@@ -196,6 +304,36 @@ export function createAgentRuns(db: Database): AgentRuns {
         `UPDATE agent_runs SET status = 'failed', ended_at = ? WHERE ${where.join(' AND ')}`
       ).run(...vals)
       return info.changes
+    },
+    findResumable(projectPath, reconciledAt, getUserRequest) {
+      // Прогоны, помеченные failed ИМЕННО реконсайлом этого старта (ended_at >=
+      // reconciledAt). Прогоны, упавшие раньше по реальной ошибке, имеют
+      // ended_at < reconciledAt и не предлагаются. owner='main' — review/
+      // background не возобновляем как «прерванную задачу пользователя».
+      const rows = db.prepare(
+        `${SELECT_RUN} WHERE project_path = ? AND status = 'failed'
+           AND ended_at IS NOT NULL AND ended_at >= ? AND owner = 'main'
+         ORDER BY started_at DESC, rowid DESC`
+      ).all(projectPath, reconciledAt) as AgentRun[]
+      const out: ResumableRun[] = []
+      for (const r of rows) {
+        // Без сохранённого ввода re-send невозможен → прогон не предлагаем.
+        const userRequest = getUserRequest(r.runId)
+        if (!userRequest) continue
+        out.push({
+          runId: r.runId,
+          projectPath: r.projectPath,
+          chatId: r.chatId,
+          title: r.title,
+          lastUserRequest: userRequest,
+          turnIndex: r.turnIndex ?? 0,
+          lastToolName: r.lastToolName,
+          agentMode: r.agentMode,
+          startedAt: r.startedAt,
+          autoResumable: isAutoResumable(r)
+        })
+      }
+      return out
     }
   }
 }

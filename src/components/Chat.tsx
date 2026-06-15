@@ -11,6 +11,7 @@ import { TimelineBar } from './TimelineBar'
 import { ReviewPanel } from './ReviewPills'
 import { CheckpointButton } from './CheckpointButton'
 import { DevTaskBadge } from './DevTaskBadge'
+import { ResumeBanner } from './ResumeBanner'
 import { ReviewButton } from './ReviewButton'
 import { SkillPicker } from './SkillPicker'
 import { MultiAgentPicker } from './MultiAgentPicker'
@@ -918,6 +919,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
 
       <div className="gg-chat-stream" ref={streamRef}>
         <div className="gg-chat-stream-inner">
+        {/* Crash-resume: баннер «сессия прервана» (если есть зависшие прогоны). */}
+        <ResumeBanner />
         {!hasMessages && (
           <div className="gg-chat-empty">
             <img src={iconUrl} alt="Verstak" className="gg-chat-empty-mark-img" />

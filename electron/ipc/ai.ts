@@ -526,7 +526,10 @@ export function registerAiIpc(deps: AiDeps): void {
         title: runTitle,
         providerId,
         model: model ?? null,
-        sendId
+        sendId,
+        // Crash-resume: режим прогона — гард деструктива в баннере возобновления
+        // (auto/bypass → авто-resume запрещён).
+        agentMode: deps.getAgentMode()
       })
     } catch (err) {
       console.warn('[agent-runs] create failed:', err instanceof Error ? err.message : err)
@@ -1243,6 +1246,18 @@ async function runApiConversation(
       pendingAttachments.length = 0
     }
     currentMessages.push(nextUserMsg)
+
+    // Crash-resume (P1): живой прогресс прогона на КАЖДОМ завершённом turn.
+    // turn_index = номер этого хода (1-based), last_tool_name = имя последнего
+    // инструмента этого turn'а (для гарда деструктива в баннере). last_checkpoint
+    // не пишем здесь (undo-head не прокинут в этот runner — не плодим dep ради
+    // best-effort поля; останется NULL). Best-effort: ошибка storage не ломает loop.
+    if (agentRuns && runId) {
+      try {
+        const lastTool = toolCalls.length > 0 ? toolCalls[toolCalls.length - 1].name : null
+        agentRuns.tick(runId, { turnIndex: turn + 1, lastToolName: lastTool })
+      } catch { /* best-effort — tick живого прогресса не критичен */ }
+    }
 
     // Авто-компакшн: после каждого turn'а проверяем не исчерпали ли 95%
     // контекстного окна. Если да — суммаризируем одним синхронным API-вызовом

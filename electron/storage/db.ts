@@ -486,6 +486,32 @@ const MIGRATIONS: Array<{ version: number; description: string; run: (db: DB) =>
         CREATE INDEX IF NOT EXISTS idx_dev_task_checks_task ON dev_task_checks(dev_task_id);
       `)
     }
+  },
+  {
+    version: 19,
+    description: 'Crash-resume (P1): ДОПОЛНЯЕТ agent_runs живым прогрессом — turn_index/last_tool_name/last_checkpoint_id/agent_mode/updated_at. Не новая таблица: agentRuns.tick() пишет прогресс на каждом turn, findResumable читает зависшие после краха для баннера «сессия прервана».',
+    run: (db: DB) => {
+      // ALTER под PRAGMA-guard — миграция идемпотентна, если частично применилась.
+      // enum CHECK status НЕ трогаем (sqlite не умеет ALTER CHECK без перестройки
+      // таблицы): зависшие прогоны остаются status='running' до reconcileStale,
+      // findResumable ловит их по снапшоту до реконсайла (см. agent-runs.ts).
+      const cols = (db.prepare('PRAGMA table_info(agent_runs)').all() as Array<{ name: string }>).map(c => c.name)
+      // turn_index — номер последнего завершённого хода агентного цикла (0 = ещё
+      // ни одного). Питает баннер «прервано на ходу N».
+      if (!cols.includes('turn_index')) db.exec('ALTER TABLE agent_runs ADD COLUMN turn_index INTEGER DEFAULT 0')
+      // last_tool_name — имя последнего диспетчеризованного инструмента. КЛЮЧЕВОЕ
+      // для гарда безопасности: write_file/apply_patch/run_command и т.п. →
+      // деструктив, авто-возобновление запрещено.
+      if (!cols.includes('last_tool_name')) db.exec('ALTER TABLE agent_runs ADD COLUMN last_tool_name TEXT')
+      // last_checkpoint_id — undo-head на момент последнего тика (для «показать
+      // что было сделано» / будущего checkpoint-resume V2).
+      if (!cols.includes('last_checkpoint_id')) db.exec('ALTER TABLE agent_runs ADD COLUMN last_checkpoint_id INTEGER')
+      // agent_mode — режим прогона (ask/accept-edits/plan/auto/bypass). auto/bypass
+      // → авто-возобновление запрещено (мог быть незаметный деструктив).
+      if (!cols.includes('agent_mode')) db.exec('ALTER TABLE agent_runs ADD COLUMN agent_mode TEXT')
+      // updated_at — время последнего тика (живость прогона). NULL у старых строк.
+      if (!cols.includes('updated_at')) db.exec('ALTER TABLE agent_runs ADD COLUMN updated_at INTEGER')
+    }
   }
 ]
 

@@ -304,7 +304,10 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('agent-runs:list', projectPath, opts),
     get: (runId: string) => ipcRenderer.invoke('agent-runs:get', runId),
     stop: (runId: string) => ipcRenderer.invoke('agent-runs:stop', runId),
-    resume: (runId: string) => ipcRenderer.invoke('agent-runs:resume', runId)
+    resume: (runId: string) => ipcRenderer.invoke('agent-runs:resume', runId),
+    // Crash-resume: зависшие после краха прогоны для баннера «сессия прервана».
+    listResumable: (projectPath: string) => ipcRenderer.invoke('ai:list-resumable', projectPath),
+    dismissResumable: (runId: string) => ipcRenderer.invoke('ai:dismiss-resumable', runId)
   },
   // История Verification Artifact (Фаза 3) — DoD-доказательства поверх файла-артефакта.
   verifications: {

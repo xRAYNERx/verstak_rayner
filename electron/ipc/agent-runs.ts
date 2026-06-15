@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import type { Database } from 'better-sqlite3'
-import type { AgentRuns, AgentRunStatus, AgentRunOwner } from '../storage/agent-runs'
+import type { AgentRuns, AgentRunStatus, AgentRunOwner, ResumableRun } from '../storage/agent-runs'
 import type { SubSessions } from '../storage/sub-sessions'
 import type { SessionTodos } from '../storage/session-todos'
 import { getRunInput } from '../storage/run-inputs'
@@ -25,8 +25,15 @@ export function registerAgentRunsIpc(
   subSessions: SubSessions,
   sessionTodos: SessionTodos,
   db: Database,
-  abortSend: (sendId: number) => boolean
+  abortSend: (sendId: number) => boolean,
+  reconciledAt: number
 ): void {
+  // Crash-resume: прогоны, отклонённые пользователем в баннере на этом старте.
+  // Прогон уже failed (reconcileStale), поэтому отдельного БД-флага не заводим —
+  // достаточно in-memory отметки, чтобы баннер не показывал его повторно (при
+  // перезапуске app reconciledAt сменится и старый failed-прогон уже не попадёт
+  // в findResumable). Минимальное решение по ТЗ.
+  const dismissed = new Set<string>()
   ipcMain.handle(
     'agent-runs:list',
     (_e, projectPath: string, opts?: { status?: AgentRunStatus; owner?: AgentRunOwner; limit?: number }) =>
@@ -94,5 +101,27 @@ export function registerAgentRunsIpc(
       return { error: 'Нет сохранённого ввода прогона — переотправка недоступна (старый прогон).' }
     }
     return { chatId: run.chatId, userMessage: input.userMessage }
+  })
+
+  // Crash-resume: зависшие после краха прогоны проекта для баннера «сессия
+  // прервана». findResumable отбирает прогоны, помеченные failed реконсайлом
+  // ЭТОГО старта (ended_at >= reconciledAt), с сохранённым вводом (run_inputs).
+  // Отклонённые баннером (dismissed) отсекаем здесь. autoResumable несёт гард
+  // деструктива: renderer показывает «Возобновить» только при true.
+  ipcMain.handle('ai:list-resumable', (_e, projectPath: string): ResumableRun[] => {
+    if (!projectPath) return []
+    const all = agentRuns.findResumable(projectPath, reconciledAt, (runId) => {
+      const input = getRunInput(db, runId)
+      return input?.userMessage || null
+    })
+    return all.filter(r => !dismissed.has(r.runId))
+  })
+
+  // Crash-resume: пользователь отклонил баннер для прогона — больше не
+  // показываем его в этом сеансе app. Прогон уже failed, БД не трогаем.
+  ipcMain.handle('ai:dismiss-resumable', (_e, runId: string): boolean => {
+    if (!runId) return false
+    dismissed.add(runId)
+    return true
   })
 }

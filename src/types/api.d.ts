@@ -391,6 +391,10 @@ declare global {
         stop(runId: string): Promise<boolean>
         /** Данные для честного re-send: { chatId, userMessage } или { error }. */
         resume(runId: string): Promise<{ chatId: number | null; userMessage: string } | { error: string }>
+        /** Crash-resume: зависшие после краха прогоны проекта для баннера «сессия прервана». */
+        listResumable(projectPath: string): Promise<ResumableRun[]>
+        /** Crash-resume: отклонить баннер для прогона (не показывать в этом сеансе app). */
+        dismissResumable(runId: string): Promise<boolean>
       }
       // История Verification Artifact (Фаза 3) — DoD-доказательства поверх файла-артефакта.
       verifications: {
@@ -592,6 +596,12 @@ export interface AgentRun {
   error: string | null
   startedAt: number
   endedAt: number | null
+  // Crash-resume (P1, миграция 19): живой прогресс. 0/null у прогонов до миграции.
+  turnIndex: number
+  lastToolName: string | null
+  lastCheckpointId: number | null
+  agentMode: string | null
+  updatedAt: number | null
 }
 
 /** Событие Timeline прогона (append-only). */
@@ -612,6 +622,26 @@ export interface AgentRunDetail {
   events: AgentRunEvent[]
   subs: SubSession[]
   todos: SessionTodo[]
+}
+
+/**
+ * Crash-resume (P1) — зависший после краха прогон для баннера «сессия прервана».
+ * Зеркало shape из electron/storage/agent-runs.ts (renderer не импортит electron/).
+ */
+export interface ResumableRun {
+  runId: string
+  projectPath: string
+  chatId: number | null
+  title: string
+  /** Текст последнего user-запроса (для re-send и подписи баннера). */
+  lastUserRequest: string
+  turnIndex: number
+  lastToolName: string | null
+  agentMode: string | null
+  startedAt: number
+  /** Можно ли предлагать авто-возобновление (read-only последний tool + безопасный режим).
+   *  false → деструктив/auto/bypass: только «показать что было» + ручной ре-промпт. */
+  autoResumable: boolean
 }
 
 /**

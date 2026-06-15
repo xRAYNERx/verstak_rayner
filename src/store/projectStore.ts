@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { FileNode, ChatMessage, ProjectMeta, ChatSession, DevTask } from '../types/api'
+import type { FileNode, ChatMessage, ProjectMeta, ChatSession, DevTask, ResumableRun } from '../types/api'
 import { isModelValidForProvider } from '../hooks/useProvider'
 import {
   freshSnapshot,
@@ -133,6 +133,9 @@ interface ProjectState {
   artifacts: Array<{ kind: 'html' | 'docx' | 'verification'; filename: string; path: string; sizeBytes: number; ts: number; overall?: 'passed' | 'failed' | 'partial' | 'not_run'; checksPassed?: number; checksTotal?: number }>
   /** Текущий артефакт открытый в preview pane (path как ID). null = закрыт. */
   previewArtifactId: string | null
+  /** Crash-resume (P1): зависшие после краха прогоны текущего проекта для баннера
+   *  «сессия прервана». Заполняется loadResumableRuns при открытии проекта. */
+  resumableRuns: ResumableRun[]
   setProject: (path: string) => Promise<void>
   closeProject: () => void
   refreshProjectList: () => Promise<void>
@@ -233,6 +236,10 @@ interface ProjectState {
   /** Уровень усилий модели. Влияет на max_tokens / extended thinking. */
   effortLevel: 'quick' | 'standard' | 'deep'
   setEffortLevel: (level: 'quick' | 'standard' | 'deep') => void
+  /** Crash-resume: подгрузить зависшие прогоны проекта для баннера. Fire-and-forget. */
+  loadResumableRuns: (path: string) => Promise<void>
+  /** Crash-resume: отклонить баннер для прогона (убрать из resumableRuns + main). */
+  dismissResumableRun: (runId: string) => void
 }
 
 // Monotonic token used by setProject to cancel its own stale concurrent runs.
@@ -277,6 +284,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   artifacts: [],
   previewArtifactId: null,
   effortLevel: 'standard',
+  resumableRuns: [],
   setProject: async (path) => {
     const myToken = ++setProjectToken
     const s = get()
@@ -369,12 +377,17 @@ export const useProject = create<ProjectState>((set, get) => ({
       // через refreshReviewsFor (ниже).
       reviews: {},
       openedReviewId: null,
-      artifacts: []
+      artifacts: [],
+      // Crash-resume: сбрасываем баннер предыдущего проекта; перезагрузим ниже.
+      resumableRuns: []
     })
     // Подгружаем ревью для активного чата (если есть). Fire-and-forget.
     if (activeChatId != null) {
       void get().refreshReviewsFor(activeChatId)
     }
+    // Crash-resume: подгружаем зависшие после краха прогоны этого проекта для
+    // баннера «сессия прервана». Fire-and-forget.
+    void get().loadResumableRuns(path)
   },
   closeProject: () => set({
     path: null,
@@ -862,6 +875,20 @@ export const useProject = create<ProjectState>((set, get) => ({
   clearArtifacts: () => set({ artifacts: [], previewArtifactId: null }),
   setPreviewArtifact: (path) => set({ previewArtifactId: path }),
   setEffortLevel: (level) => set({ effortLevel: level }),
+  loadResumableRuns: async (path) => {
+    try {
+      const runs = await window.api.agentRuns.listResumable(path)
+      // Гонка смены проекта: применяем только если проект всё ещё активен.
+      if (get().path !== path) return
+      set({ resumableRuns: runs })
+    } catch (err) {
+      console.warn('[crash-resume] loadResumableRuns failed:', err)
+    }
+  },
+  dismissResumableRun: (runId) => {
+    void window.api.agentRuns.dismissResumable(runId)
+    set(s => ({ resumableRuns: s.resumableRuns.filter(r => r.runId !== runId) }))
+  },
   cleanupReviewsFor: (parentChatId) => set(s => {
     // Удаляем review entries этого main-чата + связанные sendOwners.
     // Закрываем openedReviewId если он был из этого чата.
