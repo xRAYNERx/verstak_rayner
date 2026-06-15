@@ -2346,9 +2346,10 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 }
 .gg-settings-nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
 .gg-settings-nav-item.is-active {
-  background: var(--accent-muted);
-  color: var(--accent);
-  border-color: var(--accent);
+  background: var(--vol-recessed-bg);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+  box-shadow: var(--vol-shadow-inset);
 }
 .gg-settings-nav-icon { width: 16px; text-align: center; opacity: 0.85; display: flex; align-items: center; justify-content: center; }
 .gg-settings-nav-icon svg { vertical-align: middle; }
@@ -2360,6 +2361,29 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   margin: 0 0 12px;
   color: var(--text-primary);
 }
+
+/* ─── Doctor panel (вкладка «Провайдеры») ─── */
+.gg-doctor-panel {
+  margin: 6px 24px 20px;
+  padding: 14px 16px 12px;
+  background: var(--vol-recessed-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--vol-shadow-inset);
+}
+.gg-doctor-panel .gg-settings-row {
+  gap: 14px;
+  align-items: center;
+}
+.gg-doctor-status {
+  font-weight: 700;
+  width: 16px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.gg-doctor-status.is-ok { color: var(--success); }
+.gg-doctor-status.is-err { color: var(--error); }
+.gg-doctor-status.is-na { color: var(--text-tertiary); }
 
 /* ─── Providers page: cards (подключённые / доступные) ─── */
 .gg-providers-page { padding: 20px 24px; }
@@ -2506,19 +2530,19 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 .gg-models-cards {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md, 8px);
-  overflow: hidden;
-  background: var(--bg-elevated);
+  gap: 3px;
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
 }
 .gg-models-card {
   padding: 14px 16px;
   background: var(--bg-elevated);
-  transition: background 150ms ease;
-}
-.gg-models-card + .gg-models-card {
-  border-top: 1px solid var(--border-default);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: var(--shadow-sm);
+  transition: background 150ms ease, box-shadow 150ms ease;
 }
 .gg-models-card.is-active-provider {
   background: color-mix(in srgb, var(--accent-muted, var(--accent)) 14%, var(--bg-elevated));

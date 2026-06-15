@@ -12,7 +12,7 @@ html.gg-atelier body {
 }
 
 /* ─── Atoms ─── */
-html.gg-atelier .gg-btn {
+html.gg-atelier .gg-btn:not(.gg-btn-primary):not(.gg-btn-danger) {
   background: color-mix(in srgb, var(--vol-glass) 90%, var(--bg-elevated));
   border-color: var(--border-default);
   box-shadow: var(--shadow-sm);
@@ -23,16 +23,21 @@ html.gg-atelier .gg-btn {
     transform 120ms ease;
 }
 
-html.gg-atelier .gg-btn:hover {
+html.gg-atelier .gg-btn:not(.gg-btn-primary):not(.gg-btn-danger):hover {
   background: color-mix(in srgb, var(--bg-hover) 88%, var(--vol-glass));
   border-color: var(--border-strong);
 }
 
 html.gg-atelier .gg-btn-primary {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border-color: var(--accent);
   box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 26%, transparent);
 }
 
 html.gg-atelier .gg-btn-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
   box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
@@ -120,8 +125,9 @@ html.gg-atelier .gg-settings-nav-item:hover {
 }
 
 html.gg-atelier .gg-settings-nav-item.is-active {
-  background: var(--accent-muted);
-  border-color: var(--accent-border);
+  background: var(--vol-recessed-bg);
+  border-color: var(--border-subtle);
+  color: var(--text-primary);
   box-shadow: var(--vol-shadow-inset);
 }
 
@@ -133,7 +139,6 @@ html.gg-atelier .gg-settings-tabs .gg-settings-tab.is-active {
 
 html.gg-atelier .gg-theme-card,
 html.gg-atelier .gg-prov-card,
-html.gg-atelier .gg-models-card,
 html.gg-atelier .gg-provider-card-row,
 html.gg-atelier .gg-create-client-choice {
   background: var(--vol-glass);
@@ -141,6 +146,15 @@ html.gg-atelier .gg-create-client-choice {
   border-color: var(--border-default);
   box-shadow: var(--shadow-sm);
   transition: border-color 180ms ease, box-shadow 180ms ease, transform 160ms ease;
+}
+
+html.gg-atelier .gg-models-card {
+  background: var(--vol-glass);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
 }
 
 html.gg-atelier .gg-theme-card:hover,

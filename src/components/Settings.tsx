@@ -919,17 +919,17 @@ function ProviderHealthMatrix({ report }: { report: DoctorReport }) {
 // ─── Doctor panel ─────────────────────────────────────────────────────────────
 
 /** Иконка/цвет статуса пункта диагностики. */
-function doctorStatusIcon(status: DoctorItem['status']): { icon: string; color: string } {
-  if (status === 'ok') return { icon: '✓', color: 'var(--gg-success, #3fb950)' }
-  if (status === 'no-key') return { icon: '✗', color: 'var(--gg-danger, #f85149)' }
-  return { icon: '—', color: 'var(--gg-text-dim, #8b949e)' } // n-a
+function doctorStatusIcon(status: DoctorItem['status']): { icon: string; cls: string } {
+  if (status === 'ok') return { icon: '✓', cls: 'is-ok' }
+  if (status === 'no-key') return { icon: '✗', cls: 'is-err' }
+  return { icon: '—', cls: 'is-na' }
 }
 
 function DoctorRow({ item }: { item: DoctorItem }) {
   const s = doctorStatusIcon(item.status)
   return (
     <div className="gg-settings-row" style={{ alignItems: 'baseline', gap: 8 }}>
-      <span style={{ color: s.color, fontWeight: 700, width: 16, display: 'inline-block' }}>{s.icon}</span>
+      <span className={`gg-doctor-status ${s.cls}`}>{s.icon}</span>
       <span style={{ minWidth: 140, fontWeight: 600 }}>{item.name}</span>
       <span className="gg-settings-hint" style={{ margin: 0 }}>{item.detail}</span>
     </div>
@@ -954,8 +954,8 @@ function DoctorPanel() {
   }
 
   return (
-    <div className="gg-doctor-panel" style={{ marginBottom: 16 }}>
-      <div className="gg-settings-row" style={{ alignItems: 'center', gap: 12 }}>
+    <div className="gg-doctor-panel">
+      <div className="gg-settings-row">
         <button className="gg-btn gg-btn-primary" onClick={() => void run()} disabled={loading}>
           {loading ? 'Проверка…' : '🩺 Проверка (Doctor)'}
         </button>

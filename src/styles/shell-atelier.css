@@ -440,7 +440,15 @@ html.gg-atelier body {
 }
 
 .gg-app-atelier .gg-btn-primary {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border-color: var(--accent);
   box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.gg-app-atelier .gg-btn-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 @media (prefers-reduced-motion: reduce) {

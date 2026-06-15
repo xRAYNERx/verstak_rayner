@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 
-export type ThemeId = 'dark' | 'light' | 'dracula' | 'nord' | 'tokyo-night' | 'gruvbox'
+export type ThemeId = 'nord' | 'light'
 
 export interface ThemeMeta {
   id: ThemeId
@@ -14,22 +14,21 @@ export interface ThemeMeta {
 
 /** Single source of truth for the picker. Colours mirror theme.css. */
 export const THEMES: ThemeMeta[] = [
-  { id: 'dark', label: 'Verstak Dark', light: false, swatch: ['#0b0b0c', '#111113', '#c4a35a'] },
-  { id: 'light', label: 'Verstak Light', light: true, swatch: ['#ffffff', '#eef0f4', '#3a6ee8'] },
-  { id: 'dracula', label: 'Dracula', light: false, swatch: ['#21222c', '#282a36', '#bd93f9'] },
   { id: 'nord', label: 'Nord', light: false, swatch: ['#2e3440', '#3b4252', '#88c0d0'] },
-  { id: 'tokyo-night', label: 'Tokyo Night', light: false, swatch: ['#1a1b26', '#24283b', '#7aa2f7'] },
-  { id: 'gruvbox', label: 'Gruvbox', light: false, swatch: ['#282828', '#3c3836', '#fabd2f'] }
+  { id: 'light', label: 'Светлая', light: true, swatch: ['#ffffff', '#eef0f4', '#3a6ee8'] },
 ]
 
 const VALID = new Set<ThemeId>(THEMES.map(t => t.id))
+const LEGACY_DARK = new Set(['dark', 'dracula', 'tokyo-night', 'gruvbox'])
 
 const STORAGE_KEY = 'theme'
 const RADIUS_KEY = 'theme_radius'
-const DEFAULT_THEME: ThemeId = 'dark'
+const DEFAULT_THEME: ThemeId = 'nord'
 
 function normalize(v: unknown): ThemeId {
-  return typeof v === 'string' && VALID.has(v as ThemeId) ? (v as ThemeId) : DEFAULT_THEME
+  if (typeof v === 'string' && VALID.has(v as ThemeId)) return v as ThemeId
+  if (typeof v === 'string' && LEGACY_DARK.has(v)) return 'nord'
+  return DEFAULT_THEME
 }
 
 function applyTheme(theme: ThemeId): void {
