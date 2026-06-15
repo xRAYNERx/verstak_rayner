@@ -2768,7 +2768,7 @@ function ModelsPage(props: ModelsPageProps) {
           return (
             <div
               key={p.id}
-              className={`gg-models-card ${authorized ? 'is-ready' : 'is-locked'}`}
+              className={`gg-models-card ${isActiveProvider ? 'is-current' : ''}`}
             >
               <div className="gg-models-card-head">
                 <div className="gg-models-card-title">
@@ -2814,17 +2814,17 @@ function ModelsPage(props: ModelsPageProps) {
                   )}
                   {list.map(e => {
                     const enabled = enabledModels.has(e.key)
-                    const isDefault = (models[p.id] ?? p.defaultModel) === e.model
+                    const isCurrentModel = isActiveProvider && (models[p.id] ?? p.defaultModel) === e.model
                     return (
-                      <div key={e.key} className={`gg-models-row ${isDefault ? 'is-default' : ''}`}>
+                      <div key={e.key} className={`gg-models-row ${isCurrentModel ? 'is-current' : ''}`}>
                         <button
                           type="button"
                           className="gg-models-row-main"
                           onClick={() => setDefault(p.id, e.model)}
-                          title="Сделать моделью по умолчанию для провайдера"
+                          title="Сделать текущей моделью в чате"
                         >
                           <span className="gg-models-row-name">{e.model}</span>
-                          {isDefault && <span className="gg-models-row-default">по умолчанию</span>}
+                          {isCurrentModel && <span className="gg-models-row-current">Текущий</span>}
                           <span className="gg-models-row-tags">
                             {e.tags.map(tag => (
                               <span key={tag} className={`gg-mpal-tag is-${tag.toLowerCase().replace(/\$/g, 'd')}`}>{tag}</span>

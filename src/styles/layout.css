@@ -2544,11 +2544,15 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   padding: 14px 16px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-default);
+  border-left: 1px solid var(--border-default);
   border-radius: var(--radius-md, 8px);
   box-shadow: var(--shadow-sm);
-  transition: background 150ms ease, box-shadow 150ms ease;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
-.gg-models-card.is-locked { opacity: 0.92; }
+.gg-models-card.is-current {
+  border-left: 4px solid var(--accent);
+  box-shadow: var(--shadow-sm), inset 4px 0 0 var(--accent);
+}
 .gg-models-card-head {
   display: flex;
   flex-wrap: wrap;
@@ -2705,13 +2709,12 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   transition: background 100ms ease, border-color 100ms ease;
 }
 .gg-models-row-main:hover { background: var(--bg-hover); }
-.gg-models-row.is-default .gg-models-row-main {
+.gg-models-row.is-current .gg-models-row-main {
   border-left-color: var(--accent);
-  background: color-mix(in srgb, var(--accent-muted) 55%, transparent);
   box-shadow: inset 4px 0 0 var(--accent);
 }
-.gg-models-row.is-default .gg-models-row-main:hover {
-  background: color-mix(in srgb, var(--accent-muted) 70%, var(--bg-hover));
+.gg-models-row.is-current .gg-models-row-main:hover {
+  background: var(--bg-hover);
 }
 .gg-models-row-name {
   font-family: var(--font-mono);
@@ -2719,14 +2722,12 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   color: var(--text-primary);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.gg-models-row-default {
-  font-size: 9px;
+.gg-models-row-current {
+  font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 1px 5px;
-  border-radius: 4px;
+  letter-spacing: 0.06em;
   color: var(--accent);
-  border: 1px solid var(--accent);
 }
 .gg-models-row-tags { display: flex; gap: 4px; margin-left: auto; }
 
