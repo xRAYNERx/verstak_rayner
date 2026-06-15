@@ -69,7 +69,8 @@
   --rail-pad-x: 12px;
 }
 .gg-rail:not(.is-expanded) {
-  --rail-pad-x: 8px;
+  --rail-pad-x: 6px;
+  overflow-x: visible;
 }
 .gg-rail-top {
   display: flex;
@@ -260,8 +261,10 @@
   scrollbar-gutter: stable;
 }
 .gg-rail:not(.is-expanded) .gg-rail-list {
-  padding: 4px 2px 6px;
+  padding: 4px 0 6px;
   gap: 5px;
+  overflow-x: visible;
+  scrollbar-gutter: auto;
 }
 .gg-rail.is-expanded .gg-rail-list {
   align-items: stretch;
@@ -274,8 +277,9 @@
 }
 .gg-rail-chip:not(.is-expanded) {
   width: 100%;
-  max-width: 52px;
+  max-width: none;
   margin: 0 auto;
+  overflow: visible;
 }
 .gg-rail-chip-btn {
   display: flex;
@@ -310,8 +314,9 @@
 }
 .gg-rail-chip:not(.is-expanded) .gg-rail-chip-btn {
   border: 1px solid transparent;
-  padding: 5px;
+  padding: 3px;
   box-sizing: border-box;
+  overflow: visible;
 }
 .gg-rail-chip:not(.is-expanded).is-active .gg-rail-chip-btn {
   background: transparent;
@@ -322,6 +327,10 @@
   position: relative;
   flex-shrink: 0;
   display: inline-flex;
+  overflow: visible;
+}
+.gg-rail-chip:not(.is-expanded) .gg-rail-avatar-wrap {
+  isolation: isolate;
 }
 .gg-rail-avatar,
 .gg-rail-square {
@@ -371,14 +380,25 @@
     0 0 12px color-mix(in srgb, var(--accent) 55%, transparent),
     0 0 24px color-mix(in srgb, var(--accent) 28%, transparent);
 }
+.gg-rail-chip:not(.is-expanded).is-active .gg-rail-avatar-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 88%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--accent) 34%, transparent),
+    0 0 14px color-mix(in srgb, var(--accent) 72%, transparent),
+    0 0 26px color-mix(in srgb, var(--accent) 46%, transparent);
+}
 .gg-rail-chip:not(.is-expanded).is-active .gg-rail-avatar {
+  position: relative;
+  z-index: 1;
   border-color: var(--accent);
   border-width: 2px;
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent),
-    0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent),
-    0 0 14px color-mix(in srgb, var(--accent) 55%, transparent),
-    0 0 26px color-mix(in srgb, var(--accent) 30%, transparent);
+  box-shadow: var(--shadow-sm);
 }
 .gg-rail-chip-text {
   flex: 1;
