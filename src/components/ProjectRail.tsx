@@ -182,9 +182,6 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar, onOpenProjectSetting
                 <polyline points={railExpanded ? '15 6 9 12 15 18' : '9 6 15 12 9 18'} />
               </svg>
             </DockIcon>
-            <span className="gg-rail-dock-label" aria-hidden={!railExpanded}>
-              {railExpanded ? 'Свернуть' : 'Раскрыть'}
-            </span>
           </button>
           <button
             type="button"
@@ -199,7 +196,6 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar, onOpenProjectSetting
                 <line x1="9" y1="4" x2="9" y2="20" />
               </svg>
             </DockIcon>
-            <span className="gg-rail-dock-label" aria-hidden={!railExpanded}>Панель</span>
           </button>
           {showSearch && (
             <button
@@ -214,7 +210,6 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar, onOpenProjectSetting
                   <line x1="16.5" y1="16.5" x2="21" y2="21" />
                 </svg>
               </DockIcon>
-              <span className="gg-rail-dock-label" aria-hidden={!railExpanded}>{t.rail.search}</span>
             </button>
           )}
         </div>
