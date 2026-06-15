@@ -292,11 +292,14 @@ declare global {
       }
       updater: {
         install(): Promise<void>
-        check(): Promise<{ available: boolean; version?: string; error?: string }>
-        onAvailable(cb: (data: { version: string }) => void): () => void
+        check(): Promise<{ available: boolean; version?: string; error?: string; phase?: string; pendingRelease?: boolean }>
+        getState(): Promise<{ phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }>
+        onState(cb: (data: { phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }) => void): () => void
+        onAvailable(cb: (data: { version: string; pendingRelease?: boolean }) => void): () => void
         onDownloaded(cb: (data: { version: string }) => void): () => void
         onProgress(cb: (data: { percent: number }) => void): () => void
         onNotAvailable(cb: () => void): () => void
+        onError(cb: (data: { error: string }) => void): () => void
       }
       audit: {
         query(projectPath: string, opts?: { limit?: number; action?: string; since?: number }): Promise<AuditEntry[]>

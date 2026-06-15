@@ -223,6 +223,7 @@ interface ProjectState {
 // only B's set() should land. We bump on entry, snapshot the value, and bail
 // on every await boundary if our token is no longer current.
 let setProjectToken = 0
+let switchChatSessionToken = 0
 
 export const LAST_PROJECT_PATH_KEY = 'last_project_path'
 
@@ -278,14 +279,6 @@ export const useProject = create<ProjectState>((set, get) => ({
         }
       }
     }
-    // 2) Build the target snapshot — either restore from sessions or seed from chat history
-    const tree = await window.api.files.tree(path)
-    if (myToken !== setProjectToken) return  // a newer setProject took over
-    await window.api.projects.setCurrent(path)
-    void window.api.settings.setKey(LAST_PROJECT_PATH_KEY, path)
-    if (myToken !== setProjectToken) return
-    const projectList = await window.api.projects.list()
-    if (myToken !== setProjectToken) return
     const existing = nextSessions[path]
     let target: SessionSnapshot
     if (existing) {
@@ -299,31 +292,34 @@ export const useProject = create<ProjectState>((set, get) => ({
       target = freshSnapshot()
     }
 
-    // Load chat sessions list. Create a default one if project has none yet.
-    let chatSessions = await window.api.chatSessions.list(path)
+    void window.api.projects.setCurrent(path)
+    void window.api.settings.setKey(LAST_PROJECT_PATH_KEY, path)
+
+    const [tree, projectList, chatSessionsRaw] = await Promise.all([
+      window.api.files.tree(path),
+      window.api.projects.list(),
+      window.api.chatSessions.list(path),
+    ])
     if (myToken !== setProjectToken) return
+
+    let chatSessions = chatSessionsRaw
     if (chatSessions.length === 0) {
       const created = await window.api.chatSessions.create(path, { title: 'Основной чат' })
       if (myToken !== setProjectToken) return
       chatSessions = [created]
     }
-    // Pick the most recent active session (top of list)
-    const activeChatId = chatSessions[0]?.id ?? null
-    if (activeChatId) {
-      const history = await window.api.chats.list(activeChatId)
-      if (myToken !== setProjectToken) return
-      // Always hydrate from DB on project open unless we have a live in-memory
-      // snapshot from this app session (backgrounded project with active stream).
-      if (!existing || existing.messages.length === 0) {
-        target.messages = history.map(m => ({ role: m.role, content: m.content }))
-      }
-    }
 
-    if (myToken !== setProjectToken) return  // final safety before commit
+    const activeChatId = chatSessions[0]?.id ?? null
+    const needsDbHydrate = Boolean(
+      activeChatId && (!existing || existing.messages.length === 0)
+    )
+    const initialMessages = needsDbHydrate ? [] : target.messages
+
+    if (myToken !== setProjectToken) return
     set({
       path,
       tree,
-      messages: target.messages,
+      messages: initialMessages,
       isStreaming: target.isStreaming,
       pendingWrites: target.pendingWrites,
       pendingCommand: target.pendingCommand,
@@ -348,7 +344,17 @@ export const useProject = create<ProjectState>((set, get) => ({
       openedReviewId: null,
       artifacts: []
     })
-    // Подгружаем ревью для активного чата (если есть). Fire-and-forget.
+    if (needsDbHydrate && activeChatId != null) {
+      const hydrateChatId = activeChatId
+      void (async () => {
+        const history = await window.api.chats.list(hydrateChatId)
+        if (myToken !== setProjectToken) return
+        const cur = get()
+        if (cur.path !== path || cur.activeChatId !== hydrateChatId) return
+        set({ messages: history.map(m => ({ role: m.role, content: m.content })) })
+      })()
+    }
+
     if (activeChatId != null) {
       void get().refreshReviewsFor(activeChatId)
     }
@@ -482,11 +488,9 @@ export const useProject = create<ProjectState>((set, get) => ({
     return { sessions: { ...s.sessions, [projectPath]: { ...existing, hasUnread: false } } }
   }),
   switchChatSession: async (id) => {
+    const myToken = ++switchChatSessionToken
     const s = get()
     if (!s.path) return
-    // 1) Snapshot CURRENT chat state so its in-flight stream survives the
-    //    switch. Do NOT call ai.stop — events for the old sendId will be
-    //    routed into chatSnapshots[oldChatId] by Chat.tsx event handler.
     const nextSnapshots = { ...s.chatSnapshots }
     if (s.activeChatId != null && s.activeChatId !== id) {
       nextSnapshots[s.activeChatId] = {
@@ -500,63 +504,60 @@ export const useProject = create<ProjectState>((set, get) => ({
         hasUnread: false
       }
     }
-    // 2) Restore target — from snapshot if it has one (chat was backgrounded
-    //    earlier in this session), otherwise load history from DB.
     const restored = nextSnapshots[id]
-    let messages: ChatMessage[]
-    let isStreaming = false
-    let pendingWrites: PendingWrite[] = []
-    let pendingCommand: PendingCommand | null = null
-    let activity: ActivityEntry[] = []
-    let sessionUsage: SessionUsage = { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 }
-    let runningPlanStep: RunningPlanStep | null = null
-    if (restored) {
-      messages = restored.messages
-      isStreaming = restored.isStreaming
-      pendingWrites = restored.pendingWrites
-      pendingCommand = restored.pendingCommand
-      activity = restored.activity
-      sessionUsage = restored.sessionUsage
-      runningPlanStep = restored.runningPlanStep
-      delete nextSnapshots[id]  // it becomes active, no need to keep snapshot
-    } else {
-      const history = await window.api.chats.list(id)
-      messages = history.map(m => ({ role: m.role, content: m.content }))
-    }
-    // Per-chat provider: if the session has providerId / model saved, apply
-    // them to the global settings so the next ai:send uses that provider.
-    // Sanity check: if stored (providerId, model) pair is invalid (e.g. older
-    // bug saved gemini's model on a claude session), drop the model so
-    // useProvider falls back to the provider's default.
     const session = s.chatSessions.find(c => c.id === id)
-    if (session?.providerId) {
-      try {
-        await window.api.settings.setKey('provider', session.providerId)
-        if (session.model && isModelValidForProvider(session.providerId, session.model)) {
-          await window.api.settings.setKey(`model_${session.providerId}`, session.model)
-        } else if (session.model) {
-          // Clear stale/invalid model — useProvider will pick the default
-          await window.api.settings.setKey(`model_${session.providerId}`, '')
-          await window.api.chatSessions.setModel(id, session.providerId, null)
-        }
-      } catch { /* settings write failure shouldn't block chat switch */ }
+
+    if (restored) {
+      delete nextSnapshots[id]
+      set({
+        activeChatId: id,
+        messages: restored.messages,
+        isStreaming: restored.isStreaming,
+        pendingWrites: restored.pendingWrites,
+        pendingCommand: restored.pendingCommand,
+        activity: restored.activity,
+        sessionUsage: restored.sessionUsage,
+        runningPlanStep: restored.runningPlanStep,
+        chatSnapshots: nextSnapshots,
+        openedReviewId: null
+      })
+    } else {
+      set({
+        activeChatId: id,
+        messages: [],
+        isStreaming: false,
+        pendingWrites: [],
+        pendingCommand: null,
+        activity: [],
+        sessionUsage: { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 },
+        runningPlanStep: null,
+        chatSnapshots: nextSnapshots,
+        openedReviewId: null,
+        touchedFiles: {},
+        checkpointId: null,
+        artifacts: []
+      })
+      void (async () => {
+        const history = await window.api.chats.list(id)
+        if (myToken !== switchChatSessionToken) return
+        if (get().activeChatId !== id) return
+        set({ messages: history.map(m => ({ role: m.role, content: m.content })) })
+      })()
     }
-    set({
-      activeChatId: id,
-      messages,
-      isStreaming,
-      pendingWrites,
-      pendingCommand,
-      activity,
-      sessionUsage,
-      runningPlanStep,
-      chatSnapshots: nextSnapshots,
-      // Grok audit fix: openedReviewId переживал смену чата и мог показать
-      // панель чужого ревью. Сбрасываем при каждом switch.
-      openedReviewId: null
-    })
-    // Подгружаем review sub-chats этого main-чата (fire-and-forget — pills
-    // появятся когда подгрузятся; основная навигация не блокируется).
+
+    if (session?.providerId) {
+      void (async () => {
+        try {
+          await window.api.settings.setKey('provider', session.providerId!)
+          if (session.model && isModelValidForProvider(session.providerId!, session.model)) {
+            await window.api.settings.setKey(`model_${session.providerId}`, session.model)
+          } else if (session.model) {
+            await window.api.settings.setKey(`model_${session.providerId}`, '')
+            await window.api.chatSessions.setModel(id, session.providerId!, null)
+          }
+        } catch { /* settings write failure shouldn't block chat switch */ }
+      })()
+    }
     void get().refreshReviewsFor(id)
   },
   registerSendOwner: (sendId, owner) => set(s => ({

@@ -11,6 +11,19 @@ const BASE_NAME = 'Verstak - Журнал изменений'
 
 const ENTRIES = [
   {
+    version: '1.3.1',
+    build: '15.06.2026',
+    deployed: '15.06.2026',
+    title: 'Старт чата, обновления, скиллы Grok',
+    changes: [
+      'Двухфазная загрузка истории чата — composer доступен сразу после открытия проекта.',
+      'Автофокус textarea, отложенные модалки при старте (модели / обновления).',
+      'Исправлен updater: без красной ошибки при отсутствии GitHub Release; модалка при новой версии.',
+      'loadFromGrokTree в electron/ai/skills/loader.ts — скиллы из ~/.grok/skills/{id}/SKILL.md.',
+      'Сборка: Verstak-Setup-1.3.1-x64.exe + latest.yml для публикации на frolofpavel/verstak Releases.'
+    ]
+  },
+  {
     version: '1.3.0',
     build: '15.06.2026',
     deployed: '15.06.2026',
@@ -93,6 +106,41 @@ const ENTRIES = [
       'Жёлтый индикатор «не подключён», если активный провайдер без ключа/CLI.',
       'Тот же улучшенный пикер в composer чата.',
       'Файлы: ModelPicker.tsx, Sidebar.tsx, App.tsx, layout.css, i18n ru/en.'
+    ]
+  },
+  {
+    version: '1.3.0',
+    build: '15.06.2026 18:30',
+    deployed: '15.06.2026 18:30',
+    title: 'Модели: ползунок «Все», дефолты входа, модалка без модели',
+    changes: [
+      'Ползунок вместо «Включить все» — вкл/выкл все модели провайдера.',
+      'enabled_models: пусто при регистрации без CLI; только модель входа при подключении.',
+      'ModelRequiredPrompt при входе без авторизованных провайдеров → вкладка «Модели».',
+      'Файлы: enabled-models.ts, ModelRequiredPrompt.tsx, AuthScreen.tsx, OnboardingWizard.tsx.'
+    ]
+  },
+  {
+    version: '1.3.0',
+    build: '15.06.2026 19:00',
+    deployed: '15.06.2026 19:00',
+    title: 'Модели: UI карточек провайдеров',
+    changes: [
+      'Разделители между карточками провайдеров (Gemini / Claude / …) в одном блоке.',
+      'Кнопка «Выбрать отдельные» — обводка видна всегда.',
+      'Разделители между строками внутри раскрытого списка моделей.',
+      'layout.css.'
+    ]
+  },
+  {
+    version: '1.3.0',
+    build: '15.06.2026 19:05',
+    deployed: '15.06.2026 19:05',
+    title: 'Git: форк xRAYNERx/verstak_rayner',
+    changes: [
+      'Remote rayner → https://github.com/xRAYNERx/verstak_rayner.git',
+      'Коммит c413519 на main (52 файла).',
+      'Обновления приложения — только frolofpavel/verstak (не форк).'
     ]
   },
   {

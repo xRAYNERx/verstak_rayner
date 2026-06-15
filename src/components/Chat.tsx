@@ -491,6 +491,15 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
   }
   useEffect(autoGrow, [input])
 
+  // Composer должен быть готов к вводу сразу после открытия проекта/чата,
+  // не дожидаясь гидратации тяжёлой истории из SQLite.
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      textareaRef.current?.focus({ preventScroll: true })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [activePath, activeChatId])
+
   // Sidecar Terminal Intelligence inject — TerminalErrorToast диспатчит
   // CustomEvent('gg-inject-prompt') когда юзер жмёт «Fix in chat».
   useEffect(() => {

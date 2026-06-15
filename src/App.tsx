@@ -21,6 +21,7 @@ import { MemoryGovernance } from './components/MemoryGovernance'
 import { DiffView } from './components/DiffView'
 import { CommandConfirm } from './components/CommandConfirm'
 import { UpdateNotification } from './components/UpdateNotification'
+import { UpdateAvailableModal } from './components/UpdateAvailableModal'
 import { Terminal } from './components/Terminal'
 import { FilesPanel } from './components/FilesPanel'
 import { SideChat } from './components/SideChat'
@@ -192,8 +193,13 @@ export function App() {
     try { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth)) } catch { /* ignore */ }
   }, [sidebarWidth])
 
-  // Пока проверяем auth — ничего не рендерим
-  if (authDone === null) return null
+  if (authDone === null) {
+    return (
+      <I18nContext.Provider value={getTranslations(lang)}>
+        <div className="gg-app gg-app-booting" aria-busy="true" />
+      </I18nContext.Provider>
+    )
+  }
   // Нужна авторизация — показываем AuthScreen поверх всего
   if (!authDone) return (
     <I18nContext.Provider value={getTranslations(lang)}>
@@ -317,6 +323,7 @@ export function App() {
       <TerminalErrorToast />
       <DiffView />
       <CommandConfirm />
+      <UpdateAvailableModal />
       <UpdateNotification />
     </div>
     </I18nContext.Provider>

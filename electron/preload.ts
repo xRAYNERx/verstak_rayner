@@ -223,8 +223,20 @@ contextBridge.exposeInMainWorld('api', {
   updater: {
     install: () => ipcRenderer.invoke('update:install'),
     check: () => ipcRenderer.invoke('update:check'),
-    onAvailable: (cb: (data: { version: string }) => void) => {
-      const handler = (_e: unknown, data: { version: string }) => cb(data)
+    getState: () => ipcRenderer.invoke('update:get-state') as Promise<{
+      phase: string
+      version?: string
+      percent?: number
+      error?: string
+      pendingRelease?: boolean
+    }>,
+    onState: (cb: (data: { phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }) => void) => {
+      const handler = (_e: unknown, data: { phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }) => cb(data)
+      ipcRenderer.on('update:state', handler)
+      return () => { ipcRenderer.off('update:state', handler) }
+    },
+    onAvailable: (cb: (data: { version: string; pendingRelease?: boolean }) => void) => {
+      const handler = (_e: unknown, data: { version: string; pendingRelease?: boolean }) => cb(data)
       ipcRenderer.on('update:available', handler)
       return () => { ipcRenderer.off('update:available', handler) }
     },
@@ -242,6 +254,11 @@ contextBridge.exposeInMainWorld('api', {
       const handler = () => cb()
       ipcRenderer.on('update:not-available', handler)
       return () => { ipcRenderer.off('update:not-available', handler) }
+    },
+    onError: (cb: (data: { error: string }) => void) => {
+      const handler = (_e: unknown, data: { error: string }) => cb(data)
+      ipcRenderer.on('update:error', handler)
+      return () => { ipcRenderer.off('update:error', handler) }
     },
   },
   audit: {

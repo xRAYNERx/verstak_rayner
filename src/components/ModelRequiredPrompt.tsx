@@ -49,13 +49,28 @@ function toProviderLite(p: ProviderDescriptorDTO) {
   }
 }
 
+const STARTUP_GRACE_MS = 3000
+
 export function ModelRequiredPrompt({ active, recheckToken = 0, onOpenModelsSettings }: Props) {
   const t = useT()
   const [visible, setVisible] = useState(false)
   const [dismissed, setDismissed] = useState(false)
+  const [graceElapsed, setGraceElapsed] = useState(false)
 
   useEffect(() => {
-    if (!active || dismissed) return
+    if (!active) {
+      setGraceElapsed(false)
+      return
+    }
+    const timer = window.setTimeout(() => setGraceElapsed(true), STARTUP_GRACE_MS)
+    return () => window.clearTimeout(timer)
+  }, [active])
+
+  useEffect(() => {
+    if (!active || dismissed || !graceElapsed) {
+      setVisible(false)
+      return
+    }
     let cancelled = false
     void (async () => {
       try {
@@ -66,7 +81,7 @@ export function ModelRequiredPrompt({ active, recheckToken = 0, onOpenModelsSett
       }
     })()
     return () => { cancelled = true }
-  }, [active, dismissed, recheckToken])
+  }, [active, dismissed, recheckToken, graceElapsed])
 
   if (!visible) return null
 

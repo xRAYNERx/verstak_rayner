@@ -90,17 +90,26 @@ export const en = {
     checkUpdates: 'Check for updates',
     checkingUpdates: 'Checking…',
     upToDate: 'You have the latest version',
+    updateAvailable: 'Version {version} is available — download starting',
+    updatePendingRelease: 'Version {version} is in the repo — waiting for the installer on GitHub Releases',
     downloadingUpdate: 'Downloading v{version}… {percent}%',
     updateReady: 'v{version} is ready to install',
     installUpdate: 'Install',
     updateError: 'Could not check for updates',
+    updateNoRelease: 'No installer on GitHub yet — waiting for a published release',
     updatesHint: 'On launch we check GitHub Releases (frolofpavel/verstak). Download starts automatically; install when you click Install.',
   },
 
   updates: {
+    availableTitle: 'Update available',
+    availableBody: 'Version {version} is available. Download will start automatically.',
+    pendingBody: 'Version {version} is already in the repository. The installer will appear on GitHub Releases — we will check again on next launch.',
+    availableReady: 'Version {version} has been downloaded and is ready to install.',
+    later: 'Later',
     downloadingBar: 'Downloading update v{version}… {percent}%',
     readyBar: 'Update v{version} is ready',
     install: 'Install',
+    openReleases: 'Open Releases',
   },
 
   // Model picker

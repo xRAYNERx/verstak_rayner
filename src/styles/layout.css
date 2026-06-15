@@ -5714,6 +5714,19 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   background: rgba(255,255,255,0.3);
 }
 
+.gg-update-modal-progress {
+  position: relative;
+  height: 4px;
+  margin-top: 12px;
+  border-radius: 2px;
+  background: var(--border-subtle, rgba(255,255,255,0.1));
+  overflow: hidden;
+}
+.gg-update-modal-progress .gg-update-progress {
+  position: absolute;
+  background: var(--accent, #5865f2);
+}
+
 .gg-updates-ready-row {
   display: flex;
   flex-wrap: wrap;
