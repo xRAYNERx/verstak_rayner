@@ -4,6 +4,24 @@
 
 ---
 
+## ✅ СТАТУС РЕАЛИЗАЦИИ (обновлено автономной достройкой)
+
+**Реализовано целиком (на `origin/main`, type/build/тесты зелёные):**
+- **P0 #1 Multi-agent Manager V1** — 4 фазы: миграция 16 (`agent_runs`+`agent_run_events`), запись прогонов в `ai.ts`, вкладка «Задачи», stop/resume + живой Timeline.
+- **P0 #3 Verification Artifact** — 4 фазы: ядро (`computeOverall`/HTML-рендер), tool `attest_verification` (перепрогон проверок по exitCode), персист (миграция 17), интеграция с Explicit Review (DoD-бейдж).
+- **P0 #2 Dev Task Flow** — фазы 1-4: миграция 18 (`dev_tasks`/`dev_task_checks`), git-read+write IPC (argv-форма + жёсткий денилист push/force/reset), оркестратор open/commit/buildPackage/revert/createPr, commit-planner, вкладка «Задача». *(Фаза 5 worktree/HitL сознательно пропущена — over-engineering, flow работает без неё.)*
+- **P1 #4 CLI parity** — единый `serializeHistory`, `formatToolResult` теперь учитывает `r.error`, `describeAttachments`, verify-hint для CLI.
+- **P1 #5 Crash-resume** — миграция 19 (ALTER `agent_runs`), `tick` живого прогресса, баннер возобновления **с гардом деструктива** (auto/bypass и write/run/ssh/delegate НЕ доигрываются сами).
+- **P1 #6 Review V2** — структурированные findings (severity P0-P3 / category), карточки + `file:line` reveal, «исправить выбранные» → таргетированный `ai.send`, обратная совместимость со старым ревью.
+
+**Попутно:** фикс Codex-чата (reasoning-only турн → пустой ответ при пришедшем уведомлении), `landings/` убран из репо.
+
+**Не реализовано (на потом):** Dev Task Flow Фаза 5 (worktree sandbox + HitL pause), весь P2 (РФ workflow-шаблоны, controlled memory UI, policy dashboard, SDK/headless).
+
+> Каждая фича — отдельные откатываемые коммиты. БД на миграции 19. Проверка: `npm run type && npm run test:fast`.
+
+---
+
 ## 1. Executive summary
 
 Verstak уже не MVP-чат, а **контролируемый multi-provider agent desktop**. Бо́льшая часть «продвинутых» фич конкурентов (Codex/Claude Code/Antigravity) у Verstak либо есть инфраструктурно, либо строится тонким слоем поверх уже готового — потому что фундамент заложен заранее: `run_id` на каждый `ai:send`, `audit_log`/`run_inputs`/`plan_steps` с execution-trace, sub-sessions + sub-queue + delegate/orchestrate/swarm, per-file undo/checkpoint, verify-раннер, Explicit Review, artifacts.
