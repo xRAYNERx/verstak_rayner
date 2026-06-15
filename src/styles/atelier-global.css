@@ -400,12 +400,19 @@ html.gg-atelier .gg-mode-pill:hover {
   background: color-mix(in srgb, var(--accent-muted) 50%, var(--vol-recessed-bg));
 }
 
-/* ─── Sidebar extras ─── */
+/* ─── Sidebar extras (не перебиваем shell rail/composer — там свои vol-токены) ─── */
 html.gg-atelier .gg-project-button {
   background: var(--vol-recessed-bg);
   border-color: var(--border-subtle);
   box-shadow: var(--vol-shadow-inset);
   border-radius: var(--radius-md);
+}
+
+html.gg-atelier .gg-app-atelier .gg-rail-chip-btn,
+html.gg-atelier .gg-app-atelier .gg-rail-search,
+html.gg-atelier .gg-app-atelier .gg-composer-inner {
+  background: var(--vol-recessed-bg);
+  box-shadow: var(--vol-shadow-inset);
 }
 
 html.gg-atelier .gg-project-button:hover {
