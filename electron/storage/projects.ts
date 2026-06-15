@@ -1,5 +1,6 @@
 import type { Database } from 'better-sqlite3'
 import { basename } from 'path'
+import { sortProjectsByName } from '../../src/lib/project-sort'
 
 export interface ProjectMeta {
   path: string
@@ -51,9 +52,8 @@ export function createProjects(db: Database): Projects {
       const rows = db.prepare(`
         SELECT path, name, color, icon_path as iconPath, last_opened_at as lastOpenedAt
         FROM projects
-        ORDER BY name COLLATE NOCASE ASC, path ASC
       `).all() as ProjectMeta[]
-      return rows.map(mapRow)
+      return sortProjectsByName(rows.map(mapRow))
     },
     upsert(path) {
       const now = Date.now()

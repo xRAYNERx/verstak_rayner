@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { FileNode, ChatMessage, ProjectMeta, ChatSession } from '../types/api'
+import { sortProjectsByName } from '../lib/project-sort'
 import { isModelValidForProvider } from '../hooks/useProvider'
 import {
   freshSnapshot,
@@ -227,11 +228,7 @@ let switchChatSessionToken = 0
 
 export const LAST_PROJECT_PATH_KEY = 'last_project_path'
 
-function sortProjectsByName(list: ProjectMeta[]): ProjectMeta[] {
-  return [...list].sort(
-    (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.path.localeCompare(b.path)
-  )
-}
+
 
 export const useProject = create<ProjectState>((set, get) => ({
   path: null,

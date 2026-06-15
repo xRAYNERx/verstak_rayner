@@ -165,7 +165,10 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar, onOpenProjectSetting
         <span className="gg-rail-brand-name" aria-hidden={!railExpanded}>Verstak</span>
       </div>
 
-      <div className={`gg-rail-toolbar ${railExpanded ? 'is-expanded' : ''}`}>
+      <div
+        className={`gg-rail-toolbar ${railExpanded ? 'is-expanded' : ''}`}
+        data-tool-count={showSearch ? 3 : 2}
+      >
         <button
           type="button"
           className={`gg-rail-tool ${railExpanded ? 'is-on' : ''}`}
@@ -173,12 +176,19 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar, onOpenProjectSetting
           title={railExpanded ? t.rail.collapsePanel : t.rail.expandPanel}
           aria-expanded={railExpanded}
         >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            {railExpanded ? (
-              <polyline points="15 6 9 12 15 18" />
-            ) : (
-              <polyline points="9 6 15 12 9 18" />
-            )}
+          <svg
+            className={`gg-rail-tool-chevron ${railExpanded ? 'is-expanded' : ''}`}
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <polyline points="9 6 15 12 9 18" />
           </svg>
         </button>
         <button
