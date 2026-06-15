@@ -170,18 +170,6 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar, onOpenProjectSetting
       <div className={`gg-rail-toolbar ${railExpanded ? 'is-expanded' : ''}`}>
         <button
           type="button"
-          className={`gg-rail-tool ${sidebarOpen ? 'is-on' : ''}`}
-          onClick={onToggleSidebar}
-          title={sidebarOpen ? 'Скрыть боковую панель (Ctrl+B)' : 'Показать боковую панель (Ctrl+B)'}
-          aria-pressed={sidebarOpen}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <rect x="3" y="4" width="18" height="16" rx="2" />
-            <line x1="9" y1="4" x2="9" y2="20" />
-          </svg>
-        </button>
-        <button
-          type="button"
           className={`gg-rail-tool ${railExpanded ? 'is-on' : ''}`}
           onClick={() => setRailExpanded(v => !v)}
           title={railExpanded ? t.rail.collapsePanel : t.rail.expandPanel}
@@ -193,6 +181,18 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar, onOpenProjectSetting
             ) : (
               <polyline points="9 6 15 12 9 18" />
             )}
+          </svg>
+        </button>
+        <button
+          type="button"
+          className={`gg-rail-tool ${sidebarOpen ? 'is-on' : ''}`}
+          onClick={onToggleSidebar}
+          title={sidebarOpen ? 'Скрыть боковую панель (Ctrl+B)' : 'Показать боковую панель (Ctrl+B)'}
+          aria-pressed={sidebarOpen}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <line x1="9" y1="4" x2="9" y2="20" />
           </svg>
         </button>
         {showSearch && (
