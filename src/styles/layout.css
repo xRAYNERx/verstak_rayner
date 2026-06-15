@@ -107,10 +107,11 @@ html {
   box-shadow: inset -1px 0 0 color-mix(in srgb, var(--accent) 6%, transparent);
   transition: padding var(--shell-dur) var(--shell-ease);
 }
-.gg-rail.is-expanded {
+.gg-rail.is-expanded,
+.gg-rail.is-shell-expanded {
   --rail-pad-x: 12px;
 }
-.gg-rail:not(.is-expanded) {
+.gg-rail:not(.is-shell-expanded) {
   overflow-x: visible;
 }
 .gg-rail-top {
@@ -120,7 +121,7 @@ html {
   flex-shrink: 0;
   min-height: 40px;
 }
-.gg-rail:not(.is-expanded) .gg-rail-top {
+.gg-rail:not(.is-shell-expanded) .gg-rail-top {
   justify-content: center;
 }
 .gg-rail-home {

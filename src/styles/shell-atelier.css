@@ -21,7 +21,7 @@
   --vol-lift: 0 14px 40px rgba(0, 0, 0, 0.48), 0 0 0 1px var(--border-default);
   --vol-recessed-bg: color-mix(in srgb, var(--bg-base) 60%, transparent);
   --shell-gap: 5px;
-  --shell-col-gap: 2px;
+  --shell-col-gap: 5px;
   --shell-rail-fill:
     linear-gradient(165deg, color-mix(in srgb, var(--vol-highlight) 80%, transparent) 0%, transparent 38%),
     var(--vol-glass);
@@ -42,71 +42,33 @@ body:has(.gg-app-atelier) {
   padding: var(--shell-gap);
   column-gap: var(--shell-col-gap);
   row-gap: var(--shell-gap);
-  grid-template-columns: var(--gg-rail-w) 1fr;
+  grid-template-columns: var(--gg-rail-w) 1fr var(--gg-sidebar-resize-w) var(--gg-sidebar-panel-w);
   background: transparent;
   box-sizing: border-box;
 }
 
-/* Sidebar — выезжающий drawer, не в сетке */
-.gg-sidebar-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: rgba(0, 0, 0, 0.42);
-  backdrop-filter: blur(4px);
-  cursor: pointer;
-  animation: gg-fade-in 200ms ease-out;
-}
-
-.gg-sidebar-drawer {
-  position: fixed;
-  z-index: 100;
-  top: var(--shell-gap);
-  bottom: var(--shell-gap);
-  left: calc(var(--shell-gap) + var(--gg-rail-w) + var(--shell-col-gap));
-  display: flex;
-  align-items: stretch;
-  width: min(var(--gg-sidebar-target-w), calc(100vw - var(--gg-rail-w) - 48px));
-  transform: translateX(calc(-100% - 16px));
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition:
-    transform var(--shell-dur) var(--shell-ease),
-    opacity var(--shell-dur) ease,
-    visibility var(--shell-dur);
-}
-
-.gg-sidebar-drawer.is-open {
-  transform: translateX(0);
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-}
-
-.gg-app-atelier .gg-sidebar-drawer .gg-sidebar {
-  flex: 1;
-  min-width: 0;
-  border-radius: var(--radius-xl);
-  box-shadow: var(--vol-lift);
-}
-
-.gg-app-atelier .gg-sidebar-drawer .gg-sidebar-resize {
-  width: 4px;
-  margin: 8px 0;
+.gg-app-atelier .gg-sidebar-resize {
+  border-right: none;
+  border-left: 1px solid var(--border-subtle);
   border-radius: var(--radius-pill);
-  background: transparent;
-  border: none;
-  flex-shrink: 0;
-  cursor: col-resize;
-  transition: background 180ms ease;
+  margin: 8px 0;
+  transition:
+    background 180ms ease,
+    opacity var(--shell-dur) var(--shell-ease),
+    border-color var(--shell-dur) var(--shell-ease);
 }
 
-.gg-app-atelier .gg-sidebar-drawer .gg-sidebar-resize:hover {
+.gg-app-atelier .gg-sidebar-resize:hover {
   background: var(--accent-muted);
+}
+
+.gg-app-atelier.is-sidebar-collapsed .gg-sidebar-resize {
+  border-left-color: transparent;
+}
+
+.gg-app-atelier.is-sidebar-collapsed .gg-sidebar {
+  border-left-color: transparent;
+  border-right-color: transparent;
 }
 
 /* ─── Rail: frosted column (expand anim untouched in layout.css) ─── */
@@ -225,14 +187,20 @@ body:has(.gg-app-atelier) {
   margin-top: 10px;
 }
 
-/* ─── Sidebar drawer ─── */
+/* ─── Sidebar: docked column справа (как rail слева) ─── */
 .gg-app-atelier .gg-sidebar {
   margin: 0;
   border-radius: var(--radius-xl);
   border: 1px solid var(--border-default);
+  border-right: 1px solid var(--border-default);
+  border-left: 1px solid color-mix(in srgb, var(--accent) 8%, transparent);
   background: var(--shell-rail-fill);
   backdrop-filter: var(--vol-blur);
   -webkit-backdrop-filter: var(--vol-blur);
+  box-shadow:
+    -4px 0 24px rgba(0, 0, 0, 0.32),
+    -1px 0 0 color-mix(in srgb, var(--accent) 8%, transparent),
+    var(--ring-inset);
 }
 
 .gg-app-atelier .gg-sidebar-header {
@@ -287,9 +255,16 @@ body:has(.gg-app-atelier) {
     linear-gradient(
       90deg,
       var(--shell-rail-edge) 0%,
-      color-mix(in srgb, var(--vol-glass) 90%, var(--bg-base)) 10%,
-      color-mix(in srgb, var(--vol-glass) 50%, var(--bg-base)) 24%,
-      var(--bg-base) 48%
+      color-mix(in srgb, var(--vol-glass) 96%, var(--bg-base)) 5%,
+      color-mix(in srgb, var(--vol-glass) 88%, var(--bg-base)) 10%,
+      color-mix(in srgb, var(--vol-glass) 78%, var(--bg-base)) 16%,
+      color-mix(in srgb, var(--vol-glass) 66%, var(--bg-base)) 23%,
+      color-mix(in srgb, var(--vol-glass) 52%, var(--bg-base)) 31%,
+      color-mix(in srgb, var(--vol-glass) 38%, var(--bg-base)) 40%,
+      color-mix(in srgb, var(--vol-glass) 24%, var(--bg-base)) 50%,
+      color-mix(in srgb, var(--vol-glass) 14%, var(--bg-base)) 60%,
+      color-mix(in srgb, var(--vol-glass) 6%, var(--bg-base)) 68%,
+      var(--bg-base) 76%
     );
   box-shadow: var(--vol-shadow-inset);
   overflow: hidden;

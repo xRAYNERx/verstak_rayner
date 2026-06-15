@@ -171,7 +171,7 @@ export function App() {
     function move(ev: MouseEvent) {
       if (!dragRef.current) return
       const dx = ev.clientX - dragRef.current.startX
-      latest = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, dragRef.current.startW + dx))
+      latest = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, dragRef.current.startW - dx))
       setSidebarWidth(latest)
     }
     function up() {
@@ -210,31 +210,11 @@ export function App() {
 
   return (
     <I18nContext.Provider value={getTranslations(lang)}>
-    <div className={`gg-app gg-app-atelier ${sidebarOpen ? 'is-sidebar-open' : ''}`}>
+    <div className={`gg-app gg-app-atelier ${!sidebarOpen ? 'is-sidebar-collapsed' : ''}`}>
       <ProjectRail
         onOpenProjectSettings={setProjectSettingsTarget}
         onOpenAppSettings={() => setShowSettings(true)}
       />
-      {sidebarOpen && (
-        <button
-          type="button"
-          className="gg-sidebar-backdrop"
-          onClick={() => setSidebarOpen(false)}
-          aria-label={t.rail.hideNavPanel}
-        />
-      )}
-      <div className={`gg-sidebar-drawer ${sidebarOpen ? 'is-open' : ''}`} aria-hidden={!sidebarOpen}>
-        <Sidebar
-          onOpenSettings={() => setShowSettings(true)}
-          aria-hidden={!sidebarOpen}
-        />
-        <div
-          className="gg-sidebar-resize"
-          onMouseDown={sidebarOpen ? startDrag : undefined}
-          title={t.settings.resizeDrag}
-          aria-hidden={!sidebarOpen}
-        />
-      </div>
       <main className="gg-main">
         {activeView !== 'chat' && (
           <SidebarToggleButton
@@ -311,6 +291,16 @@ export function App() {
           </div>
         )}
       </main>
+      <div
+        className="gg-sidebar-resize"
+        onMouseDown={sidebarOpen ? startDrag : undefined}
+        title={t.settings.resizeDrag}
+        aria-hidden={!sidebarOpen}
+      />
+      <Sidebar
+        onOpenSettings={() => setShowSettings(true)}
+        aria-hidden={!sidebarOpen}
+      />
       {showSettings && (
         <Settings
           initialTab={settingsInitialTab}
