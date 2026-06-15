@@ -227,6 +227,14 @@ html.gg-atelier .gg-auth-form-wrap {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-xl);
   box-shadow: var(--vol-lift);
+  padding: 28px 32px;
+}
+
+html.gg-atelier .gg-auth-tabs {
+  background: var(--vol-recessed-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--vol-shadow-inset);
 }
 
 html.gg-atelier .gg-auth-tab {
@@ -255,9 +263,22 @@ html.gg-atelier .gg-auth-input::placeholder {
   color: var(--text-tertiary);
 }
 
-html.gg-atelier .gg-auth-role-btn.is-active,
+html.gg-atelier .gg-auth-role-btn {
+  background: var(--vol-recessed-bg);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  box-shadow: var(--vol-shadow-inset);
+}
+
 html.gg-atelier .gg-auth-role-btn:hover {
   border-color: var(--accent-border);
+  color: var(--text-primary);
+}
+
+html.gg-atelier .gg-auth-role-btn.is-active {
+  background: var(--accent-muted);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 html.gg-atelier .gg-auth-submit {
