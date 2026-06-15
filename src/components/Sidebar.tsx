@@ -306,9 +306,10 @@ const MemoryIcon = (
 
 interface SidebarProps {
   onOpenSettings: () => void
+  'aria-hidden'?: boolean
 }
 
-export function Sidebar({ onOpenSettings }: SidebarProps) {
+export function Sidebar({ onOpenSettings, 'aria-hidden': ariaHidden }: SidebarProps) {
   const { path, tree, setProject, activeView, setActiveView, refreshProjectList } = useProject()
   const t = useT()
   const [showCreateClient, setShowCreateClient] = useState(false)
@@ -334,7 +335,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
   const shortPath = path ? path.replace(/^.*[\\/]/, '') : null
 
   return (
-    <aside className="gg-sidebar">
+    <aside className="gg-sidebar" aria-hidden={ariaHidden}>
       <div className="gg-sidebar-scroll">
         <div className="gg-sidebar-section">
           <div className="gg-sidebar-section-title">{t.sidebar.project}</div>

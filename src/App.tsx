@@ -189,7 +189,7 @@ export function App() {
 
   // Push width to CSS via custom property so the grid recomputes.
   useEffect(() => {
-    document.documentElement.style.setProperty('--gg-sidebar-w', `${sidebarWidth}px`)
+    document.documentElement.style.setProperty('--gg-sidebar-target-w', `${sidebarWidth}px`)
     try { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth)) } catch { /* ignore */ }
   }, [sidebarWidth])
 
@@ -216,16 +216,16 @@ export function App() {
         onOpenProjectSettings={setProjectSettingsTarget}
         onOpenAppSettings={() => setShowSettings(true)}
       />
-      {sidebarOpen && (
-        <>
-          <Sidebar onOpenSettings={() => setShowSettings(true)} />
-          <div
-            className="gg-sidebar-resize"
-            onMouseDown={startDrag}
-            title={t.settings.resizeDrag}
-          />
-        </>
-      )}
+      <Sidebar
+        onOpenSettings={() => setShowSettings(true)}
+        aria-hidden={!sidebarOpen}
+      />
+      <div
+        className="gg-sidebar-resize"
+        onMouseDown={sidebarOpen ? startDrag : undefined}
+        title={t.settings.resizeDrag}
+        aria-hidden={!sidebarOpen}
+      />
       <main className="gg-main">
         {/* Chat НЕ размонтируется при уходе на другие вкладки — иначе его
             слушатель ai:event отваливается и фоновый стрим (CLI вроде Codex)

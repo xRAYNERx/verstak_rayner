@@ -19,29 +19,58 @@
   inherits: false;
   initial-value: 34px;
 }
+@property --gg-sidebar-panel-w {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 260px;
+}
+@property --gg-sidebar-resize-w {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 4px;
+}
 :root {
-  --gg-sidebar-w: 260px;
+  --gg-sidebar-target-w: 260px;
   --gg-rail-w: 68px;
 }
 html {
   transition: --gg-rail-w 360ms cubic-bezier(0.33, 1, 0.68, 1);
 }
 .gg-app {
+  --gg-sidebar-panel-w: var(--gg-sidebar-target-w);
+  --gg-sidebar-resize-w: 4px;
+  --shell-ease: cubic-bezier(0.33, 1, 0.68, 1);
+  --shell-dur: 360ms;
   display: grid;
-  grid-template-columns: var(--gg-rail-w) var(--gg-sidebar-w) 4px 1fr;
+  grid-template-columns: var(--gg-rail-w) var(--gg-sidebar-panel-w) var(--gg-sidebar-resize-w) 1fr;
   height: 100vh;
   background: var(--bg-base);
   overflow: hidden;
-  transition: grid-template-columns 360ms cubic-bezier(0.33, 1, 0.68, 1);
+  transition:
+    grid-template-columns var(--shell-dur) var(--shell-ease),
+    --gg-sidebar-panel-w var(--shell-dur) var(--shell-ease),
+    --gg-sidebar-resize-w var(--shell-dur) var(--shell-ease);
 }
 .gg-app.is-sidebar-collapsed {
-  grid-template-columns: var(--gg-rail-w) 1fr;
+  --gg-sidebar-panel-w: 0px;
+  --gg-sidebar-resize-w: 0px;
 }
 .gg-sidebar-resize {
   cursor: col-resize;
   background: transparent;
   border-right: 1px solid var(--border-subtle);
-  transition: background 120ms ease;
+  overflow: hidden;
+  min-width: 0;
+  opacity: 1;
+  transition:
+    background 120ms ease,
+    opacity 180ms ease,
+    border-color var(--shell-dur) var(--shell-ease);
+}
+.gg-app.is-sidebar-collapsed .gg-sidebar-resize {
+  pointer-events: none;
+  opacity: 0;
+  border-right-color: transparent;
 }
 .gg-sidebar-resize:hover {
   background: var(--accent-muted);
@@ -1238,12 +1267,18 @@ html {
   .gg-rail-app-settings-label,
   .gg-rail-toolbar,
   .gg-rail-tool,
-  .gg-rail-tool-chevron {
+  .gg-rail-tool-chevron,
+  .gg-sidebar,
+  .gg-sidebar-resize {
     transition-duration: 0.01ms !important;
   }
   .gg-rail-tool {
     --tool-tx: 0px;
     --tool-ty: 0px;
+  }
+  .gg-app.is-sidebar-collapsed {
+    --gg-sidebar-panel-w: 0px;
+    --gg-sidebar-resize-w: 0px;
   }
 }
 
@@ -1254,6 +1289,24 @@ html {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity 220ms ease 60ms,
+    visibility 0ms linear 0ms,
+    border-color var(--shell-dur) var(--shell-ease);
+}
+.gg-app.is-sidebar-collapsed .gg-sidebar {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  border-right-color: transparent;
+  transition:
+    opacity 160ms ease,
+    visibility 0ms linear var(--shell-dur),
+    border-color var(--shell-dur) var(--shell-ease);
 }
 .gg-sidebar-header {
   padding: 14px 14px 12px;
