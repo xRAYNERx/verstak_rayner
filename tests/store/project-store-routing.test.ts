@@ -213,7 +213,7 @@ describe('cleanupReviewsFor — дренаж review-owners при удалени
     useProject.getState().registerSendOwner(3, { kind: 'chat', chatId: 20 })
     useProject.setState({
       reviews: {
-        55: { reviewChatId: 55, parentChatId: 10, providerId: 'grok', model: null, content: '', status: 'streaming', createdAt: 1, noteCount: -1 }
+        55: { reviewChatId: 55, parentChatId: 10, providerId: 'grok', model: null, content: '', status: 'streaming', createdAt: 1, noteCount: -1, findings: [], accepted: [] }
       }
     }, false)
 

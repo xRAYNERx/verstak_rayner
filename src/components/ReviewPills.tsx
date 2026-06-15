@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useProject } from '../store/projectStore'
 import { Markdown } from './Markdown'
+import { composeFixPrompt, type ReviewFinding, type FindingSeverity } from '../lib/review-findings'
 import type { VerificationRow } from '../types/api'
 
 /**
@@ -82,6 +83,7 @@ export function ReviewPanel() {
   const isStreaming = useProject(s => s.isStreaming)
   const setStreaming = useProject(s => s.setStreaming)
   const registerSendOwner = useProject(s => s.registerSendOwner)
+  const toggleFinding = useProject(s => s.toggleFinding)
 
   // DoD-бейдж (Фаза 4): latest-верификация текущего чата рядом с ревью — чтобы
   // было видно доказательство, которое ревьюер сверял. Подтягиваем при открытии
@@ -132,6 +134,51 @@ export function ReviewPanel() {
     toggleReviewPanel(null)
   }
 
+  // V2: «Исправить выбранные» — собирает принятые findings в таргетированный
+  // промпт и отправляет в ОСНОВНОЙ чат. Та же guard-логика, что и forwardToChat
+  // (чат не должен стримить, ревью должно быть завершено).
+  async function fixSelected() {
+    if (!review || !path || activeChatId == null) return
+    if (review.status !== 'done') {
+      window.alert('Ревью ещё не завершилось — подожди немного и попробуй снова.')
+      return
+    }
+    if (useProject.getState().isStreaming) {
+      window.alert('Основной чат сейчас отвечает. Подожди завершения и попробуй снова.')
+      return
+    }
+    const chosen = review.findings.filter(f => review.accepted.includes(f.id))
+    if (chosen.length === 0) {
+      window.alert('Не выбрано ни одного замечания. Отметь галочками те, что нужно исправить.')
+      return
+    }
+    const prompt = composeFixPrompt(chosen)
+    addMessage({ role: 'user', content: prompt })
+    void window.api.chats.append(activeChatId, path, 'user', prompt).catch(() => {})
+    void window.api.journal.append(path, 'note',
+      `✓ Исправить выбранные замечания ревью (${chosen.length})`,
+      prompt.length > 300 ? prompt.slice(0, 300) + '…' : prompt)
+    addMessage({ role: 'assistant', content: '' })
+    setStreaming(true)
+    const allMessages = [...useProject.getState().messages].slice(0, -1)
+    const sendId = await window.api.ai.send(allMessages, path)
+    registerSendOwner(sendId, { kind: 'chat', chatId: activeChatId })
+    toggleReviewPanel(null)
+  }
+
+  // file:line → reveal в проводнике. Путь finding относителен корня проекта;
+  // склеиваем с project root (revealInExplorer требует путь внутри known roots).
+  function revealFinding(f: ReviewFinding) {
+    if (!path || !f.file || f.file === '(не указан)') return
+    const sep = path.includes('\\') ? '\\' : '/'
+    const rel = f.file.replace(/[/\\]+/g, sep).replace(/^[/\\]+/, '')
+    const abs = `${path}${sep}${rel}`
+    void window.api.files.revealInExplorer(abs).catch(() => {})
+  }
+
+  const findings = review.findings
+  const acceptedCount = review.accepted.length
+
   return (
     <div className="gg-review-panel">
       <div className="gg-review-panel-header">
@@ -153,17 +200,44 @@ export function ReviewPanel() {
       <div className="gg-review-panel-body">
         {review.status === 'error' ? (
           <div className="gg-review-error-msg">{review.errorMessage ?? 'Неизвестная ошибка'}</div>
+        ) : findings.length > 0 ? (
+          // V2: карточки findings по severity.
+          <ul className="gg-finding-list">
+            {findings.map(f => (
+              <FindingCard
+                key={f.id}
+                finding={f}
+                accepted={review.accepted.includes(f.id)}
+                onToggle={() => toggleFinding(review.reviewChatId, f.id)}
+                onReveal={() => revealFinding(f)}
+              />
+            ))}
+          </ul>
         ) : review.content ? (
+          // Старый текстовый ревью без json-блока — как раньше, markdown.
           <Markdown text={review.content} />
         ) : (
           <div className="gg-review-empty">Ревью загружается…</div>
         )}
       </div>
-      {review.status === 'done' && review.content && (
+      {review.status === 'done' && (review.content || findings.length > 0) && (
         <div className="gg-review-panel-actions">
+          {findings.length > 0 && (
+            <button
+              type="button"
+              className="gg-btn gg-btn-primary"
+              onClick={() => void fixSelected()}
+              disabled={isStreaming || acceptedCount === 0}
+              title={isStreaming
+                ? 'Основной чат отвечает — дождись завершения'
+                : acceptedCount === 0 ? 'Отметь замечания галочками' : ''}
+            >
+              ✓ Исправить выбранные ({acceptedCount})
+            </button>
+          )}
           <button
             type="button"
-            className="gg-btn gg-btn-primary"
+            className={findings.length > 0 ? 'gg-btn' : 'gg-btn gg-btn-primary'}
             onClick={() => void forwardToChat()}
             disabled={isStreaming}
             title={isStreaming ? 'Основной чат отвечает — дождись завершения' : ''}
@@ -173,12 +247,76 @@ export function ReviewPanel() {
           <span className="gg-review-panel-hint">
             {isStreaming
               ? 'Жди завершения текущего ответа основного чата'
-              : 'Отправит текст ревью в основной чат — модель сама решит что с ним делать'}
+              : findings.length > 0
+                ? 'Отметь нужные замечания и нажми «Исправить выбранные» — фикс уйдёт точечно'
+                : 'Отправит текст ревью в основной чат — модель сама решит что с ним делать'}
           </span>
         </div>
       )}
     </div>
   )
+}
+
+/** Одна карточка finding: severity-бейдж + category + title + file:line + чекбокс. */
+function FindingCard(props: {
+  finding: ReviewFinding
+  accepted: boolean
+  onToggle: () => void
+  onReveal: () => void
+}) {
+  const { finding: f, accepted, onToggle, onReveal } = props
+  const [expanded, setExpanded] = useState(false)
+  const hasFile = !!f.file && f.file !== '(не указан)'
+  const loc = f.line > 0 ? `${f.file}:${f.line}` : f.file
+  return (
+    <li className={`gg-finding gg-finding-${severityClass(f.severity)} ${accepted ? 'is-accepted' : ''}`}>
+      <label className="gg-finding-check">
+        <input type="checkbox" checked={accepted} onChange={onToggle} />
+      </label>
+      <div className="gg-finding-main">
+        <div className="gg-finding-head">
+          <span className={`gg-finding-sev gg-finding-sev-${severityClass(f.severity)}`}>{f.severity}</span>
+          <span className="gg-finding-cat">{f.category}</span>
+          <span className="gg-finding-title">{f.title}</span>
+        </div>
+        <div className="gg-finding-meta">
+          {hasFile && (
+            <button
+              type="button"
+              className="gg-finding-loc"
+              onClick={onReveal}
+              title="Открыть файл в проводнике"
+            >{loc}</button>
+          )}
+          {f.detail && (
+            <button
+              type="button"
+              className="gg-finding-toggle"
+              onClick={() => setExpanded(v => !v)}
+            >{expanded ? 'свернуть' : 'подробнее'}</button>
+          )}
+        </div>
+        {expanded && f.detail && (
+          <div className="gg-finding-detail">
+            <div>{f.detail}</div>
+            {f.suggestedFix && (
+              <div className="gg-finding-fix"><b>Фикс:</b> {f.suggestedFix}</div>
+            )}
+          </div>
+        )}
+      </div>
+    </li>
+  )
+}
+
+/** severity → css-суффикс (для цвета карточки). */
+function severityClass(sev: FindingSeverity): string {
+  switch (sev) {
+    case 'P0': return 'p0'
+    case 'P1': return 'p1'
+    case 'P2': return 'p2'
+    default: return 'p3'
+  }
 }
 
 function plural(n: number, one: string, few: string, many: string): string {

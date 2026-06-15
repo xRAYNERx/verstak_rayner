@@ -4302,6 +4302,102 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   font-size: var(--text-xs);
 }
 
+/* ----------------------------------------------------------------------
+   Review V2 — карточки findings (severity/category) в ReviewPanel.
+   ---------------------------------------------------------------------- */
+.gg-finding-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gg-finding {
+  display: flex;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  border-left-width: 3px;
+  background: var(--bg-base);
+}
+.gg-finding.is-accepted {
+  background: var(--accent-muted);
+  border-color: var(--accent-border);
+}
+.gg-finding-p0 { border-left-color: var(--error); }
+.gg-finding-p1 { border-left-color: var(--warning); }
+.gg-finding-p2 { border-left-color: var(--text-tertiary); }
+.gg-finding-p3 { border-left-color: var(--border-default); }
+.gg-finding-check {
+  display: flex;
+  align-items: flex-start;
+  padding-top: 1px;
+  cursor: pointer;
+}
+.gg-finding-main { flex: 1; min-width: 0; }
+.gg-finding-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.gg-finding-sev {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 5px;
+  color: #fff;
+}
+.gg-finding-sev-p0 { background: var(--error); }
+.gg-finding-sev-p1 { background: var(--warning); color: #1a1a1a; }
+.gg-finding-sev-p2 { background: var(--text-tertiary); }
+.gg-finding-sev-p3 { background: var(--border-default); color: var(--text-secondary); }
+.gg-finding-cat {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.gg-finding-title {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.gg-finding-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+.gg-finding-loc {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs);
+  color: var(--accent);
+  text-decoration: none;
+}
+.gg-finding-loc:hover { text-decoration: underline; }
+.gg-finding-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+.gg-finding-toggle:hover { color: var(--text-secondary); }
+.gg-finding-detail {
+  margin-top: 6px;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.gg-finding-fix { margin-top: 4px; }
+
 /* ======================================================================
    Auto Cross-Verify pill — показывается под ответом агента когда другой
    провайдер автоматически проверил изменённые файлы.

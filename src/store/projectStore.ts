@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { FileNode, ChatMessage, ProjectMeta, ChatSession, DevTask, ResumableRun } from '../types/api'
 import { isModelValidForProvider } from '../hooks/useProvider'
+import { parseReviewFindings, type ReviewFinding } from '../lib/review-findings'
 import {
   freshSnapshot,
   TOUCH_PRIORITY,
@@ -75,6 +76,11 @@ export interface ReviewState {
   createdAt: number
   /** Парсится из первой строки «ЗАМЕЧАНИЙ: N». -1 пока стримится. */
   noteCount: number
+  /** V2: структурированные findings, распарсенные из ```json блока content на
+   *  finalizeReview. Пусто для старого текстового ревью без json-блока. */
+  findings: ReviewFinding[]
+  /** V2: id принятых пользователем findings (для «исправить выбранные»). */
+  accepted: string[]
 }
 
 interface ProjectState {
@@ -217,8 +223,10 @@ interface ProjectState {
   }) => Promise<number | null>
   /** Обновить накопленный текст ревью (text event). */
   appendReviewContent: (reviewChatId: number, text: string) => void
-  /** Финализировать ревью: парсит noteCount, status='done'. */
+  /** Финализировать ревью: парсит noteCount + findings, status='done'. */
   finalizeReview: (reviewChatId: number) => void
+  /** V2: переключить «принято» для одного finding по id. */
+  toggleFinding: (reviewChatId: number, findingId: string) => void
   /** Помечает ревью как failed. */
   failReview: (reviewChatId: number, message: string) => void
   /** Раскрыть/свернуть review panel. */
@@ -753,7 +761,9 @@ export const useProject = create<ProjectState>((set, get) => ({
             // остаётся для аудита).
             status: 'done',
             createdAt: r.createdAt,
-            noteCount: -1
+            noteCount: -1,
+            findings: [],
+            accepted: []
           }
         }
         return { reviews: next }
@@ -794,7 +804,9 @@ export const useProject = create<ProjectState>((set, get) => ({
           content: '',
           status: 'streaming' as const,
           createdAt: Date.now(),
-          noteCount: -1
+          noteCount: -1,
+          findings: [],
+          accepted: []
         }
       }
     }))
@@ -845,11 +857,22 @@ export const useProject = create<ProjectState>((set, get) => ({
   finalizeReview: (reviewChatId) => set(s => {
     const r = s.reviews[reviewChatId]
     if (!r) return {}
-    // Парсим «ЗАМЕЧАНИЙ: N» из первой строки.
+    // Парсим «ЗАМЕЧАНИЙ: N» из первой строки (V1, на нём завязан pill noteCount).
     const firstLine = r.content.split('\n', 1)[0] ?? ''
     const m = firstLine.match(/ЗАМЕЧАНИЙ:\s*(\d+)/i)
     const noteCount = m ? parseInt(m[1], 10) : -1
-    return { reviews: { ...s.reviews, [reviewChatId]: { ...r, status: 'done', noteCount } } }
+    // V2: вытаскиваем структурированные findings из ```json блока (fallback на
+    // старый текстовый формат внутри parseReviewFindings).
+    const findings = parseReviewFindings(r.content)
+    return { reviews: { ...s.reviews, [reviewChatId]: { ...r, status: 'done', noteCount, findings } } }
+  }),
+  toggleFinding: (reviewChatId, findingId) => set(s => {
+    const r = s.reviews[reviewChatId]
+    if (!r) return {}
+    const accepted = r.accepted.includes(findingId)
+      ? r.accepted.filter(id => id !== findingId)
+      : [...r.accepted, findingId]
+    return { reviews: { ...s.reviews, [reviewChatId]: { ...r, accepted } } }
   }),
   failReview: (reviewChatId, message) => set(s => {
     const r = s.reviews[reviewChatId]
