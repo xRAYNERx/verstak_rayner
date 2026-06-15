@@ -12,7 +12,7 @@ export function Terminal() {
     if (!ref.current || !path) return
     const term = new XTerm({
       fontSize: 12,
-      fontFamily: '"Geist Mono", "JetBrains Mono", "SF Mono", Menlo, monospace',
+      fontFamily: '"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace',
       theme: {
         background: '#0a0b0d',
         foreground: '#e6e8ec',

@@ -113,6 +113,7 @@ html {
 }
 .gg-rail:not(.is-shell-expanded) {
   overflow-x: visible;
+  padding-right: 10px;
 }
 .gg-rail-top {
   display: flex;
@@ -382,13 +383,12 @@ html {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  overflow-x: clip;
+  overflow-x: visible;
   scrollbar-gutter: stable;
 }
 .gg-rail:not(.is-shell-expanded) .gg-rail-list {
-  padding: 4px 0 6px;
+  padding: 4px 2px 6px 0;
   gap: 5px;
-  overflow-x: visible;
   scrollbar-gutter: auto;
 }
 .gg-rail.is-shell-expanded .gg-rail-list {
@@ -533,14 +533,16 @@ html {
   overflow: hidden;
   white-space: nowrap;
   max-width: 0;
-  transition: opacity calc(var(--shell-dur) * 1.15) var(--shell-ease);
+  transition:
+    opacity calc(var(--shell-dur) * 1.1) var(--shell-ease),
+    max-width var(--shell-dur) var(--shell-ease) calc(var(--shell-dur) * 0.5);
 }
 .gg-rail-chip.is-expanded .gg-rail-chip-text {
   opacity: 1;
   max-width: 180px;
   transition:
-    opacity calc(var(--shell-dur) * 1.15) var(--shell-ease) 60ms,
-    max-width var(--shell-dur) var(--shell-ease) 60ms;
+    opacity calc(var(--shell-dur) * 1.05) var(--shell-ease),
+    max-width var(--shell-dur) var(--shell-ease);
 }
 .gg-rail-label {
   display: block;
@@ -1088,6 +1090,7 @@ html {
   padding: 0;
   align-self: center;
   margin-inline: auto;
+  margin-top: 2px;
 }
 .gg-rail.is-shell-expanded .gg-rail-add {
   width: 100%;
@@ -1112,6 +1115,7 @@ html {
   font-size: 20px;
   font-weight: 400;
   line-height: 1;
+  transform: translateY(-2px);
 }
 .gg-rail-add-label {
   font-size: var(--text-sm);
@@ -2545,10 +2549,6 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   box-shadow: var(--shadow-sm);
   transition: background 150ms ease, box-shadow 150ms ease;
 }
-.gg-models-card.is-active-provider {
-  background: color-mix(in srgb, var(--accent-muted, var(--accent)) 14%, var(--bg-elevated));
-  box-shadow: inset 3px 0 0 var(--accent);
-}
 .gg-models-card.is-locked { opacity: 0.92; }
 .gg-models-card-head {
   display: flex;
@@ -2579,10 +2579,7 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   border: 1px solid var(--border-default);
   color: var(--text-tertiary);
 }
-.gg-models-card-transport.is-cli {
-  color: var(--accent);
-  border-color: var(--accent-muted, var(--accent));
-}
+
 .gg-models-card-active {
   font-size: 10px;
   font-weight: 700;
@@ -2696,29 +2693,30 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   border-top: 1px solid var(--border-default);
 }
 .gg-models-row-main {
+  position: relative;
   flex: 1; min-width: 0;
   display: flex; align-items: center; gap: 10px;
   background: transparent; border: none;
-  padding: 4px 6px;
+  padding: 4px 6px 4px 12px;
   cursor: pointer;
   text-align: left;
   border-radius: var(--radius-sm, 4px);
   transition: background 100ms ease;
 }
 .gg-models-row-main:hover { background: var(--bg-hover); }
-.gg-models-row.is-default {
-  background: color-mix(in srgb, var(--accent-muted) 55%, var(--bg-elevated));
-  border-radius: var(--radius-md);
-  box-shadow:
-    inset 0 0 0 1px var(--accent-border),
-    inset 3px 0 0 var(--accent);
+.gg-models-row.is-default .gg-models-row-main::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 5px;
+  bottom: 5px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 65%, transparent);
 }
 .gg-models-row.is-default .gg-models-row-main:hover {
-  background: color-mix(in srgb, var(--accent-muted) 70%, var(--bg-elevated));
-}
-.gg-models-row.is-default .gg-models-row-name {
-  color: var(--accent);
-  font-weight: 600;
+  background: var(--bg-hover);
 }
 .gg-models-row-name {
   font-family: var(--font-mono);

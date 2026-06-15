@@ -127,6 +127,7 @@
     "@anthropic-ai/sdk": "^0.97.0",
     "@fontsource/geist-mono": "^5.2.8",
     "@fontsource/geist-sans": "^5.2.5",
+    "@fontsource/inter": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@google/genai": "^2.4.0",
     "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",

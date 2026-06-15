@@ -134,15 +134,12 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
   useEffect(() => {
     if (railExpanded) {
       setShellExpanded(true)
-      const id = window.setTimeout(() => setContentExpanded(true), SHELL_MS)
-      return () => clearTimeout(id)
+      setContentExpanded(true)
+      return
     }
+    setContentExpanded(false)
     const shellId = window.setTimeout(() => setShellExpanded(false), SHELL_MS)
-    const contentId = window.setTimeout(() => setContentExpanded(false), SHELL_MS)
-    return () => {
-      clearTimeout(shellId)
-      clearTimeout(contentId)
-    }
+    return () => clearTimeout(shellId)
   }, [railExpanded])
 
   useEffect(() => {

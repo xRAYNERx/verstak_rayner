@@ -14,8 +14,8 @@ export interface ThemeMeta {
 
 /** Single source of truth for the picker. Colours mirror theme.css. */
 export const THEMES: ThemeMeta[] = [
-  { id: 'nord', label: 'Тёмный', light: false, swatch: ['#2e3440', '#3b4252', '#88c0d0'] },
-  { id: 'light', label: 'Светлый', light: true, swatch: ['#ffffff', '#eef0f4', '#3a6ee8'] },
+  { id: 'nord', label: 'Тёмная', light: false, swatch: ['#2e3440', '#3b4252', '#88c0d0'] },
+  { id: 'light', label: 'Светлая', light: true, swatch: ['#ffffff', '#eef0f4', '#3a6ee8'] },
 ]
 
 const VALID = new Set<ThemeId>(THEMES.map(t => t.id))

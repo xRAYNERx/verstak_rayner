@@ -2768,7 +2768,7 @@ function ModelsPage(props: ModelsPageProps) {
           return (
             <div
               key={p.id}
-              className={`gg-models-card ${authorized ? 'is-ready' : 'is-locked'} ${isActiveProvider ? 'is-active-provider' : ''}`}
+              className={`gg-models-card ${authorized ? 'is-ready' : 'is-locked'}`}
             >
               <div className="gg-models-card-head">
                 <div className="gg-models-card-title">
@@ -2816,7 +2816,7 @@ function ModelsPage(props: ModelsPageProps) {
                     const enabled = enabledModels.has(e.key)
                     const isDefault = activeProvider === p.id && (models[p.id] ?? p.defaultModel) === e.model
                     return (
-                      <div key={e.key} className={`gg-models-row ${enabled ? 'is-on' : ''} ${isDefault ? 'is-default' : ''}`}>
+                      <div key={e.key} className={`gg-models-row ${isDefault ? 'is-default' : ''}`}>
                         <button
                           type="button"
                           className="gg-models-row-main"
