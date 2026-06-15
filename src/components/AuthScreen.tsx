@@ -4,6 +4,7 @@ import type { Lang } from '../i18n'
 import authBgUrl from '../assets/auth-bg.webp'
 import authVideoUrl from '../assets/auth-bg.mp4'
 import type { DetectedCli, DetectedLocalServer } from '../types/api'
+import { initEmptyEnabledModelsIfUnset, seedEnabledModelsIfUnset } from '../lib/enabled-models'
 
 /**
  * AuthScreen — экран регистрации/входа. Показывается ПЕРЕД основным приложением
@@ -115,6 +116,7 @@ export function AuthScreen({ onComplete, onLangChange }: Props) {
   async function activateProvider(provider: string, model: string) {
     await window.api.settings.setKey('provider', provider)
     await window.api.settings.setKey(`model_${provider}`, model)
+    await seedEnabledModelsIfUnset(provider, model)
     await window.api.settings.setKey('auth_completed', 'true')
     await window.api.settings.setKey('onboarding_completed', '1')
   }
@@ -177,6 +179,7 @@ export function AuthScreen({ onComplete, onLangChange }: Props) {
       await window.api.userProfiles.setActive(profile.id)
       await window.api.settings.setKey('provider', preset.provider)
       await window.api.settings.setKey(`model_${preset.provider}`, preset.model)
+      await initEmptyEnabledModelsIfUnset()
       await window.api.settings.setKey('auth_completed', 'true')
       await window.api.settings.setKey('onboarding_completed', '1')
       doLeave()

@@ -1,4 +1,5 @@
-import { app, BrowserWindow, safeStorage, session, dialog } from 'electron'
+import { app, BrowserWindow, safeStorage, session, dialog, protocol, net } from 'electron'
+import { pathToFileURL } from 'url'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { mkdirSync } from 'fs'
@@ -60,13 +61,21 @@ import { saveRunInput } from './storage/run-inputs'
 import { trackToolForPatterns } from './ai/procedural-memory'
 import { registerSuggestionsIpc } from './ipc/suggestions'
 import { initAutoUpdater } from './updater'
+import { registerNotifyIpc } from './ipc/notify'
+import { bindUiScaleToWindow } from './ui-scale'
+import {
+  mainWindowConstructorOptions,
+  readMainWindowState,
+  trackMainWindowState
+} from './window-state'
+import type { Settings } from './storage/settings'
 
-function createWindow(): BrowserWindow {
+function createWindow(settings: Settings): BrowserWindow {
   // HERE = out/main in dev and prod
   const iconPath = join(HERE, '../../resources/icon.png')
+  const windowState = readMainWindowState(settings)
   const win = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    ...mainWindowConstructorOptions(windowState),
     title: 'Verstak',
     icon: iconPath,
     webPreferences: {
@@ -84,6 +93,8 @@ function createWindow(): BrowserWindow {
       webviewTag: true  // Allow <webview> for the in-app browser
     }
   })
+
+  trackMainWindowState(win, settings, windowState)
 
   if (process.env.ELECTRON_RENDERER_URL) {
     win.loadURL(process.env.ELECTRON_RENDERER_URL)
@@ -125,7 +136,7 @@ function installCSP(): void {
     "script-src 'self'",
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",
-    "img-src 'self' data: blob:",
+    "img-src 'self' data: blob: gg-project-icon:",
     "connect-src 'self' https:",
     "frame-src 'none'",
     "object-src 'none'",
@@ -148,7 +159,20 @@ if (process.platform === 'win32') {
   app.setAppUserModelId('ru.verstak.ide')
 }
 
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'gg-project-icon',
+    privileges: { standard: true, secure: true, supportFetchAPI: true, bypassCSP: true }
+  }
+])
+
 app.whenReady().then(() => {
+  protocol.handle('gg-project-icon', (request) => {
+    const prefix = 'gg-project-icon://local/'
+    if (!request.url.startsWith(prefix)) return new Response(null, { status: 404 })
+    const filePath = decodeURIComponent(request.url.slice(prefix.length))
+    return net.fetch(pathToFileURL(filePath).href)
+  })
   installCSP()
   installMediaPermissions()
   const dir = join(app.getPath('userData'), 'storage')
@@ -336,7 +360,10 @@ app.whenReady().then(() => {
   registerAuditIpc(db)
   registerDebugIpc(db, chats)
   registerSuggestionsIpc(db)
-  const mainWindow = createWindow()
+  const mainWindow = createWindow(settings)
+  const iconPath = join(HERE, '../../resources/icon.png')
+  registerNotifyIpc(() => mainWindow, iconPath)
+  bindUiScaleToWindow(mainWindow, settings)
 
   if (!process.env.VITE_DEV_SERVER_URL) {
     // Авто-обновления только в production (не в npm run dev)

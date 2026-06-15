@@ -1,118 +1,233 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useProvider, type ProviderId } from '../hooks/useProvider'
 import { useProject } from '../store/projectStore'
 import { useT } from '../i18n'
+import type { ProviderDescriptorDTO } from '../types/api'
+import {
+  isProviderAuthorized,
+  type CliAuthId,
+  type CliAuthStatus,
+} from '../lib/model-catalog'
 
-interface ProviderOption {
-  id: ProviderId
-  label: string
-  description: string
-}
-
-// CLI-провайдеры помечены (beta) с явным tooltip'ом.
-// Не скрываем — пользователь может ими пользоваться — но даём сигнал что они
-// требуют локальной установки CLI и иногда падают (особенно grok-cli на Windows).
 const CLI_BETA_HINT = 'CLI-провайдеры требуют локальной установки. Если агент не отвечает — переключитесь на API-версию.'
 
-const PROVIDER_OPTIONS: ProviderOption[] = [
-  { id: 'gemini-api', label: 'Gemini',             description: 'API · с tools' },
-  { id: 'gemini-cli', label: 'Gemini Ultra (beta)', description: 'CLI · подписка' },
-  { id: 'claude',     label: 'Claude',             description: 'API · с tools' },
-  { id: 'claude-cli', label: 'Claude Code (beta)', description: 'CLI · Pro/Max подписка' },
-  { id: 'grok',       label: 'Grok',               description: 'API · с tools' },
-  { id: 'grok-cli',   label: 'Grok Build (beta)',  description: 'CLI · SuperGrok подписка' },
-  { id: 'openai',     label: 'ChatGPT',            description: 'API · с tools' },
-  { id: 'codex-cli',  label: 'Codex (beta)',       description: 'CLI · Plus подписка' },
-  { id: 'yandex-gpt', label: 'YandexGPT 🇷🇺',     description: 'API · 152-ФЗ' },
-  { id: 'gigachat',   label: 'GigaChat 🇷🇺',       description: 'API · 152-ФЗ' },
-]
+type CliStatusMap = Partial<Record<CliAuthId, CliAuthStatus>>
 
-// Секретный ключ для каждого API-провайдера. CLI-провайдеры = null (не нужен).
-// null-ключ = провайдер считается «всегда настроен» (ollama, CLI).
-const API_SECRET_KEY: Partial<Record<ProviderId, string>> = {
-  'gemini-api':   'gemini_api_key',
-  'claude':       'anthropic_api_key',
-  'grok':         'xai_api_key',
-  'openai':       'openai_api_key',
-  'yandex-gpt':   'yandex_api_key',
-  'gigachat':     'gigachat_client_id',
+interface PickerEntry {
+  providerId: ProviderId
+  providerLabel: string
+  model: string
+  transport: 'API' | 'CLI'
+  authorized: boolean
+  enabled: boolean
+  isCurrent: boolean
+  sortRank: number
 }
 
 interface Props {
   onOpenSettings: () => void
+  /** pill — в composer; footer — нижний левый угол sidebar */
+  variant?: 'pill' | 'footer'
 }
 
-export function ModelPicker({ onOpenSettings }: Props) {
+function modelKey(providerId: string, model: string): string {
+  return `${providerId}::${model}`
+}
+
+function isCliProvider(id: string): boolean {
+  return id.endsWith('-cli')
+}
+
+function shortModel(m: string): string {
+  if (m === 'auto') return 'auto'
+  const dateMatch = m.match(/(.*)-\d{8}$/)
+  if (dateMatch) return dateMatch[1]
+  return m
+}
+
+function buildPickerEntries(
+  providers: ProviderDescriptorDTO[],
+  enabledModels: Set<string>,
+  authorizedIds: Set<ProviderId>,
+  currentProviderId: ProviderId,
+  currentModel: string,
+  storedModels: Record<string, string>,
+): PickerEntry[] {
+  const entries: PickerEntry[] = []
+
+  for (const p of providers) {
+    const pid = p.id as ProviderId
+    const authorized = authorizedIds.has(pid)
+    const label = p.shortLabel || p.name
+    const models = p.models.length > 0 ? p.models : [storedModels[pid] || p.defaultModel || ''].filter(Boolean)
+
+    if (!authorized) {
+      const model = storedModels[pid] || p.defaultModel || models[0] || '—'
+      entries.push({
+        providerId: pid,
+        providerLabel: label,
+        model,
+        transport: p.transport,
+        authorized: false,
+        enabled: false,
+        isCurrent: pid === currentProviderId,
+        sortRank: 0,
+      })
+      continue
+    }
+
+    const visibleModels = models.filter(m => {
+      const key = modelKey(pid, m)
+      return enabledModels.has(key) || (pid === currentProviderId && m === currentModel)
+    })
+
+    const list = visibleModels.length > 0 ? visibleModels : models.slice(0, 1)
+    for (const m of list) {
+      const enabled = enabledModels.has(modelKey(pid, m))
+      const isCurrent = pid === currentProviderId && m === currentModel
+      let sortRank = 10
+      if (isCurrent) sortRank = 100
+      else if (enabled) sortRank = 50
+      entries.push({
+        providerId: pid,
+        providerLabel: label,
+        model: m,
+        transport: p.transport,
+        authorized: true,
+        enabled,
+        isCurrent,
+        sortRank,
+      })
+    }
+  }
+
+  return entries.sort((a, b) => {
+    if (b.sortRank !== a.sortRank) return b.sortRank - a.sortRank
+    const prov = a.providerLabel.localeCompare(b.providerLabel, 'ru')
+    if (prov !== 0) return prov
+    return a.model.localeCompare(b.model, 'ru')
+  })
+}
+
+export function ModelPicker({ onOpenSettings, variant = 'pill' }: Props) {
   const t = useT()
   const provider = useProvider()
   const activeChatId = useProject(s => s.activeChatId)
   const refreshChatSessions = useProject(s => s.refreshChatSessions)
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
-  // enabled_models — управляется в Settings → Модели через toggle. Хранится
-  // как JSON-массив ключей `providerId::model`. null = «фильтрация выключена,
-  // показывать всё» (дефолт при первом запуске). Загружаем при открытии
-  // popover'а — settings меняются редко, попадаем туда не часто.
-  const [enabledModels, setEnabledModels] = useState<Set<string> | null>(null)
-  // configuredIds: провайдеры у которых задан API-ключ (или CLI — они не требуют).
-  // Загружается при открытии пикера параллельно с enabled_models.
-  const [configuredIds, setConfiguredIds] = useState<Set<ProviderId>>(new Set())
+  const [providers, setProviders] = useState<ProviderDescriptorDTO[]>([])
+  const [enabledModels, setEnabledModels] = useState<Set<string>>(new Set())
+  const [authorizedIds, setAuthorizedIds] = useState<Set<ProviderId>>(new Set())
+  const [storedModels, setStoredModels] = useState<Record<string, string>>({})
+  const [currentAuthorized, setCurrentAuthorized] = useState(true)
 
   useEffect(() => {
-    if (!open) return
     let cancelled = false
     void (async () => {
       try {
-        // Загружаем enabled_models и ключи всех API-провайдеров параллельно
-        const secretEntries = Object.entries(API_SECRET_KEY) as [ProviderId, string][]
-        const [rawEnabled, ...keyValues] = await Promise.all([
+        const list = await window.api.providers.list()
+        if (cancelled) return
+        setProviders(list)
+
+        const [rawEnabled, rawCustomUrl, cliStatus, ...rest] = await Promise.all([
           window.api.settings.getKey('enabled_models'),
-          ...secretEntries.map(([, k]) => window.api.settings.getKey(k))
+          window.api.settings.getKey('custom_openai_baseurl'),
+          window.api.cliAuth.statusAll().catch(() => null as CliStatusMap | null),
+          ...list.map(async p => {
+            const keyVal = p.secretKey ? await window.api.settings.getKey(p.secretKey) : null
+            const modelVal = await window.api.settings.getKey(`model_${p.id}`)
+            return { id: p.id, keyVal, modelVal }
+          }),
         ])
         if (cancelled) return
 
-        // enabled_models
+        const keys: Record<string, string> = {}
+        const models: Record<string, string> = {}
+        for (const p of list) {
+          if (p.secretKey) keys[p.secretKey] = ''
+        }
+        rest.forEach((row, i) => {
+          const p = list[i]
+          if (p.secretKey && row.keyVal) keys[p.secretKey] = row.keyVal
+          if (row.modelVal) models[p.id] = row.modelVal
+        })
+
         if (!rawEnabled) {
-          setEnabledModels(null)
+          const pid = (await window.api.settings.getKey('provider')) ?? 'gemini-api'
+          const m = (await window.api.settings.getKey(`model_${pid}`)) ?? 'auto'
+          setEnabledModels(new Set([modelKey(pid, m)]))
         } else {
           const arr = JSON.parse(rawEnabled) as string[]
-          setEnabledModels(Array.isArray(arr) && arr.length > 0 ? new Set(arr) : null)
+          setEnabledModels(new Set(Array.isArray(arr) ? arr : []))
         }
 
-        // configuredIds: CLI-провайдеры всегда считаем настроенными
-        const configured = new Set<ProviderId>(
-          PROVIDER_OPTIONS.filter(p => p.id.endsWith('-cli') || !(p.id in API_SECRET_KEY)).map(p => p.id)
-        )
-        secretEntries.forEach(([pid], i) => {
-          if (keyValues[i]) configured.add(pid)
-        })
-        setConfiguredIds(configured)
-      } catch { if (!cancelled) setEnabledModels(null) }
+        const authorized = new Set<ProviderId>()
+        for (const p of list) {
+          const lite = {
+            id: p.id as ProviderId,
+            name: p.name,
+            transport: p.transport,
+            supportsTools: p.supportsTools,
+            models: p.models,
+            defaultModel: p.defaultModel,
+            secretKey: p.secretKey,
+          }
+          if (isProviderAuthorized(lite, keys, cliStatus, { customOpenaiBaseUrl: rawCustomUrl ?? '' })) {
+            authorized.add(p.id as ProviderId)
+          }
+        }
+        setAuthorizedIds(authorized)
+        setStoredModels(models)
+        setCurrentAuthorized(authorized.has(provider.id))
+      } catch {
+        if (!cancelled) {
+          setEnabledModels(new Set())
+          setAuthorizedIds(new Set())
+        }
+      }
     })()
     return () => { cancelled = true }
-  }, [open])
+  }, [open, provider.id])
 
-  // Хелпер: модель «видна» если фильтр выключен, либо она в enabled, либо это
-  // ТЕКУЩАЯ активная модель чата (даже если её выключили — не прячем, иначе
-  // пользователь увидит пустой список и не поймёт что активно). Провайдеров
-  // не фильтруем — у каждого есть «auto»-модель в provider.models, поэтому
-  // фильтр уровня модели сам по себе достаточен.
-  function isModelVisible(providerId: ProviderId, model: string): boolean {
-    if (enabledModels === null) return true
-    if (enabledModels.has(`${providerId}::${model}`)) return true
-    if (providerId === provider.id && provider.model === model) return true
-    return false
-  }
+  const entries = useMemo(
+    () => buildPickerEntries(
+      providers,
+      enabledModels,
+      authorizedIds,
+      provider.id,
+      provider.model,
+      storedModels,
+    ),
+    [providers, enabledModels, authorizedIds, provider.id, provider.model, storedModels],
+  )
 
-  // Persist provider/model on the current chat session so it sticks per-chat
+  const readyEntries = entries.filter(e => e.authorized)
+  const lockedEntries = entries.filter(e => !e.authorized)
+
   async function persistOnSession(providerId: ProviderId, model: string | null) {
     if (!activeChatId) return
     try {
-      // null model => 'use this provider's default'. Avoids writing empty
-      // strings that mask stored defaults on next switchChatSession.
-      await window.api.chatSessions.setModel(activeChatId, providerId, model && model.length > 0 ? model : null)
+      await window.api.chatSessions.setModel(
+        activeChatId,
+        providerId,
+        model && model.length > 0 ? model : null,
+      )
       await refreshChatSessions()
-    } catch { /* don't block UX if persistence fails */ }
+    } catch { /* don't block UX */ }
+  }
+
+  async function selectEntry(entry: PickerEntry) {
+    if (!entry.authorized) {
+      setOpen(false)
+      onOpenSettings()
+      return
+    }
+    await provider.setProviderId(entry.providerId)
+    await provider.setModel(entry.model)
+    await persistOnSession(entry.providerId, entry.model)
+    setCurrentAuthorized(true)
+    setOpen(false)
   }
 
   useEffect(() => {
@@ -124,104 +239,71 @@ export function ModelPicker({ onOpenSettings }: Props) {
     return () => window.removeEventListener('mousedown', onDown)
   }, [open])
 
+  const triggerTitle = !currentAuthorized
+    ? `${provider.label} · ${shortModel(provider.model)} — провайдер не подключён`
+    : t.modelPicker.changeModel
+
   return (
-    <div className="gg-mp-wrap" ref={wrapRef}>
+    <div className={`gg-mp-wrap ${variant === 'footer' ? 'is-footer' : ''}`} ref={wrapRef}>
       <button
         type="button"
-        className="gg-model-pill"
+        className={variant === 'footer' ? 'gg-provider-badge gg-provider-badge-btn' : 'gg-model-pill'}
         onClick={() => setOpen(v => !v)}
-        title={t.modelPicker.changeModel}
+        title={triggerTitle}
+        aria-expanded={open}
+        aria-haspopup="listbox"
       >
-        <span className={`gg-provider-dot ${provider.id === 'gemini-cli' ? 'cli' : ''}`} />
-        <span className="gg-model-pill-name">{provider.label}</span>
-        <span className="gg-model-pill-sep">·</span>
-        <span className="gg-model-pill-transport">{shortModel(provider.model)}</span>
+        <span className={`gg-provider-dot ${isCliProvider(provider.id) ? 'cli' : ''} ${!currentAuthorized ? 'is-offline' : ''}`} />
+        {variant === 'footer' ? (
+          <span className="gg-provider-badge-text">
+            <span className="gg-provider-badge-name">{provider.label}</span>
+            <span className="gg-provider-badge-sep">·</span>
+            <span className="gg-provider-badge-model">{shortModel(provider.model)}</span>
+            {!currentAuthorized && <span className="gg-provider-badge-warn">не подключён</span>}
+          </span>
+        ) : (
+          <>
+            <span className="gg-model-pill-name">{provider.label}</span>
+            <span className="gg-model-pill-sep">·</span>
+            <span className="gg-model-pill-transport">{shortModel(provider.model)}</span>
+          </>
+        )}
+        <span className="gg-mp-chevron" aria-hidden>{open ? '▴' : '▾'}</span>
       </button>
 
       {open && (
-        <div className="gg-mp-popover">
-          <div className="gg-mp-section">
-            <div className="gg-mp-section-title">{t.modelPicker.provider}</div>
-            {PROVIDER_OPTIONS.map(p => {
-              const isCli = p.id.endsWith('-cli')
-              const isConfigured = configuredIds.has(p.id)
-              const isActive = provider.id === p.id
-              let title: string | undefined
-              if (!isConfigured) title = t.settings.apiKeyNotSet
-              else if (isCli) title = CLI_BETA_HINT
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  className={`gg-mp-row ${isActive ? 'is-active' : ''} ${!isConfigured ? 'is-unconfigured' : ''}`}
-                  title={title}
-                  onClick={async () => {
-                    if (!isConfigured) {
-                      // Открыть Settings на провайдерах вместо переключения
-                      setOpen(false)
-                      onOpenSettings()
-                      return
-                    }
-                    await provider.setProviderId(p.id)
-                    const storedNewModel = await window.api.settings.getKey(`model_${p.id}`)
-                    await persistOnSession(p.id, storedNewModel)
-                    setOpen(false)
-                  }}
-                >
-                  <span className="gg-mp-row-label">
-                    {!isConfigured && <span className="gg-mp-lock">🔒</span>}
-                    {p.label}
-                  </span>
-                  <span className="gg-mp-row-meta">{p.description}</span>
-                </button>
-              )
-            })}
-          </div>
+        <div className="gg-mp-popover" role="listbox">
+          {readyEntries.length > 0 && (
+            <div className="gg-mp-section">
+              <div className="gg-mp-section-title">{t.modelPicker.connected}</div>
+              {readyEntries.map(e => (
+                <PickerRow key={modelKey(e.providerId, e.model)} entry={e} onSelect={() => void selectEntry(e)} />
+              ))}
+            </div>
+          )}
 
-          {provider.models.length > 1 && (() => {
-            const visibleModels = provider.models.filter(m => isModelVisible(provider.id, m))
-            const hiddenCount = provider.models.length - visibleModels.length
-            return (
-              <div className="gg-mp-section">
-                <div className="gg-mp-section-title">
-                  {t.modelPicker.model}
-                  {hiddenCount > 0 && (
-                    <span className="gg-mp-section-hint" title="Скрыты по toggle в Настройки → Модели">
-                      {' '}· {t.modelPicker.hidden} {hiddenCount}
-                    </span>
-                  )}
-                </div>
-                {visibleModels.length === 0 && (
-                  <div className="gg-mp-row gg-mp-row-empty">
-                    <span className="gg-mp-row-label">{t.modelPicker.allModelsOff}</span>
-                    <span className="gg-mp-row-meta">{t.modelPicker.enableIn}</span>
-                  </div>
-                )}
-                {visibleModels.map(m => {
-                  const isActiveModel = provider.model === m
-                  const isHidden = enabledModels !== null && !enabledModels.has(`${provider.id}::${m}`)
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      className={`gg-mp-row ${isActiveModel ? 'is-active' : ''}`}
-                      onClick={() => void provider.setModel(m).then(async () => {
-                        await persistOnSession(provider.id, m)
-                        setOpen(false)
-                      })}
-                      title={isHidden ? 'Эта модель отключена в Настройки → Модели, но активна в чате — отображается чтобы не потерять' : undefined}
-                    >
-                      <span className="gg-mp-row-label">
-                        {m}
-                        {isHidden && <span className="gg-mp-row-hidden-mark"> · скрыта</span>}
-                      </span>
-                      {isActiveModel && <span className="gg-mp-row-meta">✓</span>}
-                    </button>
-                  )
-                })}
+          {readyEntries.length === 0 && (
+            <div className="gg-mp-section">
+              <div className="gg-mp-row gg-mp-row-empty">
+                <span className="gg-mp-row-label">{t.modelPicker.noConnected}</span>
+                <span className="gg-mp-row-meta">{t.modelPicker.enableIn}</span>
               </div>
-            )
-          })()}
+            </div>
+          )}
+
+          {lockedEntries.length > 0 && (
+            <div className="gg-mp-section">
+              <div className="gg-mp-section-title">{t.modelPicker.needAuth}</div>
+              {lockedEntries.map(e => (
+                <PickerRow
+                  key={`${e.providerId}::locked`}
+                  entry={e}
+                  locked
+                  onSelect={() => void selectEntry(e)}
+                />
+              ))}
+            </div>
+          )}
 
           <div className="gg-mp-section">
             <button
@@ -238,10 +320,43 @@ export function ModelPicker({ onOpenSettings }: Props) {
   )
 }
 
-function shortModel(m: string): string {
-  if (m === 'auto') return 'auto'
-  // Strip date suffix from claude-...-20251101 and gpt-5/4o families
-  const dateMatch = m.match(/(.*)-\d{8}$/)
-  if (dateMatch) return dateMatch[1]
-  return m
+function PickerRow({
+  entry,
+  locked,
+  onSelect,
+}: {
+  entry: PickerEntry
+  locked?: boolean
+  onSelect: () => void
+}) {
+  const isCli = isCliProvider(entry.providerId)
+  let title: string | undefined
+  if (locked) title = 'Нужна авторизация — откроются Настройки'
+  else if (isCli) title = CLI_BETA_HINT
+  else if (!entry.enabled && entry.isCurrent) {
+    title = 'Модель отключена в Настройки → Модели, но активна в чате'
+  }
+
+  return (
+    <button
+      type="button"
+      className={`gg-mp-row ${entry.isCurrent ? 'is-active' : ''} ${locked ? 'is-unconfigured' : ''}`}
+      title={title}
+      onClick={onSelect}
+      role="option"
+      aria-selected={entry.isCurrent}
+    >
+      <span className="gg-mp-row-label">
+        {locked && <span className="gg-mp-lock">🔒</span>}
+        <span className="gg-mp-row-provider">{entry.providerLabel}</span>
+        <span className="gg-mp-row-model">{shortModel(entry.model)}</span>
+        {!entry.enabled && entry.authorized && !entry.isCurrent && (
+          <span className="gg-mp-row-hidden-mark"> · скрыта</span>
+        )}
+      </span>
+      <span className="gg-mp-row-meta">
+        {entry.isCurrent ? '✓' : entry.transport}
+      </span>
+    </button>
+  )
 }

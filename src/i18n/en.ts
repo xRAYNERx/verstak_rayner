@@ -74,6 +74,33 @@ export const en = {
     application: 'Application',
     server: 'Server',
     resizeDrag: 'Drag to resize',
+    uiScale: 'Interface scale',
+    uiScaleHint: 'Scales the entire UI — text, buttons, and panels. Useful on ultrawide or 4K monitors. Also adjustable with Ctrl + mouse wheel; Ctrl+0 resets to 100%.',
+    uiScaleReset: 'Reset (100%)',
+    notifications: 'Notifications',
+    notifyTitle: 'Notifications',
+    notifyIntro: 'Enable sound only, toast only, or both — whatever works for you.',
+    notifySound: 'Sound (Windows system notification)',
+    notifyToast: 'Toast (bottom-right popup)',
+    notifyUnfocusedOnly: 'Only when Verstak is not focused',
+    notifyTest: 'Test',
+    notifyHint: 'Fires when the agent finishes a chat response. Click the toast to focus the app.',
+    updates: 'Updates',
+    currentVersion: 'Current version',
+    checkUpdates: 'Check for updates',
+    checkingUpdates: 'Checking…',
+    upToDate: 'You have the latest version',
+    downloadingUpdate: 'Downloading v{version}… {percent}%',
+    updateReady: 'v{version} is ready to install',
+    installUpdate: 'Install',
+    updateError: 'Could not check for updates',
+    updatesHint: 'On launch we check GitHub Releases (frolofpavel/verstak). Download starts automatically; install when you click Install.',
+  },
+
+  updates: {
+    downloadingBar: 'Downloading update v{version}… {percent}%',
+    readyBar: 'Update v{version} is ready',
+    install: 'Install',
   },
 
   // Model picker
@@ -84,6 +111,16 @@ export const en = {
     hidden: 'hidden',
     allModelsOff: 'All models disabled',
     enableIn: 'enable in Settings → Models',
+    connected: 'Connected',
+    needAuth: 'Needs authorization',
+    noConnected: 'No connected models',
+  },
+
+  modelRequired: {
+    title: 'Choose a model',
+    body: 'To use Verstak you need at least one connected AI model. Open Models settings, connect a provider, and enable the models you want in the picker.',
+    openModels: 'Open Models settings',
+    later: 'Later',
   },
 
   // Chat

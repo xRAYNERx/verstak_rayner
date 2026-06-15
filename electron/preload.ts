@@ -6,7 +6,23 @@ contextBridge.exposeInMainWorld('api', {
     setCurrent: (path: string | null) => ipcRenderer.invoke('projects:set-current', path),
     list: () => ipcRenderer.invoke('projects:list'),
     rename: (path: string, name: string) => ipcRenderer.invoke('projects:rename', path, name),
+    updateMeta: (path: string, patch: { name?: string; iconPath?: string | null }) =>
+      ipcRenderer.invoke('projects:update-meta', path, patch),
+    pickIcon: (path: string) => ipcRenderer.invoke('projects:pick-icon', path),
+    clearIcon: (path: string) => ipcRenderer.invoke('projects:clear-icon', path),
     remove: (path: string) => ipcRenderer.invoke('projects:remove', path)
+  },
+  app: {
+    getHomeDir: () => ipcRenderer.invoke('app:home-dir') as Promise<string>,
+    getVersion: () => ipcRenderer.invoke('app:version') as Promise<string>,
+    isFocused: () => ipcRenderer.invoke('app:is-focused') as Promise<boolean>,
+    openExternal: (url: string) => ipcRenderer.invoke('app:open-external', url) as Promise<boolean>
+  },
+  notify: {
+    show: (opts: { title: string; body: string }) =>
+      ipcRenderer.invoke('notify:show', opts) as Promise<boolean>,
+    playSound: (opts?: { isError?: boolean }) =>
+      ipcRenderer.invoke('notify:play-sound', opts) as Promise<boolean>
   },
   files: {
     tree: (root: string) => ipcRenderer.invoke('files:tree', root),
@@ -16,7 +32,12 @@ contextBridge.exposeInMainWorld('api', {
   },
   settings: {
     getKey: (key: string) => ipcRenderer.invoke('settings:get-key', key),
-    setKey: (key: string, value: string) => ipcRenderer.invoke('settings:set-key', key, value)
+    setKey: (key: string, value: string) => ipcRenderer.invoke('settings:set-key', key, value),
+    onUiScaleChanged: (cb: (percent: number) => void) => {
+      const handler = (_e: unknown, percent: number) => cb(percent)
+      ipcRenderer.on('ui-scale:changed', handler)
+      return () => { ipcRenderer.off('ui-scale:changed', handler) }
+    }
   },
   providers: {
     list: () => ipcRenderer.invoke('providers:list')
@@ -216,6 +237,11 @@ contextBridge.exposeInMainWorld('api', {
       const handler = (_e: unknown, data: { percent: number }) => cb(data)
       ipcRenderer.on('update:progress', handler)
       return () => { ipcRenderer.off('update:progress', handler) }
+    },
+    onNotAvailable: (cb: () => void) => {
+      const handler = () => cb()
+      ipcRenderer.on('update:not-available', handler)
+      return () => { ipcRenderer.off('update:not-available', handler) }
     },
   },
   audit: {

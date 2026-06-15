@@ -15,12 +15,16 @@
     "electron-rebuild": "electron-rebuild -f -o better-sqlite3",
     "predev": "npm run electron-rebuild",
     "dist": "npm run electron-rebuild && npm run build && electron-builder",
-    "dist:win": "npm run electron-rebuild && npm run build && electron-builder --win --x64",
+    "dist:win": "npm run generate:icon && npm run electron-rebuild && npm run build && electron-builder --win --x64",
+    "patch:exe-icon": "node scripts/patch-exe-icon.cjs",
     "dist:linux": "npm run build && electron-builder --linux --x64",
     "dist:mac": "npm run build && electron-builder --mac --x64 --arm64",
-    "dist:all": "npm run build && electron-builder --win --linux --mac"
+    "dist:all": "npm run build && electron-builder --win --linux --mac",
+    "sync:changelog": "node scripts/sync-verstak-changelog.cjs",
+    "generate:icon": "node scripts/generate-app-icon.mjs"
   },
   "build": {
+    "afterPack": "scripts/patch-exe-icon.cjs",
     "appId": "ru.verstak.ide",
     "productName": "Verstak",
     "copyright": "Copyright © 2026 Pavel Frolov",
@@ -112,7 +116,8 @@
     "electron": "^40.10.0",
     "electron-builder": "^26.8.1",
     "electron-vite": "^5.0.0",
-    "png-to-ico": "^3.0.1",
+    "png-to-ico": "^2.1.8",
+    "rcedit": "^4.0.1",
     "sharp": "^0.34.5",
     "typescript": "^6.0.3",
     "vite": "^8.0.13",

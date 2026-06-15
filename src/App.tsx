@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { I18nContext, getTranslations, type Lang } from './i18n'
 import { AuthScreen } from './components/AuthScreen'
 import { ProjectRail } from './components/ProjectRail'
+import { ProjectSettings } from './components/ProjectSettings'
+import type { ProjectMeta } from './types/api'
 import { Sidebar } from './components/Sidebar'
 import { Settings } from './components/Settings'
 import { Chat } from './components/Chat'
@@ -23,6 +25,7 @@ import { Terminal } from './components/Terminal'
 import { FilesPanel } from './components/FilesPanel'
 import { SideChat } from './components/SideChat'
 import { OnboardingWizard } from './components/OnboardingWizard'
+import { ModelRequiredPrompt } from './components/ModelRequiredPrompt'
 import { ArtifactPreviewContainer } from './components/ArtifactPreview'
 import { TerminalErrorToast } from './components/TerminalErrorToast'
 import { useProject } from './store/projectStore'
@@ -35,6 +38,9 @@ const SIDEBAR_WIDTH_KEY = 'gg.sidebarWidth'
 
 export function App() {
   const [showSettings, setShowSettings] = useState(false)
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'models' | undefined>()
+  const [modelPromptRecheck, setModelPromptRecheck] = useState(0)
+  const [projectSettingsTarget, setProjectSettingsTarget] = useState<ProjectMeta | null>(null)
   // Right docked panel: one of terminal / files / sidechat / none (Codex-style selector).
   const [rightPanel, setRightPanel] = useState<'none' | 'terminal' | 'files' | 'sidechat'>('none')
   // Lazily-created dedicated side-chat session id. Created on first open of the
@@ -201,6 +207,8 @@ export function App() {
       <ProjectRail
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(v => !v)}
+        onOpenProjectSettings={setProjectSettingsTarget}
+        onOpenAppSettings={() => setShowSettings(true)}
       />
       {sidebarOpen && (
         <>
@@ -279,7 +287,31 @@ export function App() {
           </div>
         )}
       </main>
-      {showSettings && <Settings onClose={() => setShowSettings(false)} />}
+      {showSettings && (
+        <Settings
+          initialTab={settingsInitialTab}
+          onClose={() => {
+            setShowSettings(false)
+            setSettingsInitialTab(undefined)
+            setModelPromptRecheck(v => v + 1)
+          }}
+        />
+      )}
+      <ModelRequiredPrompt
+        active={authDone === true && !showOnboarding && !showSettings}
+        recheckToken={modelPromptRecheck}
+        onOpenModelsSettings={() => {
+          setSettingsInitialTab('models')
+          setShowSettings(true)
+        }}
+      />
+      {projectSettingsTarget && (
+        <ProjectSettings
+          project={projectSettingsTarget}
+          onClose={() => setProjectSettingsTarget(null)}
+          onProjectUpdated={setProjectSettingsTarget}
+        />
+      )}
       {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}
       <ArtifactPreviewContainer />
       <TerminalErrorToast />
