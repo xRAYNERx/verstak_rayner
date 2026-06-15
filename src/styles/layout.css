@@ -4634,6 +4634,29 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   border-color: var(--accent);
 }
 
+/* Verification pill (DoD) — цвет по overall: passed/failed/partial/not_run. */
+.gg-verification-pill { font-weight: 600; }
+.gg-verification-pill.is-passed {
+  background: rgba(56, 161, 105, 0.10);
+  border-color: rgba(56, 161, 105, 0.5);
+  color: var(--text-primary);
+}
+.gg-verification-pill.is-passed:hover { background: rgba(56, 161, 105, 0.20); border-color: var(--success); }
+.gg-verification-pill.is-failed {
+  background: rgba(229, 62, 62, 0.10);
+  border-color: rgba(229, 62, 62, 0.5);
+  color: #e53e3e;
+}
+.gg-verification-pill.is-failed:hover { background: rgba(229, 62, 62, 0.20); }
+.gg-verification-pill.is-partial,
+.gg-verification-pill.is-not_run {
+  background: rgba(215, 186, 125, 0.10);
+  border-color: rgba(215, 186, 125, 0.5);
+  color: var(--text-primary);
+}
+.gg-verification-pill.is-partial:hover,
+.gg-verification-pill.is-not_run:hover { background: rgba(215, 186, 125, 0.20); }
+
 /* ======================================================================
    OnboardingWizard — мастер первого запуска. См. V3 Plan раздел 10.1.
    ====================================================================== */

@@ -1125,7 +1125,10 @@ async function runApiConversation(
       recordRunEvent: (kind, p) => {
         if (!agentRuns || !runId) return
         try { agentRuns.appendEvent(runId, kind, p) } catch { /* best-effort */ }
-      }
+      },
+      // attest_verification (Verification Фаза 2): снимок реально записанных за
+      // прогон файлов — для сверки claimed vs actual в DoD-артефакте.
+      runFilesTouched: () => Array.from(filesTouched)
     }
     const writePromises: Array<{ idx: number; promise: Promise<ToolResult> }> = []
     const readPromises: Array<{ idx: number; promise: Promise<ToolResult> }> = []

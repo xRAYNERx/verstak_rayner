@@ -125,7 +125,7 @@ interface ProjectState {
   openedReviewId: number | null
   /** Артефакты сгенерированные агентом в активной сессии (generate_html /
    *  generate_docx). Сбрасываются при switchChatSession. */
-  artifacts: Array<{ kind: 'html' | 'docx'; filename: string; path: string; sizeBytes: number; ts: number }>
+  artifacts: Array<{ kind: 'html' | 'docx' | 'verification'; filename: string; path: string; sizeBytes: number; ts: number; overall?: 'passed' | 'failed' | 'partial' | 'not_run'; checksPassed?: number; checksTotal?: number }>
   /** Текущий артефакт открытый в preview pane (path как ID). null = закрыт. */
   previewArtifactId: string | null
   setProject: (path: string) => Promise<void>
@@ -211,7 +211,9 @@ interface ProjectState {
   /** Очистить in-memory review state для удалённого main-чата. */
   cleanupReviewsFor: (parentChatId: number) => void
   /** Зарегистрировать сгенерированный артефакт (для Timeline pill). */
-  recordArtifact: (a: { kind: 'html' | 'docx'; filename: string; path: string; sizeBytes: number }) => void
+  recordArtifact: (a: { kind: 'html' | 'docx' | 'verification'; filename: string; path: string; sizeBytes: number; overall?: 'passed' | 'failed' | 'partial' | 'not_run'; checksPassed?: number; checksTotal?: number }) => void
+  /** Прикрепить DoD-бейдж (overall/N/M) к последнему verification-артефакту. */
+  setVerificationBadge: (badge: { overall: 'passed' | 'failed' | 'partial' | 'not_run'; checksPassed: number; checksTotal: number }) => void
   /** Сбросить артефакты (вызывается при смене чата / нового чата). */
   clearArtifacts: () => void
   /** Открыть preview панель для артефакта (по path как ID), или закрыть (null). */
@@ -817,6 +819,16 @@ export const useProject = create<ProjectState>((set, get) => ({
   recordArtifact: (a) => set(s => ({
     artifacts: [...s.artifacts, { ...a, ts: Date.now() }]
   })),
+  setVerificationBadge: (badge) => set(s => {
+    // Патчим последний verification-артефакт DoD-бейджем. Хендлер шлёт
+    // artifact-created(kind=verification) синхронно перед verification-attested,
+    // так что последний verification в списке — наш.
+    const idx = [...s.artifacts].map(a => a.kind).lastIndexOf('verification')
+    if (idx < 0) return {}
+    const next = s.artifacts.slice()
+    next[idx] = { ...next[idx], ...badge }
+    return { artifacts: next }
+  }),
   clearArtifacts: () => set({ artifacts: [], previewArtifactId: null }),
   setPreviewArtifact: (path) => set({ previewArtifactId: path }),
   setEffortLevel: (level) => set({ effortLevel: level }),

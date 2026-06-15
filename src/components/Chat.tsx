@@ -318,6 +318,15 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
             `${event.path} (${event.sizeBytes} bytes)`)
         }
       }
+      else if (event.type === 'verification-attested') {
+        // DoD-бейдж прикрепляем к последнему verification-артефакту (artifact-created
+        // пришёл синхронно перед этим событием). Pill окрасится по overall.
+        store.setVerificationBadge({
+          overall: event.overall,
+          checksPassed: event.checksPassed,
+          checksTotal: event.checksTotal
+        })
+      }
       else if (event.type === 'turns-exhausted') {
         // Budget hit. Remember so the UI can offer a "+N turns" button.
         if (event.canContinue) {

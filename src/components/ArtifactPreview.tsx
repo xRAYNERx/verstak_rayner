@@ -18,7 +18,7 @@ import { useProject } from '../store/projectStore'
  */
 
 interface ArtifactRef {
-  kind: 'html' | 'docx'
+  kind: 'html' | 'docx' | 'verification'
   filename: string
   path: string
   sizeBytes: number
@@ -41,9 +41,10 @@ export function ArtifactPreview({ artifact, onClose }: Props) {
     setError(null)
     void (async () => {
       try {
-        if (artifact.kind === 'html') {
-          // Через files.read — он применяет secret-scanner (избыточно для нашего
-          // же артефакта, но безопасно).
+        if (artifact.kind === 'html' || artifact.kind === 'verification') {
+          // Verification рендерится той же веткой что html — это самодостаточный
+          // .verification.html (renderVerificationHtml). Через files.read —
+          // он применяет secret-scanner (избыточно для нашего же артефакта, но безопасно).
           const html = await window.api.files.read(artifact.path)
           setContent(html)
         } else if (artifact.kind === 'docx') {

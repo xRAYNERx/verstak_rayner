@@ -83,7 +83,10 @@ export type ChatEvent =
   /** Sub-agent run: delegate_task делегировал подзадачу другому скиллу/модели.
    *  Эфемерное — карточка в чате для видимости fan-out. В БД не пишется. */
   | { type: 'subagent-run'; callId: string; label: string; provider?: string; skill?: string; task: string; status: 'running' | 'done' | 'error'; result?: string; role?: string; toolCount?: number; swarm?: string }
-  | { type: 'artifact-created'; callId: string; kind: 'html' | 'docx'; filename: string; path: string; sizeBytes: number }
+  | { type: 'artifact-created'; callId: string; kind: 'html' | 'docx' | 'verification'; filename: string; path: string; sizeBytes: number }
+  /** Verification attested: attest_verification перепрогнал проверки и собрал DoD-артефакт.
+   *  Эфемерный бейдж для UI (overall + N/M); БД-персист — Фаза 3. */
+  | { type: 'verification-attested'; callId: string; overall: 'passed' | 'failed' | 'partial' | 'not_run'; checksTotal: number; checksPassed: number; changedFilesCount: number }
   | { type: 'usage'; usage: UsageDelta }
   /** Информационное сообщение для UI (тост). Не блокирует сессию. */
   | { type: 'info'; text: string }

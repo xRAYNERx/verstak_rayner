@@ -425,6 +425,32 @@ export const TOOL_DEFS: ToolDefinition[] = [
     }
   },
   {
+    name: 'attest_verification',
+    description: 'Сформируй доказательство выполнения задачи (Definition of Done): команды проверки будут ПЕРЕПРОГНАНЫ системой, статус ставится по реальному exitCode (не по твоему слову). Вызови в КОНЦЕ задачи. Результат — артефакт {slug}.verification.html в .verstak/artifacts/ + pill с бейджем DoD: N/M. Если команда заблокирована денилистом — статус not_run, проверка остаётся ручной. changed_files сверяются с реально записанными файлами прогона (расхождения видны в артефакте).',
+    parameters: {
+      type: 'object',
+      properties: {
+        task_summary: { type: 'string', description: 'Краткое описание выполненной задачи (1-2 предложения).' },
+        changed_files: { type: 'array', items: { type: 'string' }, description: 'Пути файлов (относительно корня проекта), которые ты заявляешь изменёнными.' },
+        checks: {
+          type: 'array',
+          description: 'Проверки выполнения. Для каждой с командой система перепрогонит её и поставит passed/failed по exitCode. Без команды — ручная проверка (берётся твой summary, статус not_run). Максимум ~10 проверок с командой.',
+          items: {
+            type: 'object',
+            properties: {
+              command: { type: 'string', description: 'Команда проверки (например "npm run type"). Будет перепрогнана системой. Опустить — для ручной проверки.' },
+              status: { type: 'string', description: 'Опционально — твоя оценка статуса. ИГНОРИРУЕТСЯ для проверок с командой (статус ставит система по exitCode).' },
+              summary: { type: 'string', description: 'Что проверяет (для ручных проверок — основной текст).' }
+            }
+          }
+        },
+        risks: { type: 'array', items: { type: 'string' }, description: 'Известные риски / что осталось непроверенным.' },
+        ui_screenshot: { type: 'boolean', description: 'Если true — приложить последний browser_screenshot как UI-доказательство (если есть свежий).' }
+      },
+      required: ['task_summary']
+    }
+  },
+  {
     name: 'memory_save',
     description: 'Сохраняет факт, решение или паттерн в долговременную память агента для этого проекта. Используй в конце сессии или когда обнаружен важный инсайт.',
     parameters: {

@@ -38,6 +38,7 @@ import { scanText, isForbiddenPath } from '../ai/secret-scanner'
 import { safeRealJoin } from '../ai/path-policy'
 import type { McpClient } from '../mcp/client'
 import type { ProviderId, CreateOptions } from '../ai/registry'
+import type { VerificationArtifact, VerificationCheck, VerificationChangedFile } from '../ai/verification'
 
 const execFileAsync = promisify(execFile)
 
@@ -151,6 +152,10 @@ export interface ToolContext {
    *  Дёргается РЯДОМ с существующими ai:event-эмиттерами (emitActivity/
    *  diffConfirmWrite/delegate/artifact/verify), не плодя новые точки. */
   recordRunEvent?: (kind: string, payload: { label?: string | null; detail?: string | null; ref?: string | null; status?: string | null }) => void
+  /** Файлы, реально записанные за этот прогон (write_file/apply_patch, accepted).
+   *  Источник истины для attest_verification — сверка claimed vs actual.
+   *  Опционально: ai.ts отдаёт снимок filesTouched; без него actual=claimed. */
+  runFilesTouched?: () => string[]
 }
 
 export type ToolMode = 'parallel-read' | 'sequential' | 'confirm-write'
@@ -1980,6 +1985,171 @@ const generateDocxHandler: ToolHandler = {
   }
 }
 
+// ============================================================================
+// attest_verification — доказательство выполнения (DoD). Verification Фаза 2.
+// Доктрина «не верь модели — перепрогони»: статус проверок ставит САМ хендлер
+// по реальному exitCode, не модель. Это и отличает доказательство от отчёта.
+// ============================================================================
+
+// Потолок проверок-с-командой на один attest — чтобы агент не превратил его в
+// способ прогнать 50 команд разом. Ручные проверки сверх лимита не режем.
+const MAX_VERIFICATION_CHECKS = 10
+// Сколько символов вывода (stdout+stderr) сохраняем в артефакт.
+const VERIFICATION_TAIL_CHARS = 800
+
+const attestVerificationHandler: ToolHandler = {
+  mode: 'sequential',
+  async handle(call, ctx) {
+    try {
+      const { writeVerificationArtifact } = await import('../ai/artifacts')
+      const { computeOverall } = await import('../ai/verification')
+
+      const taskSummary = String(call.args.task_summary ?? '').trim()
+      if (!taskSummary) return { id: call.id, name: call.name, result: '', error: 'attest_verification: task_summary обязателен' }
+
+      const claimedFiles = Array.isArray(call.args.changed_files)
+        ? call.args.changed_files.map(String).map(s => s.trim()).filter(Boolean)
+        : []
+      const risks = Array.isArray(call.args.risks)
+        ? call.args.risks.map(String).map(s => s.trim()).filter(Boolean)
+        : []
+      const rawChecks = Array.isArray(call.args.checks) ? call.args.checks : []
+
+      // --- Проверки: перепрогон команд через тот же runCommand (denylist+scanner внутри).
+      const checks: VerificationCheck[] = []
+      let commandRuns = 0
+      for (const raw of rawChecks) {
+        if (typeof raw !== 'object' || raw === null) continue
+        const c = raw as Record<string, unknown>
+        const command = c.command != null ? String(c.command).trim() : ''
+        const summary = c.summary != null ? String(c.summary).trim() : undefined
+
+        if (!command) {
+          // Ручная проверка — статус not_run, берём summary от модели.
+          checks.push({ command: null, status: 'not_run', manual: true, summary })
+          continue
+        }
+
+        // Денилист: классифицируем ДО запуска. Заблокированная команда → not_run+manual,
+        // причина в summary (агент сам решит, что с ней делать).
+        const verdict = ctx.tools.classifyCommand(command)
+        if (!verdict.allowed) {
+          checks.push({
+            command, status: 'not_run', manual: true,
+            summary: summary ? `${summary} · заблокирована: ${verdict.reason ?? 'denylist'}` : `Заблокирована политикой: ${verdict.reason ?? 'denylist'}`
+          })
+          continue
+        }
+
+        // Cap: сверх лимита команды не прогоняем — фиксируем как not_run.
+        if (commandRuns >= MAX_VERIFICATION_CHECKS) {
+          checks.push({ command, status: 'not_run', manual: true, summary: summary ? `${summary} · не запущена (лимит проверок)` : 'Не запущена — превышен лимит проверок' })
+          continue
+        }
+        commandRuns++
+
+        try {
+          const r = await ctx.tools.runCommand(command)
+          // Доктрина: статус по exitCode, не по слову модели.
+          const status: VerificationCheck['status'] = r.exitCode === 0 ? 'passed' : 'failed'
+          // runCommand редактирует через secret-scanner на своём пути, но прогоняем
+          // ещё раз на всякий случай — tail попадает в артефакт/контекст.
+          const combined = scanText(`${r.stdout}\n${r.stderr}`).redacted.trim()
+          const tail = combined.length > VERIFICATION_TAIL_CHARS
+            ? combined.slice(-VERIFICATION_TAIL_CHARS)
+            : (combined || undefined)
+          checks.push({ command, status, manual: false, summary, exitCode: r.exitCode, tail })
+          // Эфемерный фидбек в Timeline чата — видно что проверка прогнана.
+          ctx.sender.send('ai:event', {
+            id: ctx.sendId,
+            event: { type: 'tool-activity', callId: call.id, name: 'attest_verification', label: `проверка: ${status === 'passed' ? 'OK' : 'FAIL'}`, detail: `${command} · exit ${r.exitCode}`, status: status === 'passed' ? 'ok' : 'error' }
+          })
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          checks.push({ command, status: 'failed', manual: false, summary, tail: scanText(msg).redacted.slice(0, VERIFICATION_TAIL_CHARS) })
+        }
+      }
+
+      // --- changed_files: сверка claimed (из args) vs actual (реально записано прогоном).
+      // actualSet — снимок filesTouched из ai.ts; нормализуем пути к forward-slash для сравнения.
+      const norm = (p: string) => p.replace(/\\/g, '/').replace(/^\.\//, '')
+      const actualList = ctx.runFilesTouched ? ctx.runFilesTouched().map(norm) : null
+      const actualSet = actualList ? new Set(actualList) : null
+      const changedFiles: VerificationChangedFile[] = claimedFiles.map(p => ({
+        path: p,
+        claimed: true,
+        // Если источник actual недоступен — считаем actual=claimed (не блокируем фазу).
+        actual: actualSet ? actualSet.has(norm(p)) : true
+      }))
+      // Файлы, реально тронутые, но НЕ заявленные агентом — тоже в артефакт (claimed=false).
+      if (actualList) {
+        const claimedNorm = new Set(claimedFiles.map(norm))
+        for (const a of actualList) {
+          if (!claimedNorm.has(a)) changedFiles.push({ path: a, claimed: false, actual: true })
+        }
+      }
+
+      // --- UI screenshot: последний browser_screenshot из pendingAttachments (image/png).
+      let screenshotPath: string | undefined
+      if (call.args.ui_screenshot === true) {
+        const shot = [...ctx.pendingAttachments].reverse().find(a => a.mimeType === 'image/png' && a.data)
+        if (shot) {
+          try {
+            const { artifactsDir } = await import('../ai/artifacts')
+            const { mkdir, writeFile } = await import('fs/promises')
+            const { join } = await import('path')
+            const dir = artifactsDir(ctx.projectPath)
+            await mkdir(dir, { recursive: true })
+            const shotName = `verification-shot-${Date.now()}.png`
+            await writeFile(join(dir, shotName), Buffer.from(shot.data, 'base64'))
+            // Относительный путь — html артефакт лежит в той же папке.
+            screenshotPath = shotName
+          } catch { /* скриншот не критичен — пропускаем */ }
+        }
+      }
+
+      const overall = computeOverall(checks)
+      const art: VerificationArtifact = {
+        version: 1,
+        taskSummary,
+        overall,
+        changedFiles,
+        checks,
+        screenshotPath,
+        risks,
+        createdAt: Date.now(),
+        runId: ctx.runId,
+        chatId: ctx.parentChatId ?? undefined
+      }
+
+      const res = await writeVerificationArtifact(ctx.projectPath, art)
+      const checksPassed = checks.filter(c => c.status === 'passed').length
+
+      try { ctx.recordJournal(ctx.projectPath, 'session', `${overall === 'passed' ? '✅' : overall === 'failed' ? '✗' : '⚠'} Верификация: ${overall}`, taskSummary) } catch { /* journal not critical */ }
+
+      // artifact-created — как файл-артефакт (pill + preview), kind='verification'.
+      ctx.sender.send('ai:event', {
+        id: ctx.sendId,
+        event: { type: 'artifact-created', callId: call.id, kind: 'verification', filename: res.filename, path: res.htmlPath, sizeBytes: res.sizeBytes }
+      })
+      // verification-attested — эфемерный бейдж DoD для UI.
+      ctx.sender.send('ai:event', {
+        id: ctx.sendId,
+        event: { type: 'verification-attested', callId: call.id, overall, checksTotal: checks.length, checksPassed, changedFilesCount: changedFiles.length }
+      })
+      // Timeline задачи (Manager): событие verify со статусом overall.
+      try { ctx.recordRunEvent?.('verify', { label: `DoD ${checksPassed}/${checks.length}`, detail: taskSummary, ref: res.htmlPath, status: overall }) } catch { /* best-effort */ }
+
+      return {
+        id: call.id, name: call.name,
+        result: `Verification attested: overall=${overall}, DoD ${checksPassed}/${checks.length} проверок зелёные.\nАртефакт: ${res.htmlPath}\nСтатусы проверок поставлены по реальному exitCode перепрогона.`
+      }
+    } catch (err) {
+      return { id: call.id, name: call.name, result: '', error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+}
+
 const createPlanHandler: ToolHandler = {
   mode: 'sequential',
   async handle(call, ctx) {
@@ -2758,6 +2928,8 @@ const HANDLER_REGISTRY: Record<string, ToolHandler> = {
   'generate_html': generateHtmlHandler,
   'generate_docx': generateDocxHandler,
   'render_chart': renderChartHandler,
+  // Verification Artifact (DoD) — перепрогон проверок, статус по exitCode
+  'attest_verification': attestVerificationHandler,
   'delegate_task': delegateTaskHandler,
   'delegate_parallel': delegateParallelHandler,
   'orchestrate': orchestrateHandler,
