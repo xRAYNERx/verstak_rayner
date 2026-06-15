@@ -11,6 +11,18 @@ const BASE_NAME = 'Verstak - Журнал изменений'
 
 const ENTRIES = [
   {
+    version: '1.4.0',
+    build: '16.06.2026',
+    deployed: '16.06.2026',
+    title: 'Shell Luxe: премиум-редизайн главного экрана',
+    changes: [
+      'Новая дизайн-система Obsidian Luxe: obsidian-палитра, periwinkle-accent, стеклянные панели.',
+      'shell-luxe.css: rail, sidebar, main, chat, composer — glassmorphism, ambient-градиенты, spring-анимации.',
+      'Плавающий composer с glow-focus; сообщения с плавным появлением; empty-state с float-анимацией.',
+      'Миграция путей БД: скрипты migrate-project-paths.cjs / inspect-db-temp.cjs (.grok/clients → clients).'
+    ]
+  },
+  {
     version: '1.3.2',
     build: '16.06.2026',
     deployed: '16.06.2026',

@@ -2,7 +2,7 @@
 @property --gg-rail-w {
   syntax: '<length>';
   inherits: true;
-  initial-value: 68px;
+  initial-value: 72px;
 }
 @property --gg-sidebar-panel-w {
   syntax: '<length>';
@@ -15,10 +15,10 @@
   initial-value: 4px;
 }
 :root {
-  --shell-dur: 360ms;
-  --shell-ease: cubic-bezier(0.33, 1, 0.68, 1);
+  --shell-dur: 420ms;
+  --shell-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --gg-sidebar-target-w: 260px;
-  --gg-rail-w: 68px;
+  --gg-rail-w: 72px;
 }
 html {
   transition: --gg-rail-w var(--shell-dur) var(--shell-ease);
