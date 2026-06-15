@@ -135,6 +135,8 @@ export const ru: Translations = {
     explainCode: 'Explain Code',
     whatToImprove: 'Что улучшить в проекте?',
     scrollToBottom: 'К последним сообщениям',
+    autoScrollLabelOn: 'Автопрокрутка: вкл',
+    autoScrollLabelOff: 'Автопрокрутка: выкл',
     autoScrollOn: 'Автопрокрутка включена — нажми, чтобы чат не прыгал к новым сообщениям',
     autoScrollOff: 'Автопрокрутка выключена — чат остаётся на месте при ответе агента',
   },

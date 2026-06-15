@@ -143,6 +143,8 @@ export const en = {
     explainCode: 'Explain Code',
     whatToImprove: 'What to improve in the project?',
     scrollToBottom: 'Jump to latest messages',
+    autoScrollLabelOn: 'Auto-scroll: on',
+    autoScrollLabelOff: 'Auto-scroll: off',
     autoScrollOn: 'Auto-scroll on — click to keep your scroll position while the agent replies',
     autoScrollOff: 'Auto-scroll off — the chat will not jump to new messages',
   },

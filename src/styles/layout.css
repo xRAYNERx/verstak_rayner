@@ -2143,13 +2143,15 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
   height: 28px;
-  padding: 0;
+  padding: 0 10px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg-base);
   color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
   transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
 }
@@ -2160,21 +2162,10 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 }
 .gg-auto-scroll-btn.is-off {
   color: var(--text-tertiary);
-  opacity: 0.85;
-}
-.gg-auto-scroll-btn.is-off .gg-auto-scroll-off-mark {
-  display: block;
-}
-.gg-auto-scroll-btn.is-on .gg-auto-scroll-off-mark {
-  display: none;
 }
 .gg-auto-scroll-btn:hover {
   color: var(--text-primary);
   background: var(--bg-hover);
-}
-.gg-auto-scroll-off-mark {
-  display: none;
-  stroke: var(--text-tertiary);
 }
 
 .gg-undo-btn:hover {
