@@ -33,6 +33,7 @@ import { createChats } from './storage/chats'
 import { createChatSessions } from './storage/chat-sessions'
 import { createSubSessions } from './storage/sub-sessions'
 import { createSessionTodos } from './storage/session-todos'
+import { createAgentRuns } from './storage/agent-runs'
 import { registerAgentsIpc } from './ipc/agents'
 import { createTasks } from './storage/tasks'
 import { createJournal } from './storage/journal'
@@ -246,6 +247,9 @@ app.whenReady().then(() => {
   const chatSessions = createChatSessions(db)
   const subSessions = createSubSessions(db)
   const sessionTodos = createSessionTodos(db)
+  // Multi-agent Manager (Фаза 1) — фундамент «задач» поверх run_id. Пока только
+  // инстанцируется и прокидывается в AiDeps; запись прогонов включит Фаза 2.
+  const agentRuns = createAgentRuns(db)
   const tasks = createTasks(db)
   const journal = createJournal(db)
   const projects = createProjects(db)
@@ -360,7 +364,11 @@ app.whenReady().then(() => {
       update: (id, patch) => sessionTodos.update(id, patch as { status?: import('./storage/session-todos').TodoStatus; assigneeCallId?: string | null }),
       list: (projectPath, sessionId) => sessionTodos.list(projectPath, sessionId),
       findByTitle: (projectPath, sessionId, title) => sessionTodos.findByTitle(projectPath, sessionId, title)
-    }
+    },
+    // Multi-agent Manager (Фаза 1) — фасад agent_runs прокинут заранее. В ai.ts
+    // пока НЕ используется: запись прогонов (create/finish/recordRunEvent) включит
+    // Фаза 2. Здесь только делаем фундамент доступным для следующих фаз.
+    agentRuns
   })
   registerChatsIpc(chats, chatSessions, db)
   registerAgentsIpc(subSessions, chats, sessionTodos)

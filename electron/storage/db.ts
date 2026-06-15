@@ -394,6 +394,39 @@ const MIGRATIONS: Array<{ version: number; description: string; run: (db: DB) =>
         db.exec('ALTER TABLE projects ADD COLUMN icon_path TEXT')
       }
     }
+  },
+  {
+    version: 16,
+    description: 'Multi-agent Manager (Фаза 1): agent_runs (тонкий слой «задача» поверх run_id) + agent_run_events (Timeline). Keyed by существующий run_id из ai.ts.',
+    run: (db: DB) => {
+      // agent_runs — одна строка на один ai:send (run_id = randomUUID из ai.ts).
+      // owner из SendOwner (main/review/delegate/background). status вычисляется
+      // по ходу прогона. Счётчики (agents/tool/files/cost) агрегирует Manager.
+      // ВАЖНО: эту таблицу позже дополнит Crash-resume (P1) через ALTER (миграция
+      // 19) — не дублировать, добавлять колонки туда.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS agent_runs (
+          run_id TEXT PRIMARY KEY,
+          project_path TEXT NOT NULL,
+          chat_id INTEGER,
+          owner TEXT NOT NULL DEFAULT 'main' CHECK(owner IN ('main','review','delegate','background')),
+          title TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'running' CHECK(status IN ('queued','running','waiting_review','done','failed','stopped')),
+          provider_id TEXT, model TEXT, send_id INTEGER,
+          agents_count INTEGER NOT NULL DEFAULT 0, tool_count INTEGER NOT NULL DEFAULT 0,
+          files_count INTEGER NOT NULL DEFAULT 0, cost_cents INTEGER NOT NULL DEFAULT 0,
+          error TEXT, started_at INTEGER NOT NULL, ended_at INTEGER
+        );
+        CREATE INDEX IF NOT EXISTS idx_agent_runs_project ON agent_runs(project_path, started_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_agent_runs_status ON agent_runs(project_path, status);
+
+        CREATE TABLE IF NOT EXISTS agent_run_events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL,
+          kind TEXT NOT NULL, label TEXT, detail TEXT, ref TEXT, status TEXT, created_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_run_events_run ON agent_run_events(run_id, id);
+      `)
+    }
   }
 ]
 

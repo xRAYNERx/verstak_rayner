@@ -21,6 +21,7 @@ import { pickReviewProvider, buildCrossVerifyPrompt, runCrossVerify, getConfigur
 import { shouldFallback, getNextFallback } from '../ai/smart-fallback'
 import { estimateComplexity, recommendModel, complexityLabel } from '../ai/smart-router'
 import { type ExitReason, callSignature, detectVerifyScriptsForHint, writeSessionJournal } from '../ai/session-journal'
+import type { AgentRuns } from '../storage/agent-runs'
 
 export type { ProviderId } from '../ai/registry'
 
@@ -71,6 +72,9 @@ interface AiDeps {
   subSessions?: ToolContext['subSessions']
   /** Фасад TodoGate (Фаза 3, Идея 2) — оркестрационный todo-лист сессии. */
   sessionTodos?: ToolContext['sessionTodos']
+  /** Фасад Multi-agent Manager (Фаза 1) — agent_runs. Прокинут заранее; запись
+   *  прогонов (create/finish/recordRunEvent) подключит Фаза 2 — здесь НЕ используется. */
+  agentRuns?: AgentRuns
 }
 
 let currentSendId = 0
