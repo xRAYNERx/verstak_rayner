@@ -22,10 +22,10 @@
   --vol-recessed-bg: color-mix(in srgb, var(--bg-base) 60%, transparent);
   --shell-gap: 5px;
   --shell-col-gap: 2px;
-  /* Единая верхняя полоса — rail / sidebar / чат совпадают по цвету */
-  --shell-chrome-h: 48px;
-  --shell-chrome-bg: var(--vol-glass);
-  --shell-chrome-border: var(--border-default);
+  --shell-rail-fill:
+    linear-gradient(165deg, color-mix(in srgb, var(--vol-highlight) 80%, transparent) 0%, transparent 38%),
+    var(--vol-glass);
+  --shell-rail-edge: color-mix(in srgb, var(--vol-highlight) 70%, var(--vol-glass));
 }
 
 /* Depth backdrop — works with any theme via accent-muted */
@@ -42,47 +42,82 @@ body:has(.gg-app-atelier) {
   padding: var(--shell-gap);
   column-gap: var(--shell-col-gap);
   row-gap: var(--shell-gap);
-  grid-template-columns: var(--gg-rail-w) var(--gg-sidebar-panel-w) var(--gg-sidebar-resize-w) 1fr;
+  grid-template-columns: var(--gg-rail-w) 1fr;
   background: transparent;
   box-sizing: border-box;
 }
 
-.gg-app-atelier .gg-sidebar-resize {
+/* Sidebar — выезжающий drawer, не в сетке */
+.gg-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+  animation: gg-fade-in 200ms ease-out;
+}
+
+.gg-sidebar-drawer {
+  position: fixed;
+  z-index: 100;
+  top: var(--shell-gap);
+  bottom: var(--shell-gap);
+  left: calc(var(--shell-gap) + var(--gg-rail-w) + var(--shell-col-gap));
+  display: flex;
+  align-items: stretch;
+  width: min(var(--gg-sidebar-target-w), calc(100vw - var(--gg-rail-w) - 48px));
+  transform: translateX(calc(-100% - 16px));
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform var(--shell-dur) var(--shell-ease),
+    opacity var(--shell-dur) ease,
+    visibility var(--shell-dur);
+}
+
+.gg-sidebar-drawer.is-open {
+  transform: translateX(0);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.gg-app-atelier .gg-sidebar-drawer .gg-sidebar {
+  flex: 1;
+  min-width: 0;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--vol-lift);
+}
+
+.gg-app-atelier .gg-sidebar-drawer .gg-sidebar-resize {
   width: 4px;
   margin: 8px 0;
   border-radius: var(--radius-pill);
   background: transparent;
   border: none;
-  opacity: 1;
+  flex-shrink: 0;
+  cursor: col-resize;
   transition: background 180ms ease;
 }
 
-.gg-app-atelier .gg-sidebar-resize:hover {
+.gg-app-atelier .gg-sidebar-drawer .gg-sidebar-resize:hover {
   background: var(--accent-muted);
 }
 
 /* ─── Rail: frosted column (expand anim untouched in layout.css) ─── */
 .gg-app-atelier .gg-rail {
   margin: 0;
-  padding-top: 0;
   border-radius: var(--radius-xl);
   border: 1px solid var(--border-default);
-  background: var(--vol-glass);
+  background: var(--shell-rail-fill);
   backdrop-filter: var(--vol-blur);
   -webkit-backdrop-filter: var(--vol-blur);
   box-shadow: var(--vol-shadow-side), var(--ring-inset);
-}
-
-.gg-app-atelier .gg-rail-top {
-  min-height: var(--shell-chrome-h);
-  padding: 12px 8px;
-  margin: 0;
-  box-sizing: border-box;
-  background: var(--shell-chrome-bg);
-  backdrop-filter: var(--vol-blur);
-  -webkit-backdrop-filter: var(--vol-blur);
-  border-bottom: 1px solid var(--shell-chrome-border);
-  border-radius: calc(var(--radius-xl) - 1px) calc(var(--radius-xl) - 1px) 0 0;
 }
 
 .gg-app-atelier .gg-rail-home {
@@ -190,26 +225,19 @@ body:has(.gg-app-atelier) {
   margin-top: 10px;
 }
 
-/* ─── Sidebar: raised glass slab ─── */
+/* ─── Sidebar drawer ─── */
 .gg-app-atelier .gg-sidebar {
   margin: 0;
   border-radius: var(--radius-xl);
   border: 1px solid var(--border-default);
-  background: var(--vol-glass);
+  background: var(--shell-rail-fill);
   backdrop-filter: var(--vol-blur);
   -webkit-backdrop-filter: var(--vol-blur);
-  box-shadow: var(--vol-shadow-side), var(--ring-inset);
 }
 
 .gg-app-atelier .gg-sidebar-header {
-  min-height: var(--shell-chrome-h);
-  padding: 12px 16px;
-  box-sizing: border-box;
-  background: var(--shell-chrome-bg);
-  backdrop-filter: var(--vol-blur);
-  -webkit-backdrop-filter: var(--vol-blur);
-  border-bottom: 1px solid var(--shell-chrome-border);
-  border-radius: calc(var(--radius-xl) - 1px) calc(var(--radius-xl) - 1px) 0 0;
+  background: transparent;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .gg-app-atelier .gg-brand-img {
@@ -249,31 +277,87 @@ body:has(.gg-app-atelier) {
   border-radius: 0 0 var(--radius-xl) var(--radius-xl);
 }
 
-/* ─── Main: recessed workspace well ─── */
+/* ─── Main: градиент из панели проектов ─── */
 .gg-app-atelier .gg-main {
+  position: relative;
   margin: 0;
   border-radius: var(--radius-xl);
   border: 1px solid var(--border-default);
-  background: var(--bg-base);
+  background:
+    linear-gradient(
+      90deg,
+      var(--shell-rail-edge) 0%,
+      color-mix(in srgb, var(--vol-glass) 90%, var(--bg-base)) 10%,
+      color-mix(in srgb, var(--vol-glass) 50%, var(--bg-base)) 24%,
+      var(--bg-base) 48%
+    );
   box-shadow: var(--vol-shadow-inset);
   overflow: hidden;
 }
 
 .gg-app-atelier .gg-chat-area {
-  background:
-    radial-gradient(ellipse 70% 50% at 50% 0%, color-mix(in srgb, var(--accent) 5%, transparent), transparent 70%);
+  background: transparent;
 }
 
 .gg-app-atelier .gg-chat-project-bar {
-  min-height: var(--shell-chrome-h);
   padding: 12px 28px;
-  box-sizing: border-box;
-  border-bottom: 1px solid var(--shell-chrome-border);
-  background: var(--shell-chrome-bg);
-  backdrop-filter: var(--vol-blur);
-  -webkit-backdrop-filter: var(--vol-blur);
-  box-shadow: none;
-  border-radius: calc(var(--radius-xl) - 1px) calc(var(--radius-xl) - 1px) 0 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-default) 70%, transparent);
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.gg-app-atelier .gg-chat-project-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.gg-app-atelier .gg-sidebar-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: color-mix(in srgb, var(--vol-glass) 80%, var(--bg-elevated));
+  backdrop-filter: blur(12px);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.gg-app-atelier .gg-sidebar-toggle-btn:hover {
+  border-color: var(--accent-border);
+  color: var(--text-primary);
+  background: var(--accent-muted);
+}
+
+.gg-app-atelier .gg-sidebar-toggle-btn.is-open {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-muted);
+  box-shadow: 0 0 0 1px var(--accent-muted);
+}
+
+.gg-app-atelier .gg-sidebar-toggle-label {
+  letter-spacing: -0.01em;
+}
+
+.gg-app-atelier .gg-sidebar-toggle--main-float {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 25;
 }
 
 .gg-app-atelier .gg-chat-project-name {

@@ -54,6 +54,9 @@ export const ru: Translations = {
     noResults: 'Ничего не найдено',
     expandPanel: 'Развернуть панель проектов',
     collapsePanel: 'Свернуть панель проектов',
+    navPanel: 'Панель',
+    showNavPanel: 'Навигация и чаты (Ctrl+B)',
+    hideNavPanel: 'Скрыть панель (Ctrl+B)',
   },
   projectSettings: {
     removeFromList: 'Убрать из списка',

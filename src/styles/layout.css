@@ -215,6 +215,9 @@ html {
     width var(--shell-dur) var(--shell-ease),
     height var(--shell-dur) var(--shell-ease);
 }
+.gg-rail-toolbar[data-tool-count='1'] {
+  height: calc(var(--rail-tool-pad) * 2 + var(--rail-tool-h));
+}
 .gg-rail-toolbar[data-tool-count='2'] {
   height: calc(var(--rail-tool-pad) * 2 + var(--rail-tool-h) * 2 + var(--rail-tool-gap));
 }

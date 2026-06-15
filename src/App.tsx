@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { I18nContext, getTranslations, type Lang } from './i18n'
 import { AuthScreen } from './components/AuthScreen'
 import { ProjectRail } from './components/ProjectRail'
+import { SidebarToggleButton } from './components/SidebarToggleButton'
 import { ProjectSettings } from './components/ProjectSettings'
 import type { ProjectMeta } from './types/api'
 import { Sidebar } from './components/Sidebar'
@@ -47,7 +48,7 @@ export function App() {
   // Lazily-created dedicated side-chat session id. Created on first open of the
   // side-chat panel, reused while the panel stays open within a project.
   const [sideChatId, setSideChatId] = useState<number | null>(null)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [lang, setLang] = useState<Lang>('en')
 
   useEffect(() => {
@@ -209,24 +210,39 @@ export function App() {
 
   return (
     <I18nContext.Provider value={getTranslations(lang)}>
-    <div className={`gg-app gg-app-atelier ${sidebarOpen ? '' : 'is-sidebar-collapsed'}`}>
+    <div className={`gg-app gg-app-atelier ${sidebarOpen ? 'is-sidebar-open' : ''}`}>
       <ProjectRail
-        sidebarOpen={sidebarOpen}
-        onToggleSidebar={() => setSidebarOpen(v => !v)}
         onOpenProjectSettings={setProjectSettingsTarget}
         onOpenAppSettings={() => setShowSettings(true)}
       />
-      <Sidebar
-        onOpenSettings={() => setShowSettings(true)}
-        aria-hidden={!sidebarOpen}
-      />
-      <div
-        className="gg-sidebar-resize"
-        onMouseDown={sidebarOpen ? startDrag : undefined}
-        title={t.settings.resizeDrag}
-        aria-hidden={!sidebarOpen}
-      />
+      {sidebarOpen && (
+        <button
+          type="button"
+          className="gg-sidebar-backdrop"
+          onClick={() => setSidebarOpen(false)}
+          aria-label={t.rail.hideNavPanel}
+        />
+      )}
+      <div className={`gg-sidebar-drawer ${sidebarOpen ? 'is-open' : ''}`} aria-hidden={!sidebarOpen}>
+        <Sidebar
+          onOpenSettings={() => setShowSettings(true)}
+          aria-hidden={!sidebarOpen}
+        />
+        <div
+          className="gg-sidebar-resize"
+          onMouseDown={sidebarOpen ? startDrag : undefined}
+          title={t.settings.resizeDrag}
+          aria-hidden={!sidebarOpen}
+        />
+      </div>
       <main className="gg-main">
+        {activeView !== 'chat' && (
+          <SidebarToggleButton
+            open={sidebarOpen}
+            onClick={() => setSidebarOpen(v => !v)}
+            className="gg-sidebar-toggle--main-float"
+          />
+        )}
         {/* Chat НЕ размонтируется при уходе на другие вкладки — иначе его
             слушатель ai:event отваливается и фоновый стрим (CLI вроде Codex)
             теряет ответ. Прячем через display:none, слушатель остаётся жив. */}
@@ -236,6 +252,8 @@ export function App() {
               rightPanel={effectiveRightPanel}
               onSelectRightPanel={setRightPanel}
               onOpenSideChat={() => void openSideChat()}
+              sidebarOpen={sidebarOpen}
+              onToggleSidebar={() => setSidebarOpen(v => !v)}
             />
             {effectiveRightPanel === 'terminal' && (
               <div className="gg-terminal-wrap">

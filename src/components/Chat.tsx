@@ -19,6 +19,7 @@ import type { Attachment, Suggestion } from '../types/api'
 import iconUrl from '../assets/icon.png'
 import { useT } from '../i18n'
 import { notifyResponseReady } from '../lib/response-notify'
+import { SidebarToggleButton } from './SidebarToggleButton'
 
 function chatLabel(chatId: number): string {
   const title = useProject.getState().chatSessions.find(s => s.id === chatId)?.title
@@ -48,6 +49,8 @@ interface ChatProps {
   onSelectRightPanel: (panel: RightPanel) => void
   /** Open the right-docked parallel chat (lazily created by App). */
   onOpenSideChat: () => void
+  sidebarOpen: boolean
+  onToggleSidebar: () => void
 }
 
 function formatSize(bytes: number): string {
@@ -102,7 +105,7 @@ const GOAL_CYCLE_PROMPT = `Запусти цикл self-improvement по это�
 
 Out of scope: общие best practices, рефакторинги ради красоты, изменения без обоснования в журнале.`
 
-export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSideChat }: ChatProps) {
+export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSideChat, sidebarOpen, onToggleSidebar }: ChatProps) {
   const t = useT()
   // Codex-style right-panel menu anchored to the top-right header button.
   const [panelMenuOpen, setPanelMenuOpen] = useState(false)
@@ -904,8 +907,10 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
               <span className="gg-chat-project-chat">{activeChatTitle}</span>
             </>
           )}
-          {/* Меню панелей — в правом верхнем углу, как у Codex: файлы / терминал / параллельный чат */}
-          <div className="gg-panel-menu gg-chat-project-action" ref={panelMenuRef}>
+          <div className="gg-chat-project-actions">
+          <SidebarToggleButton open={sidebarOpen} onClick={onToggleSidebar} />
+          {/* Меню панелей — файлы / терминал / параллельный чат */}
+          <div className="gg-panel-menu" ref={panelMenuRef}>
             <button
               type="button"
               className={`gg-terminal-toggle ${rightPanel !== 'none' ? 'is-open' : ''}`}
@@ -948,6 +953,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
                 </button>
               </div>
             )}
+          </div>
           </div>
         </div>
       )}

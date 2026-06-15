@@ -55,6 +55,9 @@ export const en = {
     noResults: 'No matches',
     expandPanel: 'Expand project panel',
     collapsePanel: 'Collapse project panel',
+    navPanel: 'Panel',
+    showNavPanel: 'Navigation & chats (Ctrl+B)',
+    hideNavPanel: 'Hide panel (Ctrl+B)',
   },
   projectSettings: {
     removeFromList: 'Remove from list',

@@ -89,13 +89,11 @@ function ProjectChip({ project, active, unread, streaming, expanded, onClick, on
 }
 
 interface ProjectRailProps {
-  sidebarOpen: boolean
-  onToggleSidebar: () => void
   onOpenProjectSettings: (project: ProjectMeta) => void
   onOpenAppSettings: () => void
 }
 
-export function ProjectRail({ sidebarOpen, onToggleSidebar, onOpenProjectSettings, onOpenAppSettings }: ProjectRailProps) {
+export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings }: ProjectRailProps) {
   const t = useT()
   const { path, projectList, sessions, setProject, refreshProjectList } = useProject()
   const [bootstrapped, setBootstrapped] = useState(false)
@@ -180,7 +178,7 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar, onOpenProjectSetting
 
       <div
         className={`gg-rail-toolbar ${layoutExpanded ? 'is-expanded is-row' : ''}`}
-        data-tool-count={showSearch ? 3 : 2}
+        data-tool-count={showSearch ? 2 : 1}
       >
         <button
           type="button"
@@ -202,18 +200,6 @@ export function ProjectRail({ sidebarOpen, onToggleSidebar, onOpenProjectSetting
             aria-hidden
           >
             <polyline points="9 6 15 12 9 18" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          className={`gg-rail-tool ${sidebarOpen ? 'is-on' : ''}`}
-          onClick={onToggleSidebar}
-          title={sidebarOpen ? 'Скрыть боковую панель (Ctrl+B)' : 'Показать боковую панель (Ctrl+B)'}
-          aria-pressed={sidebarOpen}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <rect x="3" y="4" width="18" height="16" rx="2" />
-            <line x1="9" y1="4" x2="9" y2="20" />
           </svg>
         </button>
         {showSearch && (
