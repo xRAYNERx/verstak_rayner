@@ -192,6 +192,27 @@ html.gg-atelier .gg-ps-danger-zone {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--vol-shadow-inset);
+  overflow: visible;
+}
+
+html.gg-atelier .gg-ps-hero-name,
+html.gg-atelier .gg-ps-textarea,
+html.gg-atelier .gg-ps-path {
+  background: var(--bg-input);
+  border-color: var(--border-default);
+}
+
+html.gg-atelier .gg-ps-action-btn.gg-ps-pick-icon-btn {
+  background: color-mix(in srgb, var(--bg-elevated) 88%, var(--vol-recessed-bg));
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-tertiary) 28%, transparent);
+}
+
+html.gg-atelier .gg-ps-action-btn.gg-ps-pick-icon-btn:hover:not(:disabled) {
+  border-color: var(--accent-border);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent),
+    0 2px 8px color-mix(in srgb, var(--bg-base) 30%, transparent);
 }
 
 /* ─── Auth screen ─── */
