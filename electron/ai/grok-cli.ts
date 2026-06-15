@@ -6,6 +6,7 @@ import { tmpdir } from 'os'
 import { randomUUID } from 'crypto'
 import type { ChatProvider, ChatMessage, ChatEvent, ToolDefinition, ToolResult } from './types'
 import { buildCliPrompt } from './cli-prompt'
+import { describeAttachments } from './history-serializer'
 import { treeKill } from './child-kill'
 
 /**
@@ -179,9 +180,8 @@ export function createGrokCliProvider(opts: GrokCliOptions = {}): ChatProvider {
       let payload: string
       if (minimalMode) {
         payload = lastUser.content
-        if (lastUser.attachments?.length) {
-          payload += '\n\n' + lastUser.attachments.map(a => `[файл: ${a.name}]`).join('\n')
-        }
+        const attachNote = describeAttachments(lastUser.attachments, 'inline')
+        if (attachNote) payload += '\n\n' + attachNote
       } else {
         try {
           payload = await buildCliPrompt({

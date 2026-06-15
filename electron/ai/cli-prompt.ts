@@ -17,6 +17,8 @@
 
 import { SYSTEM_LAYER_PROMPT } from './system-layer'
 import { prepareParts } from './compose-system'
+import { serializeHistory, describeAttachments } from './history-serializer'
+import { detectVerifyScriptsForHint } from './session-journal'
 import type { ChatMessage } from './types'
 
 export type CliProviderId = 'claude-cli' | 'gemini-cli' | 'grok-cli' | 'codex-cli'
@@ -45,6 +47,10 @@ interface BuildCliPromptOpts {
   /** Топ-5 воспоминаний проекта — те же что инжектятся API-провайдерам.
    *  Передаются в prepareParts → buildContextPack. */
   memories?: Array<{ type: string; content: string; tags: string[] }>
+  /** Паритет с API-путём: после принятых write'ов API дописывает инлайн-хинт
+   *  «запусти проверку (npm test/type)». CLI one-shot — не имеет цикла, поэтому
+   *  вызывающий код выставляет флаг, когда в истории были write'ы. */
+  appendVerifyHint?: boolean
 }
 
 /**
@@ -52,7 +58,7 @@ interface BuildCliPromptOpts {
  * string that should be written to the subprocess's stdin.
  */
 export async function buildCliPrompt(opts: BuildCliPromptOpts): Promise<string> {
-  const { providerId, projectPath, messages, recentWrites, projectSystemPrompt, skillPrompt, memories } = opts
+  const { providerId, projectPath, messages, recentWrites, projectSystemPrompt, skillPrompt, memories, appendVerifyHint } = opts
 
   const lastUser = messages.filter(m => m.role === 'user').at(-1)
   if (!lastUser) throw new Error('CLI prompt: нет user-сообщения')
@@ -97,7 +103,7 @@ export async function buildCliPrompt(opts: BuildCliPromptOpts): Promise<string> 
   const trimmedSkill = (skillPrompt ?? '').trim()
   if (trimmedSkill) sections.push(`<skill_layer>\n${trimmedSkill}\n</skill_layer>`)
 
-  // 3. Conversation history — token-budgeted walk from newest to oldest.
+  // 3. Conversation history — единый сериализатор (history-serializer.ts).
   //    NEVER include system messages here (they're already above).
   //
   // Audit 2026-05-21 (vop B):
@@ -110,61 +116,13 @@ export async function buildCliPrompt(opts: BuildCliPromptOpts): Promise<string> 
   //    name-only — CLI was BLIND to what the agent had already read. Now
   //    each tool_result body is included (truncated per-call) so a follow-up
   //    in CLI can reference earlier reads. Same for tool_call args.
+  //  - serializeHistory теперь учитывает r.error (раньше игнорировался) и
+  //    умное сжатие через smartCompressResult.
   const turns = messages.filter(m => m.role !== 'system')
   // Drop the very last user message — we'll send it separately as the prompt
   const candidates = turns.slice(0, -1)
-  const HISTORY_CHAR_BUDGET = 40_000
-  const MIN_TURNS = 4
-  const PER_MSG_BODY_CAP = 4000
-  const PER_TOOL_RESULT_CAP = 1500
-  const PER_TOOL_CALL_ARGS_CAP = 300
-
-  /** Serialize a single message into the wire transcript form. Tool calls and
-   *  results carry truncated args/body so a follow-up turn isn't blind. */
-  function serializeMsg(m: ChatMessage): string {
-    const role = m.role === 'assistant' ? 'ASSISTANT' : 'USER'
-    let body = (m.content ?? '').slice(0, PER_MSG_BODY_CAP)
-    if (m.toolCalls?.length) {
-      const calls = m.toolCalls.map(c => {
-        let argSummary = ''
-        try {
-          const args = typeof c.args === 'string' ? c.args : JSON.stringify(c.args)
-          if (args && args !== '{}') argSummary = ` ${args.slice(0, PER_TOOL_CALL_ARGS_CAP)}`
-        } catch { /* args не сериализуется — ничего страшного */ }
-        return `${c.name}${argSummary}`
-      }).join('\n  · ')
-      body = body ? `${body}\n[tool_calls]\n  · ${calls}` : `[tool_calls]\n  · ${calls}`
-    }
-    if (m.toolResults?.length) {
-      const results = m.toolResults.map(r => {
-        const raw = typeof r.result === 'string' ? r.result : JSON.stringify(r.result)
-        const truncated = raw.length > PER_TOOL_RESULT_CAP
-          ? raw.slice(0, PER_TOOL_RESULT_CAP) + `\n[…truncated, всего ${raw.length} симв.]`
-          : raw
-        return `${r.name} →\n${truncated}`
-      }).join('\n---\n')
-      body = body ? `${body}\n[tool_results]\n${results}` : `[tool_results]\n${results}`
-    }
-    return `[${role}]: ${body}`
-  }
-
-  // Walk newest-to-oldest, push while we have room. Always include MIN_TURNS
-  // even if they push us over budget — losing recent context is the worse
-  // failure mode.
-  const reversed: string[] = []
-  let usedChars = 0
-  for (let i = candidates.length - 1; i >= 0; i--) {
-    const wire = serializeMsg(candidates[i])
-    const within = usedChars + wire.length <= HISTORY_CHAR_BUDGET
-    const isFloor = reversed.length < MIN_TURNS
-    if (!within && !isFloor) break
-    reversed.push(wire)
-    usedChars += wire.length
-  }
-  const includedCount = reversed.length
+  const { transcript, includedCount, droppedCount } = serializeHistory(candidates)
   if (includedCount > 0) {
-    const droppedCount = candidates.length - includedCount
-    const transcript = reversed.reverse().join('\n\n')
     const droppedNote = droppedCount > 0
       ? ` dropped="${droppedCount}" reason="budget"`
       : ''
@@ -173,13 +131,31 @@ export async function buildCliPrompt(opts: BuildCliPromptOpts): Promise<string> 
     )
   }
 
+  // 3.7. Verify-hint — паритет с API-путём. После принятых write'ов API
+  //      дописывает инлайн-напоминание «запусти проверку». CLI one-shot не
+  //      имеет цикла, поэтому: если флаг appendVerifyHint задан явно — уважаем
+  //      его; если не задан (undefined) — авто-детект по истории (были ли
+  //      write_file / apply_patch в прошлых turn'ах).
+  const WRITE_TOOLS = new Set(['write_file', 'apply_patch'])
+  const historyHadWrites = candidates.some(m => m.toolCalls?.some(c => WRITE_TOOLS.has(c.name)))
+  const wantVerifyHint = appendVerifyHint ?? historyHadWrites
+  if (wantVerifyHint && projectPath) {
+    try {
+      const hints = await detectVerifyScriptsForHint(projectPath)
+      if (hints.length > 0) {
+        sections.push(
+          `<verify_hint>\nПеред "готово" запусти проверку: ${hints.slice(0, 3).join(' / ')}. ` +
+          `Если уверен что проверка избыточна — объясни почему.\n</verify_hint>`
+        )
+      }
+    } catch { /* detect failed — verify-hint не критичен */ }
+  }
+
   // 4. The actual user prompt — last message
   let userMessage = lastUser.content
-  if (lastUser.attachments?.length) {
-    const note = lastUser.attachments
-      .map(a => `[прикреплён файл: ${a.name} (${a.mimeType}) — CLI не видит содержимое, опиши что нужно сделать]`)
-      .join('\n')
-    userMessage = userMessage ? `${userMessage}\n\n${note}` : note
+  const attachNote = describeAttachments(lastUser.attachments, 'text')
+  if (attachNote) {
+    userMessage = userMessage ? `${userMessage}\n\n${attachNote}` : attachNote
   }
   sections.push(wrapCurrentUserRequest(userMessage))
 
