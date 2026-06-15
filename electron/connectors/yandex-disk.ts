@@ -112,7 +112,7 @@ async function uploadFile(token: string, args: Record<string, unknown>, ctx: Con
     ok: true,
     remote_path: remotePath,
     size_bytes: fileBuf.length,
-    hint: 'Чтобы получить share-ссылку для клиента — вызови get_public_url с этим remote_path.'
+    hint: 'Чтобы получить публичную ссылку — вызови get_public_url с этим remote_path.'
   }
 }
 

@@ -65,7 +65,7 @@ export function ArtifactPreview({ artifact, onClose }: Props) {
               ${res.warnings.length > 0 ? `.gg-warn { background: rgba(215,186,125,0.1); padding: 8px 12px; border-left: 3px solid #d7ba7d; margin-bottom: 16px; font-size: 11px; }` : ''}
             </style></head><body>${
               res.warnings.length > 0
-                ? `<div class="gg-warn">⚠ DOCX→HTML конвертация дала ${res.warnings.length} предупреждений (стили могут потеряться). Для финальной отправки клиенту используй «↗ Открыть внешне».</div>`
+                ? `<div class="gg-warn">⚠ DOCX→HTML конвертация дала ${res.warnings.length} предупреждений (стили могут потеряться). Для финальной отправки используй «↗ Открыть внешне».</div>`
                 : ''
             }${res.html}</body></html>`)
           } else {

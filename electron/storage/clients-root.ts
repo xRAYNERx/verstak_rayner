@@ -4,9 +4,9 @@ import { join } from 'path'
 
 const RESERVED_SLUGS = new Set(['_template'])
 
-const DEFAULT_AGENTS = `# Клиент: {НАЗВАНИЕ}
+const DEFAULT_AGENTS = `# Проект: {НАЗВАНИЕ}
 
-Рабочая папка клиента. Задачи без уточнения клиента — для **{slug}**.
+Рабочая папка проекта. Задачи без уточнения проекта — для **{slug}**.
 
 | Поле | Значение |
 |------|----------|
@@ -17,10 +17,10 @@ const DEFAULT_AGENTS = `# Клиент: {НАЗВАНИЕ}
 ## Куда сохранять
 
 - **Логи API, JSON** → \`logs/\`
-- **Отчёты для клиента** → \`reports/\`
+- **Отчёты проекта** → \`reports/\`
 `
 
-/** Стандартная папка всех клиентов: ~/clients */
+/** Стандартная папка всех проектов: ~/clients */
 export function getClientsRoot(): string {
   return join(homedir(), 'clients')
 }

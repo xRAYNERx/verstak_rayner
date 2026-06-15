@@ -579,9 +579,32 @@
   padding-top: 14px;
   border-top: 1px solid color-mix(in srgb, var(--error) 22%, transparent);
 }
-.gg-ps-remove-list-btn {
+.gg-ps-action-btn.gg-ps-remove-list-btn {
   flex-shrink: 0;
   white-space: nowrap;
+  align-self: flex-end;
+  background: var(--bg-elevated);
+  border: 1px solid color-mix(in srgb, var(--border-default) 70%, var(--text-tertiary));
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 16px;
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--bg-base) 50%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 6%, transparent);
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease, color 150ms ease;
+}
+.gg-ps-action-btn.gg-ps-remove-list-btn:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  box-shadow:
+    0 2px 8px color-mix(in srgb, var(--bg-base) 45%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 8%, transparent);
+}
+.gg-ps-action-btn.gg-ps-remove-list-btn:active {
+  transform: scale(0.98);
 }
 .gg-ps-danger-title { font-size: 13px; font-weight: 500; color: var(--text-primary); }
 .gg-ps-danger-desc { font-size: 11.5px; color: var(--text-tertiary); margin-top: 2px; }
@@ -714,8 +737,9 @@
   background: var(--bg-input);
   border: 1px solid var(--border-subtle);
 }
-.gg-create-client-avatar {
-  border-radius: 50%;
+.gg-create-client-preview .gg-rail-avatar {
+  font-size: 22px;
+  line-height: 1;
 }
 .gg-create-client-preview-name {
   font-size: var(--text-md);

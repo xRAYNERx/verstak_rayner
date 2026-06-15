@@ -23,7 +23,7 @@ export type CreateClientResult =
 
 async function pickImageFile(win: BrowserWindow): Promise<string | null> {
   const result = await dialog.showOpenDialog(win, {
-    title: 'Изображение клиента',
+    title: 'Изображение проекта',
     properties: ['openFile'],
     filters: [
       { name: 'Изображения', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'ico'] }
@@ -81,7 +81,7 @@ export function registerProjectIpc(projects: Projects, db: Database): void {
     iconSourcePath?: string | null
   }): Promise<CreateClientResult> => {
     const displayName = (input.name ?? '').trim()
-    if (!displayName) return { ok: false, error: 'Укажите название клиента' }
+    if (!displayName) return { ok: false, error: 'Укажите название проекта' }
 
     const slug = normalizeClientFolderSlug(input.folderSlug ?? '')
     const slugError = validateClientFolderSlug(slug)
@@ -100,12 +100,12 @@ export function registerProjectIpc(projects: Projects, db: Database): void {
       scaffoldClientFolder(clientsRoot, projectPath, displayName, slug)
       void ensureUserLayer(projectPath).catch(() => { /* non-critical */ })
     } catch {
-      return { ok: false, error: 'Не удалось создать папку клиента на диске' }
+      return { ok: false, error: 'Не удалось создать папку проекта на диске' }
     }
 
     projects.upsert(projectPath)
     let meta = projects.updateMeta(projectPath, { name: displayName })
-    if (!meta) return { ok: false, error: 'Клиент создан на диске, но не записался в базу' }
+    if (!meta) return { ok: false, error: 'Проект создан на диске, но не записался в базу' }
 
     if (input.iconSourcePath) {
       try {
@@ -148,7 +148,7 @@ export function registerProjectIpc(projects: Projects, db: Database): void {
   })
   ipcMain.handle('projects:remove', (_e, path: string, options?: { deleteData?: boolean }) => {
     const existing = projects.list().find(p => p.path === path)
-    if (!existing) return { ok: false, error: 'Клиент не найден в списке' }
+    if (!existing) return { ok: false, error: 'Проект не найден в списке' }
 
     if (existing.iconPath) deleteProjectIconFile(existing.iconPath)
 
@@ -157,7 +157,7 @@ export function registerProjectIpc(projects: Projects, db: Database): void {
         purgeProjectAppData(db, path)
         deleteProjectDirectory(path)
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Не удалось удалить данные клиента'
+        const msg = err instanceof Error ? err.message : 'Не удалось удалить данные проекта'
         return { ok: false, error: msg }
       }
     }

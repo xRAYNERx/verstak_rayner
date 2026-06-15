@@ -1467,7 +1467,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
               className="gg-input"
               value={yDirectLogin}
               onChange={e => setYDirectLogin(e.target.value)}
-              placeholder="Login клиента — для агентских аккаунтов"
+              placeholder="Login проекта в Директе — для агентских аккаунтов"
               spellCheck={false}
             />
           </div>
@@ -1491,7 +1491,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
             />
           </div>
           <div className="gg-settings-hint">
-            Используется агентом для шеринга артефактов с клиентами:
+            Используется агентом для публичных ссылок на артефакты проекта:
             upload_file → get_public_url → отправка ссылки в TG.
             Загрузка идёт в <code>/Verstak/{`{дата}`}/</code> чтобы не засорять корень Диска.
           </div>

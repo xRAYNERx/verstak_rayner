@@ -236,7 +236,7 @@ export function ProjectSettings({ project, onClose, onProjectUpdated }: ProjectS
           </section>
 
           <section className="gg-ps-section gg-ps-danger-zone">
-            <div className="gg-ps-section-label gg-ps-danger-label">Удаление клиента</div>
+            <div className="gg-ps-section-label gg-ps-danger-label">Удаление проекта</div>
 
             <div className="gg-ps-danger-row gg-ps-danger-row-stack">
               <div>

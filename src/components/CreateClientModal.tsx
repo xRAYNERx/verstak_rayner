@@ -145,7 +145,7 @@ export function CreateClientModal({ onClose, onOpened }: CreateClientModalProps)
           {mode === 'create' && (
             <div className="gg-create-client-form">
               <div className="gg-create-client-preview">
-                <ProjectAvatar project={previewProject} className="gg-create-client-avatar" size={56} />
+                <ProjectAvatar project={previewProject} className="gg-rail-avatar" size={56} />
                 <div className="gg-create-client-preview-text">
                   <div className="gg-create-client-preview-name">{previewProject.name}</div>
                   {folderSlug && <div className="gg-create-client-preview-slug">{folderSlug}</div>}
