@@ -78,6 +78,12 @@ interface AiDeps {
   /** Фасад истории Verification Artifact (Фаза 3) — attest_verification пишет
    *  строку после writeVerificationArtifact. Прокидывается в ToolContext. */
   verifications?: ToolContext['verifications']
+  /** Dev Task Flow (Фаза 2) — привязка прогона к активной dev_task чата. Best-
+   *  effort: если у чата есть открытая (не committed/cancelled) задача, прогон
+   *  линкуется к ней (один dev_task ↔ N run_id). Опционально — без него
+   *  dev_task просто не накапливает run_id'ы (откат всё равно работает через
+   *  checkpoint). Возвращает true если связал. */
+  linkDevTaskRun?: (projectPath: string, chatId: number | null, runId: string) => void
 }
 
 let currentSendId = 0
@@ -524,6 +530,17 @@ export function registerAiIpc(deps: AiDeps): void {
       })
     } catch (err) {
       console.warn('[agent-runs] create failed:', err instanceof Error ? err.message : err)
+    }
+
+    // Dev Task Flow (Фаза 2): если у активного чата есть открытая dev_task —
+    // привязываем этот прогон к ней (один dev_task ↔ N run_id). Не для review-
+    // прогонов (их активность к задаче не относится). Best-effort.
+    if (projectPath && runOwner === 'main') {
+      try {
+        deps.linkDevTaskRun?.(projectPath, chatId ? Number(chatId) : null, runId)
+      } catch (err) {
+        console.warn('[dev-task] linkDevTaskRun failed:', err instanceof Error ? err.message : err)
+      }
     }
 
     // Force-plain path: review uses no tools regardless of provider capability.

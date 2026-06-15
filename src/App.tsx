@@ -18,6 +18,7 @@ import { SkillsView } from './components/SkillsView'
 import { AgentRunInspector } from './components/AgentRunInspector'
 import { AgentsPanel } from './components/AgentsPanel'
 import { AgentRunsPanel } from './components/AgentRunsPanel'
+import { DevTaskPanel } from './components/DevTaskPanel'
 import { ProjectMapPanel } from './components/ProjectMapPanel'
 import { WorkflowView } from './components/WorkflowView'
 import { WorkflowsPanel } from './components/WorkflowsPanel'
@@ -263,6 +264,7 @@ export function App() {
         {activeView === 'inspector' && <AgentRunInspector />}
         {activeView === 'agents' && <AgentsPanel />}
         {activeView === 'tasks-manager' && <AgentRunsPanel />}
+        {activeView === 'task' && <DevTaskPanel />}
         {activeView === 'project-map' && <ProjectMapPanel />}
         {activeView === 'memory-gov' && <MemoryGovernance />}
         {activeView === 'plan' && <PlanView />}

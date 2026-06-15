@@ -37,6 +37,7 @@ import { createAgentRuns } from './storage/agent-runs'
 import { createVerifications } from './storage/verifications'
 import { createDevTasks } from './storage/dev-tasks'
 import { registerGitIpc } from './ipc/git'
+import { registerDevTaskIpc, isActiveDevTask } from './ipc/dev-task'
 import { registerAgentsIpc } from './ipc/agents'
 import { registerAgentRunsIpc } from './ipc/agent-runs'
 import { registerVerificationsIpc } from './ipc/verifications'
@@ -267,11 +268,10 @@ app.whenReady().then(() => {
   // Verification Artifact (Фаза 3) — история DoD поверх файла-артефакта.
   // attest_verification пишет строку, Review подтягивает latest по чату.
   const verifications = createVerifications(db)
-  // Dev Task Flow (Фаза 1) — фасад dev_tasks инстанцируем заранее, фундамент
-  // доступен следующим фазам. В Фазе 1 НЕ используется: оркестратор dev-task.ts
-  // и git-write придут в Фазах 2-5. Поведение приложения не меняется.
+  // Dev Task Flow — фасад dev_tasks. Фаза 2: оркестратор open/revert + наблюдение
+  // (registerDevTaskIpc ниже) + привязка прогонов к активной задаче чата. git-write
+  // (ветки/commit) придёт в Фазах 3-5.
   const devTasks = createDevTasks(db)
-  void devTasks
   const tasks = createTasks(db)
   const journal = createJournal(db)
   const projects = createProjects(db)
@@ -395,6 +395,13 @@ app.whenReady().then(() => {
     // после writeVerificationArtifact (best-effort). Только insert нужен в ctx.
     verifications: {
       insert: (row) => verifications.insert(row)
+    },
+    // Dev Task Flow (Фаза 2) — линкуем прогон к открытой dev_task чата, если
+    // такая есть. Берём новейшую активную задачу этого чата (state не
+    // committed/cancelled). Best-effort: нет задачи → no-op.
+    linkDevTaskRun: (projectPath, chatId, runId) => {
+      const active = devTasks.list(projectPath).find(t => t.chatId === chatId && isActiveDevTask(t))
+      if (active) devTasks.linkRun(active.id, runId)
     }
   })
   registerChatsIpc(chats, chatSessions, db)
@@ -420,6 +427,9 @@ app.whenReady().then(() => {
   // Git READ IPC (Dev Task Flow, Фаза 1) — структурированные status/diff/log.
   // ТОЛЬКО чтение; git-write (ветки/commit) добавит Фаза 3.
   registerGitIpc(getActiveProjectPath)
+  // Dev Task Flow IPC (Фаза 2) — оркестратор open/openFromPreflight/get/list/
+  // linkRun/revert. Откат переиспользует undoStack (тот же стек, что undo:*).
+  registerDevTaskIpc({ tasks: devTasks, getProjectRoot: getActiveProjectPath, undoStack })
   registerAutonomousIpc({
     getSecret,
     getProviderId,

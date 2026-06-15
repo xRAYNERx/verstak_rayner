@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent, type ClipboardEvent } from 'react'
-import { useProject } from '../store/projectStore'
+import { useProject, type PreflightCard } from '../store/projectStore'
 import { useProvider } from '../hooks/useProvider'
 import { estimateCost, costSeverity, costBreakdown } from '../lib/pricing'
 import { Markdown } from './Markdown'
@@ -10,6 +10,7 @@ import { VoiceInput } from './VoiceInput'
 import { TimelineBar } from './TimelineBar'
 import { ReviewPanel } from './ReviewPills'
 import { CheckpointButton } from './CheckpointButton'
+import { DevTaskBadge } from './DevTaskBadge'
 import { ReviewButton } from './ReviewButton'
 import { SkillPicker } from './SkillPicker'
 import { MultiAgentPicker } from './MultiAgentPicker'
@@ -495,6 +496,26 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
       const newCount = await window.api.undo.count(path)
       setUndoCount(newCount)
     }
+  }
+
+  // Dev Task Flow (Фаза 2): открыть задачу из preflight-плана. Мягкое действие
+  // по клику (НЕ авто-создание): main снимет checkpoint + зафиксирует git-базу,
+  // store делает задачу активной и открывает вкладку «Задача».
+  async function openTaskFromPreflight(pf: PreflightCard) {
+    const store = useProject.getState()
+    if (!store.path) return
+    try {
+      const task = await window.api.devtask.openFromPreflight({
+        chatId: store.activeChatId,
+        preflight: {
+          summary: pf.summary,
+          risk: pf.risk,
+          riskReason: pf.riskReason,
+          affectedZones: pf.affectedZones
+        }
+      })
+      if (task) store.openDevTask(task)
+    } catch { /* IPC недоступен в dev — тихо игнорируем */ }
   }
 
   // Auto-grow textarea
@@ -1052,6 +1073,19 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
                         </ul>
                       </div>
                     )}
+                    {/* Dev Task Flow (Фаза 2): мягкое предложение открыть задачу из
+                        плана — НЕ авто-создание. Снимет checkpoint + зафиксирует
+                        git-базу, появится вкладка «Задача» с откатом. */}
+                    <div className="gg-preflight-section gg-preflight-devtask">
+                      <button
+                        type="button"
+                        className="gg-preflight-opentask"
+                        onClick={() => void openTaskFromPreflight(pf)}
+                        title="Открыть задачу из этого плана — снимет чекпоинт и покажет вкладку «Задача» с откатом"
+                      >
+                        🗂️ Открыть задачу из этого плана
+                      </button>
+                    </div>
                   </div>
                 )
               })}
@@ -1369,6 +1403,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
             <SkillPicker />
             <MultiAgentPicker onInject={injectTemplate} />
             <CheckpointButton />
+            <DevTaskBadge />
             <ReviewButton />
             <div className="gg-effort-toggle" title="Уровень усилий модели">
               <button

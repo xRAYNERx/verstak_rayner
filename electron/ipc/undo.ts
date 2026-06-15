@@ -3,6 +3,71 @@ import { writeFile, unlink, stat } from 'fs/promises'
 import type { UndoStack } from '../storage/undo'
 import { safeRealJoin } from '../ai/path-policy'
 
+/** Результат отката к чекпоинту (shape совпадает с api.d.ts undo.revertToCheckpoint). */
+export interface RevertToCheckpointResult {
+  ok: boolean
+  restored: string[]
+  count: number
+  failed?: Array<{ id: number; filePath: string; reason: string }>
+}
+
+/**
+ * Откатить каждую undo-запись с id > checkpointId. Pop'ает их newest-first,
+ * чтобы зависимые правки восстанавливались в правильном порядке. checkpointId=0
+ * — случай «чекпоинт на пустом стеке»: у каждой записи id > 0, поэтому фильтр
+ * естественно откатывает всё.
+ *
+ * Вынесено из ipc-хендлера, чтобы Dev Task Flow (ipc/dev-task.ts) переиспользовал
+ * РОВНО ТОТ ЖЕ откат через тот же UndoStack — без дублирования логики и без
+ * заведения отдельного стека. На ошибке re-push'ит непрошедшие записи для retry.
+ */
+export async function revertToCheckpoint(
+  stack: UndoStack,
+  projectPath: string,
+  checkpointId: number
+): Promise<RevertToCheckpointResult> {
+  const all = stack.list(projectPath)
+  const toRevert = all.filter(e => e.id > checkpointId)
+  if (toRevert.length === 0) return { ok: true, restored: [], count: 0 }
+  const restored: string[] = []
+  const failed: Array<{ id: number; filePath: string; before: string; after: string; reason: string }> = []
+  // Newest first — undo entries reflect chronological writes; reversing
+  // them restores files in their proper rollback order.
+  for (const entry of toRevert) {
+    const popped = stack.pop(entry.id)
+    if (!popped) continue
+    try {
+      const abs = await safeRealJoin(projectPath, popped.filePath)
+      const before = popped.beforeContent
+      if (before === null || before === '') {
+        try {
+          await stat(abs)
+          await unlink(abs)
+        } catch { /* already gone */ }
+      } else {
+        await writeFile(abs, before, 'utf8')
+      }
+      restored.push(popped.filePath)
+    } catch (err) {
+      failed.push({
+        id: popped.id,
+        filePath: popped.filePath,
+        before: popped.beforeContent ?? '',
+        after: popped.afterContent ?? '',
+        reason: err instanceof Error ? err.message : String(err)
+      })
+    }
+  }
+  // Re-push the failed ones so the user can see / retry
+  for (const f of failed) {
+    stack.push(projectPath, f.filePath, f.before, f.after)
+  }
+  if (failed.length > 0) {
+    return { ok: false, restored, count: restored.length, failed: failed.map(f => ({ id: f.id, filePath: f.filePath, reason: f.reason })) }
+  }
+  return { ok: true, restored, count: restored.length }
+}
+
 export function registerUndoIpc(stack: UndoStack): void {
   ipcMain.handle('undo:list', (_e, projectPath: string) => stack.list(projectPath))
   ipcMain.handle('undo:count', (_e, projectPath: string) => stack.count(projectPath))
@@ -29,48 +94,9 @@ export function registerUndoIpc(stack: UndoStack): void {
    * something blew up halfway. On failure we re-push popped-but-unrestored
    * entries so the user can retry.
    */
-  ipcMain.handle('undo:revertToCheckpoint', async (_e, projectPath: string, checkpointId: number) => {
-    const all = stack.list(projectPath)
-    const toRevert = all.filter(e => e.id > checkpointId)
-    if (toRevert.length === 0) return { ok: true, restored: [], count: 0 }
-    const restored: string[] = []
-    const failed: Array<{ id: number; filePath: string; before: string; after: string; reason: string }> = []
-    // Newest first — undo entries reflect chronological writes; reversing
-    // them restores files in their proper rollback order.
-    for (const entry of toRevert) {
-      const popped = stack.pop(entry.id)
-      if (!popped) continue
-      try {
-        const abs = await safeRealJoin(projectPath, popped.filePath)
-        const before = popped.beforeContent
-        if (before === null || before === '') {
-          try {
-            await stat(abs)
-            await unlink(abs)
-          } catch { /* already gone */ }
-        } else {
-          await writeFile(abs, before, 'utf8')
-        }
-        restored.push(popped.filePath)
-      } catch (err) {
-        failed.push({
-          id: popped.id,
-          filePath: popped.filePath,
-          before: popped.beforeContent ?? '',
-          after: popped.afterContent ?? '',
-          reason: err instanceof Error ? err.message : String(err)
-        })
-      }
-    }
-    // Re-push the failed ones so the user can see / retry
-    for (const f of failed) {
-      stack.push(projectPath, f.filePath, f.before, f.after)
-    }
-    if (failed.length > 0) {
-      return { ok: false, restored, count: restored.length, failed }
-    }
-    return { ok: true, restored, count: restored.length }
-  })
+  ipcMain.handle('undo:revertToCheckpoint', (_e, projectPath: string, checkpointId: number) =>
+    revertToCheckpoint(stack, projectPath, checkpointId)
+  )
 
   // Pop the most recent (or specific) entry and restore the file's previous state.
   ipcMain.handle('undo:revert', async (_e, projectPath: string, id?: number) => {

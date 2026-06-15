@@ -197,6 +197,17 @@ contextBridge.exposeInMainWorld('api', {
     diff: (opts?: { base?: string; staged?: boolean; path?: string }) => ipcRenderer.invoke('git:diff', opts),
     log: (opts?: { limit?: number }) => ipcRenderer.invoke('git:log', opts)
   },
+  // Dev Task Flow (Фаза 2) — оркестратор open/наблюдение/откат активной задачи.
+  devtask: {
+    open: (opts: { chatId?: number | null; title: string; summary?: string | null; risk?: string | null }) =>
+      ipcRenderer.invoke('devtask:open', opts),
+    openFromPreflight: (opts: { chatId?: number | null; preflight: { summary: string; risk?: string; riskReason?: string; affectedZones?: string[] } }) =>
+      ipcRenderer.invoke('devtask:openFromPreflight', opts),
+    get: (id: number) => ipcRenderer.invoke('devtask:get', id),
+    list: (projectPath: string, opts?: { state?: string }) => ipcRenderer.invoke('devtask:list', projectPath, opts),
+    linkRun: (id: number, runId: string) => ipcRenderer.invoke('devtask:linkRun', id, runId),
+    revert: (id: number) => ipcRenderer.invoke('devtask:revert', id)
+  },
   autonomous: {
     status: () => ipcRenderer.invoke('autonomous:status') as Promise<{ enabled: boolean; intervalMin: number; lastRunAt: number | null; lastRunSuggestions: number; lastRunError: string | null; nextRunAt: number | null }>,
     runOnce: () => ipcRenderer.invoke('autonomous:run-once') as Promise<{ enabled: boolean; intervalMin: number; lastRunAt: number | null; lastRunSuggestions: number; lastRunError: string | null; nextRunAt: number | null }>,

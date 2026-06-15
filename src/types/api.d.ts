@@ -306,6 +306,21 @@ declare global {
         diff(opts?: { base?: string; staged?: boolean; path?: string }): Promise<GitDiff>
         log(opts?: { limit?: number }): Promise<GitLogEntry[]>
       }
+      // Dev Task Flow (Фаза 2) — оркестратор открытия задачи + наблюдение + откат.
+      devtask: {
+        /** Открыть задачу: снять checkpoint, зафиксировать base_branch/sha. */
+        open(opts: { chatId?: number | null; title: string; summary?: string | null; risk?: string | null }): Promise<DevTask | null>
+        /** Открыть задачу из объявленного preflight-плана. */
+        openFromPreflight(opts: { chatId?: number | null; preflight: { summary: string; risk?: string; riskReason?: string; affectedZones?: string[] } }): Promise<DevTask | null>
+        /** Задача + её проверки. */
+        get(id: number): Promise<DevTaskDetail>
+        /** Задачи проекта (новейшие первыми), опц. фильтр по state. */
+        list(projectPath: string, opts?: { state?: DevTaskState }): Promise<DevTask[]>
+        /** Связать прогон с задачей (идемпотентно). */
+        linkRun(id: number, runId: string): Promise<void>
+        /** Откатить файловые правки задачи к её чекпоинту. true = успех. */
+        revert(id: number): Promise<boolean>
+      }
       term: {
         spawn: (cwd: string) => Promise<number>
         write: (id: number, data: string) => Promise<void>
@@ -677,6 +692,11 @@ export interface DevTaskCheck {
   outputTail: string | null
   ranInWorktree: boolean
   createdAt: number
+}
+/** Агрегат devtask:get — задача + её проверки (Фаза 2). */
+export interface DevTaskDetail {
+  task: DevTask | null
+  checks: DevTaskCheck[]
 }
 
 /** Дескриптор провайдера — единый источник из main process (electron/ai/registry.ts). */

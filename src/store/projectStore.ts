@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { FileNode, ChatMessage, ProjectMeta, ChatSession } from '../types/api'
+import type { FileNode, ChatMessage, ProjectMeta, ChatSession, DevTask } from '../types/api'
 import { isModelValidForProvider } from '../hooks/useProvider'
 import {
   freshSnapshot,
@@ -41,7 +41,7 @@ export interface SubagentRunCard {
   toolCount?: number
 }
 
-export type ViewId = 'chat' | 'tasks' | 'journal' | 'plan' | 'workflow' | 'calendar' | 'feedback' | 'browser' | 'skills' | 'design' | 'video' | 'inspector' | 'memory-gov' | 'agents' | 'tasks-manager' | 'project-map'
+export type ViewId = 'chat' | 'tasks' | 'journal' | 'plan' | 'workflow' | 'calendar' | 'feedback' | 'browser' | 'skills' | 'design' | 'video' | 'inspector' | 'memory-gov' | 'agents' | 'tasks-manager' | 'project-map' | 'task'
 
 /**
  * Owner для in-flight sendId. Заменил собой 2 параллельных мапа
@@ -97,6 +97,11 @@ interface ProjectState {
    *  checkpoint pops every entry whose id > this until back at this mark.
    *  Null when no checkpoint set. */
   checkpointId: number | null
+  /** Dev Task Flow (Фаза 2): id активной dev_task текущего чата (или null).
+   *  Привязывается при openDevTask, питает бейдж и вкладку «Задача». */
+  activeDevTaskId: number | null
+  /** Снимок активной dev_task — обновляется refreshDevTask. null если задачи нет. */
+  devTask: DevTask | null
   activeView: ViewId
   sessionUsage: SessionUsage
   runningPlanStep: RunningPlanStep | null
@@ -158,6 +163,13 @@ interface ProjectState {
   /** Snap a checkpoint at the current undo head. Subsequent writes can be
    *  rolled back to this mark in one click. */
   setCheckpoint: (id: number | null) => void
+  /** Dev Task Flow (Фаза 2): сделать задачу активной (id + снимок) и открыть
+   *  вкладку «Задача». */
+  openDevTask: (task: DevTask) => void
+  /** Перечитать снимок активной dev_task из main (devtask:get). No-op без id. */
+  refreshDevTask: () => Promise<void>
+  /** Сбросить активную задачу (снимок + id). Вкладку не переключает. */
+  closeDevTask: () => void
   addUsage: (delta: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number }) => void
   resetUsage: () => void
   setRunningPlanStep: (s: RunningPlanStep | null) => void
@@ -249,6 +261,8 @@ export const useProject = create<ProjectState>((set, get) => ({
   subagentRuns: [],
   touchedFiles: {},
   checkpointId: null,
+  activeDevTaskId: null,
+  devTask: null,
   activeView: 'chat',
   sessionUsage: { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 },
   runningPlanStep: null,
@@ -344,6 +358,10 @@ export const useProject = create<ProjectState>((set, get) => ({
       // to the active conversation, not the project itself.
       touchedFiles: {},
       checkpointId: null,
+      // Dev Task Flow (Фаза 2): активная задача привязана к чату/проекту —
+      // сбрасываем при смене проекта (бейдж переразрешит её для нового контекста).
+      activeDevTaskId: null,
+      devTask: null,
       // Сбрасываем chatSnapshots — при смене проекта снапшоты предыдущего
       // проекта не должны просачиваться если SQLite autoincrement ID пересекутся.
       chatSnapshots: {},
@@ -430,6 +448,18 @@ export const useProject = create<ProjectState>((set, get) => ({
   }),
   clearTouchedFiles: () => set({ touchedFiles: {} }),
   setCheckpoint: (id) => set({ checkpointId: id }),
+  openDevTask: (task) => set({ activeDevTaskId: task.id, devTask: task, activeView: 'task' }),
+  refreshDevTask: async () => {
+    const id = get().activeDevTaskId
+    if (id == null) return
+    try {
+      const detail = await window.api.devtask.get(id)
+      // Задача могла быть удалена/не найдена — снимаем активность.
+      if (!detail?.task) { set({ devTask: null, activeDevTaskId: null }); return }
+      set({ devTask: detail.task })
+    } catch { /* IPC недоступен в dev — оставляем текущий снимок */ }
+  },
+  closeDevTask: () => set({ activeDevTaskId: null, devTask: null }),
   addUsage: (delta) => set(s => ({
     sessionUsage: {
       inputTokens: s.sessionUsage.inputTokens + (delta.inputTokens ?? 0),
