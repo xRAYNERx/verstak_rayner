@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { join } from 'path'
+import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync } from 'fs'
+import { tmpdir } from 'os'
 import { safeJoin, isWithinKnownRoots } from '../../electron/ai/path-policy'
 
 const WIN = process.platform === 'win32'
@@ -59,5 +61,25 @@ describe('path-policy isWithinKnownRoots', () => {
 
   it('игнорирует пустые корни в списке', () => {
     expect(isWithinKnownRoots(join(ROOT, 'a.ts'), ['', ROOT])).toBe(true)
+  })
+
+  // Ревью F5: realpath-aware. Symlink ВНУТРИ корня, ведущий НАРУЖУ, должен
+  // отвергаться (раньше textual resolve() пропускал его как «внутри»). Нужны
+  // реальные пути (realpath работает только на существующих). На Windows
+  // создание symlink требует привилегий — мягкий пропуск при EPERM.
+  it('false для symlink внутри корня, ведущего наружу (realpath)', () => {
+    const realRoot = mkdtempSync(join(tmpdir(), 'gg-root-'))
+    const outside = mkdtempSync(join(tmpdir(), 'gg-outside-'))
+    writeFileSync(join(outside, 'secret.txt'), 'TOP SECRET')
+    const link = join(realRoot, 'escape')
+    let linked = false
+    try { symlinkSync(outside, link, 'dir'); linked = true } catch { /* нет привилегий */ }
+    if (!linked) return
+    // Путь через symlink указывает на файл вне корня → должен быть отвергнут.
+    expect(isWithinKnownRoots(join(link, 'secret.txt'), [realRoot])).toBe(false)
+    // Контроль: реальный файл внутри корня — внутри.
+    mkdirSync(join(realRoot, 'sub'))
+    writeFileSync(join(realRoot, 'sub', 'ok.txt'), 'ok')
+    expect(isWithinKnownRoots(join(realRoot, 'sub', 'ok.txt'), [realRoot])).toBe(true)
   })
 })

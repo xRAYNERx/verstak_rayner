@@ -1,5 +1,5 @@
 import { ipcMain, shell } from 'electron'
-import { readdir, stat, readFile } from 'fs/promises'
+import { readdir, stat, readFile, lstat } from 'fs/promises'
 import { join } from 'path'
 import { safeRealJoin, isWithinKnownRoots } from '../ai/path-policy'
 import { isForbiddenPath, scanText } from '../ai/secret-scanner'
@@ -10,7 +10,9 @@ export type { FileNode }
 const IGNORE = new Set(['node_modules', '.git', 'out', 'dist', '.verstak-data', '.superpowers'])
 const MAX_READ_BYTES = 2 * 1024 * 1024  // 2 MB safety cap
 
-async function listTree(current: string, depth: number): Promise<FileNode[]> {
+// export для regression-теста (ревью F4): symlink-директория наружу не должна
+// раскрываться listTree (lstat + isSymbolicLink continue).
+export async function listTree(current: string, depth: number): Promise<FileNode[]> {
   if (depth > 5) return []
   let entries: string[]
   try {
@@ -22,9 +24,10 @@ async function listTree(current: string, depth: number): Promise<FileNode[]> {
   for (const name of entries) {
     if (IGNORE.has(name) || name.startsWith('.')) continue
     const abs = join(current, name)
-    let st
-    try { st = await stat(abs) } catch { continue }
-    if (st.isDirectory()) {
+    let lst
+    try { lst = await lstat(abs) } catch { continue }
+    if (lst.isSymbolicLink()) continue // Игнорируем символические ссылки во избежание обхода дерева наружу или бесконечных циклов
+    if (lst.isDirectory()) {
       nodes.push({ name, path: abs, isDirectory: true, children: await listTree(abs, depth + 1) })
     } else {
       nodes.push({ name, path: abs, isDirectory: false })

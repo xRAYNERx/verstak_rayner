@@ -15,6 +15,7 @@
 
 import { resolve, relative, sep, isAbsolute } from 'path'
 import { realpath } from 'fs/promises'
+import { realpathSync } from 'fs'
 
 /**
  * True, если target лежит внутри (или совпадает с) одним из knownRoots.
@@ -26,10 +27,20 @@ import { realpath } from 'fs/promises'
  */
 export function isWithinKnownRoots(target: string, knownRoots: string[]): boolean {
   let abs: string
-  try { abs = resolve(target) } catch { return false }
+  try {
+    abs = realpathSync(resolve(target))
+  } catch {
+    try { abs = resolve(target) } catch { return false }
+  }
   for (const root of knownRoots) {
     if (!root) continue
-    const r = relative(resolve(root), abs)
+    let realRoot: string
+    try {
+      realRoot = realpathSync(resolve(root))
+    } catch {
+      try { realRoot = resolve(root) } catch { continue }
+    }
+    const r = relative(realRoot, abs)
     if (r === '' || (!r.startsWith('..') && !r.includes('..' + sep) && !isAbsolute(r))) return true
   }
   return false
