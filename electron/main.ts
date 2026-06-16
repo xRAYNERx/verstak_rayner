@@ -13,6 +13,8 @@ if (process.platform === 'linux' && process.env.APPIMAGE) {
   app.commandLine.appendSwitch('no-sandbox')
 }
 
+
+
 // In ESM modules __dirname is not a global. Recreate it from import.meta.url.
 const HERE = dirname(fileURLToPath(import.meta.url))
 import { registerProjectIpc } from './ipc/projects'
@@ -44,6 +46,7 @@ import { registerVerificationsIpc } from './ipc/verifications'
 import { createTasks } from './storage/tasks'
 import { createJournal } from './storage/journal'
 import { createProjects } from './storage/projects'
+import { createProjectGroups } from './storage/project-groups'
 import { createUndoStack } from './storage/undo'
 import { registerUndoIpc } from './ipc/undo'
 import { createPlans } from './storage/plans'
@@ -72,9 +75,10 @@ import { registerDebugIpc } from './ipc/debug'
 import { saveRunInput } from './storage/run-inputs'
 import { trackToolForPatterns } from './ai/procedural-memory'
 import { registerSuggestionsIpc } from './ipc/suggestions'
-import { initAutoUpdater } from './updater'
+import { initAutoUpdater, registerReleaseNotesIpc } from './updater'
 import { registerNotifyIpc } from './ipc/notify'
 import { isInsideProjectIcons } from './storage/project-icons'
+import { registerVoiceIpc } from './ipc/voice'
 import { bindUiScaleToWindow } from './ui-scale'
 import {
   mainWindowConstructorOptions,
@@ -127,16 +131,17 @@ function createWindow(settings: Settings): BrowserWindow {
  * NOT affected by this CSP either way.
  */
 /**
- * Allow microphone access so VoiceInput / Web Speech API can request it.
+ * Allow microphone access for VoiceInput.
  * Without this Electron silently rejects getUserMedia('audio').
  */
 function installMediaPermissions(): void {
+  const mediaPermissions = new Set(['media', 'audioCapture', 'videoCapture'])
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
-    if (permission === 'media') return callback(true)
+    if (mediaPermissions.has(permission)) return callback(true)
     callback(false)
   })
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => {
-    return permission === 'media'
+    return mediaPermissions.has(permission)
   })
 }
 
@@ -230,6 +235,7 @@ app.whenReady().then(() => {
     gemini_api_key: 'GEMINI_API_KEY',
     anthropic_api_key: 'ANTHROPIC_API_KEY',
     openai_api_key: 'OPENAI_API_KEY',
+    groq_api_key: 'GROQ_API_KEY',
     xai_api_key: 'XAI_API_KEY',
   }
   const getSecret = (key: string): string | null => {
@@ -283,6 +289,7 @@ app.whenReady().then(() => {
   const tasks = createTasks(db)
   const journal = createJournal(db)
   const projects = createProjects(db)
+  const projectGroups = createProjectGroups(db)
   const undoStack = createUndoStack(db)
   const plans = createPlans(db)
   const feedback = createFeedback(db)
@@ -310,7 +317,7 @@ app.whenReady().then(() => {
     return roots
   }
 
-  registerProjectIpc(projects, db)
+  registerProjectIpc(projects, projectGroups, db)
   registerProjectMapIpc(knownRoots)
   registerFilesIpc({ getProjectRoot: getActiveProjectPath, getKnownRoots: knownRoots })
   registerSettingsIpc(settings)
@@ -482,6 +489,8 @@ app.whenReady().then(() => {
   registerAuditIpc(db)
   registerDebugIpc(db, chats)
   registerSuggestionsIpc(db)
+  registerReleaseNotesIpc()
+  registerVoiceIpc()
   const mainWindow = createWindow(settings)
   const iconPath = join(HERE, '../../resources/icon.png')
   registerNotifyIpc(() => mainWindow, iconPath)

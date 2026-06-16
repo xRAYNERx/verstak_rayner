@@ -6,6 +6,7 @@ import { ensureUserLayer } from '../ai/user-layer'
 import { warmProjectMaps } from '../ai/project-map'
 import type { Database } from 'better-sqlite3'
 import type { Projects } from '../storage/projects'
+import type { ProjectGroups, ProjectGroupPatch } from '../storage/project-groups'
 import { deleteProjectDirectory, purgeProjectAppData } from '../storage/project-purge'
 import {
   clientFolderExists,
@@ -34,7 +35,7 @@ async function pickImageFile(win: BrowserWindow): Promise<string | null> {
   return result.filePaths[0]
 }
 
-export function registerProjectIpc(projects: Projects, db: Database): void {
+export function registerProjectIpc(projects: Projects, projectGroups: ProjectGroups, db: Database): void {
   ipcMain.handle('projects:pick', async () => {
     const win = BrowserWindow.getFocusedWindow()
     if (!win) return null
@@ -128,6 +129,30 @@ export function registerProjectIpc(projects: Projects, db: Database): void {
   })
 
   ipcMain.handle('projects:list', () => projects.list())
+
+  ipcMain.handle('projects:list-groups', () => projectGroups.list())
+  ipcMain.handle('projects:create-group', (_e, name: string, projectPaths: string[]) => {
+    try {
+      return { ok: true as const, group: projectGroups.create(name, projectPaths ?? []) }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Не удалось создать группу'
+      return { ok: false as const, error: msg }
+    }
+  })
+  ipcMain.handle('projects:update-group', (_e, id: number, patch: ProjectGroupPatch) => {
+    try {
+      const group = projectGroups.update(id, patch)
+      if (!group) return { ok: false as const, error: 'Группа не найдена' }
+      return { ok: true as const, group }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Не удалось обновить группу'
+      return { ok: false as const, error: msg }
+    }
+  })
+  ipcMain.handle('projects:delete-group', (_e, id: number) => {
+    projectGroups.remove(id)
+    return { ok: true as const }
+  })
   ipcMain.handle('projects:rename', (_e, path: string, name: string) => projects.rename(path, name))
   ipcMain.handle('projects:update-meta', (_e, path: string, patch: { name?: string }) => {
     // Принимаем ТОЛЬКО name. iconPath из renderer игнорируем — иконка ставится
@@ -173,6 +198,7 @@ export function registerProjectIpc(projects: Projects, db: Database): void {
       }
     }
 
+    projectGroups.detachProject(path)
     projects.remove(path)
     forgetMemorizedProject(path)
     return { ok: true }

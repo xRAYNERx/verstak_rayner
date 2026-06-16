@@ -28,6 +28,8 @@ import { DiffView } from './components/DiffView'
 import { CommandConfirm } from './components/CommandConfirm'
 
 import { UpdateAvailableModal } from './components/UpdateAvailableModal'
+import { WhatsNewModal } from './components/WhatsNewModal'
+
 import { Terminal } from './components/Terminal'
 import { FilesPanel } from './components/FilesPanel'
 import { SideChat } from './components/SideChat'
@@ -354,6 +356,8 @@ export function App() {
       <DiffView />
       <CommandConfirm />
       <UpdateAvailableModal />
+      <WhatsNewModal />
+
     </div>
     </I18nContext.Provider>
   )

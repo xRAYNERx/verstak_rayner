@@ -15,6 +15,8 @@ import { ResumeBanner } from './ResumeBanner'
 import { ReviewButton } from './ReviewButton'
 import { SkillPicker } from './SkillPicker'
 import { MultiAgentPicker } from './MultiAgentPicker'
+import { ComposerToolsMenu } from './ComposerToolsMenu'
+import { EffortPicker } from './EffortPicker'
 import { SlashCommandPopup, type SlashCommand } from './SlashCommandPopup'
 import { MULTI_AGENT_TEMPLATES } from '../lib/multi-agent-templates'
 import { useSkills as useSkillsStore } from '../store/skillStore'
@@ -113,7 +115,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
   // Codex-style right-panel menu anchored to the top-right header button.
   const [panelMenuOpen, setPanelMenuOpen] = useState(false)
   const panelMenuRef = useRef<HTMLDivElement>(null)
-  const { messages, addMessage, updateLastAssistant, isStreaming, setStreaming, activity, preflights, subagentRuns, sessionUsage, path: activePath, chatSessions, activeChatId, effortLevel, setEffortLevel } = useProject()
+  const { messages, addMessage, updateLastAssistant, isStreaming, setStreaming, activity, preflights, subagentRuns, sessionUsage, path: activePath, chatSessions, activeChatId } = useProject()
   const { mode: agentMode, setMode: setAgentMode } = useAgentMode()
   const projectName = activePath ? activePath.replace(/^.*[\\/]/, '') : null
   const activeChatTitle = chatSessions.find(s => s.id === activeChatId)?.title ?? null
@@ -1449,7 +1451,11 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
                 <path d="m21.44 11.05 -9.19 9.19a6 6 0 0 1 -8.49 -8.49l9.19 -9.19a4 4 0 0 1 5.66 5.66L9.41 17.41a2 2 0 0 1 -2.83 -2.83l8.49 -8.48" />
               </svg>
             </button>
-            <VoiceInput onTranscript={chunk => setInput(prev => prev + chunk)} />
+            <VoiceInput
+              disabled={isStreaming}
+              onTranscript={chunk => setInput(prev => prev + chunk)}
+            />
+            <EffortPicker />
             {isStreaming ? (
               <button
                 className="gg-send-btn gg-stop-btn"
@@ -1553,26 +1559,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
             <CheckpointButton />
             <DevTaskBadge />
             <ReviewButton />
-            <div className="gg-effort-toggle" title="Уровень усилий модели">
-              <button
-                type="button"
-                className={effortLevel === 'quick' ? 'active' : ''}
-                onClick={() => setEffortLevel('quick')}
-                title="Быстро — короткие ответы, дешевле"
-              >💨</button>
-              <button
-                type="button"
-                className={effortLevel === 'standard' ? 'active' : ''}
-                onClick={() => setEffortLevel('standard')}
-                title="Стандарт"
-              >⚖️</button>
-              <button
-                type="button"
-                className={effortLevel === 'deep' ? 'active' : ''}
-                onClick={() => setEffortLevel('deep')}
-                title="Глубоко — расширенное мышление"
-              >🧠</button>
-            </div>
+            <ComposerToolsMenu />
             <ModePicker mode={agentMode} onChange={setAgentMode} />
             <ModelPicker onOpenSettings={onOpenSettings} />
             <TierRecommendation input={input} />

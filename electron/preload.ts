@@ -15,7 +15,17 @@ contextBridge.exposeInMainWorld('api', {
     pickIcon: (path: string) => ipcRenderer.invoke('projects:pick-icon', path),
     clearIcon: (path: string) => ipcRenderer.invoke('projects:clear-icon', path),
     remove: (path: string, options?: { deleteData?: boolean }) =>
-      ipcRenderer.invoke('projects:remove', path, options) as Promise<{ ok: boolean; error?: string }>
+      ipcRenderer.invoke('projects:remove', path, options) as Promise<{ ok: boolean; error?: string }>,
+    listGroups: () => ipcRenderer.invoke('projects:list-groups'),
+    createGroup: (name: string, projectPaths: string[]) =>
+      ipcRenderer.invoke('projects:create-group', name, projectPaths),
+    updateGroup: (id: number, patch: {
+      name?: string
+      projectPaths?: string[]
+      collapsed?: boolean
+      sortOrder?: number
+    }) => ipcRenderer.invoke('projects:update-group', id, patch),
+    deleteGroup: (id: number) => ipcRenderer.invoke('projects:delete-group', id)
   },
   app: {
     getHomeDir: () => ipcRenderer.invoke('app:home-dir') as Promise<string>,
@@ -28,6 +38,17 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('notify:show', opts) as Promise<boolean>,
     playSound: (opts?: { isError?: boolean }) =>
       ipcRenderer.invoke('notify:play-sound', opts) as Promise<boolean>
+  },
+  voice: {
+    status: () => ipcRenderer.invoke('voice:status') as Promise<{
+      ready: boolean
+      loading: boolean
+      label: string
+    }>,
+    transcribe: (payload: { data: string; mimeType?: string }) =>
+      ipcRenderer.invoke('voice:transcribe', payload) as Promise<
+        { ok: true; text: string } | { ok: false; error: string }
+      >
   },
   files: {
     tree: (root: string) => ipcRenderer.invoke('files:tree', root),
@@ -262,6 +283,8 @@ contextBridge.exposeInMainWorld('api', {
 
   updater: {
     install: () => ipcRenderer.invoke('update:install'),
+    getReleaseNotes: (opts?: { sinceVersion?: string; upToVersion?: string; version?: string }) =>
+      ipcRenderer.invoke('update:get-release-notes', opts ?? {}),
     check: () => ipcRenderer.invoke('update:check'),
     getState: () => ipcRenderer.invoke('update:get-state') as Promise<{
       phase: string

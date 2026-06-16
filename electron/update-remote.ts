@@ -108,3 +108,71 @@ export async function releaseArtifactsReady(version: string): Promise<boolean> {
     return false
   }
 }
+
+export type ReleaseNote = {
+  version: string
+  name: string
+  body: string
+  htmlUrl: string
+}
+
+type GithubRelease = {
+  tag_name?: string
+  name?: string
+  body?: string
+  html_url?: string
+  draft?: boolean
+  prerelease?: boolean
+}
+
+export function cleanReleaseBody(body: string): string {
+  return body.replace(/\r\n/g, '\n').replace(/\n---\n[\s\S]*$/m, '').trim()
+}
+
+function mapRelease(data: GithubRelease): ReleaseNote | null {
+  if (!data.body || !data.tag_name) return null
+  const version = normalizeVersion(data.tag_name)
+  if (!SEMVER_RE.test(version)) return null
+  return {
+    version,
+    name: data.name || `Verstak ${version}`,
+    body: cleanReleaseBody(data.body),
+    htmlUrl: data.html_url || `https://github.com/${UPDATE_OWNER}/${UPDATE_REPO}/releases/tag/v${version}`,
+  }
+}
+
+export async function fetchReleaseNote(version: string): Promise<ReleaseNote | null> {
+  const tag = `v${normalizeVersion(version)}`
+  const data = await fetchJson<GithubRelease>(
+    `https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}/releases/tags/${tag}`,
+  )
+  return data ? mapRelease(data) : null
+}
+
+export async function fetchAllReleaseNotes(): Promise<ReleaseNote[]> {
+  const list = await fetchJson<GithubRelease[]>(
+    `https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}/releases?per_page=50`,
+  )
+  if (!list) return []
+
+  const notes: ReleaseNote[] = []
+  for (const item of list) {
+    if (item.draft) continue
+    const note = mapRelease(item)
+    if (note) notes.push(note)
+  }
+
+  return notes.sort((a, b) => {
+    if (semverGt(a.version, b.version)) return 1
+    if (semverGt(b.version, a.version)) return -1
+    return 0
+  })
+}
+
+/** Релизы строго после sinceVersion и не новее upToVersion (для whats-new после апдейта). */
+export async function fetchReleaseNotesSince(sinceVersion: string, upToVersion: string): Promise<ReleaseNote[]> {
+  const all = await fetchAllReleaseNotes()
+  const since = normalizeVersion(sinceVersion)
+  const upTo = normalizeVersion(upToVersion)
+  return all.filter((note) => semverGt(note.version, since) && !semverGt(upTo, note.version))
+}

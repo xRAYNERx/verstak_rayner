@@ -17,13 +17,13 @@ const ENTRIES = [
     title: '+20 российских коннекторов (тотал 30)',
     changes: [
       'Свои коннекторы под российские сервисы (не копии чужого кода) — данные клиента прямо в чате агента.',
-      'Контрагенты и реквизиты: DaData (по ИНН/ОГРН, адреса, банки), Контур.Фокус (реквизиты + риск-аналитика).',
-      'Реклама и аналитика: Яндекс.Метрика, Яндекс.Вебмастер, Яндекс.Wordstat, Google Analytics 4, Ozon Performance (бета).',
+      'Контрагенты: DaData (по ИНН/ОГРН, адреса, банки), Контур.Фокус (реквизиты + риск-аналитика).',
+      'Реклама и аналитика: Яндекс.Метрика, Вебмастер, Wordstat, Google Analytics 4, Ozon Performance (бета).',
       'Маркетплейсы: Ozon Seller, Wildberries, MPSTATS (бета), Avito.',
       'CRM и задачи: amoCRM, Яндекс.Трекер, Jira, Trello, МойСклад.',
       'Рассылки и соцсети: SendPulse, UniSender, VK, Notion.',
       'Платежи (только чтение): ЮКасса — сверка оплат и возвратов, без движения денег.',
-      'Все коннекторы read-only, ключи хранятся зашифрованно, ответы прогоняются через secret-scanner.'
+      'Все коннекторы read-only, ключи зашифрованы, ответы прогоняются через secret-scanner.'
     ]
   },
   {
@@ -32,15 +32,106 @@ const ENTRIES = [
     deployed: '16.06.2026',
     title: 'Мульти-агент, дев-задачи, верификация + редизайн Shell Atelier',
     changes: [
-      'Мульти-агент: суб-агенты с инструментами (роли researcher/critic/planner/executor/verifier), delegate_task / delegate_parallel / orchestrate / swarm, слэш-команды и пикер в композере, панель «Агенты» с живым графом.',
-      'Вкладка «Задачи»: история агентных прогонов (agent_runs) с живым прогрессом, остановка/возобновление.',
-      'Вкладка «Задача» (Dev Task Flow): ветки/коммиты под денилистом (push/--force/reset --hard заблокированы), планировщик коммитов, проверки.',
-      'Верификация: артефакт Definition-of-Done, перепрогон проверок (typecheck/test/lint), pill в Timeline + Explicit Review V2 со структурированными findings.',
-      'Crash-resume: баннер «сессия прервана» после краха без авто-повтора деструктивных операций.',
-      'Авто-карта проекта при открытии (map + граф) в контекст и панель «Карта».',
-      'Безопасность: закрыт Windows drive-bypass, обфускация денилиста, утечка частичного ключа, валидация cwd терминала, редакция вывода команд/MCP, guard Я.Диск/иконок/IPC-root (11 фиксов).',
-      'Codex: ответ больше не теряется в чате на повторных сообщениях (reasoning-fallback); форс unelevated-песочницы на Windows.',
-      'Редизайн Shell Atelier: объёмные углубления, круглые аватары, темы Nord + Light, шрифт Inter, переработка rail/sidebar, иконки проектов, удаление клиента с очисткой данных.'
+      'Мульти-агент: суб-агенты с инструментами (роли), delegate/orchestrate/swarm, панель «Агенты».',
+      'Вкладки «Задачи»/«Задача»: история прогонов + Dev Task Flow (ветки/коммиты под денилистом).',
+      'Верификация (DoD) + Explicit Review V2 со структурированными findings.',
+      'Crash-resume без авто-повтора деструктива. Авто-карта проекта. Безопасность: 11 фиксов.',
+      'Редизайн Shell Atelier: темы Nord + Light, шрифт Inter, переработка rail/sidebar.'
+    ]
+  },
+  {
+    version: '1.4.0',
+    build: '16.06.2026',
+    deployed: '16.06.2026',
+    title: 'Голосовой ввод: только Whisper small + иконка микрофона',
+    changes: [
+      'Убраны облачные STT (Grok/OpenAI/Groq) и Web Speech — только локальный Whisper small.',
+      'Иконка: классический микрофон 18px (как attach), при записи — квадрат «стоп».',
+      'Подсказки без упоминания API-ключей.',
+    ],
+  },
+  {
+    version: '1.4.0',
+    build: '16.06.2026',
+    deployed: '16.06.2026',
+    title: 'Голос: Whisper small + приоритет облачного STT',
+    changes: [
+      'Локальная модель tiny → small (~150 МБ): заметно точнее на русском.',
+      'Если есть ключ Grok/OpenAI/Groq — сначала облачный STT (large-v3), локальный — запасной.',
+      'Параметры распознавания: temperature 0, русский prompt, chunk 30 с.',
+    ],
+  },
+  {
+    version: '1.4.0',
+    build: '16.06.2026',
+    deployed: '16.06.2026',
+    title: 'Фикс: голосовой ввод — запись + Whisper вместо Web Speech',
+    changes: [
+      'Web Speech в Electron убран: показывал «запись», но текст не появлялся.',
+      'Режим: клик → запись → клик → распознавание локальным Whisper.',
+      'Фикс AudioContext (resume + реальная частота дискретизации).',
+      'Подсказка при отказе в доступе к микрофону (Параметры Windows).',
+    ],
+  },
+  {
+    version: '1.4.0',
+    build: '16.06.2026',
+    deployed: '16.06.2026',
+    title: 'Голосовой ввод бесплатно — Web Speech + локальный Whisper',
+    changes: [
+      'Без API-ключей: Web Speech (как Grok Desktop) + запасной локальный Whisper tiny (~40 МБ при первом запуске).',
+      'Ключи Grok/OpenAI/Groq — опционально, для лучшего качества; не обязательны.',
+      'При сбое Web Speech автоматически переключается на запись + локальное распознавание.',
+      'Модель кэшируется в userData/whisper-models.',
+    ],
+  },
+  {
+    version: '1.4.0',
+    build: '16.06.2026',
+    deployed: '16.06.2026',
+    title: 'Фикс: голосовой ввод — STT провайдера + WAV',
+    changes: [
+      'Приоритет: STT текущего провайдера чата (Grok/OpenAI/Groq), Web Speech — только без ключей.',
+      'Запись в WAV 16 kHz вместо webm — Grok STT (xAI) не принимает webm на Windows.',
+      'Автопереключение Web Speech → STT при сетевой ошибке, без повторного клика.',
+      'Фикс voice.ts: подсказка об API-ключе, совместимость Buffer→Blob.',
+    ],
+  },
+  {
+    version: '1.4.0',
+    build: '16.06.2026',
+    deployed: '16.06.2026',
+    title: 'Голосовой ввод в чате (Whisper)',
+    changes: [
+      'Кнопка в строке ввода: запись через MediaRecorder, распознавание через Whisper API (Groq или OpenAI).',
+      'IPC voice:has-backend / voice:transcribe; иконка — три полоски уровня звука в стиле attach-кнопки.',
+      'Визуальная обратная связь: пульс при записи, спиннер при распознавании, toast при ошибке.',
+      'Нужен API-ключ Groq или OpenAI в Настройках; язык распознавания — русский.',
+    ],
+  },
+  {
+    version: '1.4.0',
+    build: '16.06.2026',
+    deployed: '16.06.2026',
+    title: 'Фикс: better-sqlite3 ABI 143 — база снова открывается',
+    changes: [
+      'Причина: robocopy /MIR оставлял старый better_sqlite3.node (Node ABI 137) в app.asar.unpacked.',
+      'Пересборка dist:win с electron-rebuild → ABI 143; чистый деплой (удаление unpacked перед копированием).',
+      'Скрипт npm run deploy:local — проверка ABI + удаление stale unpacked + robocopy.',
+    ],
+  },
+  {
+    version: '1.3.1',
+    build: '16.06.2026',
+    deployed: '16.06.2026',
+    title: 'Обновления: whats-new после апдейта + кнопка списка изменений',
+    changes: [
+      'WhatsNewModal после установки обновления — changelog из GitHub Release (markdown).',
+      'Настройки → Обновления: кнопка «Посмотреть список текущих обновлений».',
+      'ReleaseNotesModal, fetch release notes через IPC (update-remote.ts).',
+      'Ключ last_whats_new_version — показ один раз на версию.',
+      'Фикс: не показывать «Установить» если версия уже установлена (stale updater cache).',
+      'Деплой v1.4.0 с rayner-патчами поверх upstream NSIS-установки.'
     ]
   },
   {
@@ -508,7 +599,7 @@ async function main() {
       spacing: { after: 200 }
     }),
     body(`Обновлено: ${new Date().toLocaleString('ru-RU')}`),
-    body('Версия в package.json: 1.3.1'),
+    body('Версия в package.json: 1.3.0'),
     body('Исходники: C:\\Users\\RAYNER\\verstak'),
     body('Установка: %LOCALAPPDATA%\\Programs\\Verstak'),
     body('Правило: после каждого изменения/деплоя агент дописывает запись и перегенерирует этот файл (node scripts/sync-verstak-changelog.cjs).'),

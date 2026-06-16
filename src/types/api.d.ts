@@ -52,6 +52,15 @@ export interface ProjectMeta {
   lastOpenedAt: number
 }
 
+export interface ProjectGroup {
+  id: number
+  name: string
+  sortOrder: number
+  collapsed: boolean
+  projectPaths: string[]
+  createdAt: number
+}
+
 /** User profile — multi-user поддержка команды агентства (14 человек). */
 export interface UserProfile {
   id: number
@@ -127,6 +136,17 @@ declare global {
         pickIcon: (path: string) => Promise<ProjectMeta | null>
         clearIcon: (path: string) => Promise<ProjectMeta | null>
         remove: (path: string, options?: { deleteData?: boolean }) => Promise<{ ok: boolean; error?: string }>
+        listGroups: () => Promise<ProjectGroup[]>
+        createGroup: (name: string, projectPaths: string[]) => Promise<
+          { ok: true; group: ProjectGroup } | { ok: false; error: string }
+        >
+        updateGroup: (id: number, patch: {
+          name?: string
+          projectPaths?: string[]
+          collapsed?: boolean
+          sortOrder?: number
+        }) => Promise<{ ok: true; group: ProjectGroup } | { ok: false; error: string }>
+        deleteGroup: (id: number) => Promise<{ ok: true }>
       }
       app: {
         getHomeDir: () => Promise<string>
@@ -137,6 +157,12 @@ declare global {
       notify: {
         show: (opts: { title: string; body: string }) => Promise<boolean>
         playSound: (opts?: { isError?: boolean }) => Promise<boolean>
+      }
+      voice: {
+        status: () => Promise<{ ready: boolean; loading: boolean; label: string }>
+        transcribe: (payload: { data: string; mimeType?: string }) => Promise<
+          { ok: true; text: string } | { ok: false; error: string }
+        >
       }
       files: {
         tree: (root: string) => Promise<FileNode[]>
@@ -366,6 +392,12 @@ declare global {
       }
       updater: {
         install(): Promise<void>
+        getReleaseNotes(opts?: { sinceVersion?: string; upToVersion?: string; version?: string }): Promise<Array<{
+          version: string
+          name: string
+          body: string
+          htmlUrl: string
+        }>>
         check(): Promise<{ available: boolean; version?: string; error?: string; phase?: string; pendingRelease?: boolean }>
         getState(): Promise<{ phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }>
         onState(cb: (data: { phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }) => void): () => void

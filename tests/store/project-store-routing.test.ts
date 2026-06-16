@@ -6,11 +6,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 // so module load + the actions under test don't blow up on `window.api`.
 // Keep it minimal — only the methods the tested actions actually call.
 const appendSpy = vi.fn(async () => {})
-vi.stubGlobal('window', {
-  api: {
-    chats: { append: appendSpy }
-  }
-})
+const windowStub = { api: { chats: { append: appendSpy } } }
+// Стабим ДО импорта стора (безопасность загрузки модуля). Переставляем в
+// beforeEach: глобальный afterEach (tests/setup.ts) снимает все стабы после
+// каждого теста, иначе window исчезает со второго теста файла.
+vi.stubGlobal('window', windowStub)
 
 import { useProject } from '../../src/store/projectStore'
 import type { SendOwner, PreflightCard } from '../../src/store/projectStore'
@@ -38,6 +38,7 @@ function resetStore() {
 }
 
 beforeEach(() => {
+  vi.stubGlobal('window', windowStub)
   resetStore()
   appendSpy.mockClear()
 })

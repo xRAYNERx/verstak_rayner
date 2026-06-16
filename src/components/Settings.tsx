@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react'
 import { useProject } from '../store/projectStore'
-import type { Memory, DetectedCli, AuditEntry, DoctorReport, DoctorItem, DoctorStatus, ProviderDescriptorDTO, PolicyMatrixDTO, PolicyDecision, AgentModeId } from '../types/api'
+import type { Memory, DetectedCli, AuditEntry, PolicyMatrixDTO, PolicyDecision, AgentModeId } from '../types/api'
 import type { ProviderId } from '../hooks/useProvider'
 import { useTheme, THEMES } from '../hooks/useTheme'
 import { useUiScale, UI_SCALE_PRESETS, MIN_UI_SCALE_PERCENT, MAX_UI_SCALE_PERCENT } from '../hooks/useUiScale'
@@ -801,205 +801,6 @@ function McpTab() {
     </div>
   )
 }
-
-// ─── Provider Health Matrix ───────────────────────────────────────────────────
-// Усиливает мульти-провайдерность как продуктовую фичу: одна таблица — где ключ
-// настроен, цена дефолтной модели и privacy-tier (где живут данные). Источники:
-// providers.list() (дескрипторы) ⋈ doctor.run() (config-presence статус) +
-// buildCatalog() (цены per-model). Renderer-only, без новых IPC.
-// FUTURE: живой latency-ping провайдера — сейчас doctor проверяет только наличие
-// ключа в конфиге, без реального сетевого запроса.
-
-type PrivacyTier = 'fz152' | 'local' | 'cloud'
-
-/** Privacy-tier по id провайдера: где физически обрабатываются данные. */
-function privacyTier(providerId: string): PrivacyTier {
-  if (providerId === 'yandex-gpt' || providerId === 'gigachat') return 'fz152'
-  if (providerId === 'ollama' || providerId === 'custom-openai' || providerId === 'llamacpp' || providerId.includes('local')) return 'local'
-  return 'cloud'
-}
-
-const PRIVACY_META: Record<PrivacyTier, { label: string; title: string }> = {
-  fz152: { label: '🔒 152-ФЗ', title: 'Российский провайдер, 152-ФЗ совместим — данные не покидают РФ' },
-  local: { label: '🏠 локально', title: 'Локальный/self-hosted — данные не уходят с машины' },
-  cloud: { label: '☁️ облако', title: 'Облачный провайдер — данные уходят на сервера провайдера' }
-}
-
-/** Метаданные статуса ключа для строки матрицы. */
-function matrixStatusMeta(status: DoctorStatus): { label: string; cls: string } {
-  if (status === 'ok') return { label: '✅ настроен', cls: 'is-ok' }
-  if (status === 'no-key') return { label: '⚠️ нет ключа', cls: 'is-missing' }
-  return { label: '—', cls: 'is-na' } // n-a (CLI / local)
-}
-
-/** Цена дефолтной модели провайдера ($ / 1M in·out) из каталога, или null. */
-function defaultModelPrice(p: ProviderDescriptorDTO): { input: number; output: number } | null {
-  const catalog = buildCatalog([{
-    id: p.id as ProviderId,
-    name: p.name,
-    transport: p.transport,
-    supportsTools: p.supportsTools,
-    models: p.models,
-    defaultModel: p.defaultModel
-  }])
-  const entry = catalog.find(e => e.model === p.defaultModel)
-  if (!entry || entry.pricePerMInput === null || entry.pricePerMOutput === null) return null
-  return { input: entry.pricePerMInput, output: entry.pricePerMOutput }
-}
-
-interface MatrixRow {
-  id: string
-  name: string
-  transport: 'API' | 'CLI'
-  defaultModel: string
-  status: DoctorStatus
-  price: { input: number; output: number } | null
-  tier: PrivacyTier
-}
-
-/**
- * Таблица здоровья провайдеров. Принимает уже загруженный doctor-отчёт (чтобы
- * не дублировать doctor.run — он живёт в DoctorPanel) и сам тянет providers.list.
- */
-function ProviderHealthMatrix({ report }: { report: DoctorReport }) {
-  const [providers, setProviders] = useState<ProviderDescriptorDTO[] | null>(null)
-
-  useEffect(() => {
-    void window.api.providers.list().then(setProviders).catch(() => setProviders([]))
-  }, [])
-
-  const rows: MatrixRow[] = useMemo(() => {
-    if (!providers) return []
-    const statusById = new Map(report.providers.map(d => [d.id, d.status]))
-    const built = providers.map<MatrixRow>(p => ({
-      id: p.id,
-      name: p.name,
-      transport: p.transport,
-      defaultModel: p.defaultModel,
-      status: statusById.get(p.id) ?? 'n-a',
-      price: defaultModelPrice(p),
-      tier: privacyTier(p.id)
-    }))
-    // Sort: настроенные (ok) первыми, затем по имени.
-    return built.sort((a, b) => {
-      const ar = a.status === 'ok' ? 0 : 1
-      const br = b.status === 'ok' ? 0 : 1
-      if (ar !== br) return ar - br
-      return a.name.localeCompare(b.name)
-    })
-  }, [providers, report])
-
-  if (!providers) {
-    return <div className="gg-settings-hint" style={{ marginTop: 8 }}>Загрузка провайдеров…</div>
-  }
-
-  return (
-    <div className="gg-health-matrix">
-      <div className="gg-settings-section-title">Матрица провайдеров</div>
-      <table className="gg-health-table">
-        <thead>
-          <tr>
-            <th>Провайдер</th>
-            <th>Ключ / статус</th>
-            <th>Цена (in / out за 1M)</th>
-            <th>Privacy</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(r => {
-            const st = matrixStatusMeta(r.status)
-            const tier = PRIVACY_META[r.tier]
-            return (
-              <tr key={r.id}>
-                <td>
-                  <span className="gg-health-provider">{r.name}</span>
-                  <span className={`gg-health-transport is-${r.transport.toLowerCase()}`}>{r.transport}</span>
-                </td>
-                <td><span className={`gg-health-status ${st.cls}`}>{st.label}</span></td>
-                <td className="gg-health-price">
-                  {r.price
-                    ? <span title={`Дефолтная модель: ${r.defaultModel}`}>${r.price.input} / ${r.price.output}</span>
-                    : <span className="gg-health-na">—</span>}
-                </td>
-                <td><span className={`gg-health-tier is-${r.tier}`} title={tier.title}>{tier.label}</span></td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-      <div className="gg-health-legend">
-        <span><span className="gg-health-status is-ok">✅ настроен</span> ключ задан</span>
-        <span><span className="gg-health-status is-missing">⚠️ нет ключа</span> добавь в «Провайдеры»</span>
-        <span><span className="gg-health-status is-na">—</span> CLI/локально (ключ не нужен)</span>
-        <span>🔒 152-ФЗ · 🏠 локально · ☁️ облако</span>
-      </div>
-    </div>
-  )
-}
-
-// ─── Doctor panel ─────────────────────────────────────────────────────────────
-
-/** Иконка/цвет статуса пункта диагностики. */
-function doctorStatusIcon(status: DoctorItem['status']): { icon: string; cls: string } {
-  if (status === 'ok') return { icon: '✓', cls: 'is-ok' }
-  if (status === 'no-key') return { icon: '✗', cls: 'is-err' }
-  return { icon: '—', cls: 'is-na' }
-}
-
-function DoctorRow({ item }: { item: DoctorItem }) {
-  const s = doctorStatusIcon(item.status)
-  return (
-    <div className="gg-settings-row" style={{ alignItems: 'baseline', gap: 8 }}>
-      <span className={`gg-doctor-status ${s.cls}`}>{s.icon}</span>
-      <span style={{ minWidth: 140, fontWeight: 600 }}>{item.name}</span>
-      <span className="gg-settings-hint" style={{ margin: 0 }}>{item.detail}</span>
-    </div>
-  )
-}
-
-/** Кнопка «Проверка» + вывод отчёта по провайдерам и коннекторам. */
-function DoctorPanel() {
-  const [report, setReport] = useState<DoctorReport | null>(null)
-  const [loading, setLoading] = useState(false)
-
-  async function run() {
-    setLoading(true)
-    try {
-      const r = await window.api.doctor.run()
-      setReport(r)
-    } catch {
-      setReport(null)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className="gg-doctor-panel">
-      <div className="gg-settings-row">
-        <button className="gg-btn gg-btn-primary" onClick={() => void run()} disabled={loading}>
-          {loading ? 'Проверка…' : '🩺 Проверка (Doctor)'}
-        </button>
-        {report && (
-          <span className="gg-settings-hint" style={{ margin: 0 }}>
-            Готово: {report.summary.okCount} · Проблем: {report.summary.problemCount}
-          </span>
-        )}
-      </div>
-      {report && (
-        <div style={{ marginTop: 12 }}>
-          <ProviderHealthMatrix report={report} />
-          <div className="gg-settings-section-title" style={{ marginTop: 16 }}>Провайдеры</div>
-          {report.providers.map(p => <DoctorRow key={p.id} item={p} />)}
-          <div className="gg-settings-section-title" style={{ marginTop: 12 }}>Коннекторы</div>
-          {report.connectors.map(c => <DoctorRow key={c.id} item={c} />)}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 export function Settings({ onClose, initialTab }: { onClose: () => void; initialTab?: Tab }) {
   const t = useT()
@@ -2050,8 +1851,6 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
           <div className="gg-settings-content">
 
         {tab === 'providers' && (
-        <>
-        <DoctorPanel />
         <ProvidersPage
           providers={PROVIDERS}
           keys={keys}
@@ -2063,7 +1862,6 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
           customOpenaiModels={customOpenaiModels}
           setCustomOpenaiModels={setCustomOpenaiModels}
         />
-        </>
         )}
 
         {tab === 'models' && (

@@ -171,13 +171,25 @@ html[data-theme="light"] {
   --vol-shadow-side:
     3px 0 16px color-mix(in srgb, var(--bg-base) 12%, transparent),
     1px 0 0 color-mix(in srgb, var(--accent) 6%, transparent);
+  --vol-highlight: rgba(255, 255, 255, 0.92);
+  --vol-shadow-up:
+    0 -1px 0 rgba(255, 255, 255, 0.95),
+    0 8px 22px rgba(15, 25, 40, 0.06),
+    0 1px 3px rgba(15, 25, 40, 0.04);
   --vol-shadow-inset:
-    inset 0 2px 8px color-mix(in srgb, var(--bg-base) 10%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--text-primary) 4%, transparent);
+    inset 0 1px 0 rgba(15, 25, 40, 0.09),
+    inset 0 2px 5px rgba(15, 25, 40, 0.05),
+    inset 0 8px 20px -10px rgba(15, 25, 40, 0.08),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.88);
   --vol-lift:
-    0 12px 32px color-mix(in srgb, var(--bg-base) 14%, transparent),
+    0 12px 32px rgba(15, 25, 40, 0.08),
+    0 1px 3px rgba(15, 25, 40, 0.04),
     0 0 0 1px var(--border-default);
-  --vol-recessed-bg: color-mix(in srgb, var(--bg-base) 94%, var(--bg-overlay));
+  --vol-recessed-bg: color-mix(in srgb, var(--bg-overlay) 72%, var(--bg-elevated));
+  --shell-rail-fill:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.75) 0%, transparent 44%),
+    var(--vol-glass);
+  --shell-panel-fill: var(--shell-rail-fill);
 
   --bg-code: #eef1ff;
   --text-code: #3d3996;

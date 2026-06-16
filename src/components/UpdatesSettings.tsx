@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useT } from '../i18n'
+import { ReleaseNotesModal, type ReleaseNote } from './ReleaseNotesModal'
 
 type Status = 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'ready' | 'error' | 'pending'
 
@@ -25,6 +26,10 @@ export function UpdatesSettings() {
   const [remoteVersion, setRemoteVersion] = useState('')
   const [percent, setPercent] = useState(0)
   const [error, setError] = useState('')
+  const [notesOpen, setNotesOpen] = useState(false)
+  const [releaseNotes, setReleaseNotes] = useState<ReleaseNote[]>([])
+  const [notesLoading, setNotesLoading] = useState(false)
+  const [notesTargetVersion, setNotesTargetVersion] = useState('')
 
   useEffect(() => {
     const applyPhase = (
@@ -91,6 +96,21 @@ export function UpdatesSettings() {
     }
   }, [])
 
+  const viewReleaseNotes = useCallback(async () => {
+    setNotesLoading(true)
+    try {
+      const targetVersion = remoteVersion && status !== 'current' && status !== 'idle'
+        ? remoteVersion
+        : version.replace(/^v/, '')
+      const notes = await window.api.updater.getReleaseNotes({ version: targetVersion })
+      setReleaseNotes(notes)
+      setNotesTargetVersion(targetVersion)
+      setNotesOpen(true)
+    } finally {
+      setNotesLoading(false)
+    }
+  }, [remoteVersion, status, version])
+
   const check = useCallback(async () => {
     setStatus('checking')
     setError('')
@@ -108,10 +128,26 @@ export function UpdatesSettings() {
     setStatus(result.pendingRelease ? 'pending' : 'available')
   }, [])
 
+  const notesTitle = notesTargetVersion && remoteVersion === notesTargetVersion && status !== 'current'
+    ? t.updates.releaseNotesTitleAvailable.replace('{version}', notesTargetVersion)
+    : t.updates.releaseNotesTitleCurrent.replace('{version}', notesTargetVersion || version.replace(/^v/, ''))
+
   return (
     <div className="gg-settings-extra">
       <div className="gg-settings-section-title">{t.settings.updates}</div>
       <div className="gg-settings-hint" style={{ marginBottom: 16 }}>{t.settings.updatesHint}</div>
+
+      <div className="gg-settings-row" style={{ marginBottom: 16 }}>
+        <label className="gg-settings-label">{t.settings.releaseNotes}</label>
+        <button
+          type="button"
+          className="gg-btn gg-btn-ghost"
+          onClick={() => void viewReleaseNotes()}
+          disabled={notesLoading || version === '…'}
+        >
+          {notesLoading ? t.settings.viewReleaseNotesLoading : t.settings.viewReleaseNotes}
+        </button>
+      </div>
 
       <div className="gg-settings-row">
         <label className="gg-settings-label">{t.settings.currentVersion}</label>
@@ -147,6 +183,14 @@ export function UpdatesSettings() {
           {status === 'error' && <span className="gg-settings-hint" style={{ color: 'var(--error)' }}>{error || t.settings.updateError}</span>}
         </div>
       </div>
+
+      <ReleaseNotesModal
+        open={notesOpen}
+        onClose={() => setNotesOpen(false)}
+        notes={releaseNotes}
+        title={notesTitle}
+        emptyText={t.settings.releaseNotesEmpty}
+      />
     </div>
   )
 }

@@ -512,6 +512,29 @@ const MIGRATIONS: Array<{ version: number; description: string; run: (db: DB) =>
       // updated_at — время последнего тика (живость прогона). NULL у старых строк.
       if (!cols.includes('updated_at')) db.exec('ALTER TABLE agent_runs ADD COLUMN updated_at INTEGER')
     }
+  },
+  {
+    version: 20,
+    description: 'project_groups (Rayner) — группы проектов в rail. Номер 20: у Ильи был v13 (коллизия с нашей v13), при объединении унифицировано в v20, чтобы пользователи на schema 19 (1.5.0) получили таблицы этой миграцией.',
+    run: (db: DB) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS project_groups (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          collapsed INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS project_group_members (
+          group_id INTEGER NOT NULL,
+          project_path TEXT NOT NULL,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY (group_id, project_path),
+          FOREIGN KEY (group_id) REFERENCES project_groups(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_project_group_members_path ON project_group_members(project_path);
+      `)
+    }
   }
 ]
 
