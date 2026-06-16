@@ -912,6 +912,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         systemPrompt: activeSkill.systemPrompt + antiStallNudge,
         ...(overrideProvider ? { providerId: overrideProvider } : {}),
         ...(overrideModel !== null ? { model: overrideModel } : {}),
+        // Аудит M4: tools_allow скилла → agent-loop ограничивает инструменты модели.
+        ...(activeSkill.tools_allow?.length ? { toolsAllow: activeSkill.tools_allow } : {}),
         effortLevel: useProject.getState().effortLevel
       })
     } else {

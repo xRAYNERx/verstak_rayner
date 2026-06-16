@@ -233,6 +233,10 @@ export function registerAiIpc(deps: AiDeps): void {
     useReviewerPrompt?: boolean
     /** Уровень усилий: quick / standard / deep. Влияет на max_tokens и extended thinking. */
     effortLevel?: 'quick' | 'standard' | 'deep'
+    /** Аудит M4: tools_allow активного скилла. Если задан — agent-loop отдаёт
+     *  модели ТОЛЬКО эти инструменты (read-only скилл физически не сможет
+     *  write_file/run_command). Без него безопасность скиллов была фиктивна. */
+    toolsAllow?: string[]
   }
 
   ipcMain.handle('ai:send', async (e, messages: ChatMessage[], projectPath: string | null, budget?: number, overrides?: AiSendOverrides, chatId?: string) => {
@@ -607,7 +611,8 @@ export function registerAiIpc(deps: AiDeps): void {
         deps.sessionTodos,
         deps.agentRuns,
         runId,
-        deps.verifications
+        deps.verifications,
+        overrides?.toolsAllow ?? null
       ).finally(cleanup)
     } else {
       void runPlainConversation(taggedSender, sendId, provider, projectPath, messagesWithSystem, ctrl.signal, deps.recordJournal, costGuard, providerId, model,
@@ -893,6 +898,33 @@ export type { UsageDelta } from '../ai/types'
 const DEFAULT_AGENT_TURNS = 8
 const MAX_BUDGET_TURNS = 40  // hard ceiling even with continues — prevents infinite-budget abuse
 
+/**
+ * Аудит M4: отбирает инструменты, которые увидит модель, по tools_allow скилла.
+ * - toolsAllow пуст/не задан → без ограничений (стандартные + MCP).
+ * - задан → пересечение по имени и для стандартных, и для MCP-инструментов.
+ * - все имена — опечатки (пересечение по стандартным пусто) → НЕ оставляем
+ *   модель без инструментов: полный набор + warn (broken-скилл ≠ дыра).
+ * Экспортируется для unit-теста — lock на поведение безопасности скиллов.
+ */
+export function selectAllowedToolDefs<T extends { name: string }>(
+  baseDefs: readonly T[],
+  mcpDefs: readonly T[],
+  toolsAllow?: string[] | null
+): T[] {
+  const allowSet = Array.isArray(toolsAllow) && toolsAllow.length > 0 ? new Set(toolsAllow) : null
+  if (!allowSet) return mcpDefs.length > 0 ? [...baseDefs, ...mcpDefs] : [...baseDefs]
+  const base = baseDefs.filter(t => allowSet.has(t.name))
+  const mcp = mcpDefs.filter(t => allowSet.has(t.name))
+  // Ни одно имя не совпало (скилл целиком в опечатках) → fail-open + warn, чтобы
+  // broken-скилл не стал молчаливым кирпичом. Если же совпали ТОЛЬКО mcp (скилл
+  // хочет mcp-only) — это валидное ограничение, base не восстанавливаем.
+  if (base.length === 0 && mcp.length === 0) {
+    console.warn(`[agent] tools_allow=[${toolsAllow!.join(', ')}] не совпал ни с одним инструментом — ограничение пропущено (проверь имена в скилле)`)
+    return mcpDefs.length > 0 ? [...baseDefs, ...mcpDefs] : [...baseDefs]
+  }
+  return mcp.length > 0 ? [...base, ...mcp] : [...base]
+}
+
 async function runApiConversation(
   sender: TaggedSender,
   sendId: number,
@@ -928,7 +960,8 @@ async function runApiConversation(
   sessionTodos?: AiDeps['sessionTodos'],
   agentRuns?: AgentRuns,
   runId?: string,
-  verifications?: AiDeps['verifications']
+  verifications?: AiDeps['verifications'],
+  toolsAllow?: string[] | null
 ): Promise<void> {
   const currentMessages = [...initialMessages]
   // Loop detection: per-signature occurrence counter across the whole agent
@@ -993,7 +1026,10 @@ async function runApiConversation(
       description: t.description,
       parameters: t.inputSchema
     })) : []
-    const allToolDefs = mcpToolDefs.length > 0 ? [...TOOL_DEFS, ...mcpToolDefs] : TOOL_DEFS
+    // Аудит M4: tools_allow скилла применяется ЗДЕСЬ — модель видит только
+    // разрешённые инструменты (read-only скилл физически не получит write_file/
+    // run_command). Фильтруем и стандартные, и MCP (см. selectAllowedToolDefs).
+    const allToolDefs = selectAllowedToolDefs(TOOL_DEFS, mcpToolDefs, toolsAllow)
 
     for await (const event of withInitialRetry(
       () => provider.send(messagesForProvider, allToolDefs, undefined, signal),

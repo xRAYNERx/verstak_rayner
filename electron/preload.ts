@@ -103,7 +103,7 @@ contextBridge.exposeInMainWorld('api', {
     sendWithOverrides: (
       messages: unknown[],
       projectPath: string | null,
-      overrides: { providerId?: string; model?: string | null; noTools?: boolean; systemPrompt?: string; useReviewerPrompt?: boolean },
+      overrides: { providerId?: string; model?: string | null; noTools?: boolean; systemPrompt?: string; useReviewerPrompt?: boolean; effortLevel?: 'quick' | 'standard' | 'deep'; toolsAllow?: string[] },
       chatId?: string
     ) => ipcRenderer.invoke('ai:send', messages, projectPath, undefined, overrides, chatId),
     resolveWrite: (callId: string, accept: boolean, sendId?: number) =>
