@@ -214,3 +214,24 @@ export function composeFixPrompt(accepted: ReviewFinding[]): string {
   lines.push('После правок коротко перечисли, что изменил по каждому пункту.')
   return lines.join('\n')
 }
+
+/**
+ * F8: маппит находки ревью в шаги Плана (каждая находка = шаг). Так находки
+ * получают persist + жизненный цикл (pending→done/skipped/failed) + связку
+ * шаг→прогон→верификация, не плодя новую таблицу. Чистая, тестируемая.
+ *
+ * title шага: `[P0/security] file:line — заголовок` (помещается в строку плана);
+ * detail: подробность находки + предложенный фикс (контекст для исполнителя).
+ */
+export function findingsToPlanSteps(findings: ReviewFinding[]): Array<{ title: string; detail: string | null }> {
+  return findings.map(f => {
+    const loc = f.line > 0
+      ? `${f.file}:${f.line}${f.endLine && f.endLine > f.line ? `-${f.endLine}` : ''}`
+      : f.file
+    const title = `[${f.severity}/${f.category}] ${loc} — ${f.title}`
+    const detailParts: string[] = []
+    if (f.detail) detailParts.push(f.detail)
+    if (f.suggestedFix) detailParts.push(`Как чинить: ${f.suggestedFix}`)
+    return { title, detail: detailParts.length > 0 ? detailParts.join('\n\n') : null }
+  })
+}

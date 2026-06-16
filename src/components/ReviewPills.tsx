@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useProject } from '../store/projectStore'
 import { Markdown } from './Markdown'
-import { composeFixPrompt, type ReviewFinding, type FindingSeverity } from '../lib/review-findings'
+import { composeFixPrompt, findingsToPlanSteps, type ReviewFinding, type FindingSeverity } from '../lib/review-findings'
 import type { VerificationRow } from '../types/api'
 
 /**
@@ -89,6 +89,8 @@ export function ReviewPanel() {
   // было видно доказательство, которое ревьюер сверял. Подтягиваем при открытии
   // панели / смене чата. Best-effort: нет истории или ошибка → бейджа просто нет.
   const [verification, setVerification] = useState<VerificationRow | null>(null)
+  // F8: статус сохранения находок в План (нотис под действиями).
+  const [planNotice, setPlanNotice] = useState<string | null>(null)
   useEffect(() => {
     let alive = true
     if (openedReviewId == null || !path || activeChatId == null) { setVerification(null); return }
@@ -97,6 +99,8 @@ export function ReviewPanel() {
       .catch(() => { if (alive) setVerification(null) })
     return () => { alive = false }
   }, [openedReviewId, path, activeChatId])
+  // Сброс нотиса при смене раскрытого ревью.
+  useEffect(() => { setPlanNotice(null) }, [openedReviewId])
 
   if (openedReviewId == null) return null
   const review = reviews[openedReviewId]
@@ -164,6 +168,26 @@ export function ReviewPanel() {
     const sendId = await window.api.ai.send(allMessages, path)
     registerSendOwner(sendId, { kind: 'chat', chatId: activeChatId })
     toggleReviewPanel(null)
+  }
+
+  // F8: сохранить находки в План (выбранные галочками, иначе все). Каждая находка
+  // = шаг плана → persist + статус (pending→done/skipped/failed) + связка
+  // шаг→прогон→верификация. Закрывает петлю «нашёл → исправил → перепроверил».
+  async function saveFindingsToPlan() {
+    if (!review || !path) return
+    const selected = review.findings.filter(f => review.accepted.includes(f.id))
+    const chosen = selected.length > 0 ? selected : review.findings
+    if (chosen.length === 0) { setPlanNotice('Нет находок для сохранения.'); return }
+    const steps = findingsToPlanSteps(chosen)
+    const title = `Ревью от ${label} · ${chosen.length} ${chosen.length === 1 ? 'находка' : 'находок'}`
+    try {
+      const plan = await window.api.plans.create(path, title, steps)
+      void window.api.journal.append(path, 'note', `📋 Находки ревью → план «${title}»`,
+        chosen.map(f => `${f.severity} ${f.file}: ${f.title}`).join('\n')).catch(() => {})
+      setPlanNotice(plan ? `✓ Сохранено в план «${title}». Открой вкладку «Планы» — статус по каждой находке, связка с прогоном и верификацией.` : 'Не удалось создать план.')
+    } catch {
+      setPlanNotice('Не удалось создать план.')
+    }
   }
 
   // file:line → reveal в проводнике. Путь finding относителен корня проекта;
@@ -244,6 +268,16 @@ export function ReviewPanel() {
           >
             ↪ Учесть в чате
           </button>
+          {findings.length > 0 && (
+            <button
+              type="button"
+              className="gg-btn"
+              onClick={() => void saveFindingsToPlan()}
+              title="Сохранить находки в План — статус по каждой, связка с прогоном и верификацией. Выбранные галочками, иначе все."
+            >
+              📋 В план ({acceptedCount > 0 ? acceptedCount : findings.length})
+            </button>
+          )}
           <span className="gg-review-panel-hint">
             {isStreaming
               ? 'Жди завершения текущего ответа основного чата'
@@ -251,6 +285,7 @@ export function ReviewPanel() {
                 ? 'Отметь нужные замечания и нажми «Исправить выбранные» — фикс уйдёт точечно'
                 : 'Отправит текст ревью в основной чат — модель сама решит что с ним делать'}
           </span>
+          {planNotice && <div className="gg-review-plan-notice">{planNotice}</div>}
         </div>
       )}
     </div>

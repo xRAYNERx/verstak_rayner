@@ -6038,6 +6038,7 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 .gg-review-error-msg { color: #e53e3e; font-style: normal; }
 .gg-review-panel-actions {
   display: flex; align-items: center; gap: 10px;
+  flex-wrap: wrap;
   padding: 10px 14px;
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-base);
@@ -6045,6 +6046,13 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 .gg-review-panel-hint {
   color: var(--text-tertiary);
   font-size: var(--text-xs);
+}
+/* F8: нотис «находки сохранены в план» — на всю ширину под кнопками. */
+.gg-review-plan-notice {
+  flex-basis: 100%;
+  color: var(--success, #3a9d5a);
+  font-size: var(--text-xs);
+  padding-top: 2px;
 }
 
 /* ----------------------------------------------------------------------

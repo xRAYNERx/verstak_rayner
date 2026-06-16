@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseReviewFindings, composeFixPrompt, type ReviewFinding } from '../../src/lib/review-findings'
+import { parseReviewFindings, composeFixPrompt, findingsToPlanSteps, type ReviewFinding } from '../../src/lib/review-findings'
 
 describe('parseReviewFindings', () => {
   it('валидный ```json блок → findings', () => {
@@ -149,5 +149,32 @@ describe('composeFixPrompt', () => {
 
   it('пустой список → пустая строка', () => {
     expect(composeFixPrompt([])).toBe('')
+  })
+})
+
+describe('findingsToPlanSteps (F8)', () => {
+  const sample: ReviewFinding[] = [
+    { id: 'f1', file: 'src/a.ts', line: 10, endLine: 14, severity: 'P0', category: 'bug', title: 'NPE', detail: 'a[0] без guard.', suggestedFix: 'Добавить проверку длины.' },
+    { id: 'f2', file: 'src/b.ts', line: 0, severity: 'P2', category: 'UX', title: 'Нет лоадера', detail: '' }
+  ]
+
+  it('каждая находка → шаг с severity/category/file:line в title', () => {
+    const steps = findingsToPlanSteps(sample)
+    expect(steps).toHaveLength(2)
+    expect(steps[0].title).toBe('[P0/bug] src/a.ts:10-14 — NPE')
+    // detail + suggestedFix склеены
+    expect(steps[0].detail).toContain('a[0] без guard.')
+    expect(steps[0].detail).toContain('Как чинить: Добавить проверку длины.')
+  })
+
+  it('находка без line → только файл; пустой detail → null', () => {
+    const steps = findingsToPlanSteps(sample)
+    expect(steps[1].title).toBe('[P2/UX] src/b.ts — Нет лоадера')
+    expect(steps[1].title).not.toContain(':0')
+    expect(steps[1].detail).toBeNull()
+  })
+
+  it('пустой список → пустые шаги', () => {
+    expect(findingsToPlanSteps([])).toEqual([])
   })
 })
