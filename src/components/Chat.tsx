@@ -1629,88 +1629,92 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
             </div>
           )}
           <div className="gg-composer-meta">
-            {previewTokens && previewTokens.tokens > 0 && (() => {
-              const cost = estimateCost(provider.id, provider.model, previewTokens.tokens, 0, 0)
-              const exactBadge = previewTokens.exact ? '' : '≈'
-              return (
-                <span
-                  className="gg-usage-pill is-preview"
-                  title={previewTokens.exact
-                    ? `Точная оценка от ${provider.label}: ${previewTokens.tokens} токенов на следующий запрос${cost.usd ? `, ~${cost.usd} (только input)` : ''}`
-                    : `Грубая оценка (4 символа = 1 токен): ${previewTokens.tokens} токенов`}
+            <div className="gg-composer-meta-cluster">
+              {previewTokens && previewTokens.tokens > 0 && (() => {
+                const cost = estimateCost(provider.id, provider.model, previewTokens.tokens, 0, 0)
+                const exactBadge = previewTokens.exact ? '' : '≈'
+                return (
+                  <span
+                    className="gg-usage-pill is-preview"
+                    title={previewTokens.exact
+                      ? `Точная оценка от ${provider.label}: ${previewTokens.tokens} токенов на следующий запрос${cost.usd ? `, ~${cost.usd} (только input)` : ''}`
+                      : `Грубая оценка (4 символа = 1 токен): ${previewTokens.tokens} токенов`}
+                  >
+                    <span>📝 {exactBadge}{formatTokens(previewTokens.tokens)}</span>
+                    {cost.usd && previewTokens.exact && (
+                      <>
+                        <span className="gg-usage-sep">·</span>
+                        <span className="gg-usage-cost">~{cost.usd}</span>
+                      </>
+                    )}
+                  </span>
+                )
+              })()}
+              {(sessionUsage.inputTokens > 0 || sessionUsage.outputTokens > 0) && (() => {
+                const cost = estimateCost(provider.id, provider.model, sessionUsage.inputTokens, sessionUsage.outputTokens, sessionUsage.cachedInputTokens)
+                const severity = costSeverity(cost.cents)
+                const breakdown = costBreakdown(provider.id, provider.model, sessionUsage.inputTokens, sessionUsage.outputTokens, sessionUsage.cachedInputTokens)
+                return (
+                  <span className={`gg-usage-pill ${severity}`} title={breakdown}>
+                    <span>↑{formatTokens(sessionUsage.inputTokens)}</span>
+                    <span className="gg-usage-sep">·</span>
+                    <span>↓{formatTokens(sessionUsage.outputTokens)}</span>
+                    {sessionUsage.cachedInputTokens > 0 && (
+                      <>
+                        <span className="gg-usage-sep">·</span>
+                        <span title="Cached input">⟲{formatTokens(sessionUsage.cachedInputTokens)}</span>
+                      </>
+                    )}
+                    {cost.usd && (
+                      <>
+                        <span className="gg-usage-sep">·</span>
+                        <span className="gg-usage-cost">{cost.usd}</span>
+                      </>
+                    )}
+                  </span>
+                )
+              })()}
+              {undoCount > 0 && (
+                <button
+                  type="button"
+                  className="gg-undo-btn"
+                  onClick={() => void revertLastWrite()}
+                  title="Откатить последнюю правку файла"
                 >
-                  <span>📝 {exactBadge}{formatTokens(previewTokens.tokens)}</span>
-                  {cost.usd && previewTokens.exact && (
-                    <>
-                      <span className="gg-usage-sep">·</span>
-                      <span className="gg-usage-cost">~{cost.usd}</span>
-                    </>
-                  )}
-                </span>
-              )
-            })()}
-            {(sessionUsage.inputTokens > 0 || sessionUsage.outputTokens > 0) && (() => {
-              const cost = estimateCost(provider.id, provider.model, sessionUsage.inputTokens, sessionUsage.outputTokens, sessionUsage.cachedInputTokens)
-              const severity = costSeverity(cost.cents)
-              const breakdown = costBreakdown(provider.id, provider.model, sessionUsage.inputTokens, sessionUsage.outputTokens, sessionUsage.cachedInputTokens)
-              return (
-                <span className={`gg-usage-pill ${severity}`} title={breakdown}>
-                  <span>↑{formatTokens(sessionUsage.inputTokens)}</span>
-                  <span className="gg-usage-sep">·</span>
-                  <span>↓{formatTokens(sessionUsage.outputTokens)}</span>
-                  {sessionUsage.cachedInputTokens > 0 && (
-                    <>
-                      <span className="gg-usage-sep">·</span>
-                      <span title="Cached input">⟲{formatTokens(sessionUsage.cachedInputTokens)}</span>
-                    </>
-                  )}
-                  {cost.usd && (
-                    <>
-                      <span className="gg-usage-sep">·</span>
-                      <span className="gg-usage-cost">{cost.usd}</span>
-                    </>
-                  )}
-                </span>
-              )
-            })()}
-            {undoCount > 0 && (
+                  <span>↶</span>
+                  <span className="gg-undo-count">{undoCount}</span>
+                </button>
+              )}
               <button
                 type="button"
-                className="gg-undo-btn"
-                onClick={() => void revertLastWrite()}
-                title="Откатить последнюю правку файла"
+                className={`gg-auto-scroll-btn ${autoScrollEnabled ? 'is-on' : 'is-off'}`}
+                onClick={toggleAutoScroll}
+                title={autoScrollEnabled ? t.chat.autoScrollOn : t.chat.autoScrollOff}
+                aria-pressed={autoScrollEnabled}
               >
-                <span>↶</span>
-                <span className="gg-undo-count">{undoCount}</span>
+                {autoScrollEnabled ? t.chat.autoScrollLabelOn : t.chat.autoScrollLabelOff}
               </button>
-            )}
-            <button
-              type="button"
-              className={`gg-auto-scroll-btn ${autoScrollEnabled ? 'is-on' : 'is-off'}`}
-              onClick={toggleAutoScroll}
-              title={autoScrollEnabled ? t.chat.autoScrollOn : t.chat.autoScrollOff}
-              aria-pressed={autoScrollEnabled}
-            >
-              {autoScrollEnabled ? t.chat.autoScrollLabelOn : t.chat.autoScrollLabelOff}
-            </button>
-            <DevTaskBadge />
-            <ComposerToolsMenu onInject={injectTemplate} />
-            <ModePicker mode={agentMode} onChange={setAgentMode} />
-            <ModelPicker onOpenSettings={onOpenSettings} />
-            {/* Бейдж возможностей провайдера (аудит P1 #12): у CLI-провайдеров
-                правки делает внешний агент в субпроцессе — контрольные гарантии
-                Verstak (per-file undo / checkpoint / подтверждение write / mode-
-                policy) НЕ действуют, вложения уходят текстовым хинтом. Бейдж
-                закрывает дыру «выглядит одинаково, ведёт себя по-разному». */}
-            {provider.id.endsWith('-cli') && (
-              <span
-                className="gg-provider-caps-badge"
-                title="CLI-провайдер: правки выполняет внешний агент. Контроль Verstak (per-file undo, checkpoint, подтверждение write, mode-policy) не действует. Вложения уходят текстовым хинтом, не картинкой."
-              >
-                CLI
-              </span>
-            )}
-            <TierRecommendation input={input} />
+              <DevTaskBadge />
+            </div>
+            <div className="gg-composer-meta-cluster gg-composer-meta-cluster--end">
+              <ComposerToolsMenu onInject={injectTemplate} />
+              <ModePicker mode={agentMode} onChange={setAgentMode} />
+              <ModelPicker onOpenSettings={onOpenSettings} />
+              {/* Бейдж возможностей провайдера (аудит P1 #12): у CLI-провайдеров
+                  правки делает внешний агент в субпроцессе — контрольные гарантии
+                  Verstak (per-file undo / checkpoint / подтверждение write / mode-
+                  policy) НЕ действуют, вложения уходят текстовым хинтом. Бейдж
+                  закрывает дыру «выглядит одинаково, ведёт себя по-разному». */}
+              {provider.id.endsWith('-cli') && (
+                <span
+                  className="gg-provider-caps-badge"
+                  title="CLI-провайдер: правки выполняет внешний агент. Контроль Verstak (per-file undo, checkpoint, подтверждение write, mode-policy) не действует. Вложения уходят текстовым хинтом, не картинкой."
+                >
+                  CLI
+                </span>
+              )}
+              <TierRecommendation input={input} />
+            </div>
           </div>
         </div>
       </div>

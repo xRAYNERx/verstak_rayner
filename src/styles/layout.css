@@ -2585,14 +2585,6 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   color: var(--accent);
   white-space: nowrap;
 }
-.gg-composer-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
 .gg-model-pill {
   display: inline-flex; align-items: center; gap: 6px;
   background: transparent;
@@ -3423,11 +3415,28 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
  * Раньше: gap:4px разнотипными bordered pills — визуальный шум. Теперь: gap:2px,
  * единая высота 22px, прозрачные borders по умолчанию, accent только на hover. */
 .gg-composer-meta {
-  display: inline-flex; align-items: center; gap: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 12px;
   flex-wrap: wrap;
+  width: 100%;
+}
+.gg-composer-meta-cluster {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.gg-composer-meta-cluster--end {
+  margin-left: auto;
+  justify-content: flex-end;
 }
 .gg-composer-meta > button,
-.gg-composer-meta > * > button {
+.gg-composer-meta .gg-composer-meta-cluster > button,
+.gg-composer-meta > * > button,
+.gg-composer-meta .gg-composer-meta-cluster > * > button {
   min-height: 28px;
 }
 
