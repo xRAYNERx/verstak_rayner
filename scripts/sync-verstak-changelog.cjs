@@ -8,12 +8,14 @@ const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = re
 
 const OUT_DIR = 'D:\\PROGRAMMS\\VERSTAK'
 const BASE_NAME = 'Verstak - Журнал изменений'
+const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'))
 
+// Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
-    version: '1.5.5',
-    build: '16.06.2026',
+    commit: '9f21000',
     deployed: '16.06.2026',
+    treeVersion: '1.5.5',
     title: 'Чат, rail, обновления, vision-вложения',
     changes: [
       'Предупреждение при прикреплении изображения к CLI-модели без vision; переключение на API-модели того же бренда.',
@@ -700,6 +702,18 @@ function bullet(text) {
   })
 }
 
+function formatEntryMeta(e) {
+  if (e.commit) {
+    const build = e.build || e.deployed
+    let line = `Сборка: ${build}  |  Коммит: ${e.commit}  |  Деплой: ${e.deployed}`
+    if (e.treeVersion) {
+      line += `  |  В дереве upstream: ${e.treeVersion} (не наш релиз)`
+    }
+    return line
+  }
+  return `Версия: ${e.version}  |  Сборка: ${e.build}  |  Деплой: ${e.deployed}`
+}
+
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true })
 
@@ -710,16 +724,17 @@ async function main() {
       spacing: { after: 200 }
     }),
     body(`Обновлено: ${new Date().toLocaleString('ru-RU')}`),
-    body('Версия в package.json: 1.3.0'),
+    body(`Версия в package.json (upstream): ${PKG.version} — не релиз RAYNER`),
     body('Исходники: C:\\Users\\RAYNER\\verstak'),
     body('Установка: %LOCALAPPDATA%\\Programs\\Verstak'),
-    body('Правило: после каждого изменения/деплоя агент дописывает запись и перегенерирует этот файл (node scripts/sync-verstak-changelog.cjs).'),
+    body('Правило: локальные сборки — дата + коммит (поле commit); релизы только у Павла (frolofpavel/verstak).'),
+    body('Пересборка: node scripts/sync-verstak-changelog.cjs'),
     new Paragraph({ text: '', spacing: { after: 200 } })
   ]
 
   for (const e of ENTRIES) {
     children.push(heading(e.title))
-    children.push(body(`Версия: ${e.version}  |  Сборка: ${e.build}  |  Деплой: ${e.deployed}`))
+    children.push(body(formatEntryMeta(e)))
     for (const c of e.changes) children.push(bullet(c))
   }
 
