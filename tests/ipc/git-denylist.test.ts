@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { assertGitAllowed } from '../../electron/ipc/git'
+import { assertGitAllowed, gitAdd } from '../../electron/ipc/git'
 
 /**
  * Денилист git-write (Dev Task Flow, Фаза 3) — гарантия, что обёртка git-вызова
@@ -52,6 +52,12 @@ describe('assertGitAllowed (git-write денилист)', () => {
     it('branch -D (force delete)', () => {
       expect(() => assertGitAllowed(['branch', '-D', 'feature'])).toThrow()
     })
+    // Аудит B1: -a/--all/-am стейджат всё рабочее дерево → секрет уедет в коммит.
+    it('-a / --all / -am (стейдж всего дерева)', () => {
+      expect(() => assertGitAllowed(['commit', '-a', '-m', 'x'])).toThrow()
+      expect(() => assertGitAllowed(['add', '--all'])).toThrow()
+      expect(() => assertGitAllowed(['commit', '-am', 'x'])).toThrow()
+    })
   })
 
   describe('пропускает разрешённое (не бросает)', () => {
@@ -82,5 +88,34 @@ describe('assertGitAllowed (git-write денилист)', () => {
     it('branch --list', () => {
       expect(() => assertGitAllowed(['branch', '--list', 'main'])).not.toThrow()
     })
+  })
+})
+
+/**
+ * Аудит B1: gitAdd должен отклонять секреты/креды ДО запуска git — иначе
+ * .env/*.key/creds*.json уедут в коммит и при push утекут в публичный PR.
+ * Проверка isForbiddenPath короткозамыкает до spawn git, поэтому тест чистый
+ * (не требует git-репозитория).
+ */
+describe('gitAdd блокирует секреты (B1)', () => {
+  it('.env отклонён', async () => {
+    const r = await gitAdd('/tmp/whatever', ['.env'])
+    expect(r.ok).toBe(false)
+    expect(r.error).toMatch(/forbidden-path/)
+  })
+  it('*.key отклонён', async () => {
+    const r = await gitAdd('/tmp/whatever', ['certs/server.key'])
+    expect(r.ok).toBe(false)
+    expect(r.error).toMatch(/forbidden-path/)
+  })
+  it('creds*.json отклонён', async () => {
+    const r = await gitAdd('/tmp/whatever', ['creds_google.json'])
+    expect(r.ok).toBe(false)
+    expect(r.error).toMatch(/forbidden-path/)
+  })
+  it('один секрет среди обычных путей валит всю операцию (fail-closed)', async () => {
+    const r = await gitAdd('/tmp/whatever', ['src/ok.ts', '.env.local'])
+    expect(r.ok).toBe(false)
+    expect(r.error).toMatch(/forbidden-path/)
   })
 })

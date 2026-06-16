@@ -2,7 +2,7 @@ import { ipcMain } from 'electron'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { safeRealJoin } from '../ai/path-policy'
-import { scanText } from '../ai/secret-scanner'
+import { scanText, isForbiddenPath } from '../ai/secret-scanner'
 
 const execFileAsync = promisify(execFile)
 
@@ -47,7 +47,9 @@ const FORBIDDEN_SUBCOMMANDS = new Set([
   'rebase', 'filter-branch', 'filter-repo',
   'reflog', 'gc', 'prune'
 ])
-const FORBIDDEN_FLAGS = new Set(['--force', '-f', '--no-verify', '--amend', '--hard', '-D'])
+// -a/--all/-am: `git commit -a` стейджит ВСЕ tracked-изменения в обход явного
+// списка paths и фильтра isForbiddenPath в gitAdd → секрет может уехать в коммит.
+const FORBIDDEN_FLAGS = new Set(['--force', '-f', '--no-verify', '--amend', '--hard', '-D', '-a', '--all', '-am'])
 
 /**
  * Бросает Error если argv содержит запрещённую операцию. Проверяется:
@@ -132,6 +134,10 @@ export async function gitAdd(cwd: string, paths: string[]): Promise<GitWriteResu
   const clean = paths.filter(p => typeof p === 'string' && p.trim())
   if (clean.length === 0) return { ok: false, error: 'no-paths' }
   for (const rel of clean) {
+    // Секреты в коммит (аудит B1): .env/*.key/creds*.json блокируются на write —
+    // git-write обязан соблюдать ту же модель (CLAUDE.md §8), иначе секрет уедет
+    // в коммит и при push утечёт в публичный PR.
+    if (isForbiddenPath(rel)) return { ok: false, error: `forbidden-path (секрет/креды не коммитим): ${rel}` }
     try { await safeRealJoin(cwd, rel) } catch { return { ok: false, error: `path-outside-project: ${rel}` } }
   }
   try {

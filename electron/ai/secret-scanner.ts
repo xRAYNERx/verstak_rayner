@@ -77,6 +77,10 @@ export function isForbiddenPath(relPath: string): boolean {
   }
   // Generic env files with extra suffix (.env.staging, .env.test, etc)
   if (basename.startsWith('.env.') || basename.startsWith('.env')) return true
+  // creds*.json / credentials*.json — сервис-аккаунты Google/cloud, API-ключи.
+  // Модель безопасности и CLAUDE.md прямо обещают их блокировку, но фиксированный
+  // FORBIDDEN_BASENAMES не ловил `creds_google.json` и т.п. (аудит B1).
+  if (/^(creds|credentials).*\.json$/.test(basename)) return true
   return false
 }
 

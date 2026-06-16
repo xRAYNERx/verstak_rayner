@@ -216,6 +216,30 @@ function emitActivity(ctx: ToolContext, call: ToolCall, status: 'ok' | 'error', 
 }
 
 /** Short human-readable summary of a tool call for the activity stream. */
+/**
+ * Ждать подтверждения команды/коннектора, РАЗРЫВАЯ ожидание на ctx.signal.abort
+ * (аудит B2). Без этого per-task таймаут субагента (180с) и групповая отмена роя
+ * не освобождали ожидание → весь ai:send висел до ручного Stop. Тот же паттерн,
+ * что в diffConfirmWrite для write_file.
+ */
+function awaitCommandConfirm(ctx: ToolContext, callId: string): Promise<boolean> {
+  return new Promise<boolean>(resolve => {
+    let settled = false
+    const key = ctx.scopedKey(ctx.sendId, callId)
+    const finish = (v: boolean) => {
+      if (settled) return
+      settled = true
+      ctx.pendingCommands.delete(key)
+      ctx.signal.removeEventListener('abort', onAbort)
+      resolve(v)
+    }
+    const onAbort = () => finish(false)
+    ctx.pendingCommands.set(key, { sendId: ctx.sendId, resolve: finish })
+    if (ctx.signal.aborted) { onAbort(); return }
+    ctx.signal.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
 export function summarizeToolCall(name: string, args: Record<string, unknown>, result: unknown): { label: string; detail: string } | null {
   if (name === 'read_file') {
     const p = String(args.path ?? '')
@@ -466,9 +490,7 @@ const runCommandHandler: ToolHandler = {
       accepted = true
     } else {
       ctx.sender.send('ai:event', { id: ctx.sendId, event: { type: 'pending-command', callId: call.id, command } })
-      accepted = await new Promise<boolean>(resolve => {
-        ctx.pendingCommands.set(ctx.scopedKey(ctx.sendId, call.id), { sendId: ctx.sendId, resolve })
-      })
+      accepted = await awaitCommandConfirm(ctx, call.id)
     }
     if (!accepted) {
       ctx.sender.send('ai:event', { id: ctx.sendId, event: { type: 'command-result', callId: call.id, command, status: 'rejected' } })
@@ -617,9 +639,7 @@ const connectorQueryHandler: ToolHandler = {
       } else {
         // 'confirm' — переиспользуем pending-command поток (та же модалка подтверждения)
         ctx.sender.send('ai:event', { id: ctx.sendId, event: { type: 'pending-command', callId: call.id, command: summary } })
-        accepted = await new Promise<boolean>(resolve => {
-          ctx.pendingCommands.set(ctx.scopedKey(ctx.sendId, call.id), { sendId: ctx.sendId, resolve })
-        })
+        accepted = await awaitCommandConfirm(ctx, call.id)
       }
       if (!accepted) {
         ctx.sender.send('ai:event', { id: ctx.sendId, event: { type: 'command-result', callId: call.id, command: summary, status: 'rejected' } })
@@ -647,7 +667,27 @@ const connectorQueryHandler: ToolHandler = {
         }
         rest.local_path = safe
       }
-      const result = await ctx.connectors.query(cid, rest, ctx.signal)
+      // Аудит B4: у коннекторов нет собственного таймаута — зависший хост
+      // (медленный 1С / упавший OAuth-endpoint) повесил бы весь agent-loop до
+      // ручного Stop. Комбинируем ctx.signal (ручной Stop / отмена роя) с
+      // 30-секундным таймаутом запроса. Чинит все 31 коннектора разом.
+      const connAc = new AbortController()
+      const onParentAbort = () => connAc.abort()
+      const connTimeout = setTimeout(() => connAc.abort(), 30_000)
+      ctx.signal.addEventListener('abort', onParentAbort, { once: true })
+      if (ctx.signal.aborted) connAc.abort()
+      let result: unknown
+      try {
+        result = await ctx.connectors.query(cid, rest, connAc.signal)
+      } catch (e) {
+        if (connAc.signal.aborted && !ctx.signal.aborted) {
+          return { id: call.id, name: call.name, result: '', error: `Коннектор ${cid}: таймаут запроса (30с) — хост не ответил` }
+        }
+        throw e
+      } finally {
+        clearTimeout(connTimeout)
+        ctx.signal.removeEventListener('abort', onParentAbort)
+      }
       const s = summarizeToolCall(call.name, call.args, undefined)
       if (s) emitActivity(ctx, call, 'ok', s.label, s.detail)
       // Journal connector queries
@@ -656,12 +696,17 @@ const connectorQueryHandler: ToolHandler = {
         const path = call.args.path ? ` · ${call.args.path}` : ''
         ctx.recordJournal(ctx.projectPath, 'tool', `Коннектор ${cid}${entity}${path}`, null)
       } catch { /* journal not critical */ }
-      return { id: call.id, name: call.name, result: typeof result === 'string' ? result : JSON.stringify(result) }
+      // Аудит M2: тело коннектора и его ошибки могут содержать эхо токена
+      // (многие API отражают auth-параметр). scanText — последний рубеж перед
+      // тем, как результат уйдёт в контекст модели и transcript.
+      const rawResult = typeof result === 'string' ? result : JSON.stringify(result)
+      return { id: call.id, name: call.name, result: scanText(rawResult).redacted }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      emitActivity(ctx, call, 'error', call.name, msg)
-      try { ctx.recordJournal(ctx.projectPath, 'tool', `Коннектор упал: ${String(call.args.id ?? '?')}`, msg) } catch { /* journal not critical */ }
-      return { id: call.id, name: call.name, result: '', error: msg }
+      const safeMsg = scanText(msg).redacted
+      emitActivity(ctx, call, 'error', call.name, safeMsg)
+      try { ctx.recordJournal(ctx.projectPath, 'tool', `Коннектор упал: ${String(call.args.id ?? '?')}`, safeMsg) } catch { /* journal not critical */ }
+      return { id: call.id, name: call.name, result: '', error: safeMsg }
     }
   }
 }
@@ -1289,7 +1334,7 @@ export async function decomposeGoal(
   for await (const event of provider.send([
     { role: 'system', content: sys },
     { role: 'user', content: user }
-  ], [])) {
+  ], [], undefined, signal)) {
     if (signal.aborted) break
     if (event.type === 'text' && typeof event.text === 'string') text += event.text
     else if (event.type === 'usage' && event.usage) {
@@ -2851,9 +2896,7 @@ const mcpToolHandler: ToolHandler = {
     if (decision === 'confirm') {
       // 'confirm' — переиспользуем pending-command поток (та же модалка подтверждения)
       ctx.sender.send('ai:event', { id: ctx.sendId, event: { type: 'pending-command', callId: call.id, command: summary } })
-      const accepted = await new Promise<boolean>(resolve => {
-        ctx.pendingCommands.set(ctx.scopedKey(ctx.sendId, call.id), { sendId: ctx.sendId, resolve })
-      })
+      const accepted = await awaitCommandConfirm(ctx, call.id)
       if (!accepted) {
         ctx.sender.send('ai:event', { id: ctx.sendId, event: { type: 'command-result', callId: call.id, command: summary, status: 'rejected' } })
         return { id: call.id, name: call.name, result: summary, error: 'User rejected' }
@@ -2917,9 +2960,7 @@ const editSpreadsheetHandler: ToolHandler = {
         accepted = true
       } else {
         ctx.sender.send('ai:event', { id: ctx.sendId, event: { type: 'pending-command', callId: call.id, command: summary } })
-        accepted = await new Promise<boolean>(resolve => {
-          ctx.pendingCommands.set(ctx.scopedKey(ctx.sendId, call.id), { sendId: ctx.sendId, resolve })
-        })
+        accepted = await awaitCommandConfirm(ctx, call.id)
       }
       if (!accepted) {
         ctx.sender.send('ai:event', { id: ctx.sendId, event: { type: 'command-result', callId: call.id, command: summary, status: 'rejected' } })

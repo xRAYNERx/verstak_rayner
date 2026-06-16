@@ -188,7 +188,24 @@ protocol.registerSchemesAsPrivileged([
   }
 ])
 
+// Аудит M20: single-instance lock. Без него вторая копия Verstak на старте
+// прогоняет agentRuns.reconcileStale() против той же БД (WAL пускает второй
+// процесс) и помечает ЖИВЫЕ прогоны первой копии как failed. Берём лок до
+// whenReady; не досталось — фокусируем существующее окно и выходим, БД не трогаем.
+const gotPrimaryLock = app.requestSingleInstanceLock()
+if (!gotPrimaryLock) {
+  app.quit()
+}
+app.on('second-instance', () => {
+  const win = BrowserWindow.getAllWindows()[0]
+  if (win) {
+    if (win.isMinimized()) win.restore()
+    win.focus()
+  }
+})
+
 app.whenReady().then(() => {
+  if (!gotPrimaryLock) return // вторая копия — ранний выход до любых операций с БД
   Menu.setApplicationMenu(null)
   registerWindowIpc()
   registerNotificationWindowIpc()
@@ -466,7 +483,14 @@ app.whenReady().then(() => {
       if (!cwd) return Promise.resolve({ exitCode: 1, stdout: '', stderr: 'Проект не открыт' })
       return execVerifyCommand(cwd, command)
     },
-    connectorQuery: (id, args) => connectorRegistry.query(id, args, { getSecret: (k) => settings.getSecret(k), signal: new AbortController().signal }),
+    connectorQuery: (id, args) => {
+      // Аудит B4: даже ручной тест коннектора из Настроек не должен висеть
+      // вечно на зависшем хосте — 30с таймаут.
+      const ac = new AbortController()
+      const t = setTimeout(() => ac.abort(), 30_000)
+      return connectorRegistry.query(id, args, { getSecret: (k) => settings.getSecret(k), signal: ac.signal })
+        .finally(() => clearTimeout(t))
+    },
     getSecret: (k) => settings.getSecret(k)
   })
   registerAutonomousIpc({
