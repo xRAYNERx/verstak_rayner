@@ -483,6 +483,13 @@ html {
 .gg-rail:not(.is-shell-expanded) .gg-rail-group-count {
   display: none;
 }
+/* Свёрнутая панель: только иконки папок, без вложенных проектов в группах */
+.gg-rail:not(.is-expanded) .gg-rail-group-body {
+  display: none !important;
+}
+.gg-rail:not(.is-expanded) .gg-rail-group {
+  pointer-events: auto;
+}
 .gg-rail-chip.is-nested .gg-rail-chip-btn {
   min-height: 32px;
 }
