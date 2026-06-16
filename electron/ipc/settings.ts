@@ -7,7 +7,7 @@ import {
 } from '../ui-scale'
 import { detectInstalledClis } from '../ai/cli-detect'
 import { scanLocalModelServers } from '../ai/local-models'
-import { PROVIDERS } from '../ai/registry'
+import { PROVIDERS, providerCapabilities, type ProviderCapabilities } from '../ai/registry'
 import { runDoctor } from '../ai/doctor'
 import { recommendTier, type TierRecommendation } from '../ai/tier-router'
 import { AGENT_MODES, decide, type AgentMode, type ToolDecision } from '../ai/mode-policy'
@@ -23,6 +23,8 @@ export interface ProviderDescriptorDTO {
   defaultModel: string
   supportsTools: boolean
   shortLabel: string
+  /** Ревью F3: формальная матрица возможностей — драйвит degraded-индикацию в UI. */
+  capabilities: ProviderCapabilities
 }
 
 /** Категория действия агента — для матрицы Policy Center. */
@@ -93,7 +95,8 @@ export function registerSettingsIpc(settings: Settings): void {
       models: [...p.models],
       defaultModel: p.defaultModel,
       supportsTools: p.supportsTools,
-      shortLabel: p.shortLabel
+      shortLabel: p.shortLabel,
+      capabilities: providerCapabilities(p)
     }))
   })
 

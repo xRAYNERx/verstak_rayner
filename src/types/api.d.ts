@@ -828,6 +828,19 @@ export interface ProviderDescriptorDTO {
   defaultModel: string
   supportsTools: boolean
   shortLabel: string
+  /** Ревью F3: матрица возможностей — degraded-индикация на CLI. */
+  capabilities?: ProviderCapabilitiesDTO
+}
+
+/** Ревью F3: что провайдер реально умеет под контролем Verstak. */
+export interface ProviderCapabilitiesDTO {
+  tools: boolean
+  verification: boolean
+  liveTimeline: boolean
+  resumeSafe: boolean
+  mcp: boolean
+  delegation: boolean
+  attachments: boolean
 }
 
 /** Doctor — health-check провайдеров и коннекторов (см. electron/ai/doctor.ts). */

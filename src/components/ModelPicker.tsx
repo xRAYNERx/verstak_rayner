@@ -9,7 +9,10 @@ import {
   type CliAuthStatus,
 } from '../lib/model-catalog'
 
-const CLI_BETA_HINT = 'CLI-провайдеры требуют локальной установки. Если агент не отвечает — переключитесь на API-версию.'
+// Ревью F1: честная degraded-индикация. На CLI инструменты, проверка (DoD),
+// живой таймлайн и crash-resume идут ВНУТРИ бинаря и не видны Verstak — moat
+// «контроль» там урезан. Текст выводит это явно, а не «если не отвечает».
+const CLI_BETA_HINT = 'CLI-режим: урезанный контроль. Инструменты, проверка (DoD), живой таймлайн и crash-resume работают ВНУТРИ CLI и не видны Verstak. Полный контроль и доказательство выполнения — на API-провайдере.'
 
 type CliStatusMap = Partial<Record<CliAuthId, CliAuthStatus>>
 
@@ -352,6 +355,9 @@ function PickerRow({
         <span className="gg-mp-row-model">{shortModel(entry.model)}</span>
         {!entry.enabled && entry.authorized && !entry.isCurrent && (
           <span className="gg-mp-row-hidden-mark"> · скрыта</span>
+        )}
+        {isCli && (
+          <span className="gg-mp-row-cli-degraded" title={CLI_BETA_HINT}> · урезанный контроль</span>
         )}
       </span>
       <span className="gg-mp-row-meta">

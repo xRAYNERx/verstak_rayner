@@ -36,6 +36,49 @@ export interface ProviderDescriptor {
   shortLabel: string
 }
 
+/**
+ * Ревью F3: формальная матрица возможностей провайдера. Раньше контроль был
+ * только в двух полях (transport/supportsTools), а остальное (verification,
+ * tick, resume, mcp, delegation, attachments) подразумевалось разрозненно — и
+ * пользователь не видел, что на CLI moat «контроль» деградирует.
+ */
+export interface ProviderCapabilities {
+  /** Агентный tool-loop ПОД контролем Verstak (read/write/run_command/apply_patch). */
+  tools: boolean
+  /** attest_verification artifact + DoD-доказательство выполнения. */
+  verification: boolean
+  /** Живой таймлайн прогресса (tick) в Tasks / AgentRuns. */
+  liveTimeline: boolean
+  /** Crash-resume безопасен (авто-доигрывание не повторит деструктив). */
+  resumeSafe: boolean
+  /** MCP-инструменты внешних серверов. */
+  mcp: boolean
+  /** Делегирование подзадач (delegate / orchestrate / swarm). */
+  delegation: boolean
+  /** Вложения (картинки/файлы); иначе деградируют в текстовый хинт. */
+  attachments: boolean
+}
+
+/**
+ * Единый источник правды о возможностях провайдера. Выводится из transport +
+ * supportsTools — реальных детерминантов в коде (не хардкод-таблица на 18 строк,
+ * которая бы дрейфовала). На CLI инструменты и проверка идут ВНУТРИ бинаря, и
+ * Verstak их не видит: runPlainConversation физически не зовёт tools/verification/
+ * tick (см. ipc/ai.ts), а CLI-прогоны не auto-resumable (agent-runs.ts).
+ */
+export function providerCapabilities(d: Pick<ProviderDescriptor, 'transport' | 'supportsTools'>): ProviderCapabilities {
+  const full = d.transport === 'API' && d.supportsTools
+  return {
+    tools: full,
+    verification: full,
+    liveTimeline: full,
+    resumeSafe: d.transport === 'API',
+    mcp: full,
+    delegation: full,
+    attachments: d.transport === 'API'
+  }
+}
+
 export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
   'gemini-api': {
     id: 'gemini-api',

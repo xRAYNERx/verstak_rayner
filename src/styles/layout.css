@@ -2566,6 +2566,13 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   font-size: 10px;
   margin-left: 4px;
 }
+/* Ревью F1: CLI = урезанный контроль (warning-окраска, не disabled). */
+.gg-mp-row-cli-degraded {
+  color: var(--warning, #d98a2b);
+  font-size: 10px;
+  margin-left: 4px;
+  opacity: 0.85;
+}
 .gg-mp-section-title {
   font-size: 9.5px;
   font-weight: 600;
