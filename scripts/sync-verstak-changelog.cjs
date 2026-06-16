@@ -13,6 +13,19 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: 'bf63d18',
+    deployed: '17.06.2026 00:40',
+    treeVersion: '1.5.5',
+    title: 'Ускорение старта приложения',
+    changes: [
+      'Окно открывается раньше: тяжёлый IPC (AI, терминал, MCP) регистрируется после первого кадра.',
+      'Показ окна на ready-to-show + фон #2e3440 — без пустого экрана до загрузки React.',
+      'Скелетон загрузки в HTML и в UI; кэш auth_completed — главный интерфейс без ожидания IPC.',
+      'Дерево файлов грузится асинхронно после открытия проекта; список проектов/групп — параллельно.',
+      'Lazy-load: Settings, Terminal, AuthScreen, BrowserView, DesignView, Skills и др. — главный chunk ~1.2 MB.',
+    ],
+  },
+  {
     commit: 'ca94b1e',
     deployed: '17.06.2026 00:24',
     treeVersion: '1.5.5',
