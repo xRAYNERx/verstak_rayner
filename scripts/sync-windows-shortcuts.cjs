@@ -41,7 +41,7 @@ $lnk = $sh.CreateShortcut('${psQuote(lnkPath)}')
 $lnk.TargetPath = '${psQuote(exePath)}'
 $lnk.WorkingDirectory = '${psQuote(dir)}'
 $lnk.IconLocation = '${psQuote(exePath)},0'
-$lnk.Description = 'Verstak'
+$lnk.Description = 'VERSTAK'
 $lnk.Save()
 Write-Output 'OK'
 `
@@ -119,6 +119,26 @@ async function main() {
     path.join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Verstak.lnk'),
     ...findPinnedTaskbarLinks(exePath),
   ]
+
+  const taskBarDir = path.join(
+    process.env.APPDATA || '',
+    'Microsoft',
+    'Internet Explorer',
+    'Quick Launch',
+    'User Pinned',
+    'TaskBar'
+  )
+  const legacyPinned = path.join(taskBarDir, 'Electron.lnk')
+  const verstakPinned = path.join(taskBarDir, 'Verstak.lnk')
+  if (fs.existsSync(legacyPinned)) {
+    try {
+      upsertShortcut(verstakPinned, exePath)
+      fs.unlinkSync(legacyPinned)
+      console.log('[sync-shortcuts] migrated pinned Electron.lnk → Verstak.lnk')
+    } catch (err) {
+      console.warn('[sync-shortcuts] migrate pinned shortcut failed:', err.message || err)
+    }
+  }
 
   const seen = new Set()
   for (const lnk of shortcuts) {
