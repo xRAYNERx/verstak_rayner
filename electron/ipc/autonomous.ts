@@ -131,7 +131,7 @@ async function runCycle(deps: AutonomousDeps): Promise<void> {
     let full = ''
     let runError: string | null = null
     // Run WITHOUT tools — we want plain text suggestions, not actual file edits
-    for await (const event of provider.send(messagesWithSystem, [])) {
+    for await (const event of provider.send(messagesWithSystem, [], undefined, ctrl.signal)) {
       if (event.type === 'text') full += event.text
       else if (event.type === 'error') {
         runError = 'message' in event ? String((event as { message: unknown }).message) : 'unknown error'

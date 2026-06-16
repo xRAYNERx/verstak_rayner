@@ -87,7 +87,7 @@ export function createOpenAiCompatProvider(opts: OpenAiCompatOptions): ChatProvi
     name: opts.name,
     models: opts.models,
 
-    async *send(messages: ChatMessage[], tools: ToolDefinition[], _results?: ToolResult[]): AsyncIterable<ChatEvent> {
+    async *send(messages: ChatMessage[], tools: ToolDefinition[], _results?: ToolResult[], signal?: AbortSignal): AsyncIterable<ChatEvent> {
       const apiMessages = buildOpenAiMessages(messages)
       const apiTools: OpenAI.Chat.ChatCompletionTool[] | undefined = tools.length > 0
         ? tools.map(t => ({
@@ -104,16 +104,23 @@ export function createOpenAiCompatProvider(opts: OpenAiCompatOptions): ChatProvi
       const inProgress: Record<number, { id: string; name: string; args: string }> = {}
 
       const maxTokens = effortLevel === 'quick' ? 2048 : effortLevel === 'deep' ? 16384 : 4096
+      // Аудит M14: reasoning-модели OpenAI (o1/o1-mini/o3/o4...) отвергают max_tokens
+      // с 400 'Use max_completion_tokens instead' — а это 4xx, не triggerит fallback.
+      // Шлём правильный параметр по имени модели.
+      const isReasoningModel = /^o\d/i.test(model)
+      const tokenParam = isReasoningModel
+        ? { max_completion_tokens: maxTokens }
+        : { max_tokens: maxTokens }
 
       try {
         const stream = await client.chat.completions.create({
           model,
           messages: apiMessages,
           stream: true,
-          max_tokens: maxTokens,
+          ...tokenParam,
           stream_options: { include_usage: true },
           ...(apiTools ? { tools: apiTools } : {})
-        })
+        }, signal ? { signal } : undefined)
 
         let usageSent = false
         for await (const chunk of stream) {

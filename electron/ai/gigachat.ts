@@ -290,7 +290,8 @@ export function createGigaChatProvider(opts: GigaChatOptions): ChatProvider {
     async *send(
       messages: ChatMessage[],
       tools: ToolDefinition[],
-      _results?: ToolResult[]
+      _results?: ToolResult[],
+      signal?: AbortSignal
     ): AsyncIterable<ChatEvent> {
       const body: Record<string, unknown> = {
         model,
@@ -316,7 +317,7 @@ export function createGigaChatProvider(opts: GigaChatOptions): ChatProvider {
         // Структура: index → { id, name, argumentsBuffer }
         const toolCallAccum = new Map<number, { id: string; name: string; argumentsBuffer: string }>()
 
-        for await (const line of chatStream(token, body)) {
+        for await (const line of chatStream(token, body, signal)) {
           if (!line.startsWith('data:')) continue
           const payload = line.slice(5).trim()
           if (payload === '[DONE]') break

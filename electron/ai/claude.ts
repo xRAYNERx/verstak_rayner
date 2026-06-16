@@ -74,7 +74,7 @@ export function createClaudeProvider(opts: ClaudeOptions): ChatProvider {
     name: 'Claude',
     models: CLAUDE_MODELS,
 
-    async *send(messages: ChatMessage[], tools: ToolDefinition[], _results?: ToolResult[]): AsyncIterable<ChatEvent> {
+    async *send(messages: ChatMessage[], tools: ToolDefinition[], _results?: ToolResult[], signal?: AbortSignal): AsyncIterable<ChatEvent> {
       const systemMessages = messages.filter(m => m.role === 'system').map(m => m.content).filter(Boolean).join('\n\n')
       const conversation = messages
         .filter(m => m.role !== 'system')
@@ -119,7 +119,7 @@ export function createClaudeProvider(opts: ClaudeOptions): ChatProvider {
           messages: conversation as Anthropic.Messages.MessageParam[],
           ...(apiTools ? { tools: apiTools } : {}),
           ...thinkingParam
-        })
+        }, signal ? { signal } : undefined)
 
         let inputTokens = 0
         let outputTokens = 0

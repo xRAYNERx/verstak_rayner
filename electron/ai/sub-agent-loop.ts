@@ -83,7 +83,7 @@ export async function runSubAgentLoop(params: SubAgentLoopParams): Promise<SubAg
     const toolCalls: ToolCall[] = []
     let assistantText = ''
     try {
-      for await (const event of provider.send(convo, subToolDefs)) {
+      for await (const event of provider.send(convo, subToolDefs, undefined, signal)) {
         if (signal.aborted) return { text: lastText, toolCallCount, exitReason: 'aborted' }
         if (event.type === 'text' && typeof event.text === 'string') {
           assistantText += event.text

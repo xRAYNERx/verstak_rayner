@@ -163,7 +163,8 @@ export function createYandexGptProvider(opts: YandexGptOptions): ChatProvider {
     async *send(
       messages: ChatMessage[],
       tools: ToolDefinition[],
-      _results?: ToolResult[]
+      _results?: ToolResult[],
+      signal?: AbortSignal
     ): AsyncIterable<ChatEvent> {
       const yandexMessages = buildYandexMessages(messages)
       const body: Record<string, unknown> = {
@@ -192,7 +193,8 @@ export function createYandexGptProvider(opts: YandexGptOptions): ChatProvider {
             'x-folder-id': opts.folderId,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(body)
+          body: JSON.stringify(body),
+          signal // Аудит B3: Stop рвёт стрим YandexGPT
         })
 
         if (!response.ok) {
@@ -215,7 +217,7 @@ export function createYandexGptProvider(opts: YandexGptOptions): ChatProvider {
         let prevText = '' // ПОЛНЫЙ накопленный текст из предыдущего chunk'а
 
         // Накапливаем tool calls из NDJSON — последний chunk содержит финальное
-        // состояние. Ключ: имя тула.
+        // состояние. Ключ дедупа: name + args (см. M15 ниже).
         const toolCallsSeen = new Set<string>()
 
         const processChunk = (chunk: YandexChunk): { text?: string; toolCalls?: Array<{ name: string; args: Record<string, unknown> }> } => {
@@ -284,10 +286,14 @@ export function createYandexGptProvider(opts: YandexGptOptions): ChatProvider {
           } catch { /* skip */ }
         }
 
-        // Эмитим tool calls после завершения стрима
+        // Эмитим tool calls после завершения стрима.
+        // Аудит M15: дедуп по name терял повторные вызовы одного тула (две правки
+        // через write_file, два чтения) — ключ по name+args сохраняет их, но всё
+        // ещё гасит точные дубли из накопленного NDJSON-стрима.
         for (const tc of pendingToolCalls) {
-          if (!toolCallsSeen.has(tc.name)) {
-            toolCallsSeen.add(tc.name)
+          const dedupKey = `${tc.name} ${JSON.stringify(tc.args)}`
+          if (!toolCallsSeen.has(dedupKey)) {
+            toolCallsSeen.add(dedupKey)
             yield {
               type: 'tool-call',
               call: {

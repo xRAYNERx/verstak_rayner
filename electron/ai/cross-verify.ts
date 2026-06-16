@@ -89,7 +89,7 @@ export async function runCrossVerify(
     ]
 
     let resultText = ''
-    for await (const event of provider.send(messages, [])) {
+    for await (const event of provider.send(messages, [], undefined, ctrl.signal)) {
       if (event.type === 'text') {
         resultText += event.text
       }

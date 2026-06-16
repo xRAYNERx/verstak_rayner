@@ -782,7 +782,7 @@ async function runPlainConversation(
   }
   let exitReason: ExitReason = 'completed'
   try {
-    for await (const event of provider.send(messages, [])) {
+    for await (const event of provider.send(messages, [], undefined, signal)) {
       if (signal.aborted) {
         exitReason = 'aborted'
         sender.send('ai:event', { id: sendId, event: { type: 'done' } })
@@ -996,7 +996,7 @@ async function runApiConversation(
     const allToolDefs = mcpToolDefs.length > 0 ? [...TOOL_DEFS, ...mcpToolDefs] : TOOL_DEFS
 
     for await (const event of withInitialRetry(
-      () => provider.send(messagesForProvider, allToolDefs),
+      () => provider.send(messagesForProvider, allToolDefs, undefined, signal),
       {
         label: `turn-${turnNum}`,
         signal,
@@ -1295,7 +1295,7 @@ async function runApiConversation(
         // Получаем резюме от той же модели — один non-streamed вызов
         const summaryMessages = buildCompactSummaryPrompt(currentMessages)
         let summaryText = ''
-        for await (const ev of provider.send(summaryMessages, [])) {
+        for await (const ev of provider.send(summaryMessages, [], undefined, signal)) {
           if (ev.type === 'text') summaryText += ev.text
           if (ev.type === 'done' || ev.type === 'error') break
         }

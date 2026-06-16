@@ -57,7 +57,7 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
     name: 'Gemini',
     models: MODELS,
 
-    async *send(messages: ChatMessage[], tools: ToolDefinition[], _toolResults?: ToolResult[]): AsyncIterable<ChatEvent> {
+    async *send(messages: ChatMessage[], tools: ToolDefinition[], _toolResults?: ToolResult[], signal?: AbortSignal): AsyncIterable<ChatEvent> {
       // Extract system messages — Gemini wants them in `config.systemInstruction`,
       // not as a user turn. Mixing system content into user turns wastes the
       // prompt cache and confuses multi-turn role alternation.
@@ -92,6 +92,8 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
       if (systemTexts.length > 0) {
         config.systemInstruction = { parts: [{ text: systemTexts.join('\n\n') }] }
       }
+      // Аудит B3: abortSignal в config рвёт HTTP-стрим Gemini при Stop.
+      if (signal) config.abortSignal = signal
       const hasConfig = Object.keys(config).length > 0
 
       try {
@@ -217,6 +219,7 @@ export function createGeminiProvider(opts: GeminiOptions): ChatProvider {
           if (systemTexts.length > 0) {
             noToolsConfig.systemInstruction = { parts: [{ text: systemTexts.join('\n\n') }] }
           }
+          if (signal) noToolsConfig.abortSignal = signal
           try {
             const retryStream = await client.models.generateContentStream(
               Object.keys(noToolsConfig).length > 0

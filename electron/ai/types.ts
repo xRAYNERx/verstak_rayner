@@ -102,6 +102,10 @@ export interface ChatProvider {
   send: (
     messages: ChatMessage[],
     tools: ToolDefinition[],
-    toolResults?: ToolResult[]
+    toolResults?: ToolResult[],
+    /** Аудит B3: abort-сигнал агентного цикла. API-провайдеры пробрасывают его
+     *  в SDK/fetch, чтобы Stop реально рвал HTTP-стрим (иначе платим за токены,
+     *  которые сервер генерит уже после нажатия Stop). CLI-провайдеры игнорируют. */
+    signal?: AbortSignal
   ) => AsyncIterable<ChatEvent>
 }
