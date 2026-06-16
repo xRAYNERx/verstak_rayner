@@ -6,6 +6,19 @@ import type { ChatProvider, ChatMessage, ChatEvent, ToolDefinition, ToolResult }
 import { buildCliPrompt } from './cli-prompt'
 import { treeKill } from './child-kill'
 
+/**
+ * Аудит M7: gemini-cli шлёт assistant-сообщение accumulated (каждое событие —
+ * полный текст с начала), а не дельтой. Без дедупа чат превращается в кашу из
+ * нарастающих повторов. Хелпер вычисляет хвост для эмита и новое «прежнее»:
+ * - full начинается с prev (accumulated) → delta = хвост, next = full;
+ * - иначе (delta-style независимый чанк) → delta = full, next = prev + full.
+ * Экспортируется для unit-теста парсера (см. также M11).
+ */
+export function dedupAccumulatedText(prev: string, full: string): { delta: string; next: string } {
+  if (full.startsWith(prev)) return { delta: full.slice(prev.length), next: full }
+  return { delta: full, next: prev + full }
+}
+
 interface GeminiCliOptions {
   binary?: string  // override path for testing
   cwd?: string
@@ -125,6 +138,10 @@ export function createGeminiCliProvider(opts: GeminiCliOptions = {}): ChatProvid
       const events: ChatEvent[] = []
       let done = false
       let resolve: (() => void) | null = null
+      // Аудит M7: gemini-cli шлёт assistant-сообщение accumulated (каждое событие —
+      // полный текст с начала, не дельта). Без дедупа чат = нарастающие повторы.
+      // Держим предыдущий полный текст и эмитим только новый хвост.
+      let prevAssistant = ''
 
       const wake = () => { if (resolve) { const r = resolve; resolve = null; r() } }
 
@@ -161,8 +178,13 @@ export function createGeminiCliProvider(opts: GeminiCliOptions = {}): ChatProvid
         try { ev = JSON.parse(trimmed) } catch { return }
 
         if (ev.type === 'message' && ev.role === 'assistant' && ev.content) {
-          events.push({ type: 'text', text: ev.content })
-          wake()
+          // Accumulated → дельта (см. dedupAccumulatedText).
+          const { delta, next } = dedupAccumulatedText(prevAssistant, ev.content)
+          prevAssistant = next
+          if (delta) {
+            events.push({ type: 'text', text: delta })
+            wake()
+          }
         } else if (ev.type === 'usage') {
           const u = extractUsage(ev)
           if (u) {
