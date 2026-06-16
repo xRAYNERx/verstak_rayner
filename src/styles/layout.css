@@ -1571,11 +1571,24 @@ html {
 .gg-rail:not(.is-expanded) .gg-rail-footer,
 .gg-rail:not(.is-shell-expanded) .gg-rail-footer {
   align-items: center;
-  border-top: none;
+  border-top: 1px solid var(--bg-base);
   padding-top: 0;
   margin-top: auto;
   gap: 6px;
-  background: transparent;
+  background: var(--bg-base);
+}
+.gg-rail:not(.is-expanded) .gg-rail-hidden {
+  border-top-color: transparent;
+  padding-top: 0;
+  margin-top: 0;
+}
+.gg-rail:not(.is-expanded) .gg-update-rail-track {
+  margin-top: 0;
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-base);
+  border: none;
 }
 .gg-rail:not(.is-expanded) .gg-rail-add {
   width: 36px;
@@ -1588,9 +1601,6 @@ html {
   width: 40px;
   padding: 4px;
   margin: 0 auto;
-}
-.gg-rail:not(.is-expanded) .gg-update-rail-track {
-  margin-top: 3px;
 }
 .gg-rail-app-settings {
   flex-shrink: 0;
@@ -2022,6 +2032,9 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 .gg-settings-extra {
   padding: 14px 22px 4px;
   border-top: 1px solid var(--border-subtle);
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .gg-settings-section-title {
   font-size: var(--text-xs);
@@ -2878,7 +2891,22 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 }
 .gg-settings-nav-icon { width: 16px; text-align: center; opacity: 0.85; display: flex; align-items: center; justify-content: center; }
 .gg-settings-nav-icon svg { vertical-align: middle; }
-.gg-settings-content { flex: 1; overflow-y: auto; }
+.gg-settings-content {
+  flex: 1;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+/* Settings: плоские кнопки без accent-glow */
+.gg-settings-shell .gg-btn-primary,
+.gg-settings-shell .gg-btn-primary:hover,
+.gg-settings-shell .gg-btn-primary:active,
+html.gg-atelier .gg-settings-shell .gg-btn-primary,
+html.gg-atelier .gg-settings-shell .gg-btn-primary:hover,
+.gg-app-atelier .gg-settings-shell .gg-btn-primary,
+.gg-app-atelier .gg-settings-shell .gg-btn-primary:hover {
+  box-shadow: var(--shadow-sm);
+}
 .gg-settings-page-title {
   font-size: 18px;
   font-weight: 600;
@@ -7096,14 +7124,16 @@ textarea.gg-input {
 }
 .gg-connector-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin: 16px 0;
+  max-width: 100%;
 }
 .gg-connector-card {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
   padding: 14px 16px;
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
@@ -7178,6 +7208,10 @@ textarea.gg-input {
   border-radius: 10px;
   padding: 20px;
   margin-top: 8px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
   background: var(--bg-raised, var(--bg-surface));
 }
 .gg-connector-detail-header {
@@ -8704,7 +8738,11 @@ textarea.gg-input {
    под текст задачи. Рекомендация, не autopilot — переключает только «применить». */
 .gg-composer-meta .gg-tier-rec {
   cursor: default;
-  max-width: min(320px, 100%);
+  min-width: 0;
+  max-width: min(300px, 100%);
+  overflow: hidden;
+  gap: 4px;
+  padding-right: 4px;
   animation: gg-fade-in 140ms ease-out;
 }
 .gg-composer-meta .gg-tier-rec.tier-cheap {
@@ -8717,6 +8755,8 @@ textarea.gg-input {
   border-color: color-mix(in srgb, var(--warning) 45%, var(--border-subtle));
 }
 .gg-tier-rec-text {
+  flex: 1 1 auto;
+  min-width: 0;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -8726,17 +8766,22 @@ textarea.gg-input {
 .gg-tier-rec-apply {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  height: 22px;
-  padding: 0 8px;
+  height: 20px;
+  padding: 0 6px;
   font-family: inherit;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
   cursor: pointer;
   background: var(--bg-base);
   color: var(--text-secondary);
   transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
   white-space: nowrap;
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 58px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 18px;
 }
 .gg-tier-rec-apply:hover {
   background: var(--bg-hover);

@@ -11,7 +11,13 @@ import { useT } from '../i18n'
 const RAIL_EXPANDED_KEY = 'gg-rail-expanded'
 const RAIL_WIDTH_COLLAPSED = '76px'
 const RAIL_WIDTH_EXPANDED = '248px'
-const SHELL_MS = 280
+
+/**
+ * Контракт анимации rail (визуально проверен — не ломать без ручной проверки):
+ * — Открытие: railExpanded=true → shell, content и --gg-rail-w сразу в expanded;
+ *   параллельные переходы только в CSS (--shell-dur / --shell-ease в layout.css).
+ * — Закрытие: симметрично — всё сразу в collapsed, без staged setTimeout.
+ */
 
 function readRailExpanded(): boolean {
   try {
@@ -348,27 +354,18 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
   }
 
   useEffect(() => {
-    if (railExpanded) {
-      document.documentElement.style.setProperty('--gg-rail-w', RAIL_WIDTH_EXPANDED)
-      try { localStorage.setItem(RAIL_EXPANDED_KEY, '1') } catch { /* ignore */ }
-      return
-    }
-    const widthId = window.setTimeout(() => {
-      document.documentElement.style.setProperty('--gg-rail-w', RAIL_WIDTH_COLLAPSED)
-      try { localStorage.setItem(RAIL_EXPANDED_KEY, '0') } catch { /* ignore */ }
-    }, SHELL_MS)
-    return () => clearTimeout(widthId)
+    document.documentElement.style.setProperty(
+      '--gg-rail-w',
+      railExpanded ? RAIL_WIDTH_EXPANDED : RAIL_WIDTH_COLLAPSED
+    )
+    try {
+      localStorage.setItem(RAIL_EXPANDED_KEY, railExpanded ? '1' : '0')
+    } catch { /* ignore */ }
   }, [railExpanded])
 
   useEffect(() => {
-    if (railExpanded) {
-      setShellExpanded(true)
-      setContentExpanded(true)
-      return
-    }
-    setContentExpanded(false)
-    const shellId = window.setTimeout(() => setShellExpanded(false), SHELL_MS)
-    return () => clearTimeout(shellId)
+    setShellExpanded(railExpanded)
+    setContentExpanded(railExpanded)
   }, [railExpanded])
 
   useEffect(() => {
