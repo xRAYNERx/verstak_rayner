@@ -13,6 +13,18 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: '7c0b23f',
+    deployed: '17.06.2026 02:35',
+    treeVersion: '1.5.5',
+    title: 'Rail footer, скрытые проекты, tier apply, токены',
+    changes: [
+      'Скрытые проекты: при сворачивании rail папка закрывается как группы — только иконка.',
+      'Кнопка «применить» в рекомендации модели: компактная по высоте, контрастный accent, текст целиком.',
+      'Rail footer: убрана полоска над «Настройки»; в свёрнутом виде кнопка настроек 40×36, без прямоугольного фона.',
+      'Индикатор токенов под чатом: pill в стиле tools/mode/model, SVG-заливка по объёму текста.',
+    ],
+  },
+  {
     commit: 'f60f2a0',
     deployed: '17.06.2026 02:22',
     treeVersion: '1.5.5',
