@@ -14,6 +14,18 @@ const ENTRIES = [
     version: '1.5.1',
     build: '16.06.2026',
     deployed: '16.06.2026',
+    title: 'Фирменный установщик Verstak (NSIS, Nord-тема)',
+    changes: [
+      'Кастомный wizard: тёмный фон Nord (#2e3440), акцент #88c0d0, русские тексты welcome/finish.',
+      'Боковая панель и header с логотипом Verstak (generate-installer-assets.mjs).',
+      'Страница «Добро пожаловать», «Verstak установлен», брендированное удаление.',
+      'Совместимость с electron-updater сохранена (NSIS target).',
+    ],
+  },
+  {
+    version: '1.5.1',
+    build: '16.06.2026',
+    deployed: '16.06.2026',
     title: 'Тосты: плотная плашка + позиция как у Windows',
     changes: [
       'Overlay-тост: плотный фон, нормальная тень, высота ~124px, акцентная полоса слева.',
