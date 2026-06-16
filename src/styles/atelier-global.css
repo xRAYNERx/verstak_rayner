@@ -467,17 +467,7 @@ html.gg-atelier .gg-provider-badge {
 }
 
 /* ─── Toasts & banners ─── */
-html.gg-atelier .gg-theme-cycle-fab {
-  background: var(--shell-panel-fill);
-  backdrop-filter: var(--vol-blur);
-  -webkit-backdrop-filter: var(--vol-blur);
-  box-shadow: var(--vol-lift);
-}
 
-html.gg-atelier .gg-theme-cycle-fab:hover {
-  border-color: var(--accent-border);
-  box-shadow: var(--vol-lift), 0 0 0 2px var(--accent-muted);
-}
 
 html.gg-atelier .gg-prov-toast {
   background: var(--shell-panel-fill);

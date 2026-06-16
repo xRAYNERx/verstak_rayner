@@ -24,7 +24,7 @@ import { CommandConfirm } from './components/CommandConfirm'
 
 import { UpdateAvailableModal } from './components/UpdateAvailableModal'
 import { WhatsNewModal } from './components/WhatsNewModal'
-import { ThemeCycleButton } from './components/ThemeCycleButton'
+
 import { Terminal } from './components/Terminal'
 import { FilesPanel } from './components/FilesPanel'
 import { SideChat } from './components/SideChat'
@@ -343,7 +343,7 @@ export function App() {
       <CommandConfirm />
       <UpdateAvailableModal />
       <WhatsNewModal />
-      {authDone && <ThemeCycleButton />}
+
     </div>
     </I18nContext.Provider>
   )
