@@ -97,6 +97,16 @@ export function ProjectSettings({ project, onClose, onProjectUpdated }: ProjectS
     setTimeout(() => setSaved(false), 2000)
   }
 
+  async function handleToggleHidden(hidden: boolean) {
+    setSaving(true)
+    const updated = await updateProjectMeta(project.path, { hidden })
+    setSaving(false)
+    if (updated) {
+      applyUpdated(updated)
+      await refreshProjectList()
+    }
+  }
+
   async function handleRemoveFromList() {
     const ok = window.confirm(
       t.projectSettings.removeFromListConfirm.replace('{name}', localProject.name)
@@ -231,6 +241,20 @@ export function ProjectSettings({ project, onClose, onProjectUpdated }: ProjectS
                 {saved ? '✓ Сохранено' : saving ? 'Сохраняю…' : 'Сохранить'}
               </button>
             </div>
+          </section>
+
+          <section className="gg-ps-section">
+            <div className="gg-ps-section-label">{t.projectSettings.hideFromList}</div>
+            <p className="gg-ps-section-hint-block">{t.projectSettings.hideFromListDesc}</p>
+            <label className="gg-ps-toggle-row">
+              <input
+                type="checkbox"
+                checked={localProject.hidden}
+                onChange={e => void handleToggleHidden(e.target.checked)}
+                disabled={saving}
+              />
+              <span>{t.projectSettings.hideFromList}</span>
+            </label>
           </section>
 
           <section className="gg-ps-section gg-ps-danger-zone">

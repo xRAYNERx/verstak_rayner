@@ -154,12 +154,12 @@ export function registerProjectIpc(projects: Projects, projectGroups: ProjectGro
     return { ok: true as const }
   })
   ipcMain.handle('projects:rename', (_e, path: string, name: string) => projects.rename(path, name))
-  ipcMain.handle('projects:update-meta', (_e, path: string, patch: { name?: string }) => {
-    // Принимаем ТОЛЬКО name. iconPath из renderer игнорируем — иконка ставится
+  ipcMain.handle('projects:update-meta', (_e, path: string, patch: { name?: string; hidden?: boolean }) => {
+    // Принимаем name и hidden. iconPath из renderer игнорируем — иконка ставится
     // строго через pick-icon/clear-icon (там путь генерит main внутри
     // project-icons). Иначе renderer мог бы записать произвольный путь как
     // iconPath и через protocol-хендлер прочитать любой файл.
-    return projects.updateMeta(path, { name: patch?.name })
+    return projects.updateMeta(path, { name: patch?.name, hidden: patch?.hidden })
   })
   ipcMain.handle('projects:pick-icon', async (_e, projectPath: string) => {
     const win = BrowserWindow.getFocusedWindow()

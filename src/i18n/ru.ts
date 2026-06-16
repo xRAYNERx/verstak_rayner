@@ -77,8 +77,12 @@ export const ru: Translations = {
     groupCollapse: 'Свернуть группу',
     groupEdit: 'Настройки группы',
     groupMemberCount: '{count} проектов',
+    hiddenProjects: 'Скрытые',
   },
   projectSettings: {
+    hideFromList: 'Скрыть из общего списка',
+    hideFromListDesc: 'Проект переедет в секцию «Скрытые» внизу rail. Открыть и работать с ним можно как обычно.',
+    showInList: 'Показывать в общем списке',
     removeFromList: 'Убрать из списка',
     removeFromListDesc: 'Проект исчезнет из Verstak. Папка на диске и переписки останутся.',
     removeFromListConfirm: 'Убрать «{name}» из списка?\nПапка и файлы на диске не удаляются.',

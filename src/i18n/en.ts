@@ -78,8 +78,12 @@ export const en = {
     groupCollapse: 'Collapse group',
     groupEdit: 'Group settings',
     groupMemberCount: '{count} projects',
+    hiddenProjects: 'Hidden',
   },
   projectSettings: {
+    hideFromList: 'Hide from main list',
+    hideFromListDesc: 'Moves the project to the Hidden section at the bottom of the rail. You can still open and use it.',
+    showInList: 'Show in main list',
     removeFromList: 'Remove from list',
     removeFromListDesc: 'Hides the project in Verstak. Folder and chat history on disk stay.',
     removeFromListConfirm: 'Remove «{name}» from the list?\nFiles on disk will not be deleted.',

@@ -535,6 +535,16 @@ const MIGRATIONS: Array<{ version: number; description: string; run: (db: DB) =>
         CREATE INDEX IF NOT EXISTS idx_project_group_members_path ON project_group_members(project_path);
       `)
     }
+  },
+  {
+    version: 21,
+    description: 'projects.hidden — скрытые проекты в отдельной секции rail',
+    run: (db: DB) => {
+      const cols = (db.prepare('PRAGMA table_info(projects)').all() as Array<{ name: string }>).map(c => c.name)
+      if (!cols.includes('hidden')) {
+        db.exec('ALTER TABLE projects ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0')
+      }
+    }
   }
 ]
 

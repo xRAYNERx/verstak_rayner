@@ -9,7 +9,8 @@ const TOAST_W = 420
 const TOAST_H = 440
 /** Как Windows toast: вплотную к правому нижнему углу рабочей области. */
 const MARGIN = 8
-const BOTTOM = 0
+/** Отступ от нижнего края рабочей области — выше панели задач Windows. */
+const BOTTOM = 52
 
 export interface ToastPayload {
   title?: string
