@@ -224,7 +224,7 @@ export const en = {
 
   // Chat
   chat: {
-    placeholder: 'Describe a task. Enter — send, Shift+Enter — new line, Ctrl+V — paste screenshot.',
+    placeholder: 'Describe your task…',
     streamingPlaceholder: 'is responding… (Esc — stop)',
     streamingAppendHint: 'add to the current task context',
     streamingQueueHint: 'run right after this one finishes',

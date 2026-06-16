@@ -216,7 +216,7 @@ export const ru: Translations = {
     later: 'Позже',
   },
   chat: {
-    placeholder: 'Опиши задачу. Enter — отправить, Shift+Enter — новая строка, Ctrl+V — вставить скриншот.',
+    placeholder: 'Опишите задачу…',
     streamingPlaceholder: 'отвечает… (Esc — остановить)',
     streamingAppendHint: 'добавить в контекст текущей задачи',
     streamingQueueHint: 'выполнить сразу после этой',
