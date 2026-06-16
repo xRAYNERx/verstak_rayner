@@ -1,36 +1,25 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { I18nContext, getTranslations, type Lang } from './i18n'
-import { AuthScreen } from './components/AuthScreen'
 import { ProjectRail } from './components/ProjectRail'
 
 import { ProjectSettings } from './components/ProjectSettings'
 import type { ProjectMeta } from './types/api'
 import { Sidebar } from './components/Sidebar'
-import { Settings } from './components/Settings'
 import { Chat } from './components/Chat'
 import { TasksView } from './components/TasksView'
 import { JournalView } from './components/JournalView'
 import { PlanView } from './components/PlanView'
 import { FeedbackView } from './components/FeedbackView'
-import { BrowserView } from './components/BrowserView'
-import { DesignView } from './components/DesignView'
 import { StubView } from './components/StubView'
-import { SkillsView } from './components/SkillsView'
-import { AgentRunInspector } from './components/AgentRunInspector'
 import { AgentsPanel } from './components/AgentsPanel'
 import { AgentRunsPanel } from './components/AgentRunsPanel'
 import { DevTaskPanel } from './components/DevTaskPanel'
 import { ProjectMapPanel } from './components/ProjectMapPanel'
-import { WorkflowView } from './components/WorkflowView'
-import { WorkflowsPanel } from './components/WorkflowsPanel'
-import { MemoryGovernance } from './components/MemoryGovernance'
 import { DiffView } from './components/DiffView'
 import { CommandConfirm } from './components/CommandConfirm'
 
 import { UpdateAvailableModal } from './components/UpdateAvailableModal'
 import { WhatsNewModal } from './components/WhatsNewModal'
-
-import { Terminal } from './components/Terminal'
 import { FilesPanel } from './components/FilesPanel'
 import { SideChat } from './components/SideChat'
 import { OnboardingWizard } from './components/OnboardingWizard'
@@ -40,6 +29,23 @@ import { ArtifactPreviewContainer } from './components/ArtifactPreview'
 import { TerminalErrorToast } from './components/TerminalErrorToast'
 import { useProject } from './store/projectStore'
 import { useSkills as useSkillsStore } from './store/skillStore'
+
+const AUTH_CACHE_KEY = 'gg.auth_completed'
+
+const AuthScreen = lazy(() => import('./components/AuthScreen').then(m => ({ default: m.AuthScreen })))
+const Settings = lazy(() => import('./components/Settings').then(m => ({ default: m.Settings })))
+const Terminal = lazy(() => import('./components/Terminal').then(m => ({ default: m.Terminal })))
+const BrowserView = lazy(() => import('./components/BrowserView').then(m => ({ default: m.BrowserView })))
+const DesignView = lazy(() => import('./components/DesignView').then(m => ({ default: m.DesignView })))
+const SkillsView = lazy(() => import('./components/SkillsView').then(m => ({ default: m.SkillsView })))
+const AgentRunInspector = lazy(() => import('./components/AgentRunInspector').then(m => ({ default: m.AgentRunInspector })))
+const MemoryGovernance = lazy(() => import('./components/MemoryGovernance').then(m => ({ default: m.MemoryGovernance })))
+const WorkflowView = lazy(() => import('./components/WorkflowView').then(m => ({ default: m.WorkflowView })))
+const WorkflowsPanel = lazy(() => import('./components/WorkflowsPanel').then(m => ({ default: m.WorkflowsPanel })))
+
+function ViewFallback() {
+  return <div className="gg-view-loading" aria-busy="true" />
+}
 
 const SIDEBAR_MIN = 200
 const SIDEBAR_MAX = 480
@@ -77,27 +83,34 @@ export function App() {
   const t = getTranslations(lang)
 
   // ── Auth gate: null = загрузка, false = нужна авторизация, true = готово ──
-  const [authDone, setAuthDone] = useState<boolean | null>(null)
+  const [authDone, setAuthDone] = useState<boolean | null>(() => {
+    try {
+      return localStorage.getItem(AUTH_CACHE_KEY) === '1' ? true : null
+    } catch {
+      return null
+    }
+  })
   useEffect(() => {
     void (async () => {
       try {
-        // Если ровно 1 профиль — автовход без экрана
         const [authVal, profiles] = await Promise.all([
           window.api.settings.getKey('auth_completed'),
           window.api.userProfiles.list(),
         ])
         if (authVal === 'true') {
+          try { localStorage.setItem(AUTH_CACHE_KEY, '1') } catch { /* ignore */ }
           setAuthDone(true)
         } else if (profiles.length === 1) {
-          // Авто-вход: один профиль, экран не нужен
           await window.api.userProfiles.setActive(profiles[0].id)
           await window.api.settings.setKey('auth_completed', 'true')
+          try { localStorage.setItem(AUTH_CACHE_KEY, '1') } catch { /* ignore */ }
           setAuthDone(true)
         } else {
+          try { localStorage.removeItem(AUTH_CACHE_KEY) } catch { /* ignore */ }
           setAuthDone(false)
         }
       } catch {
-        // Первый запуск — нет settings
+        try { localStorage.removeItem(AUTH_CACHE_KEY) } catch { /* ignore */ }
         setAuthDone(false)
       }
     })()
@@ -221,16 +234,27 @@ export function App() {
     return (
       <I18nContext.Provider value={getTranslations(lang)}>
         <WindowShell>
-          <div className="gg-app gg-app-booting" aria-busy="true" />
+          <div className="gg-app gg-app-booting" aria-busy="true">
+            <div className="gg-boot-rail" />
+            <div className="gg-boot-main">
+              <div className="gg-boot-line gg-boot-line--wide" />
+              <div className="gg-boot-line" />
+              <div className="gg-boot-line gg-boot-line--short" />
+            </div>
+          </div>
         </WindowShell>
       </I18nContext.Provider>
     )
   }
-  // Нужна авторизация — показываем AuthScreen поверх всего
   if (!authDone) return (
     <I18nContext.Provider value={getTranslations(lang)}>
       <WindowShell>
-        <AuthScreen onComplete={() => setAuthDone(true)} onLangChange={setLang} />
+        <Suspense fallback={<div className="gg-app gg-app-booting" aria-busy="true" />}>
+          <AuthScreen onComplete={() => {
+            try { localStorage.setItem(AUTH_CACHE_KEY, '1') } catch { /* ignore */ }
+            setAuthDone(true)
+          }} onLangChange={setLang} />
+        </Suspense>
       </WindowShell>
     </I18nContext.Provider>
   )
@@ -278,7 +302,9 @@ export function App() {
                   >×</button>
                 </div>
                 <div className="gg-terminal-body">
-                  <Terminal />
+                  <Suspense fallback={<ViewFallback />}>
+                    <Terminal />
+                  </Suspense>
                 </div>
               </div>
             )}
@@ -291,23 +317,32 @@ export function App() {
         </div>
         {activeView === 'tasks' && <TasksView />}
         {activeView === 'journal' && <JournalView />}
-        {activeView === 'inspector' && <AgentRunInspector />}
+        {activeView === 'inspector' && (
+          <Suspense fallback={<ViewFallback />}><AgentRunInspector /></Suspense>
+        )}
         {activeView === 'agents' && <AgentsPanel />}
         {activeView === 'tasks-manager' && <AgentRunsPanel />}
         {activeView === 'task' && <DevTaskPanel />}
         {activeView === 'project-map' && <ProjectMapPanel />}
-        {activeView === 'memory-gov' && <MemoryGovernance />}
+        {activeView === 'memory-gov' && (
+          <Suspense fallback={<ViewFallback />}><MemoryGovernance /></Suspense>
+        )}
         {activeView === 'plan' && <PlanView />}
         {activeView === 'workflow' && (
           <div className="gg-workflow-scroll">
-            <WorkflowsPanel />
-            <WorkflowView />
+            <Suspense fallback={<ViewFallback />}>
+              <WorkflowsPanel />
+              <WorkflowView />
+            </Suspense>
           </div>
         )}
         {activeView === 'calendar' && <StubView title="Calendar" description="Здесь будут события и дедлайны проекта. В работе." />}
         {activeView === 'feedback' && <FeedbackView />}
-        {activeView === 'browser' && <BrowserView />}
+        {activeView === 'browser' && (
+          <Suspense fallback={<ViewFallback />}><BrowserView /></Suspense>
+        )}
         {activeView === 'skills' && (
+          <Suspense fallback={<ViewFallback />}>
           <SkillsView
             onActivateSkill={slash => {
               // Активируем скилл по slash-имени, затем переходим в чат
@@ -317,8 +352,13 @@ export function App() {
               setActiveView('chat')
             }}
           />
+          </Suspense>
         )}
-        {activeView === 'design' && <DesignView onGoToChat={() => setActiveView('chat')} />}
+        {activeView === 'design' && (
+          <Suspense fallback={<ViewFallback />}>
+            <DesignView onGoToChat={() => setActiveView('chat')} />
+          </Suspense>
+        )}
         {activeView === 'video' && (
           <div className="gg-view-placeholder">
             <div className="gg-view-placeholder-icon">🎬</div>
@@ -332,14 +372,16 @@ export function App() {
         )}
       </main>
       {showSettings && (
-        <Settings
-          initialTab={settingsInitialTab}
-          onClose={() => {
-            setShowSettings(false)
-            setSettingsInitialTab(undefined)
-            setModelPromptRecheck(v => v + 1)
-          }}
-        />
+        <Suspense fallback={<ViewFallback />}>
+          <Settings
+            initialTab={settingsInitialTab}
+            onClose={() => {
+              setShowSettings(false)
+              setSettingsInitialTab(undefined)
+              setModelPromptRecheck(v => v + 1)
+            }}
+          />
+        </Suspense>
       )}
       <ModelRequiredPrompt
         active={authDone === true && !showOnboarding && !showSettings}

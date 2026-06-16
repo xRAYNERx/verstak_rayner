@@ -97,6 +97,8 @@ function createWindow(settings: Settings): BrowserWindow {
     ...mainWindowConstructorOptions(windowState),
     title: 'Verstak',
     icon: iconPath,
+    show: false,
+    backgroundColor: '#2e3440',
     frame: false,
     webPreferences: {
       preload: join(HERE, '../preload/preload.mjs'),
@@ -241,17 +243,19 @@ app.whenReady().then(() => {
     app.quit()
     return
   }
-  // Затухание памяти — раз в запуск, тихо
-  try {
-    const decayResult = applyMemoryDecay(db)
-    if (decayResult.decayed > 0 || decayResult.deleted > 0) {
-      console.log(`[memory] decay: ${decayResult.decayed} updated, ${decayResult.deleted} deleted`)
-    }
-  } catch (err) {
-    console.warn('[memory] decay failed:', err instanceof Error ? err.message : err)
-  }
-
   const settings = createSettings(db, safeStorage)
+
+  // Затухание памяти — после показа окна, не блокирует старт
+  setImmediate(() => {
+    try {
+      const decayResult = applyMemoryDecay(db)
+      if (decayResult.decayed > 0 || decayResult.deleted > 0) {
+        console.log(`[memory] decay: ${decayResult.decayed} updated, ${decayResult.deleted} deleted`)
+      }
+    } catch (err) {
+      console.warn('[memory] decay failed:', err instanceof Error ? err.message : err)
+    }
+  })
 
   const ENV_MAP: Record<string, string> = {
     gemini_api_key: 'GEMINI_API_KEY',
@@ -339,11 +343,20 @@ app.whenReady().then(() => {
     return roots
   }
 
+  // Минимальный IPC для первого кадра UI — окно открываем до тяжёлой регистрации.
+  registerSettingsIpc(settings)
+  registerCliAuthIpc(settings)
+  registerUserProfilesIpc(userProfiles)
   registerProjectIpc(projects, projectGroups, db)
   registerProjectMapIpc(knownRoots)
   registerFilesIpc({ getProjectRoot: getActiveProjectPath, getKnownRoots: knownRoots })
-  registerSettingsIpc(settings)
-  registerCliAuthIpc(settings)
+  registerChatsIpc(chats, chatSessions, db)
+
+  const mainWindow = createWindow(settings)
+  bindUiScaleToWindow(mainWindow, settings)
+  initNotificationWindow(() => mainWindow)
+
+  const registerDeferredIpc = () => {
   registerAiIpc({
     getSecret,
     getProviderId,
@@ -441,7 +454,6 @@ app.whenReady().then(() => {
       if (active) devTasks.linkRun(active.id, runId)
     }
   })
-  registerChatsIpc(chats, chatSessions, db)
   registerAgentsIpc(subSessions, chats, sessionTodos)
   // Вкладка «Задачи» (Multi-agent Manager) — список прогонов + stop/resume (Фаза 4).
   // abortSend переиспользует ядро ai:stop; db — для getRunInput при resume.
@@ -504,7 +516,6 @@ app.whenReady().then(() => {
   // (см. resolveSafeTerminalCwd). Та же лямбда, что и для files/project-map.
   registerTerminalIpc(knownRoots)
   registerSkillsIpc(skillRegistry, { getSecret })
-  registerUserProfilesIpc(userProfiles)
   registerMemoryIpc(db)
   registerCommandsIpc()
   registerMcpIpc(settings)
@@ -513,15 +524,15 @@ app.whenReady().then(() => {
   registerSuggestionsIpc(db)
   registerReleaseNotesIpc()
   registerVoiceIpc()
-  const mainWindow = createWindow(settings)
-  initNotificationWindow(() => mainWindow)
   registerNotifyIpc(() => mainWindow, settings)
-  bindUiScaleToWindow(mainWindow, settings)
 
   if (!process.env.VITE_DEV_SERVER_URL) {
     // Авто-обновления только в production (не в npm run dev)
     initAutoUpdater(mainWindow)
   }
+  }
+
+  setImmediate(registerDeferredIpc)
 })
 app.on('before-quit', () => { mcpClient.disconnectAll() })
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })

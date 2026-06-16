@@ -98,7 +98,8 @@ export function trackMainWindowState(win: BrowserWindow, settings: Settings, res
     persistState(win, settings, normalBounds)
   })
 
-  if (restored.isMaximized) {
-    win.once('ready-to-show', () => win.maximize())
-  }
+  win.once('ready-to-show', () => {
+    if (restored.isMaximized) win.maximize()
+    win.show()
+  })
 }

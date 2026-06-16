@@ -40,6 +40,39 @@ html {
   --gg-sidebar-panel-w: 0px;
   --gg-sidebar-resize-w: 0px;
 }
+.gg-app-booting {
+  grid-template-columns: var(--gg-rail-w) 1fr;
+}
+.gg-boot-rail {
+  border-right: 1px solid var(--border-subtle);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-elevated) 70%, transparent), var(--bg-base));
+  animation: gg-boot-pulse 1.4s ease-in-out infinite;
+}
+.gg-boot-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px 32px;
+}
+.gg-boot-line {
+  height: 12px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bg-elevated) 85%, var(--border-default));
+  animation: gg-boot-pulse 1.4s ease-in-out infinite;
+}
+.gg-boot-line--wide { width: min(420px, 70%); }
+.gg-boot-line--short { width: min(220px, 40%); }
+.gg-view-loading {
+  min-height: 120px;
+  background: color-mix(in srgb, var(--bg-elevated) 55%, transparent);
+  border-radius: 10px;
+  margin: 16px;
+  animation: gg-boot-pulse 1.4s ease-in-out infinite;
+}
+@keyframes gg-boot-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
 .gg-sidebar-resize {
   cursor: col-resize;
   background: transparent;

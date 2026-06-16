@@ -354,8 +354,7 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
 
   useEffect(() => {
     void (async () => {
-      await refreshProjectList()
-      await refreshGroups()
+      await Promise.all([refreshProjectList(), refreshGroups()])
       const state = useProject.getState()
       if (!state.path) {
         const list = state.projectList
