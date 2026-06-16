@@ -7018,16 +7018,11 @@ textarea.gg-input {
 .gg-auth-logo-icon {
   width: 48px;
   height: 48px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #5865f2, #9b59ff);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  font-weight: 800;
-  color: white;
-  box-shadow: 0 8px 32px rgba(88, 101, 242, 0.4);
-  letter-spacing: -1px;
+  border-radius: 50%;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
 }
 .gg-auth-logo-text {
   font-size: 28px;
@@ -7378,10 +7373,13 @@ textarea.gg-input {
   height: 100vh; background: #0d1117; color: #c9d1d9;
 }
 .gg-lang-picker-logo {
-  width: 60px; height: 60px; border-radius: 14px;
-  background: linear-gradient(135deg, #5865f2, #7c3aed);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 28px; font-weight: 700; color: white; margin-bottom: 16px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  object-fit: contain;
+  display: block;
+  margin-bottom: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
 }
 .gg-lang-picker h1 { font-size: 28px; margin-bottom: 8px; }
 .gg-lang-picker p { color: #8b949e; margin-bottom: 32px; }
