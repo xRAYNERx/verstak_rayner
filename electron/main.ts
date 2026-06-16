@@ -29,6 +29,12 @@ import { registerAiIpc, abortSend } from './ipc/ai'
 import { registerChatsIpc } from './ipc/chats'
 import { registerHandoffIpc } from './ipc/handoff'
 import { registerTerminalIpc } from './ipc/terminal'
+import {
+  APP_DISPLAY_NAME,
+  bindMainWindowLifecycle,
+  installAppIdentity,
+  installGlobalQuitHandlers
+} from './app-lifecycle'
 import { openDb } from './storage/db'
 import { createSettings } from './storage/settings'
 import { createChats } from './storage/chats'
@@ -95,7 +101,7 @@ function createWindow(settings: Settings): BrowserWindow {
   const windowState = readMainWindowState(settings)
   const win = new BrowserWindow({
     ...mainWindowConstructorOptions(windowState),
-    title: 'Verstak',
+    title: APP_DISPLAY_NAME,
     icon: iconPath,
     show: false,
     backgroundColor: '#2e3440',
@@ -177,11 +183,15 @@ function installCSP(): void {
   })
 }
 
+installAppIdentity()
+
 // Tell Windows this is its own application so the taskbar uses our icon
 // (and not the generic Electron / Node icon).
 if (process.platform === 'win32') {
   app.setAppUserModelId('ru.verstak.ide')
 }
+
+installGlobalQuitHandlers()
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock) {
@@ -353,6 +363,7 @@ app.whenReady().then(() => {
   registerChatsIpc(chats, chatSessions, db)
 
   const mainWindow = createWindow(settings)
+  bindMainWindowLifecycle(mainWindow)
   bindUiScaleToWindow(mainWindow, settings)
   initNotificationWindow(() => mainWindow)
 
@@ -534,5 +545,4 @@ app.whenReady().then(() => {
 
   setImmediate(registerDeferredIpc)
 })
-app.on('before-quit', () => { mcpClient.disconnectAll() })
-app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
+

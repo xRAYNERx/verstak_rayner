@@ -103,8 +103,16 @@ async function main() {
     throw new Error(`ico not found: ${ICO} — npm run generate:icon`)
   }
 
-  await rcedit(exePath, { icon: ICO })
-  console.log('[sync-shortcuts] icon →', exePath)
+  await rcedit(exePath, {
+    icon: ICO,
+    'version-string': {
+      FileDescription: 'VERSTAK',
+      ProductName: 'VERSTAK',
+      InternalName: 'VERSTAK',
+      OriginalFilename: 'Verstak.exe',
+    },
+  })
+  console.log('[sync-shortcuts] icon + metadata →', exePath)
 
   const shortcuts = [
     path.join(os.homedir(), 'Desktop', 'Verstak.lnk'),

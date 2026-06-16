@@ -2753,7 +2753,7 @@ const screenCaptureHandler: ToolHandler = {
           types: ['window'],
           thumbnailSize: { width: primary.size.width, height: primary.size.height }
         })
-        // Ищем окно Verstak по имени (title содержит 'Verstak' или 'Electron')
+        // Ищем окно Verstak по имени (title / FileDescription: VERSTAK, Verstak, Electron в dev)
         const win = sources.find(s => /verstak|electron/i.test(s.name)) ?? sources[0]
         if (!win) {
           return { id: call.id, name: call.name, result: 'Не найдено окно для захвата' }

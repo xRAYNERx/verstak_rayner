@@ -24,6 +24,8 @@ let toastWin: BrowserWindow | null = null
 let getMainWindow: (() => BrowserWindow | null) | null = null
 let pending: ToastPayload[] = []
 let ipcReady = false
+let toastShutdown = false
+let onDisplayMetricsChanged: (() => void) | null = null
 
 function positionToastWindow(win: BrowserWindow): void {
   const { workArea } = screen.getPrimaryDisplay()
@@ -44,6 +46,9 @@ function flushPending(win: BrowserWindow): void {
 }
 
 function ensureToastWindow(): BrowserWindow {
+  if (toastShutdown) {
+    throw new Error('toast window unavailable after shutdown')
+  }
   if (toastWin && !toastWin.isDestroyed()) return toastWin
 
   toastWin = new BrowserWindow({
@@ -76,9 +81,10 @@ function ensureToastWindow(): BrowserWindow {
 
   positionToastWindow(toastWin)
 
-  screen.on('display-metrics-changed', () => {
+  onDisplayMetricsChanged = () => {
     if (toastWin && !toastWin.isDestroyed()) positionToastWindow(toastWin)
-  })
+  }
+  screen.on('display-metrics-changed', onDisplayMetricsChanged)
 
   toastWin.webContents.on('did-finish-load', () => {
     ipcReady = true
@@ -105,8 +111,28 @@ export function initNotificationWindow(getMain: () => BrowserWindow | null): voi
   getMainWindow = getMain
 }
 
+export function destroyNotificationWindow(): void {
+  toastShutdown = true
+  pending = []
+  ipcReady = false
+  if (onDisplayMetricsChanged) {
+    screen.removeListener('display-metrics-changed', onDisplayMetricsChanged)
+    onDisplayMetricsChanged = null
+  }
+  if (toastWin && !toastWin.isDestroyed()) {
+    toastWin.destroy()
+  }
+  toastWin = null
+}
+
 export function showAppToast(payload: ToastPayload): void {
-  const win = ensureToastWindow()
+  if (toastShutdown) return
+  let win: BrowserWindow
+  try {
+    win = ensureToastWindow()
+  } catch {
+    return
+  }
   if (!ipcReady || win.webContents.isLoading()) {
     pending.push(payload)
   } else {

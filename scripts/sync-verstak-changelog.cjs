@@ -13,6 +13,16 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: 'pending',
+    deployed: '17.06.2026 02:22',
+    treeVersion: '1.5.5',
+    title: 'Выход из приложения и имя процесса VERSTAK',
+    changes: [
+      'Закрытие: уничтожается окно тостов, гасятся PTY/MCP/AI-стримы — процесс не висит в фоне.',
+      'Диспетчер задач: app.setName + process.title = VERSTAK; в exe — FileDescription/ProductName VERSTAK.',
+    ],
+  },
+  {
     commit: 'bdbef55',
     deployed: '17.06.2026 02:17',
     treeVersion: '1.5.5',
