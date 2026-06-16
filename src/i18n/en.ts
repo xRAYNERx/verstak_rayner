@@ -241,13 +241,6 @@ export const en = {
   },
 
   // Common
-  themeFab: {
-    cycle: 'Switch theme',
-    switchTo: 'Switch to {name}',
-    nord: 'Dark',
-    light: 'Light',
-  },
-
   common: {
     close: 'Close',
     cancel: 'Cancel',

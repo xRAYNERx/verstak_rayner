@@ -225,13 +225,6 @@ export const ru: Translations = {
     connected: 'Подключён',
     add: 'Добавить',
   },
-  themeFab: {
-    cycle: 'Сменить тему',
-    switchTo: 'Переключить на {name}',
-    nord: 'Тёмная',
-    light: 'Светлая',
-  },
-
   common: {
     close: 'Закрыть',
     cancel: 'Отмена',
