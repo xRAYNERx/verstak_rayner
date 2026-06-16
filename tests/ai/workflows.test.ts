@@ -29,8 +29,36 @@ describe('workflows registry', () => {
     expect(getWorkflow('nope')).toBeUndefined()
   })
 
-  it('marketing-audit — единственный в каталоге WORKFLOWS', () => {
-    expect(WORKFLOWS.map(w => w.id)).toContain('marketing-audit')
+  it('каталог WORKFLOWS включает marketing-audit + RU-пак (F9)', () => {
+    const ids = WORKFLOWS.map(w => w.id)
+    expect(ids).toContain('marketing-audit')
+    expect(ids).toContain('ydirect-metrika-audit')
+    expect(ids).toContain('bitrix-stale-deals')
+    expect(ids).toContain('onec-sheets-reconcile')
+  })
+
+  it('у всех workflow уникальные id и непустые шаги с уникальными step.id', () => {
+    const ids = WORKFLOWS.map(w => w.id)
+    expect(new Set(ids).size).toBe(ids.length) // id уникальны
+    for (const w of WORKFLOWS) {
+      expect(w.name.length, `${w.id} name`).toBeGreaterThan(0)
+      expect(w.description.length, `${w.id} description`).toBeGreaterThan(0)
+      expect(w.steps.length, `${w.id} steps`).toBeGreaterThan(0)
+      const stepIds = w.steps.map(s => s.id)
+      expect(new Set(stepIds).size, `${w.id} step ids`).toBe(stepIds.length)
+      for (const s of w.steps) {
+        expect(s.title.length, `${w.id}/${s.id} title`).toBeGreaterThan(0)
+        expect(s.instruction.length, `${w.id}/${s.id} instruction`).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('финальный шаг каждого RU-сценария собирает артефакт через generate_html', () => {
+    for (const id of ['ydirect-metrika-audit', 'bitrix-stale-deals', 'onec-sheets-reconcile']) {
+      const wf = getWorkflow(id)!
+      const last = wf.steps[wf.steps.length - 1]
+      expect(last.suggestedTools, `${id} финал`).toContain('generate_html')
+    }
   })
 })
 
