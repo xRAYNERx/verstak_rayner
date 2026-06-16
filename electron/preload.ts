@@ -249,7 +249,7 @@ contextBridge.exposeInMainWorld('api', {
     list: (projectPath: string, opts?: { state?: string }) => ipcRenderer.invoke('devtask:list', projectPath, opts),
     linkRun: (id: number, runId: string) => ipcRenderer.invoke('devtask:linkRun', id, runId),
     revert: (id: number) => ipcRenderer.invoke('devtask:revert', id),
-    commit: (id: number, opts: { message: string; paths?: string[] }) => ipcRenderer.invoke('devtask:commit', id, opts),
+    commit: (id: number, opts: { message: string; paths?: string[]; overrideReason?: string }) => ipcRenderer.invoke('devtask:commit', id, opts),
     buildPackage: (id: number, opts?: { runChecks?: boolean; checks?: string[] }) => ipcRenderer.invoke('devtask:buildPackage', id, opts),
     createPr: (id: number, opts: { repo: string; base: string; draft?: boolean }) => ipcRenderer.invoke('devtask:createPr', id, opts),
     setBranch: (id: number, branch: string) => ipcRenderer.invoke('devtask:setBranch', id, branch)

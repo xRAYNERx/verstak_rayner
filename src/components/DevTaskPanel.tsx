@@ -155,18 +155,23 @@ export function DevTaskPanel() {
     if (activeDevTaskId == null) return
     const msg = commitMessage.trim()
     if (!msg) { setNotice('Заполни сообщение коммита.'); return }
-    // Предупреждение при упавших проверках (аудит P1 #9): коммит поверх красных
-    // проверок противоречит позиционированию «высокий контроль» — требуем явного
-    // подтверждения, а не молча коммитим.
-    const failed = checks.filter(c => c.status === 'fail').length
-    if (failed > 0) {
-      const ok = window.confirm(`Есть проваленные проверки (${failed} ✗). Точно закоммитить поверх них?`)
-      if (!ok) return
+    // Backend DoD gate (ревью F2): commit поверх не-зелёных проверок блокируется
+    // в main-процессе и требует overrideReason (пишется в audit_log). UI берёт у
+    // пользователя причину и прокидывает её — иначе backend вернёт dod-gate.
+    const blocking = checks.filter(c => c.status === 'fail' || c.status === 'pending' || c.status === 'running')
+    let overrideReason: string | undefined
+    if (blocking.length > 0) {
+      const reason = window.prompt(
+        `Есть не-зелёные проверки (${blocking.length}: ${blocking.map(c => `${c.label} ${c.status}`).join(', ')}).\n` +
+        `Чтобы закоммитить поверх — укажи причину (попадёт в журнал аудита):`
+      )
+      if (reason === null) return // отмена
+      overrideReason = reason.trim() || 'commit поверх не-зелёных проверок (без указания причины)'
     }
     setCommitting(true)
     setNotice(null)
     try {
-      const res = await window.api.devtask.commit(activeDevTaskId, { message: msg })
+      const res = await window.api.devtask.commit(activeDevTaskId, { message: msg, ...(overrideReason ? { overrideReason } : {}) })
       if (res.ok) setNotice(`Коммит создан: ${res.sha?.slice(0, 8)}`)
       else setNotice(`Коммит не прошёл: ${res.error ?? 'ошибка'}`)
     } catch {

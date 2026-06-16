@@ -40,17 +40,21 @@ function invoke<T>(channel: string, ...args: unknown[]): T {
 describe('dev-task ipc (Фаза 2)', () => {
   let dir: string
   let db: ReturnType<typeof openDb>
+  let tasks: ReturnType<typeof createDevTasks>
+  const auditEvents: Array<{ action: string; detail: string }> = []
 
   beforeEach(() => {
     handlers.clear()
+    auditEvents.length = 0
     dir = mkdtempSync(join(tmpdir(), 'gg-devtask-ipc-'))
     db = openDb(join(dir, 'test.db'))
-    const tasks = createDevTasks(db)
+    tasks = createDevTasks(db)
     const undoStack = createUndoStack(db)
     // runCheck-заглушка — exit 0 (фаза 2 тесты не гоняют buildPackage с проверками).
     registerDevTaskIpc({
       tasks, getProjectRoot: () => dir, undoStack,
-      runCheck: async () => ({ exitCode: 0, stdout: '', stderr: '' })
+      runCheck: async () => ({ exitCode: 0, stdout: '', stderr: '' }),
+      recordAudit: (action, detail) => auditEvents.push({ action, detail })
     })
   })
   afterEach(() => {
@@ -141,5 +145,39 @@ describe('dev-task ipc (Фаза 2)', () => {
     expect(drafts.length).toBe(2)
     const committed = invoke<DevTask[]>('devtask:list', dir, { state: 'committed' })
     expect(committed.length).toBe(0)
+  })
+
+  // Ревью F2 (P0): backend DoD gate — commit поверх не-зелёных проверок.
+  describe('devtask:commit DoD gate (F2)', () => {
+    it('блокирует commit при failed check без overrideReason', async () => {
+      const task = await invoke<Promise<DevTask | null>>('devtask:open', { title: 'gate' })
+      tasks.addCheck(task!.id, { label: 'tsc', command: 'npm run type', status: 'fail', exitCode: 1 })
+      const res = await invoke<Promise<{ ok: boolean; error?: string }>>('devtask:commit', task!.id, { message: 'wip' })
+      expect(res.ok).toBe(false)
+      expect(res.error).toMatch(/dod-gate/)
+    })
+
+    it('блокирует и при pending/running (проверки не завершены)', async () => {
+      const task = await invoke<Promise<DevTask | null>>('devtask:open', { title: 'gate2' })
+      tasks.addCheck(task!.id, { label: 'test', command: 'npm test', status: 'pending', exitCode: null })
+      const res = await invoke<Promise<{ ok: boolean; error?: string }>>('devtask:commit', task!.id, { message: 'wip' })
+      expect(res.ok).toBe(false)
+      expect(res.error).toMatch(/dod-gate/)
+    })
+
+    it('с overrideReason gate пропускает (дальше падает уже на git, не на dod-gate)', async () => {
+      const task = await invoke<Promise<DevTask | null>>('devtask:open', { title: 'gate3' })
+      tasks.addCheck(task!.id, { label: 'tsc', command: 'npm run type', status: 'fail', exitCode: 1 })
+      const res = await invoke<Promise<{ ok: boolean; error?: string }>>('devtask:commit', task!.id, { message: 'wip', overrideReason: 'срочный хотфикс' })
+      // dir не git-репо → commit упадёт, но УЖЕ не на dod-gate (gate пройден).
+      expect(res.error ?? '').not.toMatch(/dod-gate/)
+    })
+
+    it('зелёные проверки не блокируются gate', async () => {
+      const task = await invoke<Promise<DevTask | null>>('devtask:open', { title: 'gate4' })
+      tasks.addCheck(task!.id, { label: 'tsc', command: 'npm run type', status: 'pass', exitCode: 0 })
+      const res = await invoke<Promise<{ ok: boolean; error?: string }>>('devtask:commit', task!.id, { message: 'wip' })
+      expect(res.error ?? '').not.toMatch(/dod-gate/)
+    })
   })
 })

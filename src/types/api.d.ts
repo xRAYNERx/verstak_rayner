@@ -371,8 +371,10 @@ declare global {
         linkRun(id: number, runId: string): Promise<void>
         /** Откатить файловые правки задачи к её чекпоинту. true = успех. */
         revert(id: number): Promise<boolean>
-        /** Закоммитить правки задачи (git add+commit), state→committed. */
-        commit(id: number, opts: { message: string; paths?: string[] }): Promise<{ ok: boolean; sha?: string; error?: string }>
+        /** Закоммитить правки задачи (git add+commit), state→committed.
+         *  Ревью F2: backend блокирует commit при fail/pending/running проверках;
+         *  обойти можно только явным overrideReason (пишется в audit_log). */
+        commit(id: number, opts: { message: string; paths?: string[]; overrideReason?: string }): Promise<{ ok: boolean; sha?: string; error?: string }>
         /** Собрать пакет: прогнать проверки + diff + commit-planner, state→packaged. */
         buildPackage(id: number, opts?: { runChecks?: boolean; checks?: string[] }): Promise<DevTaskPackage | null>
         /** Открыть PR через github (нужен github_token + work_branch). */

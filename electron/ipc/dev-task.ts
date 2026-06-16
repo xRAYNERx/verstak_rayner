@@ -46,6 +46,8 @@ export interface DevTaskDeps {
   connectorQuery?: (id: string, args: Record<string, unknown>) => Promise<unknown>
   /** Чтение секрета (например github_token). Опц. — нужен только для createPr. */
   getSecret?: (key: string) => string | null
+  /** Ревью F2: запись в audit_log (commit-override поверх красных проверок). Опц. */
+  recordAudit?: (action: string, detail: string) => void
 }
 
 /** Снимок git-базы на момент открытия задачи. */
@@ -110,7 +112,7 @@ function slugify(title: string): string {
 }
 
 export function registerDevTaskIpc(deps: DevTaskDeps): void {
-  const { tasks, getProjectRoot, undoStack, runCheck, connectorQuery, getSecret } = deps
+  const { tasks, getProjectRoot, undoStack, runCheck, connectorQuery, getSecret, recordAudit } = deps
 
   /**
    * Снять checkpoint текущего топа undo-стека — ТА ЖЕ семантика, что и
@@ -316,13 +318,25 @@ export function registerDevTaskIpc(deps: DevTaskDeps): void {
    * или все из diff) + git commit -m. Записываем sha, state→'committed'.
    * Денилист (push/force/--no-verify) гарантирован gitCommit → assertGitAllowed.
    */
-  ipcMain.handle('devtask:commit', async (_e, id: number, opts: { message: string; paths?: string[] }): Promise<{ ok: boolean; sha?: string; error?: string }> => {
+  ipcMain.handle('devtask:commit', async (_e, id: number, opts: { message: string; paths?: string[]; overrideReason?: string }): Promise<{ ok: boolean; sha?: string; error?: string }> => {
     const projectPath = getProjectRoot()
     if (!projectPath) return { ok: false, error: 'no-project' }
     const task = tasks.get(id)
     if (!task) return { ok: false, error: 'no-task' }
     const message = String(opts?.message ?? '').trim()
     if (!message) return { ok: false, error: 'empty-message' }
+    // Ревью F2 (P0): backend DoD gate. UI предупреждает перед коммитом поверх
+    // красных проверок, но это клиентская валидация (обходится через devtools).
+    // Жёсткая проверка статуса checks ЗДЕСЬ: fail/pending/running блокируют
+    // коммит, обойти можно только явным overrideReason (с audit-записью).
+    const blocking = tasks.listChecks(id).filter(c => c.status === 'fail' || c.status === 'pending' || c.status === 'running')
+    const overrideReason = String(opts?.overrideReason ?? '').trim()
+    if (blocking.length > 0 && !overrideReason) {
+      return {
+        ok: false,
+        error: `dod-gate: ${blocking.length} проверок не зелёные (${blocking.map(c => `${c.label}:${c.status}`).join(', ')}). Чтобы закоммитить поверх — передай overrideReason.`
+      }
+    }
     // paths: явные или из текущего diff рабочего дерева (только новые правки).
     let paths = Array.isArray(opts?.paths) ? opts.paths.filter(p => typeof p === 'string' && p.trim()) : []
     if (paths.length === 0) {
@@ -335,6 +349,12 @@ export function registerDevTaskIpc(deps: DevTaskDeps): void {
     }
     const res = await gitCommit(projectPath, message)
     if (!res.ok) return res
+    // Ревью F2: override поверх красных проверок — оставляем след в audit_log.
+    if (blocking.length > 0 && overrideReason) {
+      try {
+        recordAudit?.('devtask-commit-override', `task=${id} sha=${res.sha ?? '?'} reason="${overrideReason}" checks=${blocking.map(c => `${c.label}:${c.status}`).join(',')}`)
+      } catch { /* audit best-effort */ }
+    }
     tasks.setState(id, 'committed')
     return res
   })

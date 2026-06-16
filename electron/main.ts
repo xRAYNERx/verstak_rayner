@@ -491,7 +491,15 @@ app.whenReady().then(() => {
       return connectorRegistry.query(id, args, { getSecret: (k) => settings.getSecret(k), signal: ac.signal })
         .finally(() => clearTimeout(t))
     },
-    getSecret: (k) => settings.getSecret(k)
+    getSecret: (k) => settings.getSecret(k),
+    // Ревью F2: DoD-override поверх красных проверок → audit_log.
+    recordAudit: (action, detail) => {
+      try {
+        const projectPath = getActiveProjectPath()
+        if (!projectPath) return
+        appendAudit(db, { timestamp: Date.now(), projectPath, chatId: null, action, detail, providerId: null, model: null, runId: null })
+      } catch { /* audit best-effort */ }
+    }
   })
   registerAutonomousIpc({
     getSecret,
