@@ -106,7 +106,19 @@ const PATTERNS: SecretPattern[] = [
   { name: 'jwt', re: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g },
   { name: 'private-key-block', re: /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----(?:[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----|[\s\S]*)/g },
   // 1C-style basic auth in URLs (http://user:pass@host)
-  { name: 'http-basic-auth', re: /\b(https?:\/\/)[^\s/:]+:[^\s/@]+@/g }
+  { name: 'http-basic-auth', re: /\b(https?:\/\/)[^\s/:]+:[^\s/@]+@/g },
+  // Аудит M1: RU/TG/Yandex токены. Раньше PATTERNS знал только западные сервисы —
+  // ключи 22 новых RU-коннекторов утекали бы в чат/контекст (а многие API
+  // отражают auth-параметр в теле/ошибке). Distinctive-prefix токены:
+  { name: 'vk-token', re: /\bvk1\.a\.[A-Za-z0-9_-]{30,}/g },
+  { name: 'yandex-oauth', re: /\by0_[A-Za-z0-9_-]{20,}\b/g },
+  // Telegram bot token: <digits>:<35 base64url> — формат отличимый, риск ложных мал.
+  { name: 'telegram-bot-token', re: /\b\d{6,12}:[A-Za-z0-9_-]{35}\b/g },
+  // Generic auth keyword → value. Ловит DaData (X-Secret/Token), Контур.Фокус
+  // (api_key=<uuid>), GigaChat/OAuth (client_secret), Bearer-токены. Только при
+  // явном auth-ключевом слове рядом — иначе UUID/хеши из легитимных ответов не
+  // редактируем (см. спец-обработку в scanText: гасится лишь сам value).
+  { name: 'auth-keyword-value', re: /\b(authorization|x-secret|x-api-key|api[_-]?key|access[_-]?token|client[_-]?secret|secret[_-]?key)\b\s*[:=]\s*["']?(?:bearer\s+|token\s+)?([A-Za-z0-9._\-+/]{16,})/gi }
 ]
 
 export interface ScanResult {
@@ -128,6 +140,9 @@ export function scanText(input: string): ScanResult {
       re.lastIndex = 0
       out = out.replace(re, (m) => {
         if (name === 'http-basic-auth') return m.replace(/(https?:\/\/)[^@]+@/, '$1[REDACTED:basic-auth]@')
+        // auth-keyword-value: оставляем ключевое слово/разделитель, гасим только
+        // сам секрет (он в конце совпадения после auth-ключа).
+        if (name === 'auth-keyword-value') return m.replace(/([A-Za-z0-9._\-+/]{16,})$/, '[REDACTED:auth-value]')
         return `[REDACTED:${name}]`
       })
     }

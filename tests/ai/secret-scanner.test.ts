@@ -21,10 +21,16 @@ describe('isForbiddenPath', () => {
     expect(isForbiddenPath('.aws/credentials')).toBe(true)
     expect(isForbiddenPath('.config/gcloud/application_default_credentials.json')).toBe(true)
   })
+  it('blocks creds*.json / credentials*.json (B1)', () => {
+    expect(isForbiddenPath('creds.json')).toBe(true)
+    expect(isForbiddenPath('creds_google.json')).toBe(true)
+    expect(isForbiddenPath('config/credentials_sa.json')).toBe(true)
+  })
   it('allows ordinary code', () => {
     expect(isForbiddenPath('src/index.ts')).toBe(false)
     expect(isForbiddenPath('package.json')).toBe(false)
     expect(isForbiddenPath('README.md')).toBe(false)
+    expect(isForbiddenPath('tsconfig.json')).toBe(false) // creds-паттерн не задевает обычные json
   })
 })
 
@@ -91,5 +97,38 @@ describe('scanText', () => {
     expect(redacted).toContain('Loading env...') // обычный текст сохранён
     expect(hits).toContain('github-token')
     expect(hits).toContain('aws-access-key')
+  })
+
+  // Аудит M1: RU/TG/Yandex токены — ключи 22 новых RU-коннекторов.
+  describe('RU / TG / Yandex токены (M1)', () => {
+    it('redacts VK access token (vk1.a...)', () => {
+      const { redacted, hits } = scanText('token=vk1.a.AbCdEf0123456789AbCdEf0123456789AbCdEf01 end')
+      expect(redacted).not.toContain('vk1.a.AbCdEf0123456789')
+      expect(hits).toContain('vk-token')
+    })
+    it('redacts Yandex OAuth (y0_...)', () => {
+      const { redacted, hits } = scanText('OAuth y0_AgAAAABcDeFgHiJkLmNoPqRsTuVwXyZ012345')
+      expect(redacted).not.toContain('y0_AgAAAABcDeFgHiJkLmNoPqRsTuVwXyZ012345')
+      expect(hits).toContain('yandex-oauth')
+    })
+    it('redacts Telegram bot token (123:AA...)', () => {
+      const { redacted, hits } = scanText('TG: 123456789:AAH4xYz_abcdefghijklmnopqrstuvwxyz0 ok')
+      expect(redacted).not.toContain('123456789:AAH4xYz_abcdefghijklmnopqrstuvwxyz0')
+      expect(hits).toContain('telegram-bot-token')
+    })
+    it('redacts DaData X-Secret / Контур api_key value, keeps the keyword', () => {
+      const r1 = scanText('X-Secret: 0123456789abcdef0123456789abcdef01234567')
+      expect(r1.redacted).toContain('[REDACTED:auth-value]')
+      expect(r1.redacted).not.toContain('0123456789abcdef0123456789abcdef01234567')
+      const r2 = scanText('api_key=550e8400-e29b-41d4-a716-446655440000')
+      expect(r2.redacted).toContain('[REDACTED:auth-value]')
+      expect(r2.redacted).not.toContain('550e8400-e29b-41d4-a716-446655440000')
+    })
+    it('does NOT redact bare UUIDs without auth keyword (no false positive)', () => {
+      const code = 'entity id 550e8400-e29b-41d4-a716-446655440000 returned'
+      const { redacted, hits } = scanText(code)
+      expect(redacted).toBe(code)
+      expect(hits).toEqual([])
+    })
   })
 })
