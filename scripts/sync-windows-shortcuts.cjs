@@ -114,12 +114,6 @@ async function main() {
   })
   console.log('[sync-shortcuts] icon + metadata →', exePath)
 
-  const shortcuts = [
-    path.join(os.homedir(), 'Desktop', 'Verstak.lnk'),
-    path.join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Verstak.lnk'),
-    ...findPinnedTaskbarLinks(exePath),
-  ]
-
   const taskBarDir = path.join(
     process.env.APPDATA || '',
     'Microsoft',
@@ -139,6 +133,13 @@ async function main() {
       console.warn('[sync-shortcuts] migrate pinned shortcut failed:', err.message || err)
     }
   }
+
+  const shortcuts = [
+    path.join(os.homedir(), 'Desktop', 'Verstak.lnk'),
+    path.join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Verstak.lnk'),
+    verstakPinned,
+    ...findPinnedTaskbarLinks(exePath),
+  ]
 
   const seen = new Set()
   for (const lnk of shortcuts) {
