@@ -181,6 +181,11 @@ if (process.platform === 'win32') {
   app.setAppUserModelId('ru.verstak.ide')
 }
 
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) {
+  app.quit()
+}
+
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'gg-project-icon',
@@ -188,24 +193,20 @@ protocol.registerSchemesAsPrivileged([
   }
 ])
 
-// Аудит M20: single-instance lock. Без него вторая копия Verstak на старте
-// прогоняет agentRuns.reconcileStale() против той же БД (WAL пускает второй
-// процесс) и помечает ЖИВЫЕ прогоны первой копии как failed. Берём лок до
-// whenReady; не досталось — фокусируем существующее окно и выходим, БД не трогаем.
-const gotPrimaryLock = app.requestSingleInstanceLock()
-if (!gotPrimaryLock) {
-  app.quit()
-}
+// Аудит M20 / Rayner: single-instance lock (lock берётся выше, gotSingleInstanceLock).
+// Без него вторая копия Verstak на старте прогоняет agentRuns.reconcileStale()
+// против той же БД (WAL пускает второй процесс) и помечает ЖИВЫЕ прогоны первой
+// копии как failed. Вторая копия — фокусируем существующее окно и выходим.
 app.on('second-instance', () => {
   const win = BrowserWindow.getAllWindows()[0]
-  if (win) {
-    if (win.isMinimized()) win.restore()
-    win.focus()
-  }
+  if (!win) return
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
 })
 
 app.whenReady().then(() => {
-  if (!gotPrimaryLock) return // вторая копия — ранний выход до любых операций с БД
+  if (!gotSingleInstanceLock) return // вторая копия — ранний выход до операций с БД
   Menu.setApplicationMenu(null)
   registerWindowIpc()
   registerNotificationWindowIpc()

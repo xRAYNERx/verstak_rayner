@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useT } from '../i18n'
+import { semverGt } from '../lib/semver'
 import { PastReleasesModal } from './PastReleasesModal'
 import { ReleaseNotesModal, type ReleaseNote } from './ReleaseNotesModal'
 
@@ -34,6 +35,11 @@ export function UpdatesSettings() {
   const [notesTargetVersion, setNotesTargetVersion] = useState('')
 
   useEffect(() => {
+    const isNewerThanInstalled = (v?: string) => {
+      const installed = version.replace(/^v/, '')
+      return !!v && installed !== '…' && semverGt(v, installed)
+    }
+
     const applyPhase = (
       phase: string,
       v?: string,
@@ -42,6 +48,10 @@ export function UpdatesSettings() {
       pendingRelease?: boolean,
     ) => {
       if (phase === 'available') {
+        if (!pendingRelease && !isNewerThanInstalled(v)) {
+          setStatus('current')
+          return
+        }
         if (v) setRemoteVersion(v)
         setStatus(pendingRelease ? 'pending' : 'available')
         setError('')
@@ -51,6 +61,10 @@ export function UpdatesSettings() {
         if (p != null) setPercent(p)
         setError('')
       } else if (phase === 'downloaded') {
+        if (!isNewerThanInstalled(v)) {
+          setStatus('current')
+          return
+        }
         if (v) setRemoteVersion(v)
         setStatus('ready')
         setError('')
@@ -70,6 +84,10 @@ export function UpdatesSettings() {
 
     const offState = window.api.updater.onState(s => applyPhase(s.phase, s.version, s.percent, s.error, s.pendingRelease))
     const offAvailable = window.api.updater.onAvailable(({ version: v, pendingRelease }) => {
+      if (!pendingRelease && !isNewerThanInstalled(v)) {
+        setStatus('current')
+        return
+      }
       setRemoteVersion(v)
       setStatus(pendingRelease ? 'pending' : 'available')
     })
@@ -78,6 +96,10 @@ export function UpdatesSettings() {
       setStatus('downloading')
     })
     const offDownloaded = window.api.updater.onDownloaded(({ version: v }) => {
+      if (!isNewerThanInstalled(v)) {
+        setStatus('current')
+        return
+      }
       setRemoteVersion(v)
       setStatus('ready')
     })
@@ -96,7 +118,7 @@ export function UpdatesSettings() {
       offNotAvailable()
       offError()
     }
-  }, [])
+  }, [version])
 
   const viewReleaseNotes = useCallback(async () => {
     setNotesLoading(true)
@@ -197,6 +219,7 @@ export function UpdatesSettings() {
 
       <ReleaseNotesModal
         open={notesOpen}
+        elevated
         onClose={() => setNotesOpen(false)}
         notes={releaseNotes}
         title={notesTitle}

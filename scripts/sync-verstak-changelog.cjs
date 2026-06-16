@@ -8,8 +8,48 @@ const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = re
 
 const OUT_DIR = 'D:\\PROGRAMMS\\VERSTAK'
 const BASE_NAME = 'Verstak - Журнал изменений'
+const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'))
 
+// Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
+  {
+    commit: 'ca94b1e',
+    deployed: '17.06.2026 00:24',
+    treeVersion: '1.5.5',
+    title: 'Чат: дополнение и очередь во время работы ИИ',
+    changes: [
+      'Пока агент отвечает: Ctrl+Enter добавляет сообщение в контекст текущей задачи (API agent-loop).',
+      'Enter во время стрима ставит сообщение в очередь — выполнится сразу после завершения текущей.',
+      'Подсказка в композере при наборе текста во время стрима; счётчик очереди.',
+      'IPC ai:append-context; дополнения подмешиваются в agent-loop на следующем ходу.',
+      'CLI-модели: дополнение сохраняется в историю, учитывается в следующем запросе.',
+    ],
+  },
+  {
+    commit: '212f855',
+    deployed: '16.06.2026 23:59',
+    treeVersion: '1.5.5',
+    title: 'Чат, rail, обновления, vision-вложения',
+    changes: [
+      'Предупреждение при прикреплении изображения к CLI-модели без vision; переключение на API-модели того же бренда.',
+      'Время сообщений (ЧЧ:ММ:СС), дата при наведении, разделители по дням в ленте чата.',
+      'История обновлений: закрытие окна релиза (крестик, «К списку»), portal поверх настроек.',
+      'Официальный стиль changelog: merge GitHub + дополнение, формализация текста release notes.',
+      'Rail свёрнутый: убрана светлая полоса над кнопкой «Настройки».',
+      'Бейдж CLI в композере приведён к общему стилю чипов.',
+    ],
+  },
+  {
+    version: '1.5.5',
+    build: '16.06.2026',
+    deployed: '16.06.2026',
+    title: 'Фикс: петля обновления 1.5.4 + ошибка запуска',
+    changes: [
+      'Установщик той же версии больше не предлагается: stale-кэш electron-updater очищается при старте.',
+      'Кнопка «Установить» блокируется, если версия уже установлена (защита в main + UI).',
+      'Один экземпляр Verstak — второй запуск фокусирует окно вместо ошибки БД «файл заблокирован».',
+    ],
+  },
   {
     version: '1.5.4',
     build: '16.06.2026',
@@ -17,7 +57,7 @@ const ENTRIES = [
     title: 'Скорость и фиксы настроек',
     changes: [
       'Настройки открываются заметно быстрее — ключи коннекторов грузятся параллельно (было ~66 запросов цепочкой).',
-      'Клик по карточке коннектора теперь скроллит к его настройкам (раньше панель появлялась за экраном — «жму, ничего не происходит»).',
+      'Добавлена прокрутка к карточке коннектора при выборе из списка.',
       'Панели «Задачи»/«Задача» не опрашивают данные, когда окно свёрнуто/вкладка скрыта.',
       'Доказательство (DoD): «не запущено» отличимо по цвету от «частично»; повторная проверка не затирает прежний артефакт.',
       'Ревью: замечания сортируются по важности — критичные сверху.'
@@ -49,6 +89,29 @@ const ENTRIES = [
       'Доказательство (DoD): если задача меняла файлы, но проверки не запускались — это явно помечается в Timeline.',
       'Бейдж «CLI ⚠» в композере: честно показывает, что у CLI-провайдеров не действует контроль Verstak (undo/checkpoint/подтверждение).'
     ]
+  },
+  {
+    version: '1.5.1',
+    build: '16.06.2026',
+    deployed: '16.06.2026',
+    title: 'Фирменный установщик Verstak (NSIS, Nord-тема)',
+    changes: [
+      'Кастомный wizard: тёмный фон Nord (#2e3440), акцент #88c0d0, русские тексты welcome/finish.',
+      'Боковая панель и header с логотипом Verstak (generate-installer-assets.mjs).',
+      'Страница «Добро пожаловать», «Verstak установлен», брендированное удаление.',
+      'Совместимость с electron-updater сохранена (NSIS target).',
+    ],
+  },
+  {
+    version: '1.5.1',
+    build: '16.06.2026',
+    deployed: '16.06.2026',
+    title: 'Тосты: плотная плашка + позиция как у Windows',
+    changes: [
+      'Overlay-тост: плотный фон, нормальная тень, высота ~124px, акцентная полоса слева.',
+      'Позиция: правый нижний угол рабочей области (как системные уведомления Windows).',
+      'Стек снизу вверх: новый тост внизу, старые поднимаются.',
+    ],
   },
   {
     version: '1.5.1',
@@ -652,6 +715,18 @@ function bullet(text) {
   })
 }
 
+function formatEntryMeta(e) {
+  if (e.commit) {
+    const build = e.build || e.deployed
+    let line = `Сборка: ${build}  |  Коммит: ${e.commit}  |  Деплой: ${e.deployed}`
+    if (e.treeVersion) {
+      line += `  |  В дереве upstream: ${e.treeVersion} (не наш релиз)`
+    }
+    return line
+  }
+  return `Версия: ${e.version}  |  Сборка: ${e.build}  |  Деплой: ${e.deployed}`
+}
+
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true })
 
@@ -662,16 +737,17 @@ async function main() {
       spacing: { after: 200 }
     }),
     body(`Обновлено: ${new Date().toLocaleString('ru-RU')}`),
-    body('Версия в package.json: 1.3.0'),
+    body(`Версия в package.json (upstream): ${PKG.version} — не релиз RAYNER`),
     body('Исходники: C:\\Users\\RAYNER\\verstak'),
     body('Установка: %LOCALAPPDATA%\\Programs\\Verstak'),
-    body('Правило: после каждого изменения/деплоя агент дописывает запись и перегенерирует этот файл (node scripts/sync-verstak-changelog.cjs).'),
+    body('Правило: локальные сборки — дата + коммит (поле commit); релизы только у Павла (frolofpavel/verstak).'),
+    body('Пересборка: node scripts/sync-verstak-changelog.cjs'),
     new Paragraph({ text: '', spacing: { after: 200 } })
   ]
 
   for (const e of ENTRIES) {
     children.push(heading(e.title))
-    children.push(body(`Версия: ${e.version}  |  Сборка: ${e.build}  |  Деплой: ${e.deployed}`))
+    children.push(body(formatEntryMeta(e)))
     for (const c of e.changes) children.push(bullet(c))
   }
 

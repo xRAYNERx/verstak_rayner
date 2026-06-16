@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type DragEvent, type ClipboardEvent } from 'react'
+import { Fragment, useEffect, useRef, useState, type DragEvent, type ClipboardEvent } from 'react'
 import { useProject, type PreflightCard } from '../store/projectStore'
 import { useProvider } from '../hooks/useProvider'
 import { estimateCost, costSeverity, costBreakdown } from '../lib/pricing'
@@ -21,6 +21,16 @@ import type { Attachment, Suggestion } from '../types/api'
 import iconUrl from '../assets/icon.png'
 import { useT } from '../i18n'
 import { notifyResponseReady } from '../lib/response-notify'
+import { VisionAttachmentBanner } from './VisionAttachmentBanner'
+import { isImageAttachment, providerSupportsVision } from '../lib/vision-support'
+import type { ProviderId } from '../hooks/useProvider'
+import {
+  formatChatDateDivider,
+  formatMessageClock,
+  formatMessageDateTitle,
+  isSameLocalDay,
+} from '../lib/chat-timestamps'
+import type { QueuedComposerMessage } from '../lib/composer-streaming'
 
 function normalizeProjectPath(p: string): string {
   return p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
@@ -116,7 +126,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
   // Codex-style right-panel menu anchored to the top-right header button.
   const [panelMenuOpen, setPanelMenuOpen] = useState(false)
   const panelMenuRef = useRef<HTMLDivElement>(null)
-  const { messages, addMessage, updateLastAssistant, isStreaming, setStreaming, activity, preflights, subagentRuns, sessionUsage, path: activePath, chatSessions, activeChatId } = useProject()
+  const { messages, addMessage, insertMessageBeforeLast, updateLastAssistant, isStreaming, setStreaming, activity, preflights, subagentRuns, sessionUsage, path: activePath, chatSessions, activeChatId } = useProject()
   const { mode: agentMode, setMode: setAgentMode } = useAgentMode()
   const projectName = activePath ? activePath.replace(/^.*[\\/]/, '') : null
   const activeChatTitle = chatSessions.find(s => s.id === activeChatId)?.title ?? null
@@ -129,6 +139,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [dragOver, setDragOver] = useState(false)
   const [warning, setWarning] = useState<string | null>(null)
+  const [visionBannerDismissed, setVisionBannerDismissed] = useState(false)
   const streamRef = useRef<HTMLDivElement>(null)
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(readAutoScrollPref)
   const autoScrollEnabledRef = useRef(autoScrollEnabled)
@@ -142,6 +153,9 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
   const screenshotCounter = useRef(0)
   const warningTimer = useRef<number | null>(null)
   const currentSendIdRef = useRef<number | null>(null)
+  const messageQueueRef = useRef<QueuedComposerMessage[]>([])
+  const [queueCount, setQueueCount] = useState(0)
+  const flushQueueRef = useRef<() => void>(() => {})
   // Resume задачи (Фаза 4): взводится при gg-resume-send, эффект ниже шлёт send().
   const resumeAutoSendRef = useRef(false)
   const [undoCount, setUndoCount] = useState(0)
@@ -155,6 +169,31 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     setWarning(msg)
     if (warningTimer.current) window.clearTimeout(warningTimer.current)
     warningTimer.current = window.setTimeout(() => setWarning(null), 2500)
+  }
+
+  const hasImageAttachments = attachments.some(a => isImageAttachment(a.mimeType))
+  const showVisionBanner = hasImageAttachments
+    && !providerSupportsVision(provider.id)
+    && !visionBannerDismissed
+
+  useEffect(() => {
+    if (!hasImageAttachments) setVisionBannerDismissed(false)
+  }, [hasImageAttachments])
+
+  useEffect(() => {
+    if (providerSupportsVision(provider.id)) setVisionBannerDismissed(true)
+  }, [provider.id])
+
+  async function switchVisionModel(nextProviderId: ProviderId, model: string) {
+    await provider.setProviderId(nextProviderId)
+    await provider.setModel(model)
+    if (activeChatId != null) {
+      try {
+        await window.api.chatSessions.setModel(activeChatId, nextProviderId, model)
+        await useProject.getState().refreshChatSessions()
+      } catch { /* don't block UX */ }
+    }
+    setVisionBannerDismissed(true)
   }
 
   async function addBlobs(blobs: Array<{ blob: Blob; nameHint: string }>) {
@@ -460,6 +499,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         setStreaming(false)
         store.forgetSendOwner(id)
         void notifyResponseReady({ projectName: projectNameForPath(store.path) })
+        flushQueueRef.current()
       }
       else if (event.type === 'error') {
         // If a plan step was running, mark it failed
@@ -481,6 +521,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         setStreaming(false)
         store.forgetSendOwner(id)
         void notifyResponseReady({ projectName: projectNameForPath(store.path), isError: true })
+        flushQueueRef.current()
       }
     })
     return off
@@ -821,10 +862,47 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     return { path: next.path, activeChatId: next.activeChatId }
   }
 
-  async function send() {
+  async function flushMessageQueue() {
+    if (messageQueueRef.current.length === 0) return
+    if (useProject.getState().isStreaming) return
+    const next = messageQueueRef.current.shift()!
+    setQueueCount(messageQueueRef.current.length)
+    await send({ text: next.text, fromQueue: true })
+  }
+
+  flushQueueRef.current = () => { void flushMessageQueue() }
+
+  function queueFollowUp(text: string) {
+    messageQueueRef.current.push({ text })
+    setQueueCount(messageQueueRef.current.length)
+    setInput('')
+    armAutoScrollForOutgoing()
+  }
+
+  async function appendToCurrentContext() {
     const text = input.trim()
+    if (!text || !isStreaming) return
+    const sendId = currentSendIdRef.current
+    const ctx = await ensureProjectForChat()
+    insertMessageBeforeLast({ role: 'user', content: text })
+    setInput('')
+    armAutoScrollForOutgoing()
+    if (ctx?.path && ctx.activeChatId) {
+      await window.api.chats.append(ctx.activeChatId, ctx.path, 'user', text)
+    }
+    if (sendId == null) return
+    const res = await window.api.ai.appendContext(sendId, text)
+    if (!res.ok) {
+      if (provider.id.endsWith('-cli')) {
+        flashWarning(t.chat.streamingAppendCliNote)
+      }
+    }
+  }
+
+  async function send(opts?: { text?: string; fromQueue?: boolean }) {
+    const text = (opts?.text ?? input).trim()
     if (!text && attachments.length === 0) return
-    if (isStreaming) return
+    if (!opts?.fromQueue && isStreaming) return
     const store = useProject.getState()
     const ctx = await ensureProjectForChat()
     if (!ctx) {
@@ -836,8 +914,10 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     store.clearActivity()
     setExhausted(null)  // new send wipes any pending continue state
     setCrossVerify(null)  // сбрасываем предыдущий результат cross-verify
-    setInput('')
-    setAttachments([])
+    if (!opts?.text) {
+      setInput('')
+      setAttachments([])
+    }
     const summary = userAttachments.length > 0
       ? `${text}${text ? '\n\n' : ''}📎 ${userAttachments.map(a => a.name).join(', ')}`
       : text
@@ -943,6 +1023,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     // в мапе, потому что done event на abort иногда теряется.
     useProject.getState().forgetSendOwner(id)
     currentSendIdRef.current = null
+    flushQueueRef.current()
   }
 
   /**
@@ -1154,8 +1235,17 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
           const changedFiles = isLast && m.role === 'assistant' && !isStreaming
             ? activity.filter(a => a.kind === 'write' && a.status === 'ok').map(a => a.detail ?? '')
             : []
+          const prevMsg = i > 0 ? messages[i - 1] : null
+          const showDateDivider = m.createdAt != null
+            && (prevMsg?.createdAt == null || !isSameLocalDay(prevMsg.createdAt, m.createdAt))
           return (
-            <div key={i} className={`gg-msg ${m.role === 'user' ? 'gg-msg-user' : 'gg-msg-assistant'}`}>
+            <Fragment key={i}>
+            {showDateDivider && (
+              <div className="gg-chat-date-divider" role="separator" aria-label={formatChatDateDivider(m.createdAt!)}>
+                <span className="gg-chat-date-divider-label">{formatChatDateDivider(m.createdAt!)}</span>
+              </div>
+            )}
+            <div className={`gg-msg ${m.role === 'user' ? 'gg-msg-user' : 'gg-msg-assistant'}`}>
               {showActivity && (
                 <div className="gg-activity-list">
                   {activity.map(a => (
@@ -1243,9 +1333,20 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
                   </div>
                 )
               })}
-              {m.role === 'assistant' && (
+              {(m.role === 'assistant' || m.role === 'user') && (
                 <div className="gg-msg-meta">
-                  <span className="gg-msg-author">{provider.label}</span>
+                  {m.role === 'assistant' && (
+                    <span className="gg-msg-author">{provider.label}</span>
+                  )}
+                  {m.createdAt != null && (
+                    <time
+                      className="gg-msg-time"
+                      dateTime={new Date(m.createdAt).toISOString()}
+                      title={formatMessageDateTitle(m.createdAt)}
+                    >
+                      {formatMessageClock(m.createdAt)}
+                    </time>
+                  )}
                 </div>
               )}
               <div className="gg-msg-bubble">
@@ -1314,6 +1415,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
                 </div>
               )}
             </div>
+            </Fragment>
           )
         })}
         </div>
@@ -1343,6 +1445,15 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
               <AttachmentChip key={i} attachment={a} onRemove={() => removeAttachment(i)} />
             ))}
           </div>
+        )}
+        {showVisionBanner && (
+          <VisionAttachmentBanner
+            currentProviderId={provider.id}
+            currentProviderLabel={provider.label}
+            onSwitch={switchVisionModel}
+            onOpenSettings={onOpenSettings}
+            onDismiss={() => setVisionBannerDismissed(true)}
+          />
         )}
         {warning && <div className="gg-composer-warning">{warning}</div>}
         {exhausted && !isStreaming && (
@@ -1428,8 +1539,17 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
               if (slashOpen && (e.key === 'Enter' || e.key === 'Escape' || e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
                 return  // popup сам всё обработает
               }
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && isStreaming && input.trim()) {
+                e.preventDefault()
+                void appendToCurrentContext()
+                return
+              }
               if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
                 e.preventDefault()
+                if (isStreaming && input.trim()) {
+                  queueFollowUp(input.trim())
+                  return
+                }
                 void send()
               }
               if (e.key === 'Escape' && isStreaming) {
@@ -1490,6 +1610,26 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
           />
         </div>
         <div className="gg-composer-hint">
+          {isStreaming && (input.trim() || queueCount > 0) && (
+            <div className="gg-composer-streaming-hint">
+              {input.trim() && (
+                <span>
+                  <kbd className="gg-kbd">Ctrl+Enter</kbd>
+                  {' — '}
+                  {t.chat.streamingAppendHint}
+                  {' · '}
+                  <kbd className="gg-kbd">Enter</kbd>
+                  {' — '}
+                  {t.chat.streamingQueueHint}
+                </span>
+              )}
+              {queueCount > 0 && (
+                <span className="gg-composer-queue-count">
+                  {t.chat.streamingQueueCount.replace('{n}', String(queueCount))}
+                </span>
+              )}
+            </div>
+          )}
           <div className="gg-composer-meta">
             {previewTokens && previewTokens.tokens > 0 && (() => {
               const cost = estimateCost(provider.id, provider.model, previewTokens.tokens, 0, 0)
@@ -1569,7 +1709,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
                 className="gg-provider-caps-badge"
                 title="CLI-провайдер: правки выполняет внешний агент. Контроль Verstak (per-file undo, checkpoint, подтверждение write, mode-policy) не действует. Вложения уходят текстовым хинтом, не картинкой."
               >
-                CLI ⚠
+                CLI
               </span>
             )}
             <TierRecommendation input={input} />

@@ -7,8 +7,9 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const TOAST_W = 420
 /** Высота окна под до 3 тостов (~132px каждый + отступы). */
 const TOAST_H = 440
-const MARGIN = 16
-const BOTTOM = 24
+/** Как Windows toast: вплотную к правому нижнему углу рабочей области. */
+const MARGIN = 8
+const BOTTOM = 0
 
 export interface ToastPayload {
   title?: string

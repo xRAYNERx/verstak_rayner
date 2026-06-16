@@ -50,6 +50,7 @@ export function UpdateAvailableModal() {
         return
       }
       if (state.phase === 'available' && state.version) {
+        if (!state.pendingRelease && !isNewerThanInstalled(state.version)) return
         showUpdate(state.pendingRelease ? 'pending' : 'available', state.version)
       }
     }
@@ -58,6 +59,7 @@ export function UpdateAvailableModal() {
 
     const offState = window.api.updater.onState(applyState)
     const offAvailable = window.api.updater.onAvailable(({ version: v, pendingRelease }) => {
+      if (!pendingRelease && !isNewerThanInstalled(v)) return
       showUpdate(pendingRelease ? 'pending' : 'available', v)
     })
     const offProgress = window.api.updater.onProgress(({ percent: p }) => {

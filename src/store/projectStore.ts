@@ -150,6 +150,8 @@ interface ProjectState {
   removeProject: (path: string, options?: { deleteData?: boolean }) => Promise<{ ok: boolean; error?: string }>
   setActiveView: (v: ViewId) => void
   addMessage: (msg: ChatMessage) => void
+  /** Вставить сообщение перед последним (обычно — перед стримящим assistant). */
+  insertMessageBeforeLast: (msg: ChatMessage) => void
   updateLastAssistant: (text: string) => void
   /** Append chain-of-thought text to the last assistant message. Rendered as
    *  a collapsible block, not as part of the visible answer. */
@@ -389,7 +391,7 @@ export const useProject = create<ProjectState>((set, get) => ({
         if (myToken !== setProjectToken) return
         const cur = get()
         if (cur.path !== path || cur.activeChatId !== hydrateChatId) return
-        set({ messages: history.map(m => ({ role: m.role, content: m.content })) })
+        set({ messages: history.map(m => ({ role: m.role, content: m.content, createdAt: m.createdAt })) })
       })()
     }
 
@@ -433,7 +435,18 @@ export const useProject = create<ProjectState>((set, get) => ({
     return result
   },
   setActiveView: (v) => set({ activeView: v }),
-  addMessage: (msg) => set(s => ({ messages: [...s.messages, msg] })),
+  addMessage: (msg) => set(s => ({
+    messages: [...s.messages, { ...msg, createdAt: msg.createdAt ?? Date.now() }],
+  })),
+  insertMessageBeforeLast: (msg) => set(s => {
+    const stamped = { ...msg, createdAt: msg.createdAt ?? Date.now() }
+    const msgs = [...s.messages]
+    if (msgs.length === 0) return { messages: [stamped] }
+    const last = msgs[msgs.length - 1]
+    const at = last?.role === 'assistant' ? msgs.length - 1 : msgs.length
+    msgs.splice(at, 0, stamped)
+    return { messages: msgs }
+  }),
   updateLastAssistant: (text) => set(s => {
     const msgs = [...s.messages]
     const last = msgs[msgs.length - 1]
@@ -596,7 +609,7 @@ export const useProject = create<ProjectState>((set, get) => ({
         const history = await window.api.chats.list(id)
         if (myToken !== switchChatSessionToken) return
         if (get().activeChatId !== id) return
-        set({ messages: history.map(m => ({ role: m.role, content: m.content })) })
+        set({ messages: history.map(m => ({ role: m.role, content: m.content, createdAt: m.createdAt })) })
       })()
     }
 
