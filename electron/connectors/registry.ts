@@ -10,6 +10,9 @@ import { createYandexDiskConnector } from './yandex-disk'
 import { createGitHubConnector } from './github'
 import { createSocialPublishConnector } from './social-publish'
 import { createDaDataConnector } from './dadata'
+import { createYandexMetrikaConnector } from './yandex-metrika'
+import { createAvitoConnector } from './avito'
+import { createYandexWebmasterConnector } from './yandex-webmaster'
 
 // Built-in connectors. Adding a new adapter = register it here.
 const BUILTINS: Connector[] = [
@@ -23,7 +26,10 @@ const BUILTINS: Connector[] = [
   createYandexDiskConnector(),
   createGitHubConnector(),
   createSocialPublishConnector(),
-  createDaDataConnector()
+  createDaDataConnector(),
+  createYandexMetrikaConnector(),
+  createAvitoConnector(),
+  createYandexWebmasterConnector()
 ]
 
 export interface ConnectorRegistry {

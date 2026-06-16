@@ -299,6 +299,9 @@ const CONNECTORS: ConnectorDef[] = [
   { id: 'github', name: 'GitHub', description: 'Репозитории, issues, PR, code search', icon: IconGitHub, configuredKey: 'github_token' },
   { id: 'social-publish', name: 'Social Publish', description: 'Постинг в Telegram, VK, webhooks', icon: IconSocialPublish, configuredKey: 'social_publish_telegram_channels' },
   { id: 'dadata', name: 'DaData', description: 'Контрагенты по ИНН, адреса, банки', icon: IconHTTP, configuredKey: 'dadata_api_key' },
+  { id: 'ymetrika', name: 'Яндекс.Метрика', description: 'Веб-аналитика: трафик, источники, цели', icon: IconYandexDirect, configuredKey: 'yandex_metrika_token' },
+  { id: 'avito', name: 'Avito', description: 'Объявления, статистика, баланс', icon: IconHTTP, configuredKey: 'avito_client_id' },
+  { id: 'ywebmaster', name: 'Яндекс.Вебмастер', description: 'SEO: ИКС, проблемы, запросы', icon: IconYandexDirect, configuredKey: 'yandex_webmaster_token' },
 ]
 
 // ─── MCP Tab ─────────────────────────────────────────────────────────────────
@@ -1027,6 +1030,10 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
   const [yDirectToken, setYDirectToken] = useState('')
   const [dadataApiKey, setDadataApiKey] = useState('')
   const [dadataSecret, setDadataSecret] = useState('')
+  const [yMetrikaToken, setYMetrikaToken] = useState('')
+  const [avitoClientId, setAvitoClientId] = useState('')
+  const [avitoClientSecret, setAvitoClientSecret] = useState('')
+  const [yWebmasterToken, setYWebmasterToken] = useState('')
   const [yDirectLogin, setYDirectLogin] = useState('')
   const [skillsServerBase, setSkillsServerBase] = useState('')
   const [claudeOauthToken, setClaudeOauthToken] = useState('')
@@ -1117,6 +1124,10 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
       setYDirectToken((await window.api.settings.getKey('yandex_direct_token')) ?? '')
       setDadataApiKey((await window.api.settings.getKey('dadata_api_key')) ?? '')
       setDadataSecret((await window.api.settings.getKey('dadata_secret')) ?? '')
+      setYMetrikaToken((await window.api.settings.getKey('yandex_metrika_token')) ?? '')
+      setAvitoClientId((await window.api.settings.getKey('avito_client_id')) ?? '')
+      setAvitoClientSecret((await window.api.settings.getKey('avito_client_secret')) ?? '')
+      setYWebmasterToken((await window.api.settings.getKey('yandex_webmaster_token')) ?? '')
       setYDirectLogin((await window.api.settings.getKey('yandex_direct_login')) ?? '')
       setSkillsServerBase((await window.api.settings.getKey('skills_server_base')) ?? '')
       setClaudeOauthToken((await window.api.settings.getKey('claude_code_oauth_token')) ?? '')
@@ -1237,6 +1248,10 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
     await window.api.settings.setKey('yandex_direct_token', yDirectToken)
     await window.api.settings.setKey('dadata_api_key', dadataApiKey)
     await window.api.settings.setKey('dadata_secret', dadataSecret)
+    await window.api.settings.setKey('yandex_metrika_token', yMetrikaToken)
+    await window.api.settings.setKey('avito_client_id', avitoClientId)
+    await window.api.settings.setKey('avito_client_secret', avitoClientSecret)
+    await window.api.settings.setKey('yandex_webmaster_token', yWebmasterToken)
     await window.api.settings.setKey('yandex_direct_login', yDirectLogin)
     await window.api.settings.setKey('skills_server_base', skillsServerBase)
     await window.api.settings.setKey('claude_code_oauth_token', claudeOauthToken)
@@ -1512,6 +1527,73 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
             Операции: find_party (контрагент по ИНН/ОГРН), suggest_party, suggest_address,
             suggest_bank, clean_address. Подсказки работают по одному API key; clean_address
             требует Secret.
+          </div>
+        </>
+      )
+      case 'ymetrika': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">OAuth token</label>
+            <input
+              className="gg-input"
+              type="password"
+              value={yMetrikaToken}
+              onChange={e => setYMetrikaToken(e.target.value)}
+              placeholder="oauth.yandex.ru, scope metrika:read"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="gg-settings-hint">
+            Операции: list_counters, get_traffic (визиты/посетители/отказы по дням),
+            get_sources (источники), list_goals. Период — date1/date2 (YYYY-MM-DD или 7daysAgo/today).
+          </div>
+        </>
+      )
+      case 'avito': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Client ID</label>
+            <input
+              className="gg-input"
+              value={avitoClientId}
+              onChange={e => setAvitoClientId(e.target.value)}
+              placeholder="client_id приложения developers.avito.ru"
+              spellCheck={false}
+            />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Client Secret</label>
+            <input
+              className="gg-input"
+              type="password"
+              value={avitoClientSecret}
+              onChange={e => setAvitoClientSecret(e.target.value)}
+              placeholder="client_secret"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="gg-settings-hint">
+            OAuth2 client_credentials — токен получается автоматически и кэшируется.
+            Операции: list_items, get_stats (показы/контакты), get_balance.
+          </div>
+        </>
+      )
+      case 'ywebmaster': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">OAuth token</label>
+            <input
+              className="gg-input"
+              type="password"
+              value={yWebmasterToken}
+              onChange={e => setYWebmasterToken(e.target.value)}
+              placeholder="oauth.yandex.ru, scope webmaster:hostinfo"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="gg-settings-hint">
+            Операции: list_hosts, get_summary (ИКС + проблемы), get_queries (топ запросов
+            с показами/кликами). host_id берётся из list_hosts.
           </div>
         </>
       )
