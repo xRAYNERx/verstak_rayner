@@ -1534,42 +1534,15 @@ html {
   align-items: center;
   gap: 6px;
   width: 100%;
-  min-height: 36px;
-  padding: 0 8px 0 6px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--bg-overlay) 55%, transparent);
-  color: var(--text-secondary);
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-tertiary);
   font-size: var(--text-xs);
   font-weight: 500;
   cursor: pointer;
-  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
-}
-.gg-rail-hidden-icon {
-  flex-shrink: 0;
-  display: inline-flex;
-  color: var(--accent);
-  opacity: 0.85;
-}
-.gg-rail-hidden.is-expanded .gg-rail-hidden-label {
-  flex: 1;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--text-secondary);
-}
-.gg-rail:not(.is-shell-expanded) .gg-rail-hidden-toggle {
-  width: 36px;
-  min-height: 36px;
-  padding: 0;
-  justify-content: center;
-  margin-inline: auto;
-  gap: 0;
-}
-.gg-rail:not(.is-shell-expanded) .gg-rail-hidden-toggle .gg-rail-group-chevron,
-.gg-rail:not(.is-shell-expanded) .gg-rail-hidden-label,
-.gg-rail:not(.is-shell-expanded) .gg-rail-hidden-count {
-  display: none;
+  transition: background 150ms ease, color 150ms ease;
 }
 .gg-rail:not(.is-expanded) .gg-rail-hidden .gg-rail-chip {
   display: none !important;
@@ -1581,8 +1554,7 @@ html {
 }
 .gg-rail-hidden-toggle:hover {
   background: var(--bg-hover);
-  border-color: var(--border-subtle);
-  color: var(--text-primary);
+  color: var(--text-secondary);
 }
 .gg-rail-hidden-label {
   flex: 1;
