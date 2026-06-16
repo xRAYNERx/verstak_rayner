@@ -43,7 +43,9 @@ function buildBody(opts: {
 }): string {
   if (opts.body) return opts.body
   if (opts.projectName) {
-    return opts.isError ? 'Не удалось завершить работу' : 'Работа завершена'
+    return opts.isError
+      ? `Не удалось завершить работу по проекту «${opts.projectName}»`
+      : `Работа по проекту «${opts.projectName}» завершена`
   }
   return opts.isError ? 'Не удалось получить ответ' : 'Ответ готов'
 }

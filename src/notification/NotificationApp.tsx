@@ -94,9 +94,6 @@ export function NotificationApp() {
               ×
             </button>
           </div>
-          {toast.projectName && (
-            <div className="gg-app-toast-project">Проект «{toast.projectName}»</div>
-          )}
           <div className="gg-app-toast-body">{toast.body}</div>
         </article>
       ))}

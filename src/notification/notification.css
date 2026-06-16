@@ -110,16 +110,9 @@ html, body, #root {
   color: var(--toast-text);
 }
 
-.gg-app-toast-project {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--toast-text);
-  margin-bottom: 4px;
-  line-height: 1.35;
-}
-
 .gg-app-toast-body {
-  font-size: 12.5px;
-  color: var(--toast-muted);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--toast-text);
   line-height: 1.4;
 }

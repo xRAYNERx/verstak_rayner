@@ -226,15 +226,25 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         store.applyEventToChat(owner.chatId, event as unknown as { type: string; [k: string]: unknown })
         if (event.type === 'done') {
           const chat = chatTitle(owner.chatId)
+          const project = projectNameForPath(store.path)
           void notifyResponseReady({
-            projectName: projectNameForPath(store.path),
-            body: chat ? `Ответ в чате «${chat}» готов` : undefined
+            projectName: project,
+            body: chat && project
+              ? `Проект «${project}» — ответ в чате «${chat}» готов`
+              : chat
+                ? `Ответ в чате «${chat}» готов`
+                : undefined
           })
         } else if (event.type === 'error') {
           const chat = chatTitle(owner.chatId)
+          const project = projectNameForPath(store.path)
           void notifyResponseReady({
-            projectName: projectNameForPath(store.path),
-            body: chat ? `Ошибка в чате «${chat}»` : undefined,
+            projectName: project,
+            body: chat && project
+              ? `Проект «${project}» — ошибка в чате «${chat}»`
+              : chat
+                ? `Ошибка в чате «${chat}»`
+                : undefined,
             isError: true
           })
         }
