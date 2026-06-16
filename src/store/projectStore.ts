@@ -329,12 +329,17 @@ export const useProject = create<ProjectState>((set, get) => ({
     void window.api.projects.setCurrent(path)
     void window.api.settings.setKey(LAST_PROJECT_PATH_KEY, path)
 
-    const [tree, projectList, chatSessionsRaw] = await Promise.all([
-      window.api.files.tree(path),
+    const [projectList, chatSessionsRaw] = await Promise.all([
       window.api.projects.list(),
       window.api.chatSessions.list(path),
     ])
     if (myToken !== setProjectToken) return
+
+    void window.api.files.tree(path).then(tree => {
+      if (myToken !== setProjectToken) return
+      if (get().path !== path) return
+      set({ tree })
+    }).catch(() => { /* files panel fills in later */ })
 
     let chatSessions = chatSessionsRaw
     if (chatSessions.length === 0) {
@@ -352,7 +357,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     if (myToken !== setProjectToken) return
     set({
       path,
-      tree,
+      tree: [],
       messages: initialMessages,
       isStreaming: target.isStreaming,
       pendingWrites: target.pendingWrites,
