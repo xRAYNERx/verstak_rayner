@@ -236,6 +236,14 @@ function RunCard({ run, providerLabel, expanded, onToggle, onStop, onResume }: {
           {run.agentsCount > 0 && <span className="gg-run-stat" title="суб-агентов">🤖{run.agentsCount}</span>}
           {run.toolCount > 0 && <span className="gg-run-stat" title="tool-вызовов">🔧{run.toolCount}</span>}
           {run.filesCount > 0 && <span className="gg-run-stat" title="файлов изменено">📄{run.filesCount}</span>}
+          {/* Живой прогресс running-прогона (tick): «ход N» + текущий инструмент —
+              данные пишутся agentRuns.tick на каждом turn (аудит P0). */}
+          {run.status === 'running' && run.turnIndex > 0 && (
+            <span className="gg-run-stat" title="ход агентного цикла">↻{run.turnIndex}</span>
+          )}
+          {run.status === 'running' && run.lastToolName && (
+            <span className="gg-run-stat gg-run-stat-livetool" title="сейчас выполняется">▸{run.lastToolName}</span>
+          )}
           {cost && <span className="gg-run-stat gg-run-stat-cost">{cost}</span>}
           <span className="gg-run-stat gg-run-stat-dur">{fmtDuration(run.startedAt, run.endedAt)}</span>
           {canStop && (
