@@ -168,6 +168,11 @@ export const ru: Translations = {
     releaseNotes: 'Список изменений',
     viewReleaseNotes: 'Посмотреть список текущих обновлений',
     viewReleaseNotesLoading: 'Загружаю…',
+    viewPastUpdates: 'Ознакомиться с прошлыми обновлениями',
+    pastUpdatesTitle: 'История обновлений',
+    pastUpdatesHint: 'Выберите версию, чтобы открыть описание изменений',
+    pastUpdatesLoading: 'Загружаю список релизов…',
+    pastUpdatesEmpty: 'Список релизов пока недоступен',
     releaseNotesEmpty: 'Описание обновления пока недоступно на GitHub Releases',
   },
 

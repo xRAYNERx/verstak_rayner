@@ -171,6 +171,11 @@ export const en = {
     releaseNotes: 'Release notes',
     viewReleaseNotes: 'View current update notes',
     viewReleaseNotesLoading: 'Loading…',
+    viewPastUpdates: 'Browse past updates',
+    pastUpdatesTitle: 'Update history',
+    pastUpdatesHint: 'Pick a version to read its release notes',
+    pastUpdatesLoading: 'Loading releases…',
+    pastUpdatesEmpty: 'Release list is not available yet',
     releaseNotesEmpty: 'Release notes are not available on GitHub Releases yet',
   },
 

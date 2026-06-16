@@ -404,7 +404,7 @@ declare global {
       }
       updater: {
         install(): Promise<void>
-        getReleaseNotes(opts?: { sinceVersion?: string; upToVersion?: string; version?: string }): Promise<Array<{
+        getReleaseNotes(opts?: { sinceVersion?: string; upToVersion?: string; version?: string; all?: boolean }): Promise<Array<{
           version: string
           name: string
           body: string

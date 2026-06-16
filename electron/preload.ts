@@ -294,7 +294,7 @@ contextBridge.exposeInMainWorld('api', {
 
   updater: {
     install: () => ipcRenderer.invoke('update:install'),
-    getReleaseNotes: (opts?: { sinceVersion?: string; upToVersion?: string; version?: string }) =>
+    getReleaseNotes: (opts?: { sinceVersion?: string; upToVersion?: string; version?: string; all?: boolean }) =>
       ipcRenderer.invoke('update:get-release-notes', opts ?? {}),
     check: () => ipcRenderer.invoke('update:check'),
     getState: () => ipcRenderer.invoke('update:get-state') as Promise<{

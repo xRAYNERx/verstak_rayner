@@ -182,3 +182,19 @@ export async function fetchReleaseNotesSince(sinceVersion: string, upToVersion: 
   const bundled = getBundledReleaseNotesInRange(since, upTo)
   return mergeReleaseNotes(github, bundled)
 }
+
+/** Все релизы: GitHub + встроенные заметки сборки Rayner. */
+export async function fetchAllReleaseNotesMerged(): Promise<ReleaseNote[]> {
+  const { getAllBundledReleaseNotes, mergeReleaseNotes } = await import('./rayner-changelog')
+  const github = await fetchAllReleaseNotes()
+  return mergeReleaseNotes(github, getAllBundledReleaseNotes())
+}
+
+export async function fetchReleaseNoteMerged(version: string): Promise<ReleaseNote | null> {
+  const { getBundledReleaseNote, mergeReleaseNotes } = await import('./rayner-changelog')
+  const github = await fetchReleaseNote(version)
+  const bundled = getBundledReleaseNote(version)
+  if (!github && !bundled) return null
+  const merged = mergeReleaseNotes(github ? [github] : [], bundled ? [bundled] : [])
+  return merged[0] ?? null
+}

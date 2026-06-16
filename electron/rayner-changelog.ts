@@ -38,6 +38,15 @@ function inVersionRange(note: ReleaseNote, since: string, upTo: string): boolean
   return semverGt(v, since) && !semverGt(upTo, v)
 }
 
+export function getAllBundledReleaseNotes(): ReleaseNote[] {
+  return RAYNER_NOTES.map(note => ({ ...note }))
+}
+
+export function getBundledReleaseNote(version: string): ReleaseNote | undefined {
+  const key = normalizeVersion(version)
+  return RAYNER_NOTES.find(note => normalizeVersion(note.version) === key)
+}
+
 export function getBundledReleaseNotesInRange(sinceVersion: string, upToVersion: string): ReleaseNote[] {
   const since = normalizeVersion(sinceVersion)
   const upTo = normalizeVersion(upToVersion)
