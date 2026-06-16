@@ -10,6 +10,7 @@ import {
   releaseFeedBase,
   semverGt,
 } from './update-remote'
+import { clearPendingUpdateCache } from './updater-cache'
 
 autoUpdater.logger = null
 autoUpdater.autoDownload = true
@@ -33,6 +34,19 @@ let checkInFlight = false
 let usedGenericFeed = false
 let releaseNotesIpcRegistered = false
 let updaterIpcRegistered = false
+
+function isNewerThanInstalled(target: string | null | undefined): boolean {
+  if (!target) return false
+  return semverGt(target, app.getVersion())
+}
+
+/** Сброс кэша, если на диске лежит установщик уже установленной (или более новой) версии. */
+function reconcileStaleDownloadedUpdate(target?: string | null): boolean {
+  const remote = target ?? lastProbeVersion
+  if (remote && isNewerThanInstalled(remote)) return false
+  clearPendingUpdateCache()
+  return true
+}
 
 /** Release notes IPC — регистрируем до старта renderer (WhatsNewModal при запуске). */
 export function registerReleaseNotesIpc(): void {
@@ -79,6 +93,11 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
   }
 
   const announceAvailable = (version: string, pendingRelease = false) => {
+    if (!pendingRelease && !isNewerThanInstalled(version)) {
+      reconcileStaleDownloadedUpdate(version)
+      announceNotAvailable()
+      return
+    }
     setSnapshot({ phase: 'available', version, pendingRelease })
     sendToRenderer(mainWindow, 'update:available', { version, pendingRelease })
   }
@@ -113,6 +132,7 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     const remote = await fetchRemoteVersion()
     lastProbeVersion = remote
     if (!remote || !semverGt(remote, current)) {
+      reconcileStaleDownloadedUpdate(remote)
       return { newer: false, version: remote, pendingRelease: false }
     }
     const hasArtifacts = await releaseArtifactsReady(remote)
@@ -161,7 +181,14 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     updaterIpcRegistered = true
 
     ipcMain.handle('update:install', () => {
+      const target = snapshot.version ?? lastProbeVersion
+      if (!isNewerThanInstalled(target)) {
+        reconcileStaleDownloadedUpdate(target)
+        announceNotAvailable()
+        return { ok: false as const, reason: 'already-current' as const }
+      }
       autoUpdater.quitAndInstall(false, true)
+      return { ok: true as const }
     })
 
     ipcMain.handle('update:get-state', () => snapshot)
@@ -186,6 +213,11 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     })
 
     autoUpdater.on('update-available', (info) => {
+      if (!isNewerThanInstalled(info.version)) {
+        reconcileStaleDownloadedUpdate(info.version)
+        announceNotAvailable()
+        return
+      }
       setSnapshot({ phase: 'available', version: info.version, pendingRelease: false })
       sendToRenderer(mainWindow, 'update:available', {
         version: info.version,
@@ -195,6 +227,7 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     })
 
     autoUpdater.on('update-not-available', () => {
+      reconcileStaleDownloadedUpdate(lastProbeVersion)
       announceNotAvailable()
     })
 
@@ -214,8 +247,8 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     })
 
     autoUpdater.on('update-downloaded', (info) => {
-      const current = app.getVersion()
-      if (!semverGt(info.version, current)) {
+      if (!isNewerThanInstalled(info.version)) {
+        reconcileStaleDownloadedUpdate(info.version)
         announceNotAvailable()
         return
       }
@@ -236,6 +269,7 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
       }
 
       if (isBenignUpdaterError(message)) {
+        reconcileStaleDownloadedUpdate(remote)
         announceNotAvailable()
         return
       }
@@ -244,6 +278,10 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
       sendToRenderer(mainWindow, 'update:error', { error: message })
     })
   }
+
+  void evaluateProbe().then((probe) => {
+    if (!probe.newer) announceNotAvailable()
+  })
 
   mainWindow.webContents.once('did-finish-load', () => {
     pushSnapshot()

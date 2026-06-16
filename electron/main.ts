@@ -181,6 +181,11 @@ if (process.platform === 'win32') {
   app.setAppUserModelId('ru.verstak.ide')
 }
 
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) {
+  app.quit()
+}
+
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'gg-project-icon',
@@ -188,7 +193,16 @@ protocol.registerSchemesAsPrivileged([
   }
 ])
 
+app.on('second-instance', () => {
+  const win = BrowserWindow.getAllWindows()[0]
+  if (!win) return
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+})
+
 app.whenReady().then(() => {
+  if (!gotSingleInstanceLock) return
   Menu.setApplicationMenu(null)
   registerWindowIpc()
   registerNotificationWindowIpc()
