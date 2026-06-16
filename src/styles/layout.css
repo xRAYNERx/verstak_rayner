@@ -1,4 +1,11 @@
 /* ─── App shell ─── */
+/*
+ * Rail animation contract (frozen 17.06.2026 — do not break):
+ * Ширина колонки — @property --gg-rail-w на html (transition ниже).
+ * JS (ProjectRail.tsx) выставляет 76px|248px синхронно с railExpanded.
+ * Визуал rail (padding, labels, chips, footer) — transition на --shell-dur/--shell-ease.
+ * Не добавлять отдельные тайминги open/close; не анимировать ширину из JS.
+ */
 @property --gg-rail-w {
   syntax: '<length>';
   inherits: true;

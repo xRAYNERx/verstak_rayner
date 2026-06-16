@@ -13,10 +13,24 @@ const RAIL_WIDTH_COLLAPSED = '76px'
 const RAIL_WIDTH_EXPANDED = '248px'
 
 /**
- * Контракт анимации rail (визуально проверен — не ломать без ручной проверки):
- * — Открытие: railExpanded=true → shell, content и --gg-rail-w сразу в expanded;
- *   параллельные переходы только в CSS (--shell-dur / --shell-ease в layout.css).
- * — Закрытие: симметрично — всё сразу в collapsed, без staged setTimeout.
+ * ═══ КОНТРАКТ АНИМАЦИИ RAIL — ЗАМОРОЖЕН 17.06.2026 (RAYNER: «тупо топ») ═══
+ * Не менять без ручной проверки открытия И закрытия.
+ *
+ * Единственный переключатель: railExpanded (кнопка-шеврон в toolbar).
+ *
+ * Открытие и закрытие СИММЕТРИЧНЫ:
+ *   railExpanded меняется → в том же тике React:
+ *     • useEffect → shellExpanded + contentExpanded = railExpanded (без setTimeout/rAF-очередей)
+ *     • useEffect → --gg-rail-w = 248px | 76px на documentElement
+ *   Вся плавность — только CSS: --shell-dur (280ms), --shell-ease в layout.css.
+ *
+ * Группы и «Скрытые»: expanded = contentExpanded && localOpen — при свёрнутом rail
+ *   папки визуально закрыты; состояние в БД / hiddenOpen не сбрасываем.
+ *
+ * ЗАПРЕЩЕНО: staged setTimeout между shell/content/шириной; разная логика open vs close;
+ *   анимировать ширину в JS; отдельные transition-duration для open/close.
+ *
+ * Skill: .grok/skills/verstak/SKILL.md → «Контракт анимации rail».
  */
 
 function readRailExpanded(): boolean {
