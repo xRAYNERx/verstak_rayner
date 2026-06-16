@@ -58,6 +58,13 @@ export function SideChat({ sideChatId, onClose }: SideChatProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sideChatId])
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      textareaRef.current?.focus({ preventScroll: true })
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [sideChatId])
+
   // Загружаем список провайдеров + «настроенные» (ключ задан / CLI не требует).
   useEffect(() => {
     let cancelled = false

@@ -1,62 +1,58 @@
-/* ─── Fonts ─── */
-@import '@fontsource/geist-sans/400.css';
-@import '@fontsource/geist-sans/500.css';
-@import '@fontsource/geist-sans/600.css';
-@import '@fontsource/geist-mono/400.css';
-@import '@fontsource/geist-mono/500.css';
-@import '@fontsource/jetbrains-mono/400.css';
+/* ─── Fonts (Inter + JetBrains — latin и кириллица одной гарнитурой) ─── */
+@import '@fontsource/inter/cyrillic-400.css';
+@import '@fontsource/inter/cyrillic-500.css';
+@import '@fontsource/inter/cyrillic-600.css';
+@import '@fontsource/inter/latin-400.css';
+@import '@fontsource/inter/latin-500.css';
+@import '@fontsource/inter/latin-600.css';
+@import '@fontsource/jetbrains-mono/cyrillic-400.css';
+@import '@fontsource/jetbrains-mono/cyrillic-500.css';
+@import '@fontsource/jetbrains-mono/latin-400.css';
+@import '@fontsource/jetbrains-mono/latin-500.css';
 
 /* ─── Design Tokens ─── */
 :root {
-  /* Surfaces — warm dark with subtle blue undertone */
-  --bg-base: #0a0b0d;
-  --bg-elevated: #111316;
-  --bg-overlay: #16191d;
-  --bg-input: #0d0f12;
-  --bg-hover: #1c2025;
-  --bg-active: #232831;
+  /* Nord — дефолтная тёмная тема */
+  --bg-base: #2e3440;
+  --bg-elevated: #353c4a;
+  --bg-overlay: #3b4252;
+  --bg-input: #2b313c;
+  --bg-hover: #3b4252;
+  --bg-active: #434c5e;
 
-  /* Lines */
-  --border-subtle: #1d2025;
-  --border-default: #262a31;
-  --border-strong: #353a44;
-  --border-focus: #4f7cff;
+  --border-subtle: #353c4a;
+  --border-default: #434c5e;
+  --border-strong: #4c566a;
+  --border-focus: #88c0d0;
 
-  /* Text */
-  --text-primary: #e6e8ec;
-  --text-secondary: #a7adb8;
-  --text-tertiary: #6b727d;
-  --text-disabled: #4a505a;
-  --text-on-accent: #0a0b0d;
+  --text-primary: #eceff4;
+  --text-secondary: #d8dee9;
+  --text-tertiary: #97a1b5;
+  --text-disabled: #61697b;
+  --text-on-accent: #2e3440;
 
-  /* Accent — Gemini-inspired electric blue */
-  --accent: #5b8dff;
-  --accent-hover: #7aa3ff;
-  --accent-muted: rgba(91, 141, 255, 0.12);
-  --accent-border: rgba(91, 141, 255, 0.35);
+  --accent: #88c0d0;
+  --accent-hover: #9fd0de;
+  --accent-muted: rgba(136, 192, 208, 0.14);
+  --accent-border: rgba(136, 192, 208, 0.38);
 
-  /* Semantic */
-  --success: #4ec9b0;
-  --success-muted: rgba(78, 201, 176, 0.1);
-  --warning: #d7ba7d;
-  --error: #f47174;
-  --error-muted: rgba(244, 113, 116, 0.12);
-  --diff-add: #4ec9b0;
-  --diff-add-bg: rgba(78, 201, 176, 0.08);
-  --diff-remove: #f47174;
-  --diff-remove-bg: rgba(244, 113, 116, 0.08);
+  --success: #a3be8c;
+  --success-muted: rgba(163, 190, 140, 0.14);
+  --warning: #ebcb8b;
+  --error: #bf616a;
+  --error-muted: rgba(191, 97, 106, 0.16);
+  --diff-add: #a3be8c;
+  --diff-add-bg: rgba(163, 190, 140, 0.10);
+  --diff-remove: #bf616a;
+  --diff-remove-bg: rgba(191, 97, 106, 0.10);
 
-  /* Inline-code chips (markdown `backticks`). Needs distinct text/bg in BOTH
-   * themes — on dark we want a soft blue tint, on light a deep purple-ink so
-   * chips on white surfaces stay readable. Light variant defined in the
-   * html[data-theme="light"] block below. */
-  --bg-code: rgba(91, 141, 255, 0.08);
-  --text-code: #b8c8ff;
-  --border-code: rgba(91, 141, 255, 0.18);
+  --bg-code: rgba(136, 192, 208, 0.10);
+  --text-code: #b0dce8;
+  --border-code: rgba(136, 192, 208, 0.22);
 
   /* Typography */
-  --font-sans: 'Geist Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --font-mono: 'Geist Mono', 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   /* Sizes */
   --text-xs: 11px;
@@ -73,25 +69,53 @@
   --space-5: 20px;
   --space-6: 24px;
 
-  /* Radii — consistent scale. data-radius="square" zeroes these out below. */
-  --radius-sm: 5px;
-  --radius-md: 7px;
-  --radius-lg: 11px;
-  --radius-xl: 15px;
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
   --radius-pill: 999px;
 
-  /* Elevation — layered for a softer, more "expensive" depth. The hairline ring
-   * (inset) gives surfaces a crisp edge that reads as premium on dark UIs. */
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.32);
-  --shadow-md: 0 6px 20px rgba(0,0,0,0.40), 0 1px 3px rgba(0,0,0,0.28);
-  --shadow-lg: 0 20px 56px rgba(0,0,0,0.52), 0 2px 8px rgba(0,0,0,0.30);
-  --shadow-glow: 0 0 24px rgba(91, 141, 255, 0.15);
-  --ring-inset: inset 0 0 0 1px rgba(255,255,255,0.04);
+  /* Elevation — volumetric (theme-agnostic via color-mix in shell) */
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.34);
+  --shadow-md: 0 6px 22px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 24px rgba(136, 192, 208, 0.16);
+  --ring-inset: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+
+  /* Volumetric glass — все темы через color-mix */
+  --vol-blur: blur(22px) saturate(1.3);
+  --vol-glass: color-mix(in srgb, var(--bg-elevated) 68%, transparent);
+  --vol-glass-deep: color-mix(in srgb, var(--bg-overlay) 74%, transparent);
+  --vol-highlight: color-mix(in srgb, var(--text-primary) 7%, transparent);
+  --vol-shadow-up:
+    0 -1px 0 var(--vol-highlight),
+    0 10px 36px color-mix(in srgb, var(--bg-base) 72%, transparent),
+    0 2px 6px color-mix(in srgb, var(--bg-base) 55%, transparent);
+  --vol-shadow-side:
+    4px 0 24px color-mix(in srgb, var(--bg-base) 65%, transparent),
+    1px 0 0 color-mix(in srgb, var(--accent) 8%, transparent);
+  --vol-shadow-inset:
+    inset 0 2px 12px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 color-mix(in srgb, var(--text-primary) 3%, transparent);
+  --vol-lift:
+    0 14px 40px color-mix(in srgb, var(--bg-base) 68%, transparent),
+    0 0 0 1px var(--border-default);
+  --vol-recessed-bg: color-mix(in srgb, var(--bg-base) 60%, transparent);
+  --shell-rail-fill:
+    linear-gradient(165deg, color-mix(in srgb, var(--vol-highlight) 80%, transparent) 0%, transparent 38%),
+    var(--vol-glass);
+  --shell-panel-fill: var(--shell-rail-fill);
+  --shell-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  /* Motion */
+  --dur-fast: 160ms;
+  --dur-normal: 240ms;
+  --dur-slow: 360ms;
 }
 
-/* ─── Dark theme alias — :root above is the dark default; this lets the picker
- * set data-theme="dark" explicitly without changing anything visually. ─── */
-html[data-theme="dark"] { color-scheme: dark; }
+/* ─── Nord (явный выбор = :root) ─── */
+html[data-theme="nord"] { color-scheme: dark; }
 
 /* ─── Light theme — applied when html[data-theme="light"] ─── */
 html[data-theme="light"] {
@@ -141,202 +165,23 @@ html[data-theme="light"] {
   --shadow-glow: 0 0 24px rgba(58, 110, 232, 0.10);
   --ring-inset: inset 0 0 0 1px rgba(15, 25, 40, 0.03);
 
-  /* Inline-code chips on light — deep purple-ink on a pale lavender wash so
-   * the chip is legible AND visually distinct from running prose. The dark-
-   * theme defaults sit on a near-white background and become invisible. */
+  --vol-blur: blur(20px) saturate(1.08);
+  --vol-glass: color-mix(in srgb, var(--bg-elevated) 82%, transparent);
+  --vol-glass-deep: color-mix(in srgb, var(--bg-overlay) 88%, transparent);
+  --vol-shadow-side:
+    3px 0 16px color-mix(in srgb, var(--bg-base) 12%, transparent),
+    1px 0 0 color-mix(in srgb, var(--accent) 6%, transparent);
+  --vol-shadow-inset:
+    inset 0 2px 8px color-mix(in srgb, var(--bg-base) 10%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--text-primary) 4%, transparent);
+  --vol-lift:
+    0 12px 32px color-mix(in srgb, var(--bg-base) 14%, transparent),
+    0 0 0 1px var(--border-default);
+  --vol-recessed-bg: color-mix(in srgb, var(--bg-base) 94%, var(--bg-overlay));
+
   --bg-code: #eef1ff;
   --text-code: #3d3996;
   --border-code: #c9d0f5;
-}
-
-/* ════════════════════════════════════════════════════════════════════════
- * Curated palettes. Each block is a COMPLETE set of variable overrides — no
- * layout touched, every component already reads these vars. Colour values are
- * taken from the canonical palettes (Dracula, Nord, Tokyo Night, Gruvbox).
- * ════════════════════════════════════════════════════════════════════════ */
-
-/* ─── Dracula ─── */
-html[data-theme="dracula"] {
-  color-scheme: dark;
-  --bg-base: #21222c;
-  --bg-elevated: #282a36;
-  --bg-overlay: #343746;
-  --bg-input: #1e1f29;
-  --bg-hover: #343746;
-  --bg-active: #3c3f51;
-
-  --border-subtle: #2b2d3a;
-  --border-default: #383b4a;
-  --border-strong: #4a4d61;
-  --border-focus: #bd93f9;
-
-  --text-primary: #f8f8f2;
-  --text-secondary: #c3c4d3;
-  --text-tertiary: #8b8da3;
-  --text-disabled: #5a5c70;
-  --text-on-accent: #21222c;
-
-  --accent: #bd93f9;
-  --accent-hover: #cba9fb;
-  --accent-muted: rgba(189, 147, 249, 0.14);
-  --accent-border: rgba(189, 147, 249, 0.38);
-
-  --success: #50fa7b;
-  --success-muted: rgba(80, 250, 123, 0.12);
-  --warning: #f1fa8c;
-  --error: #ff5555;
-  --error-muted: rgba(255, 85, 85, 0.14);
-  --diff-add: #50fa7b;
-  --diff-add-bg: rgba(80, 250, 123, 0.08);
-  --diff-remove: #ff5555;
-  --diff-remove-bg: rgba(255, 85, 85, 0.08);
-
-  --bg-code: rgba(189, 147, 249, 0.10);
-  --text-code: #d6bcff;
-  --border-code: rgba(189, 147, 249, 0.22);
-
-  --shadow-glow: 0 0 24px rgba(189, 147, 249, 0.18);
-  --ring-inset: inset 0 0 0 1px rgba(255,255,255,0.04);
-}
-
-/* ─── Nord ─── */
-html[data-theme="nord"] {
-  color-scheme: dark;
-  --bg-base: #2e3440;
-  --bg-elevated: #353c4a;
-  --bg-overlay: #3b4252;
-  --bg-input: #2b313c;
-  --bg-hover: #3b4252;
-  --bg-active: #434c5e;
-
-  --border-subtle: #353c4a;
-  --border-default: #434c5e;
-  --border-strong: #4c566a;
-  --border-focus: #88c0d0;
-
-  --text-primary: #eceff4;
-  --text-secondary: #d8dee9;
-  --text-tertiary: #97a1b5;
-  --text-disabled: #61697b;
-  --text-on-accent: #2e3440;
-
-  --accent: #88c0d0;
-  --accent-hover: #9fd0de;
-  --accent-muted: rgba(136, 192, 208, 0.14);
-  --accent-border: rgba(136, 192, 208, 0.38);
-
-  --success: #a3be8c;
-  --success-muted: rgba(163, 190, 140, 0.14);
-  --warning: #ebcb8b;
-  --error: #bf616a;
-  --error-muted: rgba(191, 97, 106, 0.16);
-  --diff-add: #a3be8c;
-  --diff-add-bg: rgba(163, 190, 140, 0.10);
-  --diff-remove: #bf616a;
-  --diff-remove-bg: rgba(191, 97, 106, 0.10);
-
-  --bg-code: rgba(136, 192, 208, 0.10);
-  --text-code: #b0dce8;
-  --border-code: rgba(136, 192, 208, 0.22);
-
-  --shadow-glow: 0 0 24px rgba(136, 192, 208, 0.16);
-  --ring-inset: inset 0 0 0 1px rgba(255,255,255,0.04);
-}
-
-/* ─── Tokyo Night ─── */
-html[data-theme="tokyo-night"] {
-  color-scheme: dark;
-  --bg-base: #1a1b26;
-  --bg-elevated: #1f2335;
-  --bg-overlay: #24283b;
-  --bg-input: #16161e;
-  --bg-hover: #24283b;
-  --bg-active: #2f3450;
-
-  --border-subtle: #20222f;
-  --border-default: #2a2e42;
-  --border-strong: #3b4261;
-  --border-focus: #7aa2f7;
-
-  --text-primary: #c0caf5;
-  --text-secondary: #9aa5ce;
-  --text-tertiary: #6b7394;
-  --text-disabled: #444b6a;
-  --text-on-accent: #1a1b26;
-
-  --accent: #7aa2f7;
-  --accent-hover: #9ab8ff;
-  --accent-muted: rgba(122, 162, 247, 0.14);
-  --accent-border: rgba(122, 162, 247, 0.38);
-
-  --success: #9ece6a;
-  --success-muted: rgba(158, 206, 106, 0.12);
-  --warning: #e0af68;
-  --error: #f7768e;
-  --error-muted: rgba(247, 118, 142, 0.14);
-  --diff-add: #9ece6a;
-  --diff-add-bg: rgba(158, 206, 106, 0.08);
-  --diff-remove: #f7768e;
-  --diff-remove-bg: rgba(247, 118, 142, 0.08);
-
-  --bg-code: rgba(122, 162, 247, 0.10);
-  --text-code: #b4c6ff;
-  --border-code: rgba(122, 162, 247, 0.22);
-
-  --shadow-glow: 0 0 24px rgba(122, 162, 247, 0.18);
-  --ring-inset: inset 0 0 0 1px rgba(255,255,255,0.04);
-}
-
-/* ─── Gruvbox (dark, medium) ─── */
-html[data-theme="gruvbox"] {
-  color-scheme: dark;
-  --bg-base: #282828;
-  --bg-elevated: #32302f;
-  --bg-overlay: #3c3836;
-  --bg-input: #232323;
-  --bg-hover: #3c3836;
-  --bg-active: #504945;
-
-  --border-subtle: #353230;
-  --border-default: #423d39;
-  --border-strong: #5a524b;
-  --border-focus: #fabd2f;
-
-  --text-primary: #ebdbb2;
-  --text-secondary: #d5c4a1;
-  --text-tertiary: #a89984;
-  --text-disabled: #7c6f64;
-  --text-on-accent: #282828;
-
-  --accent: #fabd2f;
-  --accent-hover: #fdd35e;
-  --accent-muted: rgba(250, 189, 47, 0.14);
-  --accent-border: rgba(250, 189, 47, 0.38);
-
-  --success: #b8bb26;
-  --success-muted: rgba(184, 187, 38, 0.14);
-  --warning: #fe8019;
-  --error: #fb4934;
-  --error-muted: rgba(251, 73, 52, 0.14);
-  --diff-add: #b8bb26;
-  --diff-add-bg: rgba(184, 187, 38, 0.10);
-  --diff-remove: #fb4934;
-  --diff-remove-bg: rgba(251, 73, 52, 0.10);
-
-  --bg-code: rgba(250, 189, 47, 0.10);
-  --text-code: #fbd28a;
-  --border-code: rgba(250, 189, 47, 0.22);
-
-  --shadow-glow: 0 0 24px rgba(250, 189, 47, 0.14);
-  --ring-inset: inset 0 0 0 1px rgba(255,255,255,0.04);
-}
-
-/* ─── Squared corners toggle (data-radius="square"). Opt-in, additive. ─── */
-html[data-radius="square"] {
-  --radius-sm: 0px;
-  --radius-md: 2px;
-  --radius-lg: 3px;
-  --radius-xl: 4px;
 }
 
 /* ─── Reset ─── */
@@ -351,7 +196,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  font-feature-settings: "ss01", "cv11";
+  font-feature-settings: "cv11", "cv05";
   letter-spacing: -0.005em;
 }
 
@@ -380,7 +225,7 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   font-size: var(--text-sm); font-weight: 500;
-  transition: all 120ms ease;
+  transition: background 120ms ease, border-color 120ms ease;
 }
 .gg-btn:hover { background: var(--bg-hover); border-color: var(--border-strong); }
 .gg-btn:active { transform: scale(0.98); }

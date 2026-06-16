@@ -919,17 +919,17 @@ function ProviderHealthMatrix({ report }: { report: DoctorReport }) {
 // ─── Doctor panel ─────────────────────────────────────────────────────────────
 
 /** Иконка/цвет статуса пункта диагностики. */
-function doctorStatusIcon(status: DoctorItem['status']): { icon: string; color: string } {
-  if (status === 'ok') return { icon: '✓', color: 'var(--gg-success, #3fb950)' }
-  if (status === 'no-key') return { icon: '✗', color: 'var(--gg-danger, #f85149)' }
-  return { icon: '—', color: 'var(--gg-text-dim, #8b949e)' } // n-a
+function doctorStatusIcon(status: DoctorItem['status']): { icon: string; cls: string } {
+  if (status === 'ok') return { icon: '✓', cls: 'is-ok' }
+  if (status === 'no-key') return { icon: '✗', cls: 'is-err' }
+  return { icon: '—', cls: 'is-na' }
 }
 
 function DoctorRow({ item }: { item: DoctorItem }) {
   const s = doctorStatusIcon(item.status)
   return (
     <div className="gg-settings-row" style={{ alignItems: 'baseline', gap: 8 }}>
-      <span style={{ color: s.color, fontWeight: 700, width: 16, display: 'inline-block' }}>{s.icon}</span>
+      <span className={`gg-doctor-status ${s.cls}`}>{s.icon}</span>
       <span style={{ minWidth: 140, fontWeight: 600 }}>{item.name}</span>
       <span className="gg-settings-hint" style={{ margin: 0 }}>{item.detail}</span>
     </div>
@@ -954,8 +954,8 @@ function DoctorPanel() {
   }
 
   return (
-    <div className="gg-doctor-panel" style={{ marginBottom: 16 }}>
-      <div className="gg-settings-row" style={{ alignItems: 'center', gap: 12 }}>
+    <div className="gg-doctor-panel">
+      <div className="gg-settings-row">
         <button className="gg-btn gg-btn-primary" onClick={() => void run()} disabled={loading}>
           {loading ? 'Проверка…' : '🩺 Проверка (Doctor)'}
         </button>
@@ -1047,7 +1047,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
   const [coreUserText, setCoreUserText] = useState('')
   const [coreMemorySaved, setCoreMemorySaved] = useState(false)
   const [currentLang, setCurrentLang] = useState('en')
-  const { theme, setTheme, squareCorners, setSquareCorners } = useTheme()
+  const { theme, setTheme } = useTheme()
   const { uiScalePercent, setUiScalePercent } = useUiScale()
   const {
     notifyPrefs,
@@ -1467,7 +1467,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
               className="gg-input"
               value={yDirectLogin}
               onChange={e => setYDirectLogin(e.target.value)}
-              placeholder="Login клиента — для агентских аккаунтов"
+              placeholder="Login проекта в Директе — для агентских аккаунтов"
               spellCheck={false}
             />
           </div>
@@ -1491,7 +1491,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
             />
           </div>
           <div className="gg-settings-hint">
-            Используется агентом для шеринга артефактов с клиентами:
+            Используется агентом для публичных ссылок на артефакты проекта:
             upload_file → get_public_url → отправка ссылки в TG.
             Загрузка идёт в <code>/Verstak/{`{дата}`}/</code> чтобы не засорять корень Диска.
           </div>
@@ -1999,15 +1999,6 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
               </button>
             ))}
           </div>
-          <label className="gg-theme-square" style={{ marginBottom: 12 }}>
-            <input
-              type="checkbox"
-              checked={squareCorners}
-              onChange={(e) => void setSquareCorners(e.target.checked)}
-            />
-            <span>Прямые углы (без скруглений)</span>
-          </label>
-
           <div className="gg-settings-section-title" style={{ marginTop: 8 }}>{t.settings.uiScale}</div>
           <div className="gg-ui-scale-block">
             <div className="gg-ui-scale-head">
@@ -2777,7 +2768,7 @@ function ModelsPage(props: ModelsPageProps) {
           return (
             <div
               key={p.id}
-              className={`gg-models-card ${authorized ? 'is-ready' : 'is-locked'} ${isActiveProvider ? 'is-active-provider' : ''}`}
+              className={`gg-models-card ${isActiveProvider ? 'is-current' : ''}`}
             >
               <div className="gg-models-card-head">
                 <div className="gg-models-card-title">
@@ -2823,17 +2814,17 @@ function ModelsPage(props: ModelsPageProps) {
                   )}
                   {list.map(e => {
                     const enabled = enabledModels.has(e.key)
-                    const isDefault = activeProvider === p.id && (models[p.id] ?? p.defaultModel) === e.model
+                    const isCurrentModel = isActiveProvider && (models[p.id] ?? p.defaultModel) === e.model
                     return (
-                      <div key={e.key} className={`gg-models-row ${enabled ? 'is-on' : ''}`}>
+                      <div key={e.key} className={`gg-models-row ${isCurrentModel ? 'is-current' : ''}`}>
                         <button
                           type="button"
                           className="gg-models-row-main"
                           onClick={() => setDefault(p.id, e.model)}
-                          title="Сделать моделью по умолчанию для провайдера"
+                          title="Сделать текущей моделью в чате"
                         >
                           <span className="gg-models-row-name">{e.model}</span>
-                          {isDefault && <span className="gg-models-row-default">по умолчанию</span>}
+                          {isCurrentModel && <span className="gg-models-row-current">Текущий</span>}
                           <span className="gg-models-row-tags">
                             {e.tags.map(tag => (
                               <span key={tag} className={`gg-mpal-tag is-${tag.toLowerCase().replace(/\$/g, 'd')}`}>{tag}</span>

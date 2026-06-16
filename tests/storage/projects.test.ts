@@ -47,6 +47,17 @@ describe('projects', () => {
     expect(projects.list().map(p => p.name)).toEqual(['Alpha', 'Mike', 'Zeta'])
   })
 
+  it('list puts Cyrillic before Latin', () => {
+    db = openDb(join(dir, 't4.db'))
+    const projects = createProjects(db)
+    projects.upsert('C:\\Alpha')
+    projects.upsert('C:\\Ostov')
+    projects.upsert('C:\\Avtor')
+    projects.updateMeta('C:\\Ostov', { name: 'ГК Остов' })
+    projects.updateMeta('C:\\Avtor', { name: 'Автор' })
+    expect(projects.list().map(p => p.name)).toEqual(['Автор', 'ГК Остов', 'Alpha'])
+  })
+
   it('updateMeta renames and stores icon path without touching folder', () => {
     db = openDb(join(dir, 't2.db'))
     const projects = createProjects(db)

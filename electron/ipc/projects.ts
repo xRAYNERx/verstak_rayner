@@ -1,12 +1,40 @@
 import { app, dialog, ipcMain, BrowserWindow, shell } from 'electron'
+import { mkdirSync } from 'fs'
+import { join } from 'path'
 import { setActiveProjectPath } from '../state/project-state'
 import { ensureUserLayer } from '../ai/user-layer'
 import { warmProjectMaps } from '../ai/project-map'
+import type { Database } from 'better-sqlite3'
 import type { Projects } from '../storage/projects'
+import { deleteProjectDirectory, purgeProjectAppData } from '../storage/project-purge'
+import {
+  clientFolderExists,
+  getClientsRoot,
+  normalizeClientFolderSlug,
+  scaffoldClientFolder,
+  validateClientFolderSlug
+} from '../storage/clients-root'
 import { deleteProjectIconFile, importProjectIcon } from '../storage/project-icons'
 import { forgetMemorizedProject } from './ai'
+import type { ProjectMeta } from '../storage/projects'
 
-export function registerProjectIpc(projects: Projects): void {
+export type CreateClientResult =
+  | { ok: true; path: string; meta: ProjectMeta }
+  | { ok: false; error: string }
+
+async function pickImageFile(win: BrowserWindow): Promise<string | null> {
+  const result = await dialog.showOpenDialog(win, {
+    title: 'Изображение проекта',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Изображения', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'ico'] }
+    ]
+  })
+  if (result.canceled || result.filePaths.length === 0) return null
+  return result.filePaths[0]
+}
+
+export function registerProjectIpc(projects: Projects, db: Database): void {
   ipcMain.handle('projects:pick', async () => {
     const win = BrowserWindow.getFocusedWindow()
     if (!win) return null
@@ -46,6 +74,59 @@ export function registerProjectIpc(projects: Projects): void {
     return true
   })
 
+  ipcMain.handle('projects:clients-root', () => getClientsRoot())
+
+  ipcMain.handle('projects:pick-image', async () => {
+    const win = BrowserWindow.getFocusedWindow()
+    if (!win) return null
+    return pickImageFile(win)
+  })
+
+  ipcMain.handle('projects:create', async (_e, input: {
+    name?: string
+    folderSlug?: string
+    iconSourcePath?: string | null
+  }): Promise<CreateClientResult> => {
+    const displayName = (input.name ?? '').trim()
+    if (!displayName) return { ok: false, error: 'Укажите название проекта' }
+
+    const slug = normalizeClientFolderSlug(input.folderSlug ?? '')
+    const slugError = validateClientFolderSlug(slug)
+    if (slugError) return { ok: false, error: slugError }
+
+    const clientsRoot = getClientsRoot()
+    mkdirSync(clientsRoot, { recursive: true })
+
+    if (clientFolderExists(clientsRoot, slug)) {
+      return { ok: false, error: `Папка «${slug}» уже есть в ${clientsRoot}` }
+    }
+
+    const projectPath = join(clientsRoot, slug)
+    try {
+      mkdirSync(projectPath, { recursive: false })
+      scaffoldClientFolder(clientsRoot, projectPath, displayName, slug)
+      void ensureUserLayer(projectPath).catch(() => { /* non-critical */ })
+    } catch {
+      return { ok: false, error: 'Не удалось создать папку проекта на диске' }
+    }
+
+    projects.upsert(projectPath)
+    let meta = projects.updateMeta(projectPath, { name: displayName })
+    if (!meta) return { ok: false, error: 'Проект создан на диске, но не записался в базу' }
+
+    if (input.iconSourcePath) {
+      try {
+        const iconPath = importProjectIcon(projectPath, input.iconSourcePath)
+        meta = projects.updateMeta(projectPath, { iconPath }) ?? meta
+      } catch {
+        /* icon optional — client still created */
+      }
+    }
+
+    setActiveProjectPath(projectPath)
+    return { ok: true, path: projectPath, meta }
+  })
+
   ipcMain.handle('projects:list', () => projects.list())
   ipcMain.handle('projects:rename', (_e, path: string, name: string) => projects.rename(path, name))
   ipcMain.handle('projects:update-meta', (_e, path: string, patch: { name?: string }) => {
@@ -76,10 +157,24 @@ export function registerProjectIpc(projects: Projects): void {
     if (existing?.iconPath) deleteProjectIconFile(existing.iconPath)
     return projects.updateMeta(projectPath, { iconPath: null })
   })
-  ipcMain.handle('projects:remove', (_e, path: string) => {
+  ipcMain.handle('projects:remove', (_e, path: string, options?: { deleteData?: boolean }) => {
     const existing = projects.list().find(p => p.path === path)
-    if (existing?.iconPath) deleteProjectIconFile(existing.iconPath)
+    if (!existing) return { ok: false, error: 'Проект не найден в списке' }
+
+    if (existing.iconPath) deleteProjectIconFile(existing.iconPath)
+
+    if (options?.deleteData) {
+      try {
+        purgeProjectAppData(db, path)
+        deleteProjectDirectory(path)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Не удалось удалить данные проекта'
+        return { ok: false, error: msg }
+      }
+    }
+
     projects.remove(path)
     forgetMemorizedProject(path)
+    return { ok: true }
   })
 }

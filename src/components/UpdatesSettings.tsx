@@ -1,7 +1,22 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useT } from '../i18n'
 
-type Status = 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'ready' | 'error'
+type Status = 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'ready' | 'error' | 'pending'
+
+function friendlyUpdateError(raw: string, fallback: string, noRelease: string): string {
+  if (!raw) return fallback
+  const m = raw.toLowerCase()
+  if (
+    m.includes('404')
+    || m.includes('not found')
+    || m.includes('latest.yml')
+    || m.includes('no published')
+    || m.includes('cannot find')
+  ) {
+    return noRelease
+  }
+  return raw.length > 160 ? fallback : raw
+}
 
 export function UpdatesSettings() {
   const t = useT()
@@ -12,10 +27,44 @@ export function UpdatesSettings() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    const applyPhase = (
+      phase: string,
+      v?: string,
+      p?: number,
+      err?: string,
+      pendingRelease?: boolean,
+    ) => {
+      if (phase === 'available') {
+        if (v) setRemoteVersion(v)
+        setStatus(pendingRelease ? 'pending' : 'available')
+        setError('')
+      } else if (phase === 'downloading') {
+        if (v) setRemoteVersion(v)
+        setStatus('downloading')
+        if (p != null) setPercent(p)
+        setError('')
+      } else if (phase === 'downloaded') {
+        if (v) setRemoteVersion(v)
+        setStatus('ready')
+        setError('')
+      } else if (phase === 'not-available') {
+        setStatus('current')
+        setError('')
+      } else if (phase === 'checking') {
+        setStatus('checking')
+      } else if (phase === 'error') {
+        setError(friendlyUpdateError(err || '', t.settings.updateError, t.settings.updateNoRelease))
+        setStatus('error')
+      }
+    }
+
     void window.api.app.getVersion().then(setVersion)
-    const offAvailable = window.api.updater.onAvailable(({ version: v }) => {
+    void window.api.updater.getState().then(s => applyPhase(s.phase, s.version, s.percent, s.error, s.pendingRelease))
+
+    const offState = window.api.updater.onState(s => applyPhase(s.phase, s.version, s.percent, s.error, s.pendingRelease))
+    const offAvailable = window.api.updater.onAvailable(({ version: v, pendingRelease }) => {
       setRemoteVersion(v)
-      setStatus('downloading')
+      setStatus(pendingRelease ? 'pending' : 'available')
     })
     const offProgress = window.api.updater.onProgress(({ percent: p }) => {
       setPercent(p)
@@ -28,11 +77,17 @@ export function UpdatesSettings() {
     const offNotAvailable = window.api.updater.onNotAvailable(() => {
       setStatus('current')
     })
+    const offError = window.api.updater.onError(({ error: e }) => {
+      setError(friendlyUpdateError(e, t.settings.updateError, t.settings.updateNoRelease))
+      setStatus('error')
+    })
     return () => {
+      offState()
       offAvailable()
       offProgress()
       offDownloaded()
       offNotAvailable()
+      offError()
     }
   }, [])
 
@@ -41,7 +96,7 @@ export function UpdatesSettings() {
     setError('')
     const result = await window.api.updater.check()
     if (result.error) {
-      setError(result.error)
+      setError(friendlyUpdateError(result.error, t.settings.updateError, t.settings.updateNoRelease))
       setStatus('error')
       return
     }
@@ -50,7 +105,7 @@ export function UpdatesSettings() {
       return
     }
     if (result.version) setRemoteVersion(result.version)
-    setStatus('downloading')
+    setStatus(result.pendingRelease ? 'pending' : 'available')
   }, [])
 
   return (
@@ -70,6 +125,12 @@ export function UpdatesSettings() {
             {status === 'checking' ? t.settings.checkingUpdates : t.settings.checkUpdates}
           </button>
           {status === 'current' && <span className="gg-settings-hint">{t.settings.upToDate}</span>}
+          {status === 'available' && remoteVersion && (
+            <span className="gg-settings-hint">{t.settings.updateAvailable.replace('{version}', remoteVersion)}</span>
+          )}
+          {status === 'pending' && remoteVersion && (
+            <span className="gg-settings-hint">{t.settings.updatePendingRelease.replace('{version}', remoteVersion)}</span>
+          )}
           {status === 'downloading' && remoteVersion && (
             <span className="gg-settings-hint">
               {t.settings.downloadingUpdate.replace('{version}', remoteVersion).replace('{percent}', String(percent))}

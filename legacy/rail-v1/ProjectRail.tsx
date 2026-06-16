@@ -9,9 +9,9 @@ import { CreateClientModal } from './CreateClientModal'
 import { useT } from '../i18n'
 
 const RAIL_EXPANDED_KEY = 'gg-rail-expanded'
-const RAIL_WIDTH_COLLAPSED = '76px'
+const RAIL_WIDTH_COLLAPSED = '68px'
 const RAIL_WIDTH_EXPANDED = '248px'
-const SHELL_MS = 280
+const SHELL_MS = 360
 
 function readRailExpanded(): boolean {
   try {
@@ -39,22 +39,21 @@ interface ProjectChipProps {
   active: boolean
   unread: boolean
   streaming: boolean
-  shellExpanded: boolean
-  contentExpanded: boolean
+  expanded: boolean
   onClick: () => void
   onSettings: () => void
 }
 
-function ProjectChip({ project, active, unread, streaming, shellExpanded, contentExpanded, onClick, onSettings }: ProjectChipProps) {
+function ProjectChip({ project, active, unread, streaming, expanded, onClick, onSettings }: ProjectChipProps) {
   const [hover, setHover] = useState(false)
   const status = streaming ? 'streaming' : unread ? 'unread' : null
 
   return (
     <div
-      className={`gg-rail-chip ${active ? 'is-active' : ''} ${shellExpanded ? 'is-shell-expanded' : ''} ${contentExpanded ? 'is-expanded' : ''}`}
+      className={`gg-rail-chip ${active ? 'is-active' : ''} ${expanded ? 'is-expanded' : ''}`}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      title={contentExpanded ? project.path : `${project.name}\n${project.path}`}
+      title={expanded ? project.path : `${project.name}\n${project.path}`}
     >
       <button
         type="button"
@@ -70,7 +69,7 @@ function ProjectChip({ project, active, unread, streaming, shellExpanded, conten
             />
           )}
         </span>
-        <span className="gg-rail-chip-text" aria-hidden={!contentExpanded}>
+        <span className="gg-rail-chip-text" aria-hidden={!expanded}>
           <span className="gg-rail-label">{project.name}</span>
         </span>
       </button>
@@ -90,22 +89,18 @@ function ProjectChip({ project, active, unread, streaming, shellExpanded, conten
 }
 
 interface ProjectRailProps {
-  onOpenProjectSettings: (project: ProjectMeta) => void
-  onOpenAppSettings: () => void
   sidebarOpen: boolean
   onToggleSidebar: () => void
+  onOpenProjectSettings: (project: ProjectMeta) => void
+  onOpenAppSettings: () => void
 }
 
-export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarOpen, onToggleSidebar }: ProjectRailProps) {
+export function ProjectRail({ sidebarOpen, onToggleSidebar, onOpenProjectSettings, onOpenAppSettings }: ProjectRailProps) {
   const t = useT()
   const { path, projectList, sessions, setProject, refreshProjectList } = useProject()
   const [bootstrapped, setBootstrapped] = useState(false)
-  const initialRailExpanded = readRailExpanded()
-  const [railExpanded, setRailExpanded] = useState(initialRailExpanded)
-  /** Оболочка rail (padding, ширина toolbar) — сразу при открытии, с задержкой при закрытии */
-  const [shellExpanded, setShellExpanded] = useState(initialRailExpanded)
-  /** Контент rail (подписи, строка кнопок) — с задержкой в обе стороны */
-  const [contentExpanded, setContentExpanded] = useState(initialRailExpanded)
+  const [railExpanded, setRailExpanded] = useState(readRailExpanded)
+  const [toolbarRow, setToolbarRow] = useState(readRailExpanded)
   const [projectQuery, setProjectQuery] = useState('')
   const [showCreateClient, setShowCreateClient] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -116,8 +111,6 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
   )
   const showSearch = projectList.length >= 2
   const hasActiveFilter = projectQuery.trim().length > 0
-  const showSearchTool = !contentExpanded && showSearch
-  const toolbarToolCount = 2 + (showSearchTool ? 1 : 0)
 
   function openSearch() {
     setRailExpanded(true)
@@ -133,13 +126,10 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
 
   useEffect(() => {
     if (railExpanded) {
-      setShellExpanded(true)
-      setContentExpanded(true)
-      return
+      const id = window.setTimeout(() => setToolbarRow(true), SHELL_MS)
+      return () => clearTimeout(id)
     }
-    setContentExpanded(false)
-    const shellId = window.setTimeout(() => setShellExpanded(false), SHELL_MS)
-    return () => clearTimeout(shellId)
+    setToolbarRow(false)
   }, [railExpanded])
 
   useEffect(() => {
@@ -172,7 +162,7 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
 
   return (
     <>
-    <div className={`gg-rail ${shellExpanded ? 'is-shell-expanded' : ''} ${contentExpanded ? 'is-expanded' : ''}`}>
+    <div className={`gg-rail ${railExpanded ? 'is-expanded' : ''}`}>
       <div className="gg-rail-top">
         <button
           type="button"
@@ -182,12 +172,12 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
         >
           <img src={iconUrl} alt="Verstak" />
         </button>
-        <span className="gg-rail-brand-name" aria-hidden={!contentExpanded}>VERSTAK</span>
+        <span className="gg-rail-brand-name" aria-hidden={!railExpanded}>Verstak</span>
       </div>
 
       <div
-        className={`gg-rail-toolbar ${shellExpanded ? 'is-expanded is-row' : ''}`}
-        data-tool-count={toolbarToolCount}
+        className={`gg-rail-toolbar ${railExpanded ? 'is-expanded' : ''} ${toolbarRow ? 'is-row' : ''}`}
+        data-tool-count={showSearch ? 3 : 2}
       >
         <button
           type="button"
@@ -211,13 +201,24 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
             <polyline points="9 6 15 12 9 18" />
           </svg>
         </button>
-        {showSearchTool && (
+        <button
+          type="button"
+          className={`gg-rail-tool ${sidebarOpen ? 'is-on' : ''}`}
+          onClick={onToggleSidebar}
+          title={sidebarOpen ? 'Скрыть боковую панель (Ctrl+B)' : 'Показать боковую панель (Ctrl+B)'}
+          aria-pressed={sidebarOpen}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <line x1="9" y1="4" x2="9" y2="20" />
+          </svg>
+        </button>
+        {showSearch && (
           <button
             type="button"
-            className={`gg-rail-tool gg-rail-tool-search ${hasActiveFilter ? 'is-on' : ''}`}
+            className={`gg-rail-tool ${hasActiveFilter ? 'is-on' : ''}`}
             onClick={openSearch}
             title={t.rail.search}
-            aria-label={t.rail.search}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <circle cx="11" cy="11" r="7" />
@@ -225,22 +226,9 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
             </svg>
           </button>
         )}
-        <button
-          type="button"
-          className={`gg-rail-tool gg-rail-tool-sidebar ${sidebarOpen ? 'is-on' : ''}`}
-          onClick={onToggleSidebar}
-          title={sidebarOpen ? t.rail.hideNavPanel : t.rail.showNavPanel}
-          aria-pressed={sidebarOpen}
-          aria-label={sidebarOpen ? t.rail.hideNavPanel : t.rail.showNavPanel}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <rect x="3" y="4" width="18" height="16" rx="2" />
-            <line x1="9" y1="4" x2="9" y2="20" />
-          </svg>
-        </button>
       </div>
 
-      <div className="gg-rail-expand-panel" aria-hidden={!contentExpanded}>
+      <div className="gg-rail-expand-panel" aria-hidden={!railExpanded}>
         <div className="gg-rail-expand-inner">
           <div className="gg-rail-section-head">
             <span className="gg-rail-section-title">{t.rail.clients}</span>
@@ -261,7 +249,7 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
                 onChange={e => setProjectQuery(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Escape') setProjectQuery('') }}
                 aria-label={t.rail.search}
-                tabIndex={contentExpanded ? 0 : -1}
+                tabIndex={railExpanded ? 0 : -1}
               />
               {hasActiveFilter && (
                 <button
@@ -269,7 +257,7 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
                   className="gg-rail-search-clear"
                   onClick={() => setProjectQuery('')}
                   title={t.rail.clearSearch}
-                  tabIndex={contentExpanded ? 0 : -1}
+                  tabIndex={railExpanded ? 0 : -1}
                 >×</button>
               )}
             </div>
@@ -290,8 +278,7 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
               active={path === p.path}
               unread={!!session?.hasUnread}
               streaming={!!session?.isStreaming}
-              shellExpanded={shellExpanded}
-              contentExpanded={contentExpanded}
+              expanded={railExpanded}
               onClick={() => { if (path !== p.path) void setProject(p.path) }}
               onSettings={() => onOpenProjectSettings(p)}
             />
@@ -304,12 +291,12 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
           title={t.rail.createClient}
         >
           <span className="gg-rail-add-icon" aria-hidden>+</span>
-          <span className="gg-rail-add-label" aria-hidden={!contentExpanded}>{t.rail.createClient}</span>
+          <span className="gg-rail-add-label" aria-hidden={!railExpanded}>{t.rail.createClient}</span>
         </button>
       </div>
 
       <div className="gg-rail-footer">
-        <UpdateNotification railExpanded={contentExpanded} />
+        <UpdateNotification railExpanded={railExpanded} />
         <button
           type="button"
           className="gg-rail-app-settings"
@@ -318,7 +305,7 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
           aria-label={t.settings.title}
         >
           <SettingsGearIcon size={18} />
-          <span className="gg-rail-app-settings-label" aria-hidden={!contentExpanded}>{t.settings.title}</span>
+          <span className="gg-rail-app-settings-label" aria-hidden={!railExpanded}>{t.settings.title}</span>
         </button>
       </div>
     </div>

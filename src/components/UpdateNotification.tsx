@@ -1,55 +1,102 @@
 import { useEffect, useState } from 'react'
 import { useT } from '../i18n'
 
+type Phase = 'idle' | 'downloading' | 'ready'
+
+interface Props {
+  /** Развёрнут ли левый rail — влияет на подпись и ширину. */
+  railExpanded: boolean
+}
+
 /**
- * Полоска внизу экрана — прогресс скачивания и кнопка «Установить».
+ * Компактный индикатор скачивания / готовности обновления — над кнопкой «Настройки» в rail.
  */
-export function UpdateNotification() {
+export function UpdateNotification({ railExpanded }: Props) {
   const t = useT()
-  const [state, setState] = useState<'idle' | 'downloading' | 'ready'>('idle')
+  const [phase, setPhase] = useState<Phase>('idle')
   const [version, setVersion] = useState('')
   const [percent, setPercent] = useState(0)
 
   useEffect(() => {
-    const offAvailable = window.api.updater.onAvailable(({ version: v }) => {
-      setVersion(v)
-      setState('downloading')
-    })
+    const apply = (state: { phase: string; version?: string; percent?: number; pendingRelease?: boolean }) => {
+      if (state.phase === 'downloaded' && state.version) {
+        setVersion(state.version)
+        setPhase('ready')
+        setPercent(100)
+      } else if (state.phase === 'downloading') {
+        if (state.version) setVersion(state.version)
+        setPhase('downloading')
+        if (state.percent != null) setPercent(state.percent)
+      }
+    }
+
+    void window.api.updater.getState().then(apply).catch(() => {})
+
+    const offState = window.api.updater.onState(apply)
     const offProgress = window.api.updater.onProgress(({ percent: p }) => {
       setPercent(p)
+      setPhase('downloading')
     })
     const offDownloaded = window.api.updater.onDownloaded(({ version: v }) => {
       setVersion(v)
-      setState('ready')
+      setPhase('ready')
+      setPercent(100)
     })
+    const offAvailable = window.api.updater.onAvailable(({ version: v, pendingRelease }) => {
+      if (!pendingRelease) {
+        setVersion(v)
+        setPhase('downloading')
+      }
+    })
+
     return () => {
-      offAvailable()
+      offState()
       offProgress()
       offDownloaded()
+      offAvailable()
     }
   }, [])
 
-  if (state === 'idle') return null
+  if (phase === 'idle') return null
+
+  const title =
+    phase === 'ready'
+      ? t.updates.readyBar.replace('{version}', version)
+      : t.updates.downloadingBar.replace('{version}', version).replace('{percent}', String(percent))
+
+  const label =
+    phase === 'ready'
+      ? (railExpanded
+        ? t.updates.readyBar.replace('{version}', version)
+        : t.updates.railReadyShort)
+      : (railExpanded
+        ? t.updates.downloadingBar.replace('{version}', version).replace('{percent}', String(percent))
+        : t.updates.railPercent.replace('{percent}', String(percent)))
 
   return (
-    <div className="gg-update-bar">
-      {state === 'downloading' && (
-        <>
-          <span>
-            {t.updates.downloadingBar
-              .replace('{version}', version)
-              .replace('{percent}', String(percent))}
-          </span>
-          <div className="gg-update-progress" style={{ width: `${percent}%` }} />
-        </>
-      )}
-      {state === 'ready' && (
-        <>
-          <span>{t.updates.readyBar.replace('{version}', version)}</span>
-          <button type="button" onClick={() => void window.api.updater.install()}>
-            {t.updates.install}
+    <div
+      className={`gg-update-rail ${railExpanded ? 'is-expanded' : ''}`}
+      title={title}
+      role="status"
+    >
+      <div className="gg-update-rail-row">
+        <span className="gg-update-rail-icon" aria-hidden>⬆</span>
+        <span className="gg-update-rail-label">{label}</span>
+        {phase === 'ready' && (
+          <button
+            type="button"
+            className="gg-update-rail-install"
+            onClick={() => void window.api.updater.install()}
+            title={t.updates.install}
+          >
+            {railExpanded ? t.updates.install : '↵'}
           </button>
-        </>
+        )}
+      </div>
+      {phase === 'downloading' && (
+        <div className="gg-update-rail-track" aria-hidden>
+          <div className="gg-update-rail-fill" style={{ width: `${percent}%` }} />
+        </div>
       )}
     </div>
   )

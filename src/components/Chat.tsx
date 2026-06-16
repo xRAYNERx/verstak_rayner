@@ -24,6 +24,7 @@ import iconUrl from '../assets/icon.png'
 import { useT } from '../i18n'
 import { notifyResponseReady } from '../lib/response-notify'
 
+
 function chatLabel(chatId: number): string {
   const title = useProject.getState().chatSessions.find(s => s.id === chatId)?.title
   return title ? `Ответ готов — ${title}` : 'Ответ готов'
@@ -31,6 +32,16 @@ function chatLabel(chatId: number): string {
 
 const MAX_BYTES_PER_FILE = 5 * 1024 * 1024  // 5 MB
 const MAX_ATTACHMENTS = 8
+const CHAT_AUTO_SCROLL_KEY = 'gg.chatAutoScroll'
+
+function readAutoScrollPref(): boolean {
+  try {
+    const v = localStorage.getItem(CHAT_AUTO_SCROLL_KEY)
+    if (v === '0') return false
+    if (v === '1') return true
+  } catch { /* private mode */ }
+  return true
+}
 
 const ACCEPTED_MIME_PREFIXES = ['image/', 'text/', 'application/pdf', 'application/json']
 
@@ -42,6 +53,7 @@ interface ChatProps {
   onSelectRightPanel: (panel: RightPanel) => void
   /** Open the right-docked parallel chat (lazily created by App). */
   onOpenSideChat: () => void
+
 }
 
 function formatSize(bytes: number): string {
@@ -115,6 +127,13 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
   const [dragOver, setDragOver] = useState(false)
   const [warning, setWarning] = useState<string | null>(null)
   const streamRef = useRef<HTMLDivElement>(null)
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(readAutoScrollPref)
+  const autoScrollEnabledRef = useRef(autoScrollEnabled)
+  /** Пока true и автопрокрутка вкл — новые сообщения тянут чат вниз. */
+  const stickToBottomRef = useRef(true)
+  /** Отправка своего сообщения — принудительно липнем к низу, onScroll не сбрасывает. */
+  const pendingPinToBottomRef = useRef(false)
+  const [showScrollDown, setShowScrollDown] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const screenshotCounter = useRef(0)
@@ -466,10 +485,99 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     return off
   }, [updateLastAssistant, setStreaming])
 
-  // Autoscroll on new content
   useEffect(() => {
-    if (streamRef.current) streamRef.current.scrollTop = streamRef.current.scrollHeight
-  }, [messages])
+    autoScrollEnabledRef.current = autoScrollEnabled
+  }, [autoScrollEnabled])
+
+  const SCROLL_STICK_THRESHOLD = 72
+
+  function isNearBottom(el: HTMLElement): boolean {
+    return el.scrollHeight - el.scrollTop - el.clientHeight <= SCROLL_STICK_THRESHOLD
+  }
+
+  function applyScrollToBottom(behavior: ScrollBehavior = 'auto') {
+    const el = streamRef.current
+    if (!el) return
+    if (behavior === 'smooth') {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+    } else {
+      el.scrollTop = el.scrollHeight
+    }
+  }
+
+  /** После commit React — иначе scrollHeight ещё старый. */
+  function pinChatToBottom(behavior: ScrollBehavior = 'auto') {
+    stickToBottomRef.current = true
+    setShowScrollDown(false)
+    applyScrollToBottom(behavior)
+    requestAnimationFrame(() => {
+      applyScrollToBottom(behavior)
+      requestAnimationFrame(() => applyScrollToBottom(behavior))
+    })
+  }
+
+  function armAutoScrollForOutgoing() {
+    if (!autoScrollEnabledRef.current) return
+    stickToBottomRef.current = true
+    pendingPinToBottomRef.current = true
+    setShowScrollDown(false)
+  }
+
+  function scrollChatToBottom(behavior: ScrollBehavior = 'smooth') {
+    if (autoScrollEnabledRef.current) stickToBottomRef.current = true
+    setShowScrollDown(false)
+    pinChatToBottom(behavior)
+  }
+
+  function toggleAutoScroll() {
+    setAutoScrollEnabled(prev => {
+      const next = !prev
+      try { localStorage.setItem(CHAT_AUTO_SCROLL_KEY, next ? '1' : '0') } catch { /* ignore */ }
+      if (!next) {
+        stickToBottomRef.current = false
+      } else {
+        const el = streamRef.current
+        stickToBottomRef.current = el ? isNearBottom(el) : true
+      }
+      return next
+    })
+  }
+
+  useEffect(() => {
+    if (autoScrollEnabled) {
+      stickToBottomRef.current = true
+      setShowScrollDown(false)
+      const el = streamRef.current
+      if (el) el.scrollTop = el.scrollHeight
+    } else {
+      stickToBottomRef.current = false
+    }
+  }, [activeChatId, activePath, autoScrollEnabled])
+
+  useEffect(() => {
+    if (!autoScrollEnabled) return
+    if (!stickToBottomRef.current && !pendingPinToBottomRef.current) return
+    pendingPinToBottomRef.current = false
+    pinChatToBottom('auto')
+  }, [messages, autoScrollEnabled])
+
+  useEffect(() => {
+    const el = streamRef.current
+    if (!el) return
+    function onScroll() {
+      if (!el) return
+      const atBottom = isNearBottom(el)
+      if (pendingPinToBottomRef.current) {
+        setShowScrollDown(!atBottom && messages.length > 0)
+        return
+      }
+      if (autoScrollEnabled) stickToBottomRef.current = atBottom
+      setShowScrollDown(!atBottom && messages.length > 0)
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [messages.length, autoScrollEnabled])
 
   // Refresh undo count when project changes / after each assistant turn settles
   useEffect(() => {
@@ -527,6 +635,15 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     ta.style.height = Math.min(ta.scrollHeight, 220) + 'px'
   }
   useEffect(autoGrow, [input])
+
+  // Composer должен быть готов к вводу сразу после открытия проекта/чата,
+  // не дожидаясь гидратации тяжёлой истории из SQLite.
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      textareaRef.current?.focus({ preventScroll: true })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [activePath, activeChatId])
 
   // Sidecar Terminal Intelligence inject — TerminalErrorToast диспатчит
   // CustomEvent('gg-inject-prompt') когда юзер жмёт «Fix in chat».
@@ -674,6 +791,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     const store = useProject.getState()
     const newBudget = Math.min(exhausted.maxBudget, exhausted.used + exhausted.suggestedAdd)
     setExhausted(null)
+    armAutoScrollForOutgoing()
     addMessage({ role: 'assistant', content: '' })
     setStreaming(true)
     // Send everything except the empty placeholder we just pushed
@@ -746,6 +864,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         console.warn('[chat] skill loaders failed:', err)
       }
     }
+    armAutoScrollForOutgoing()
     addMessage({ role: 'user', content: enrichedText, attachments: userAttachments })
     const activeChatId = ctx.activeChatId
     if (path && activeChatId) {
@@ -869,8 +988,9 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
               <span className="gg-chat-project-chat">{activeChatTitle}</span>
             </>
           )}
-          {/* Меню панелей — в правом верхнем углу, как у Codex: файлы / терминал / параллельный чат */}
-          <div className="gg-panel-menu gg-chat-project-action" ref={panelMenuRef}>
+          <div className="gg-chat-project-actions">
+          {/* Меню панелей — файлы / терминал / параллельный чат */}
+          <div className="gg-panel-menu" ref={panelMenuRef}>
             <button
               type="button"
               className={`gg-terminal-toggle ${rightPanel !== 'none' ? 'is-open' : ''}`}
@@ -914,10 +1034,12 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
               </div>
             )}
           </div>
+          </div>
         </div>
       )}
 
-      <div className="gg-chat-stream" ref={streamRef}>
+      <div className="gg-chat-stream-area">
+        <div className="gg-chat-stream" ref={streamRef}>
         <div className="gg-chat-stream-inner">
         {/* Crash-resume: баннер «сессия прервана» (если есть зависшие прогоны). */}
         <ResumeBanner />
@@ -1192,6 +1314,20 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
           )
         })}
         </div>
+        </div>
+        {showScrollDown && (
+          <button
+            type="button"
+            className="gg-chat-scroll-down"
+            onClick={() => scrollChatToBottom('smooth')}
+            title={t.chat.scrollToBottom}
+            aria-label={t.chat.scrollToBottom}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+        )}
       </div>
 
       <TimelineBar />
@@ -1403,6 +1539,15 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
                 <span className="gg-undo-count">{undoCount}</span>
               </button>
             )}
+            <button
+              type="button"
+              className={`gg-auto-scroll-btn ${autoScrollEnabled ? 'is-on' : 'is-off'}`}
+              onClick={toggleAutoScroll}
+              title={autoScrollEnabled ? t.chat.autoScrollOn : t.chat.autoScrollOff}
+              aria-pressed={autoScrollEnabled}
+            >
+              {autoScrollEnabled ? t.chat.autoScrollLabelOn : t.chat.autoScrollLabelOff}
+            </button>
             <SkillPicker />
             <MultiAgentPicker onInject={injectTemplate} />
             <CheckpointButton />

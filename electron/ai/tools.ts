@@ -413,7 +413,7 @@ export const TOOL_DEFS: ToolDefinition[] = [
   },
   {
     name: 'generate_html',
-    description: 'Сохранить артефакт в формате HTML (КП, аудит, отчёт). Файл попадает в .verstak/artifacts/{YYYY-MM-DD}/ и открывается в preview pane. Используй для клиентских артефактов где важна визуальная структура.',
+    description: 'Сохранить артефакт в формате HTML (КП, аудит, отчёт). Файл попадает в .verstak/artifacts/{YYYY-MM-DD}/ и открывается в preview pane. Используй для артефактов проекта, где важна визуальная структура.',
     parameters: {
       type: 'object',
       properties: {

@@ -1,6 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { useProject, type ViewId } from '../store/projectStore'
 import { ModelPicker } from './ModelPicker'
+import { CreateClientModal } from './CreateClientModal'
 import { useT } from '../i18n'
 import type { FileNode } from '../types/api'
 
@@ -339,11 +340,13 @@ const DevTaskIcon = (
 
 interface SidebarProps {
   onOpenSettings: () => void
+  'aria-hidden'?: boolean
 }
 
-export function Sidebar({ onOpenSettings }: SidebarProps) {
-  const { path, tree, setProject, activeView, setActiveView } = useProject()
+export function Sidebar({ onOpenSettings, 'aria-hidden': ariaHidden }: SidebarProps) {
+  const { path, tree, setProject, activeView, setActiveView, refreshProjectList } = useProject()
   const t = useT()
+  const [showCreateClient, setShowCreateClient] = useState(false)
 
   const NAV: NavItem[] = [
     { id: 'tasks',    label: t.sidebar.tasks,    icon: TasksIcon },
@@ -363,26 +366,26 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
     { id: 'feedback', label: t.sidebar.feedback, icon: FeedbackIcon }
   ]
 
-  async function openProject() {
-    const picked = await window.api.projects.pick()
-    if (picked) await setProject(picked)
+  async function handleClientOpened(clientPath: string) {
+    await setProject(clientPath)
+    await refreshProjectList()
   }
 
   const shortPath = path ? path.replace(/^.*[\\/]/, '') : null
 
   return (
-    <aside className="gg-sidebar">
+    <aside className="gg-sidebar" aria-hidden={ariaHidden}>
       <div className="gg-sidebar-scroll">
         <div className="gg-sidebar-section">
           <div className="gg-sidebar-section-title">{t.sidebar.project}</div>
         </div>
         <button
           className={`gg-project-button ${path ? 'has-project' : ''}`}
-          onClick={openProject}
+          onClick={() => setShowCreateClient(true)}
         >
           <span>{path ? '📁' : '＋'}</span>
           <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {shortPath ?? t.sidebar.openFolder}
+            {shortPath ?? t.rail.createClient}
           </span>
         </button>
         {path && <div className="gg-project-path" title={path}>{path}</div>}
@@ -412,6 +415,12 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
       <div className="gg-sidebar-footer">
         <ModelPicker variant="footer" onOpenSettings={onOpenSettings} />
       </div>
+      {showCreateClient && (
+        <CreateClientModal
+          onClose={() => setShowCreateClient(false)}
+          onOpened={clientPath => void handleClientOpened(clientPath)}
+        />
+      )}
     </aside>
   )
 }

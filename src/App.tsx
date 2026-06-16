@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { I18nContext, getTranslations, type Lang } from './i18n'
 import { AuthScreen } from './components/AuthScreen'
 import { ProjectRail } from './components/ProjectRail'
+
 import { ProjectSettings } from './components/ProjectSettings'
 import type { ProjectMeta } from './types/api'
 import { Sidebar } from './components/Sidebar'
@@ -25,7 +26,8 @@ import { WorkflowsPanel } from './components/WorkflowsPanel'
 import { MemoryGovernance } from './components/MemoryGovernance'
 import { DiffView } from './components/DiffView'
 import { CommandConfirm } from './components/CommandConfirm'
-import { UpdateNotification } from './components/UpdateNotification'
+
+import { UpdateAvailableModal } from './components/UpdateAvailableModal'
 import { Terminal } from './components/Terminal'
 import { FilesPanel } from './components/FilesPanel'
 import { SideChat } from './components/SideChat'
@@ -40,6 +42,15 @@ const SIDEBAR_MIN = 200
 const SIDEBAR_MAX = 480
 const SIDEBAR_DEFAULT = 260
 const SIDEBAR_WIDTH_KEY = 'gg.sidebarWidth'
+const SIDEBAR_OPEN_KEY = 'gg-sidebar-open'
+
+function readSidebarOpen(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_OPEN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 
 export function App() {
   const [showSettings, setShowSettings] = useState(false)
@@ -51,7 +62,7 @@ export function App() {
   // Lazily-created dedicated side-chat session id. Created on first open of the
   // side-chat panel, reused while the panel stays open within a project.
   const [sideChatId, setSideChatId] = useState<number | null>(null)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(readSidebarOpen)
   const [lang, setLang] = useState<Lang>('en')
 
   useEffect(() => {
@@ -193,12 +204,23 @@ export function App() {
 
   // Push width to CSS via custom property so the grid recomputes.
   useEffect(() => {
-    document.documentElement.style.setProperty('--gg-sidebar-w', `${sidebarWidth}px`)
+    document.documentElement.style.setProperty('--gg-sidebar-target-w', `${sidebarWidth}px`)
     try { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth)) } catch { /* ignore */ }
   }, [sidebarWidth])
 
-  // Пока проверяем auth — ничего не рендерим
-  if (authDone === null) return null
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_OPEN_KEY, sidebarOpen ? '1' : '0')
+    } catch { /* ignore */ }
+  }, [sidebarOpen])
+
+  if (authDone === null) {
+    return (
+      <I18nContext.Provider value={getTranslations(lang)}>
+        <div className="gg-app gg-app-booting" aria-busy="true" />
+      </I18nContext.Provider>
+    )
+  }
   // Нужна авторизация — показываем AuthScreen поверх всего
   if (!authDone) return (
     <I18nContext.Provider value={getTranslations(lang)}>
@@ -208,23 +230,23 @@ export function App() {
 
   return (
     <I18nContext.Provider value={getTranslations(lang)}>
-    <div className={`gg-app ${sidebarOpen ? '' : 'is-sidebar-collapsed'}`}>
+    <div className={`gg-app gg-app-atelier ${!sidebarOpen ? 'is-sidebar-collapsed' : ''}`}>
       <ProjectRail
-        sidebarOpen={sidebarOpen}
-        onToggleSidebar={() => setSidebarOpen(v => !v)}
         onOpenProjectSettings={setProjectSettingsTarget}
         onOpenAppSettings={() => setShowSettings(true)}
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(v => !v)}
       />
-      {sidebarOpen && (
-        <>
-          <Sidebar onOpenSettings={() => setShowSettings(true)} />
-          <div
-            className="gg-sidebar-resize"
-            onMouseDown={startDrag}
-            title={t.settings.resizeDrag}
-          />
-        </>
-      )}
+      <Sidebar
+        onOpenSettings={() => setShowSettings(true)}
+        aria-hidden={!sidebarOpen}
+      />
+      <div
+        className="gg-sidebar-resize"
+        onMouseDown={sidebarOpen ? startDrag : undefined}
+        title={t.settings.resizeDrag}
+        aria-hidden={!sidebarOpen}
+      />
       <main className="gg-main">
         {/* Chat НЕ размонтируется при уходе на другие вкладки — иначе его
             слушатель ai:event отваливается и фоновый стрим (CLI вроде Codex)
@@ -331,7 +353,7 @@ export function App() {
       <TerminalErrorToast />
       <DiffView />
       <CommandConfirm />
-      <UpdateNotification />
+      <UpdateAvailableModal />
     </div>
     </I18nContext.Provider>
   )

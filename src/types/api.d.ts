@@ -115,13 +115,18 @@ declare global {
     api: {
       projects: {
         pick: () => Promise<string | null>
+        create: (input: { name: string; folderSlug: string; iconSourcePath?: string | null }) => Promise<
+          { ok: true; path: string; meta: ProjectMeta } | { ok: false; error: string }
+        >
+        clientsRoot: () => Promise<string>
+        pickImage: () => Promise<string | null>
         setCurrent: (path: string | null) => Promise<void>
         list: () => Promise<ProjectMeta[]>
         rename: (path: string, name: string) => Promise<void>
         updateMeta: (path: string, patch: { name?: string }) => Promise<ProjectMeta | null>
         pickIcon: (path: string) => Promise<ProjectMeta | null>
         clearIcon: (path: string) => Promise<ProjectMeta | null>
-        remove: (path: string) => Promise<void>
+        remove: (path: string, options?: { deleteData?: boolean }) => Promise<{ ok: boolean; error?: string }>
       }
       app: {
         getHomeDir: () => Promise<string>
@@ -361,11 +366,14 @@ declare global {
       }
       updater: {
         install(): Promise<void>
-        check(): Promise<{ available: boolean; version?: string; error?: string }>
-        onAvailable(cb: (data: { version: string }) => void): () => void
+        check(): Promise<{ available: boolean; version?: string; error?: string; phase?: string; pendingRelease?: boolean }>
+        getState(): Promise<{ phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }>
+        onState(cb: (data: { phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }) => void): () => void
+        onAvailable(cb: (data: { version: string; pendingRelease?: boolean }) => void): () => void
         onDownloaded(cb: (data: { version: string }) => void): () => void
         onProgress(cb: (data: { percent: number }) => void): () => void
         onNotAvailable(cb: () => void): () => void
+        onError(cb: (data: { error: string }) => void): () => void
       }
       audit: {
         query(projectPath: string, opts?: { limit?: number; action?: string; since?: number }): Promise<AuditEntry[]>

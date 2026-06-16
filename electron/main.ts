@@ -310,7 +310,7 @@ app.whenReady().then(() => {
     return roots
   }
 
-  registerProjectIpc(projects)
+  registerProjectIpc(projects, db)
   registerProjectMapIpc(knownRoots)
   registerFilesIpc({ getProjectRoot: getActiveProjectPath, getKnownRoots: knownRoots })
   registerSettingsIpc(settings)

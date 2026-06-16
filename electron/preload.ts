@@ -3,6 +3,10 @@ import { contextBridge, ipcRenderer } from 'electron'
 contextBridge.exposeInMainWorld('api', {
   projects: {
     pick: () => ipcRenderer.invoke('projects:pick'),
+    create: (input: { name: string; folderSlug: string; iconSourcePath?: string | null }) =>
+      ipcRenderer.invoke('projects:create', input),
+    clientsRoot: () => ipcRenderer.invoke('projects:clients-root') as Promise<string>,
+    pickImage: () => ipcRenderer.invoke('projects:pick-image') as Promise<string | null>,
     setCurrent: (path: string | null) => ipcRenderer.invoke('projects:set-current', path),
     list: () => ipcRenderer.invoke('projects:list'),
     rename: (path: string, name: string) => ipcRenderer.invoke('projects:rename', path, name),
@@ -10,7 +14,8 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('projects:update-meta', path, patch),
     pickIcon: (path: string) => ipcRenderer.invoke('projects:pick-icon', path),
     clearIcon: (path: string) => ipcRenderer.invoke('projects:clear-icon', path),
-    remove: (path: string) => ipcRenderer.invoke('projects:remove', path)
+    remove: (path: string, options?: { deleteData?: boolean }) =>
+      ipcRenderer.invoke('projects:remove', path, options) as Promise<{ ok: boolean; error?: string }>
   },
   app: {
     getHomeDir: () => ipcRenderer.invoke('app:home-dir') as Promise<string>,
@@ -258,8 +263,20 @@ contextBridge.exposeInMainWorld('api', {
   updater: {
     install: () => ipcRenderer.invoke('update:install'),
     check: () => ipcRenderer.invoke('update:check'),
-    onAvailable: (cb: (data: { version: string }) => void) => {
-      const handler = (_e: unknown, data: { version: string }) => cb(data)
+    getState: () => ipcRenderer.invoke('update:get-state') as Promise<{
+      phase: string
+      version?: string
+      percent?: number
+      error?: string
+      pendingRelease?: boolean
+    }>,
+    onState: (cb: (data: { phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }) => void) => {
+      const handler = (_e: unknown, data: { phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }) => cb(data)
+      ipcRenderer.on('update:state', handler)
+      return () => { ipcRenderer.off('update:state', handler) }
+    },
+    onAvailable: (cb: (data: { version: string; pendingRelease?: boolean }) => void) => {
+      const handler = (_e: unknown, data: { version: string; pendingRelease?: boolean }) => cb(data)
       ipcRenderer.on('update:available', handler)
       return () => { ipcRenderer.off('update:available', handler) }
     },
@@ -277,6 +294,11 @@ contextBridge.exposeInMainWorld('api', {
       const handler = () => cb()
       ipcRenderer.on('update:not-available', handler)
       return () => { ipcRenderer.off('update:not-available', handler) }
+    },
+    onError: (cb: (data: { error: string }) => void) => {
+      const handler = (_e: unknown, data: { error: string }) => cb(data)
+      ipcRenderer.on('update:error', handler)
+      return () => { ipcRenderer.off('update:error', handler) }
     },
   },
   audit: {
