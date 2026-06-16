@@ -154,6 +154,13 @@ declare global {
         isFocused: () => Promise<boolean>
         openExternal: (url: string) => Promise<boolean>
       }
+      window: {
+        minimize: () => Promise<void>
+        maximize: () => Promise<boolean>
+        close: () => Promise<void>
+        isMaximized: () => Promise<boolean>
+        onMaximizedChanged: (cb: (maximized: boolean) => void) => () => void
+      }
       notify: {
         show: (opts: { title: string; body: string }) => Promise<boolean>
         playSound: (opts?: { isError?: boolean }) => Promise<boolean>

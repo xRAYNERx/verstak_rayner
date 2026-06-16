@@ -28,7 +28,7 @@ html {
   --gg-sidebar-resize-w: 4px;
   display: grid;
   grid-template-columns: var(--gg-rail-w) var(--gg-sidebar-panel-w) var(--gg-sidebar-resize-w) 1fr;
-  height: 100vh;
+  height: 100%;
   background: var(--bg-base);
   overflow: hidden;
   transition:
@@ -6922,10 +6922,10 @@ textarea.gg-input {
 
 /* Root: full-viewport split */
 .gg-auth-root {
-  position: fixed;
-  inset: 0;
+  position: relative;
+  height: 100%;
   display: flex;
-  z-index: 9999;
+  z-index: 1;
   opacity: 1;
   transition: opacity 0.4s ease;
 }
@@ -7370,7 +7370,7 @@ textarea.gg-input {
 /* ── Language picker — first launch ── */
 .gg-lang-picker {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  height: 100vh; background: #0d1117; color: #c9d1d9;
+  height: 100%; background: #0d1117; color: #c9d1d9;
 }
 .gg-lang-picker-logo {
   width: 60px;
