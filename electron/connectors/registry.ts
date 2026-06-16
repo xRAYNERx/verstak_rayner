@@ -14,6 +14,11 @@ import { createYandexMetrikaConnector } from './yandex-metrika'
 import { createAvitoConnector } from './avito'
 import { createYandexWebmasterConnector } from './yandex-webmaster'
 import { createYandexWordstatConnector } from './yandex-wordstat'
+import { createOzonConnector } from './ozon'
+import { createWildberriesConnector } from './wildberries'
+import { createYooKassaConnector } from './yookassa'
+import { createVkConnector } from './vk'
+import { createAmoCrmConnector } from './amocrm'
 
 // Built-in connectors. Adding a new adapter = register it here.
 const BUILTINS: Connector[] = [
@@ -31,7 +36,12 @@ const BUILTINS: Connector[] = [
   createYandexMetrikaConnector(),
   createAvitoConnector(),
   createYandexWebmasterConnector(),
-  createYandexWordstatConnector()
+  createYandexWordstatConnector(),
+  createOzonConnector(),
+  createWildberriesConnector(),
+  createYooKassaConnector(),
+  createVkConnector(),
+  createAmoCrmConnector()
 ]
 
 export interface ConnectorRegistry {

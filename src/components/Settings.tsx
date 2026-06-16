@@ -303,6 +303,11 @@ const CONNECTORS: ConnectorDef[] = [
   { id: 'avito', name: 'Avito', description: 'Объявления, статистика, баланс', icon: IconHTTP, configuredKey: 'avito_client_id' },
   { id: 'ywebmaster', name: 'Яндекс.Вебмастер', description: 'SEO: ИКС, проблемы, запросы', icon: IconYandexDirect, configuredKey: 'yandex_webmaster_token' },
   { id: 'ywordstat', name: 'Яндекс.Wordstat', description: 'Частотность ключевых слов', icon: IconYandexDirect, configuredKey: 'yandex_wordstat_token' },
+  { id: 'ozon', name: 'Ozon Seller', description: 'Товары, остатки, аналитика, финансы', icon: IconHTTP, configuredKey: 'ozon_client_id' },
+  { id: 'wildberries', name: 'Wildberries', description: 'Продажи, заказы, остатки', icon: IconHTTP, configuredKey: 'wildberries_token' },
+  { id: 'yookassa', name: 'ЮКасса', description: 'Платежи и возвраты (чтение)', icon: IconHTTP, configuredKey: 'yookassa_shop_id' },
+  { id: 'vk', name: 'VK', description: 'Сообщества, стена, пользователи', icon: IconHTTP, configuredKey: 'vk_access_token' },
+  { id: 'amocrm', name: 'amoCRM', description: 'Сделки, контакты, воронки', icon: IconHTTP, configuredKey: 'amocrm_subdomain' },
 ]
 
 // ─── MCP Tab ─────────────────────────────────────────────────────────────────
@@ -1036,6 +1041,14 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
   const [avitoClientSecret, setAvitoClientSecret] = useState('')
   const [yWebmasterToken, setYWebmasterToken] = useState('')
   const [yWordstatToken, setYWordstatToken] = useState('')
+  const [ozonClientId, setOzonClientId] = useState('')
+  const [ozonApiKey, setOzonApiKey] = useState('')
+  const [wbToken, setWbToken] = useState('')
+  const [yookassaShopId, setYookassaShopId] = useState('')
+  const [yookassaSecretKey, setYookassaSecretKey] = useState('')
+  const [vkToken, setVkToken] = useState('')
+  const [amocrmSubdomain, setAmocrmSubdomain] = useState('')
+  const [amocrmToken, setAmocrmToken] = useState('')
   const [yDirectLogin, setYDirectLogin] = useState('')
   const [skillsServerBase, setSkillsServerBase] = useState('')
   const [claudeOauthToken, setClaudeOauthToken] = useState('')
@@ -1131,6 +1144,14 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
       setAvitoClientSecret((await window.api.settings.getKey('avito_client_secret')) ?? '')
       setYWebmasterToken((await window.api.settings.getKey('yandex_webmaster_token')) ?? '')
       setYWordstatToken((await window.api.settings.getKey('yandex_wordstat_token')) ?? '')
+      setOzonClientId((await window.api.settings.getKey('ozon_client_id')) ?? '')
+      setOzonApiKey((await window.api.settings.getKey('ozon_api_key')) ?? '')
+      setWbToken((await window.api.settings.getKey('wildberries_token')) ?? '')
+      setYookassaShopId((await window.api.settings.getKey('yookassa_shop_id')) ?? '')
+      setYookassaSecretKey((await window.api.settings.getKey('yookassa_secret_key')) ?? '')
+      setVkToken((await window.api.settings.getKey('vk_access_token')) ?? '')
+      setAmocrmSubdomain((await window.api.settings.getKey('amocrm_subdomain')) ?? '')
+      setAmocrmToken((await window.api.settings.getKey('amocrm_access_token')) ?? '')
       setYDirectLogin((await window.api.settings.getKey('yandex_direct_login')) ?? '')
       setSkillsServerBase((await window.api.settings.getKey('skills_server_base')) ?? '')
       setClaudeOauthToken((await window.api.settings.getKey('claude_code_oauth_token')) ?? '')
@@ -1256,6 +1277,14 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
     await window.api.settings.setKey('avito_client_secret', avitoClientSecret)
     await window.api.settings.setKey('yandex_webmaster_token', yWebmasterToken)
     await window.api.settings.setKey('yandex_wordstat_token', yWordstatToken)
+    await window.api.settings.setKey('ozon_client_id', ozonClientId)
+    await window.api.settings.setKey('ozon_api_key', ozonApiKey)
+    await window.api.settings.setKey('wildberries_token', wbToken)
+    await window.api.settings.setKey('yookassa_shop_id', yookassaShopId)
+    await window.api.settings.setKey('yookassa_secret_key', yookassaSecretKey)
+    await window.api.settings.setKey('vk_access_token', vkToken)
+    await window.api.settings.setKey('amocrm_subdomain', amocrmSubdomain)
+    await window.api.settings.setKey('amocrm_access_token', amocrmToken)
     await window.api.settings.setKey('yandex_direct_login', yDirectLogin)
     await window.api.settings.setKey('skills_server_base', skillsServerBase)
     await window.api.settings.setKey('claude_code_oauth_token', claudeOauthToken)
@@ -1618,6 +1647,63 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
             Wordstat работает через Директ API (асинхронный отчёт). Если поле пустое —
             используется yandex_direct_token. Операция: get_wordstat (phrases, geo_id).
           </div>
+        </>
+      )
+      case 'ozon': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Client-Id</label>
+            <input className="gg-input" value={ozonClientId} onChange={e => setOzonClientId(e.target.value)} placeholder="Client-Id продавца" spellCheck={false} />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Api-Key</label>
+            <input className="gg-input" type="password" value={ozonApiKey} onChange={e => setOzonApiKey(e.target.value)} placeholder="Api-Key (Seller → Настройки → API-ключи)" autoComplete="new-password" />
+          </div>
+          <div className="gg-settings-hint">Операции: list_products, get_stocks, get_analytics (date_from/date_to), get_transactions.</div>
+        </>
+      )
+      case 'wildberries': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Token (Статистика)</label>
+            <input className="gg-input" type="password" value={wbToken} onChange={e => setWbToken(e.target.value)} placeholder="ЛК WB → Доступ к API → категория «Статистика»" autoComplete="new-password" />
+          </div>
+          <div className="gg-settings-hint">Операции: get_sales, get_orders, get_stocks (date_from, по умолчанию 7 дней назад).</div>
+        </>
+      )
+      case 'yookassa': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">shopId</label>
+            <input className="gg-input" value={yookassaShopId} onChange={e => setYookassaShopId(e.target.value)} placeholder="Идентификатор магазина" spellCheck={false} />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Секретный ключ</label>
+            <input className="gg-input" type="password" value={yookassaSecretKey} onChange={e => setYookassaSecretKey(e.target.value)} placeholder="live_… / test_…" autoComplete="new-password" />
+          </div>
+          <div className="gg-settings-hint">Только чтение: list_payments, get_payment, list_refunds. Создание платежей намеренно недоступно.</div>
+        </>
+      )
+      case 'vk': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Access token</label>
+            <input className="gg-input" type="password" value={vkToken} onChange={e => setVkToken(e.target.value)} placeholder="oauth/сервисный токен VK" autoComplete="new-password" />
+          </div>
+          <div className="gg-settings-hint">Операции: group_info, wall_get (owner_id для группы отрицательный), users_get.</div>
+        </>
+      )
+      case 'amocrm': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Поддомен</label>
+            <input className="gg-input" value={amocrmSubdomain} onChange={e => setAmocrmSubdomain(e.target.value)} placeholder="mycompany (без .amocrm.ru)" spellCheck={false} />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Access token</label>
+            <input className="gg-input" type="password" value={amocrmToken} onChange={e => setAmocrmToken(e.target.value)} placeholder="long-lived токен интеграции" autoComplete="new-password" />
+          </div>
+          <div className="gg-settings-hint">Операции: list_leads, list_contacts, list_pipelines, get_lead.</div>
         </>
       )
       case 'ydisk': return (
