@@ -162,7 +162,12 @@ declare global {
         onMaximizedChanged: (cb: (maximized: boolean) => void) => () => void
       }
       notify: {
-        show: (opts: { title: string; body: string }) => Promise<boolean>
+        show: (opts: {
+          title?: string
+          body: string
+          projectName?: string
+          isError?: boolean
+        }) => Promise<boolean>
         playSound: (opts?: { isError?: boolean }) => Promise<boolean>
       }
       voice: {

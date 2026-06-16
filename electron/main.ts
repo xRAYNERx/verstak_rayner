@@ -78,6 +78,7 @@ import { registerSuggestionsIpc } from './ipc/suggestions'
 import { initAutoUpdater, registerReleaseNotesIpc } from './updater'
 import { registerNotifyIpc } from './ipc/notify'
 import { bindWindowChromeEvents, registerWindowIpc } from './ipc/window'
+import { initNotificationWindow, registerNotificationWindowIpc } from './notification-window'
 import { isInsideProjectIcons } from './storage/project-icons'
 import { registerVoiceIpc } from './ipc/voice'
 import { bindUiScaleToWindow } from './ui-scale'
@@ -190,6 +191,7 @@ protocol.registerSchemesAsPrivileged([
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null)
   registerWindowIpc()
+  registerNotificationWindowIpc()
 
   protocol.handle('gg-project-icon', (request) => {
     const prefix = 'gg-project-icon://local/'
@@ -498,8 +500,8 @@ app.whenReady().then(() => {
   registerReleaseNotesIpc()
   registerVoiceIpc()
   const mainWindow = createWindow(settings)
-  const iconPath = join(HERE, '../../resources/icon.png')
-  registerNotifyIpc(() => mainWindow, iconPath)
+  initNotificationWindow(() => mainWindow)
+  registerNotifyIpc(() => mainWindow, settings)
   bindUiScaleToWindow(mainWindow, settings)
 
   if (!process.env.VITE_DEV_SERVER_URL) {

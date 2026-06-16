@@ -23,9 +23,14 @@ import { useT } from '../i18n'
 import { notifyResponseReady } from '../lib/response-notify'
 
 
-function chatLabel(chatId: number): string {
-  const title = useProject.getState().chatSessions.find(s => s.id === chatId)?.title
-  return title ? `Ответ готов — ${title}` : 'Ответ готов'
+function chatTitle(chatId: number): string | undefined {
+  return useProject.getState().chatSessions.find(s => s.id === chatId)?.title
+}
+
+function projectNameForPath(projectPath: string | null | undefined): string | undefined {
+  if (!projectPath) return undefined
+  const meta = useProject.getState().projectList.find(p => p.path === projectPath)
+  return meta?.name ?? projectPath.split(/[/\\]/).pop() ?? undefined
 }
 
 const MAX_BYTES_PER_FILE = 5 * 1024 * 1024  // 5 MB
@@ -208,9 +213,9 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         // мапа растёт при каждом переключении проекта во время активного
         // стрима в фоне.
         if (event.type === 'done') {
-          void notifyResponseReady({ body: 'Ответ готов — фоновый проект' })
+          void notifyResponseReady({ projectName: projectNameForPath(projectPath) })
         } else if (event.type === 'error') {
-          void notifyResponseReady({ body: 'Ошибка в фоновом проекте', isError: true })
+          void notifyResponseReady({ projectName: projectNameForPath(projectPath), isError: true })
         }
         if (event.type === 'done' || event.type === 'error') store.forgetSendOwner(id)
         return
@@ -220,9 +225,18 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
       if (owner?.kind === 'chat' && owner.chatId !== store.activeChatId) {
         store.applyEventToChat(owner.chatId, event as unknown as { type: string; [k: string]: unknown })
         if (event.type === 'done') {
-          void notifyResponseReady({ body: chatLabel(owner.chatId) })
+          const chat = chatTitle(owner.chatId)
+          void notifyResponseReady({
+            projectName: projectNameForPath(store.path),
+            body: chat ? `Ответ в чате «${chat}» готов` : undefined
+          })
         } else if (event.type === 'error') {
-          void notifyResponseReady({ body: `Ошибка — ${chatLabel(owner.chatId)}`, isError: true })
+          const chat = chatTitle(owner.chatId)
+          void notifyResponseReady({
+            projectName: projectNameForPath(store.path),
+            body: chat ? `Ошибка в чате «${chat}»` : undefined,
+            isError: true
+          })
         }
         if (event.type === 'done' || event.type === 'error') store.forgetSendOwner(id)
         return
@@ -454,8 +468,11 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         }
         setStreaming(false)
         store.forgetSendOwner(id)
-        const chatTitle = store.activeChatId != null ? chatLabel(store.activeChatId) : 'Ответ готов'
-        void notifyResponseReady({ body: chatTitle })
+        const chat = store.activeChatId != null ? chatTitle(store.activeChatId) : undefined
+        void notifyResponseReady({
+          projectName: projectNameForPath(store.path),
+          body: chat ? `Ответ в чате «${chat}» готов` : undefined
+        })
       }
       else if (event.type === 'error') {
         // If a plan step was running, mark it failed
@@ -476,8 +493,12 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         }
         setStreaming(false)
         store.forgetSendOwner(id)
-        const errChat = store.activeChatId != null ? chatLabel(store.activeChatId) : 'Ошибка ответа'
-        void notifyResponseReady({ body: errChat, isError: true })
+        const chat = store.activeChatId != null ? chatTitle(store.activeChatId) : undefined
+        void notifyResponseReady({
+          projectName: projectNameForPath(store.path),
+          body: chat ? `Ошибка в чате «${chat}»` : undefined,
+          isError: true
+        })
       }
     })
     return off

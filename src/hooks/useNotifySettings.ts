@@ -64,7 +64,8 @@ export function useNotifySettings(): {
     const { notifyResponseReady } = await import('../lib/response-notify')
     await notifyResponseReady({
       title: 'Verstak',
-      body: 'Тест: ответ готов',
+      projectName: 'Демо-проект',
+      body: 'Работа завершена',
       force: true
     })
   }, [])
