@@ -1,7 +1,13 @@
 import { app, nativeImage } from 'electron'
 import { createHash } from 'crypto'
-import { mkdirSync, writeFileSync, unlinkSync, existsSync } from 'fs'
-import { join, resolve, relative, isAbsolute, sep } from 'path'
+import { mkdirSync, writeFileSync, unlinkSync, existsSync, realpathSync } from 'fs'
+import { join, resolve, relative, isAbsolute, sep, extname } from 'path'
+import { isForbiddenPath } from '../ai/secret-scanner'
+
+// Ревью F7: importProjectIcon принимал любой sourcePath из рендерера. Ограничиваем
+// расширения изображениями (иначе скомпрометированный рендерер использовал бы
+// импорт как канал чтения произвольного файла через icon-протокол).
+const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.ico'])
 
 export function projectIconsDir(): string {
   const dir = join(app.getPath('userData'), 'project-icons')
@@ -17,7 +23,15 @@ export function projectIconsDir(): string {
  */
 export function isInsideProjectIcons(p: string): boolean {
   if (!p) return false
-  const r = relative(resolve(projectIconsDir()), resolve(p))
+  // Ревью F6: текстовая проверка через resolve() обходилась symlink'ом внутри
+  // project-icons, ведущим наружу (→ чтение/удаление произвольного файла через
+  // gg-project-icon протокол). realpathSync разворачивает ссылки на обеих
+  // сторонах; для несуществующих путей — textual fallback (нечего раскрывать).
+  let dir: string
+  let target: string
+  try { dir = realpathSync(resolve(projectIconsDir())) } catch { dir = resolve(projectIconsDir()) }
+  try { target = realpathSync(resolve(p)) } catch { target = resolve(p) }
+  const r = relative(dir, target)
   return r !== '' && !r.startsWith('..') && !r.includes('..' + sep) && !isAbsolute(r)
 }
 
@@ -28,6 +42,14 @@ function iconDestPath(projectPath: string): string {
 
 /** Copy & resize user image to stable PNG in userData. Returns absolute path. */
 export function importProjectIcon(projectPath: string, sourcePath: string): string {
+  // Ревью F7: валидируем источник ДО чтения. Только изображения и не секреты —
+  // иначе рендерер мог бы скопировать произвольный файл в .png и прочитать его
+  // обратно через icon-протокол (arbitrary file read).
+  if (!sourcePath || typeof sourcePath !== 'string') throw new Error('Иконка: пустой путь')
+  if (!IMAGE_EXTS.has(extname(sourcePath).toLowerCase())) {
+    throw new Error('Иконка: поддерживаются только изображения (png/jpg/webp/gif/bmp/ico)')
+  }
+  if (isForbiddenPath(sourcePath)) throw new Error('Иконка: путь заблокирован (секрет/креды)')
   const img = nativeImage.createFromPath(sourcePath)
   if (img.isEmpty()) throw new Error('Не удалось прочитать изображение')
   const size = img.getSize()

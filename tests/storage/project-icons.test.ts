@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest'
-import { mkdtempSync } from 'fs'
+import { mkdtempSync, symlinkSync, writeFileSync, mkdirSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 
@@ -13,11 +13,13 @@ vi.mock('electron', () => ({
 
 let isInsideProjectIcons: (p: string) => boolean
 let projectIconsDir: () => string
+let importProjectIcon: (projectPath: string, sourcePath: string) => string
 
 beforeAll(async () => {
   const mod = await import('../../electron/storage/project-icons')
   isInsideProjectIcons = mod.isInsideProjectIcons
   projectIconsDir = mod.projectIconsDir
+  importProjectIcon = mod.importProjectIcon
 })
 
 describe('isInsideProjectIcons', () => {
@@ -39,5 +41,31 @@ describe('isInsideProjectIcons', () => {
   it('false для самой папки (не файл внутри неё) и для пустой строки', () => {
     expect(isInsideProjectIcons(projectIconsDir())).toBe(false)
     expect(isInsideProjectIcons('')).toBe(false)
+  })
+
+  // Ревью F6: symlink внутри project-icons, ведущий наружу, не должен считаться
+  // «внутри» (realpath разворачивает ссылку). На Windows создание symlink требует
+  // привилегий — тест мягко пропускается, если symlinkSync кинул EPERM.
+  it('false для symlink наружу (realpath-проверка)', () => {
+    const outsideDir = mkdtempSync(join(tmpdir(), 'gg-outside-'))
+    const secret = join(outsideDir, 'secret.png')
+    writeFileSync(secret, 'PNGDATA')
+    const link = join(projectIconsDir(), 'evil.png')
+    let linked = false
+    try { symlinkSync(secret, link); linked = true } catch { /* нет привилегий — пропуск */ }
+    if (!linked) return
+    expect(isInsideProjectIcons(link)).toBe(false)
+  })
+})
+
+describe('importProjectIcon — валидация источника (F7)', () => {
+  it('отвергает не-изображение (произвольное чтение через .png невозможно)', () => {
+    expect(() => importProjectIcon('/proj', '/etc/passwd')).toThrow(/изображения/)
+    expect(() => importProjectIcon('/proj', 'C:/secret/data.txt')).toThrow(/изображения/)
+    expect(() => importProjectIcon('/proj', '')).toThrow()
+  })
+
+  it('отвергает image внутри запрещённой папки (.ssh/icon.png) — isForbiddenPath', () => {
+    expect(() => importProjectIcon('/proj', '.ssh/icon.png')).toThrow(/заблокирован|секрет/)
   })
 })
