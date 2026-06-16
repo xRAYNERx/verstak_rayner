@@ -9,12 +9,8 @@ import { ModePicker } from './ModePicker'
 import { VoiceInput } from './VoiceInput'
 import { TimelineBar } from './TimelineBar'
 import { ReviewPanel } from './ReviewPills'
-import { CheckpointButton } from './CheckpointButton'
 import { DevTaskBadge } from './DevTaskBadge'
 import { ResumeBanner } from './ResumeBanner'
-import { ReviewButton } from './ReviewButton'
-import { SkillPicker } from './SkillPicker'
-import { MultiAgentPicker } from './MultiAgentPicker'
 import { ComposerToolsMenu } from './ComposerToolsMenu'
 import { EffortPicker } from './EffortPicker'
 import { SlashCommandPopup, type SlashCommand } from './SlashCommandPopup'
@@ -1554,12 +1550,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
             >
               {autoScrollEnabled ? t.chat.autoScrollLabelOn : t.chat.autoScrollLabelOff}
             </button>
-            <SkillPicker />
-            <MultiAgentPicker onInject={injectTemplate} />
-            <CheckpointButton />
             <DevTaskBadge />
-            <ReviewButton />
-            <ComposerToolsMenu />
+            <ComposerToolsMenu onInject={injectTemplate} />
             <ModePicker mode={agentMode} onChange={setAgentMode} />
             <ModelPicker onOpenSettings={onOpenSettings} />
             <TierRecommendation input={input} />
