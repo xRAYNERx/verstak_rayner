@@ -88,7 +88,7 @@ export function DevTaskPanel() {
   // Поллинг раз в 3с пока вкладка открыта — diff/state живые во время прогона.
   useEffect(() => {
     void refresh()
-    const t = setInterval(() => void refresh(), 3000)
+    const t = setInterval(() => { if (!document.hidden) void refresh() }, 3000)
     return () => clearInterval(t)
   }, [refresh])
 

@@ -82,7 +82,7 @@ function RunDetail({ runId, providerLabel }: { runId: string; providerLabel: (id
   // Поллинг детали раз в 2с — пока прогон идёт, его субы/события живые.
   useEffect(() => {
     void load()
-    const t = setInterval(() => void load(), 2000)
+    const t = setInterval(() => { if (!document.hidden) void load() }, 2000)
     return () => clearInterval(t)
   }, [load])
 
@@ -309,7 +309,7 @@ export function AgentRunsPanel() {
   // Поллинг раз в 2с пока панель открыта — живые статусы прогонов.
   useEffect(() => {
     void refresh()
-    const t = setInterval(() => void refresh(), 2000)
+    const t = setInterval(() => { if (!document.hidden) void refresh() }, 2000)
     return () => clearInterval(t)
   }, [refresh])
 
