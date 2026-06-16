@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useT } from '../i18n'
+import { semverGt } from '../lib/semver'
 
 type Phase = 'idle' | 'downloading' | 'ready'
 
@@ -16,10 +17,15 @@ export function UpdateNotification({ railExpanded }: Props) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [version, setVersion] = useState('')
   const [percent, setPercent] = useState(0)
+  const [currentVersion, setCurrentVersion] = useState('')
 
   useEffect(() => {
+    void window.api.app.getVersion().then(setCurrentVersion).catch(() => {})
+
+    const isNewer = (v?: string) => !!v && !!currentVersion && semverGt(v, currentVersion)
+
     const apply = (state: { phase: string; version?: string; percent?: number; pendingRelease?: boolean }) => {
-      if (state.phase === 'downloaded' && state.version) {
+      if (state.phase === 'downloaded' && state.version && isNewer(state.version)) {
         setVersion(state.version)
         setPhase('ready')
         setPercent(100)
@@ -38,6 +44,7 @@ export function UpdateNotification({ railExpanded }: Props) {
       setPhase('downloading')
     })
     const offDownloaded = window.api.updater.onDownloaded(({ version: v }) => {
+      if (!isNewer(v)) return
       setVersion(v)
       setPhase('ready')
       setPercent(100)
@@ -55,7 +62,7 @@ export function UpdateNotification({ railExpanded }: Props) {
       offDownloaded()
       offAvailable()
     }
-  }, [])
+  }, [currentVersion])
 
   if (phase === 'idle') return null
 

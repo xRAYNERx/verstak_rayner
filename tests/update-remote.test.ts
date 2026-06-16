@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { isBenignUpdaterError, maxSemver, normalizeVersion, releaseFeedBase, semverGt } from '../electron/update-remote'
+import {
+  cleanReleaseBody,
+  isBenignUpdaterError,
+  maxSemver,
+  normalizeVersion,
+  releaseFeedBase,
+  semverGt,
+} from '../electron/update-remote'
 
 describe('update-remote semver', () => {
   it('normalizeVersion strips v prefix', () => {
@@ -20,6 +27,13 @@ describe('update-remote semver', () => {
     expect(releaseFeedBase('1.3.1')).toBe(
       'https://github.com/frolofpavel/verstak/releases/download/v1.3.1',
     )
+  })
+})
+
+describe('cleanReleaseBody', () => {
+  it('strips install footer after horizontal rule', () => {
+    const raw = '## Verstak 1.4.0\n\n- Feature A\n\n---\nУстановка: setup.exe'
+    expect(cleanReleaseBody(raw)).toBe('## Verstak 1.4.0\n\n- Feature A')
   })
 })
 

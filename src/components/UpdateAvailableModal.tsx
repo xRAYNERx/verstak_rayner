@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useT } from '../i18n'
+import { semverGt } from '../lib/semver'
 
 type ModalPhase = 'available' | 'pending' | 'downloading' | 'ready'
 
@@ -16,8 +17,15 @@ export function UpdateAvailableModal() {
   const [version, setVersion] = useState('')
   const [phase, setPhase] = useState<ModalPhase>('available')
   const [percent, setPercent] = useState(0)
+  const [currentVersion, setCurrentVersion] = useState('')
 
   useEffect(() => {
+    void window.api.app.getVersion().then(setCurrentVersion).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const isNewerThanInstalled = (v: string) => !!currentVersion && semverGt(v, currentVersion)
+
     const showUpdate = (nextPhase: ModalPhase, v: string) => {
       if (v) setVersion(v)
       setPhase(nextPhase)
@@ -31,6 +39,7 @@ export function UpdateAvailableModal() {
       pendingRelease?: boolean
     }) => {
       if (state.phase === 'downloaded' && state.version) {
+        if (!isNewerThanInstalled(state.version)) return
         showUpdate('ready', state.version)
         setPercent(100)
         return
@@ -57,6 +66,7 @@ export function UpdateAvailableModal() {
       if (!dismissed) setVisible(true)
     })
     const offDownloaded = window.api.updater.onDownloaded(({ version: v }) => {
+      if (!isNewerThanInstalled(v)) return
       showUpdate('ready', v)
       setPercent(100)
     })
@@ -67,7 +77,7 @@ export function UpdateAvailableModal() {
       offProgress()
       offDownloaded()
     }
-  }, [dismissed])
+  }, [dismissed, currentVersion])
 
   if (!visible || dismissed) return null
 

@@ -148,6 +148,10 @@ export const en = {
     updateError: 'Could not check for updates',
     updateNoRelease: 'No installer on GitHub yet — waiting for a published release',
     updatesHint: 'On launch we check GitHub Releases (frolofpavel/verstak). Download starts automatically; install when you click Install.',
+    releaseNotes: 'Release notes',
+    viewReleaseNotes: 'View current update notes',
+    viewReleaseNotesLoading: 'Loading…',
+    releaseNotesEmpty: 'Release notes are not available on GitHub Releases yet',
   },
 
   updates: {
@@ -162,6 +166,12 @@ export const en = {
     openReleases: 'Open Releases',
     railPercent: '{percent}%',
     railReadyShort: 'Ready',
+    whatsNewTitle: 'Update installed',
+    whatsNewSubtitle: 'Version {version} — what\'s new',
+    releaseNotesTitleCurrent: 'What\'s new in v{version}',
+    releaseNotesTitleAvailable: 'What\'s new in v{version} (available to install)',
+    releaseNotesClose: 'Got it',
+    openReleasePage: 'Open on GitHub',
   },
 
   // Model picker
@@ -231,6 +241,13 @@ export const en = {
   },
 
   // Common
+  themeFab: {
+    cycle: 'Switch theme',
+    switchTo: 'Switch to {name}',
+    nord: 'Dark',
+    light: 'Light',
+  },
+
   common: {
     close: 'Close',
     cancel: 'Cancel',

@@ -48,9 +48,16 @@ export async function bootstrapTheme(): Promise<void> {
   }
 }
 
+export function getNextTheme(current: ThemeId): ThemeMeta {
+  const idx = THEMES.findIndex(t => t.id === current)
+  const nextIdx = idx < 0 ? 0 : (idx + 1) % THEMES.length
+  return THEMES[nextIdx]
+}
+
 export function useTheme(): {
   theme: ThemeId
   setTheme: (t: ThemeId) => Promise<void>
+  cycleTheme: () => Promise<void>
 } {
   const [theme, setLocal] = useState<ThemeId>(DEFAULT_THEME)
 
@@ -71,5 +78,10 @@ export function useTheme(): {
     await window.api.settings.setKey(STORAGE_KEY, next)
   }, [])
 
-  return { theme, setTheme }
+  const cycleTheme = useCallback(async () => {
+    const next = getNextTheme(theme)
+    await setTheme(next.id)
+  }, [theme, setTheme])
+
+  return { theme, setTheme, cycleTheme }
 }

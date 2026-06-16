@@ -145,6 +145,10 @@ export const ru: Translations = {
     updateError: 'Не удалось проверить обновления',
     updateNoRelease: 'На GitHub пока нет установщика — ждём публикации релиза',
     updatesHint: 'При запуске проверяем GitHub Releases (frolofpavel/verstak). Скачивание начинается само; установка — по кнопке «Установить».',
+    releaseNotes: 'Список изменений',
+    viewReleaseNotes: 'Посмотреть список текущих обновлений',
+    viewReleaseNotesLoading: 'Загружаю…',
+    releaseNotesEmpty: 'Описание обновления пока недоступно на GitHub Releases',
   },
 
   updates: {
@@ -159,6 +163,12 @@ export const ru: Translations = {
     openReleases: 'Открыть Releases',
     railPercent: '{percent}%',
     railReadyShort: 'Готово',
+    whatsNewTitle: 'Обновление установлено',
+    whatsNewSubtitle: 'Версия {version} — что нового',
+    releaseNotesTitleCurrent: 'Что нового в v{version}',
+    releaseNotesTitleAvailable: 'Что нового в v{version} (доступно для установки)',
+    releaseNotesClose: 'Понятно',
+    openReleasePage: 'Открыть на GitHub',
   },
   modelPicker: {
     changeModel: 'Сменить модель / провайдер',
@@ -215,6 +225,13 @@ export const ru: Translations = {
     connected: 'Подключён',
     add: 'Добавить',
   },
+  themeFab: {
+    cycle: 'Сменить тему',
+    switchTo: 'Переключить на {name}',
+    nord: 'Тёмная',
+    light: 'Светлая',
+  },
+
   common: {
     close: 'Закрыть',
     cancel: 'Отмена',

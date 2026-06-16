@@ -116,6 +116,12 @@ declare global {
         show: (opts: { title: string; body: string }) => Promise<boolean>
         playSound: (opts?: { isError?: boolean }) => Promise<boolean>
       }
+      voice: {
+        status: () => Promise<{ ready: boolean; loading: boolean; label: string }>
+        transcribe: (payload: { data: string; mimeType?: string }) => Promise<
+          { ok: true; text: string } | { ok: false; error: string }
+        >
+      }
       files: {
         tree: (root: string) => Promise<FileNode[]>
         read: (path: string) => Promise<string>
@@ -297,6 +303,12 @@ declare global {
       }
       updater: {
         install(): Promise<void>
+        getReleaseNotes(opts?: { sinceVersion?: string; upToVersion?: string; version?: string }): Promise<Array<{
+          version: string
+          name: string
+          body: string
+          htmlUrl: string
+        }>>
         check(): Promise<{ available: boolean; version?: string; error?: string; phase?: string; pendingRelease?: boolean }>
         getState(): Promise<{ phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }>
         onState(cb: (data: { phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }) => void): () => void

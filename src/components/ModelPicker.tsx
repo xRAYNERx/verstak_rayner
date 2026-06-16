@@ -272,7 +272,7 @@ export function ModelPicker({ onOpenSettings, variant = 'pill' }: Props) {
       </button>
 
       {open && (
-        <div className="gg-mp-popover" role="listbox">
+        <div className="gg-mp-popover gg-mp-popover-opaque" role="listbox">
           {readyEntries.length > 0 && (
             <div className="gg-mp-section">
               <div className="gg-mp-section-title">{t.modelPicker.connected}</div>

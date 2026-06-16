@@ -83,23 +83,21 @@ export function ModePicker({ mode, onChange }: Props) {
       </button>
 
       {open && (
-        <div className="gg-mp-popover">
+        <div className="gg-mp-popover gg-mp-popover-opaque">
           <div className="gg-mp-section">
             <div className="gg-mp-section-title">Режим работы агента</div>
             {MODES.map(m => (
               <button
                 key={m.id}
                 type="button"
-                className={`gg-mp-row ${mode === m.id ? 'is-active' : ''}`}
+                className={`gg-mp-row gg-mp-row-stack ${mode === m.id ? 'is-active' : ''}`}
                 onClick={() => { onChange(m.id); setOpen(false) }}
               >
-                <span className="gg-mp-row-label">
-                  {m.icon} {m.label}
+                <span className="gg-mp-row-top">
+                  <span className="gg-mp-row-label">{m.label}</span>
+                  <span className="gg-mp-row-shortcut">{m.shortcut}</span>
                 </span>
-                <span className="gg-mp-row-meta">
-                  {m.description}
-                  <span style={{ marginLeft: 8, opacity: 0.6, fontFamily: 'var(--font-mono)' }}>{m.shortcut}</span>
-                </span>
+                <span className="gg-mp-row-desc">{m.description}</span>
               </button>
             ))}
           </div>

@@ -29,6 +29,17 @@ contextBridge.exposeInMainWorld('api', {
     playSound: (opts?: { isError?: boolean }) =>
       ipcRenderer.invoke('notify:play-sound', opts) as Promise<boolean>
   },
+  voice: {
+    status: () => ipcRenderer.invoke('voice:status') as Promise<{
+      ready: boolean
+      loading: boolean
+      label: string
+    }>,
+    transcribe: (payload: { data: string; mimeType?: string }) =>
+      ipcRenderer.invoke('voice:transcribe', payload) as Promise<
+        { ok: true; text: string } | { ok: false; error: string }
+      >
+  },
   files: {
     tree: (root: string) => ipcRenderer.invoke('files:tree', root),
     read: (path: string) => ipcRenderer.invoke('files:read', path),
@@ -227,6 +238,8 @@ contextBridge.exposeInMainWorld('api', {
 
   updater: {
     install: () => ipcRenderer.invoke('update:install'),
+    getReleaseNotes: (opts?: { sinceVersion?: string; upToVersion?: string; version?: string }) =>
+      ipcRenderer.invoke('update:get-release-notes', opts ?? {}),
     check: () => ipcRenderer.invoke('update:check'),
     getState: () => ipcRenderer.invoke('update:get-state') as Promise<{
       phase: string
