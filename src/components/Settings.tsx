@@ -308,6 +308,17 @@ const CONNECTORS: ConnectorDef[] = [
   { id: 'yookassa', name: 'ЮКасса', description: 'Платежи и возвраты (чтение)', icon: IconHTTP, configuredKey: 'yookassa_shop_id' },
   { id: 'vk', name: 'VK', description: 'Сообщества, стена, пользователи', icon: IconHTTP, configuredKey: 'vk_access_token' },
   { id: 'amocrm', name: 'amoCRM', description: 'Сделки, контакты, воронки', icon: IconHTTP, configuredKey: 'amocrm_subdomain' },
+  { id: 'moysklad', name: 'МойСклад', description: 'Товары, заказы, остатки', icon: IconHTTP, configuredKey: 'moysklad_token' },
+  { id: 'yandex_tracker', name: 'Яндекс.Трекер', description: 'Задачи, очереди', icon: IconYandexDirect, configuredKey: 'yandex_tracker_token' },
+  { id: 'sendpulse', name: 'SendPulse', description: 'Email/SMS-рассылки', icon: IconHTTP, configuredKey: 'sendpulse_client_id' },
+  { id: 'unisender', name: 'UniSender', description: 'Email/SMS-рассылки', icon: IconHTTP, configuredKey: 'unisender_api_key' },
+  { id: 'ga4', name: 'Google Analytics 4', description: 'Веб-аналитика', icon: IconHTTP, configuredKey: 'ga4_access_token' },
+  { id: 'notion', name: 'Notion', description: 'Базы, страницы, поиск', icon: IconHTTP, configuredKey: 'notion_token' },
+  { id: 'kontur_focus', name: 'Контур.Фокус', description: 'Контрагенты, риск-аналитика', icon: IconHTTP, configuredKey: 'kontur_focus_api_key' },
+  { id: 'mpstats', name: 'MPSTATS', description: 'Аналитика маркетплейсов', icon: IconHTTP, configuredKey: 'mpstats_token' },
+  { id: 'ozon_performance', name: 'Ozon Performance', description: 'Реклама Ozon', icon: IconHTTP, configuredKey: 'ozon_perf_client_id' },
+  { id: 'jira', name: 'Jira', description: 'Задачи, проекты, JQL', icon: IconHTTP, configuredKey: 'jira_base_url' },
+  { id: 'trello', name: 'Trello', description: 'Доски, списки, карточки', icon: IconHTTP, configuredKey: 'trello_api_key' },
 ]
 
 // ─── MCP Tab ─────────────────────────────────────────────────────────────────
@@ -1049,6 +1060,24 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
   const [vkToken, setVkToken] = useState('')
   const [amocrmSubdomain, setAmocrmSubdomain] = useState('')
   const [amocrmToken, setAmocrmToken] = useState('')
+  const [moyskladToken, setMoyskladToken] = useState('')
+  const [yTrackerToken, setYTrackerToken] = useState('')
+  const [yTrackerOrgId, setYTrackerOrgId] = useState('')
+  const [sendpulseClientId, setSendpulseClientId] = useState('')
+  const [sendpulseClientSecret, setSendpulseClientSecret] = useState('')
+  const [unisenderApiKey, setUnisenderApiKey] = useState('')
+  const [ga4Token, setGa4Token] = useState('')
+  const [ga4PropertyId, setGa4PropertyId] = useState('')
+  const [notionToken, setNotionToken] = useState('')
+  const [konturFocusKey, setKonturFocusKey] = useState('')
+  const [mpstatsToken, setMpstatsToken] = useState('')
+  const [ozonPerfClientId, setOzonPerfClientId] = useState('')
+  const [ozonPerfClientSecret, setOzonPerfClientSecret] = useState('')
+  const [jiraBaseUrl, setJiraBaseUrl] = useState('')
+  const [jiraEmail, setJiraEmail] = useState('')
+  const [jiraApiToken, setJiraApiToken] = useState('')
+  const [trelloApiKey, setTrelloApiKey] = useState('')
+  const [trelloToken, setTrelloToken] = useState('')
   const [yDirectLogin, setYDirectLogin] = useState('')
   const [skillsServerBase, setSkillsServerBase] = useState('')
   const [claudeOauthToken, setClaudeOauthToken] = useState('')
@@ -1152,6 +1181,24 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
       setVkToken((await window.api.settings.getKey('vk_access_token')) ?? '')
       setAmocrmSubdomain((await window.api.settings.getKey('amocrm_subdomain')) ?? '')
       setAmocrmToken((await window.api.settings.getKey('amocrm_access_token')) ?? '')
+      setMoyskladToken((await window.api.settings.getKey('moysklad_token')) ?? '')
+      setYTrackerToken((await window.api.settings.getKey('yandex_tracker_token')) ?? '')
+      setYTrackerOrgId((await window.api.settings.getKey('yandex_tracker_org_id')) ?? '')
+      setSendpulseClientId((await window.api.settings.getKey('sendpulse_client_id')) ?? '')
+      setSendpulseClientSecret((await window.api.settings.getKey('sendpulse_client_secret')) ?? '')
+      setUnisenderApiKey((await window.api.settings.getKey('unisender_api_key')) ?? '')
+      setGa4Token((await window.api.settings.getKey('ga4_access_token')) ?? '')
+      setGa4PropertyId((await window.api.settings.getKey('ga4_property_id')) ?? '')
+      setNotionToken((await window.api.settings.getKey('notion_token')) ?? '')
+      setKonturFocusKey((await window.api.settings.getKey('kontur_focus_api_key')) ?? '')
+      setMpstatsToken((await window.api.settings.getKey('mpstats_token')) ?? '')
+      setOzonPerfClientId((await window.api.settings.getKey('ozon_perf_client_id')) ?? '')
+      setOzonPerfClientSecret((await window.api.settings.getKey('ozon_perf_client_secret')) ?? '')
+      setJiraBaseUrl((await window.api.settings.getKey('jira_base_url')) ?? '')
+      setJiraEmail((await window.api.settings.getKey('jira_email')) ?? '')
+      setJiraApiToken((await window.api.settings.getKey('jira_api_token')) ?? '')
+      setTrelloApiKey((await window.api.settings.getKey('trello_api_key')) ?? '')
+      setTrelloToken((await window.api.settings.getKey('trello_token')) ?? '')
       setYDirectLogin((await window.api.settings.getKey('yandex_direct_login')) ?? '')
       setSkillsServerBase((await window.api.settings.getKey('skills_server_base')) ?? '')
       setClaudeOauthToken((await window.api.settings.getKey('claude_code_oauth_token')) ?? '')
@@ -1285,6 +1332,24 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
     await window.api.settings.setKey('vk_access_token', vkToken)
     await window.api.settings.setKey('amocrm_subdomain', amocrmSubdomain)
     await window.api.settings.setKey('amocrm_access_token', amocrmToken)
+    await window.api.settings.setKey('moysklad_token', moyskladToken)
+    await window.api.settings.setKey('yandex_tracker_token', yTrackerToken)
+    await window.api.settings.setKey('yandex_tracker_org_id', yTrackerOrgId)
+    await window.api.settings.setKey('sendpulse_client_id', sendpulseClientId)
+    await window.api.settings.setKey('sendpulse_client_secret', sendpulseClientSecret)
+    await window.api.settings.setKey('unisender_api_key', unisenderApiKey)
+    await window.api.settings.setKey('ga4_access_token', ga4Token)
+    await window.api.settings.setKey('ga4_property_id', ga4PropertyId)
+    await window.api.settings.setKey('notion_token', notionToken)
+    await window.api.settings.setKey('kontur_focus_api_key', konturFocusKey)
+    await window.api.settings.setKey('mpstats_token', mpstatsToken)
+    await window.api.settings.setKey('ozon_perf_client_id', ozonPerfClientId)
+    await window.api.settings.setKey('ozon_perf_client_secret', ozonPerfClientSecret)
+    await window.api.settings.setKey('jira_base_url', jiraBaseUrl)
+    await window.api.settings.setKey('jira_email', jiraEmail)
+    await window.api.settings.setKey('jira_api_token', jiraApiToken)
+    await window.api.settings.setKey('trello_api_key', trelloApiKey)
+    await window.api.settings.setKey('trello_token', trelloToken)
     await window.api.settings.setKey('yandex_direct_login', yDirectLogin)
     await window.api.settings.setKey('skills_server_base', skillsServerBase)
     await window.api.settings.setKey('claude_code_oauth_token', claudeOauthToken)
@@ -1647,6 +1712,133 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
             Wordstat работает через Директ API (асинхронный отчёт). Если поле пустое —
             используется yandex_direct_token. Операция: get_wordstat (phrases, geo_id).
           </div>
+        </>
+      )
+      case 'moysklad': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Token</label>
+            <input className="gg-input" type="password" value={moyskladToken} onChange={e => setMoyskladToken(e.target.value)} placeholder="Bearer-токен МойСклад (Настройки → API)" autoComplete="new-password" />
+          </div>
+          <div className="gg-settings-hint">Операции: list_products, list_orders, get_stock.</div>
+        </>
+      )
+      case 'yandex_tracker': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">OAuth token</label>
+            <input className="gg-input" type="password" value={yTrackerToken} onChange={e => setYTrackerToken(e.target.value)} placeholder="oauth.yandex.ru, доступ к Трекеру" autoComplete="new-password" />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">X-Org-ID</label>
+            <input className="gg-input" value={yTrackerOrgId} onChange={e => setYTrackerOrgId(e.target.value)} placeholder="ID организации Трекера" spellCheck={false} />
+          </div>
+          <div className="gg-settings-hint">Операции: list_queues, list_issues (queue), get_issue.</div>
+        </>
+      )
+      case 'sendpulse': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Client ID</label>
+            <input className="gg-input" value={sendpulseClientId} onChange={e => setSendpulseClientId(e.target.value)} placeholder="ID из SendPulse → API" spellCheck={false} />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Client Secret</label>
+            <input className="gg-input" type="password" value={sendpulseClientSecret} onChange={e => setSendpulseClientSecret(e.target.value)} placeholder="Secret" autoComplete="new-password" />
+          </div>
+          <div className="gg-settings-hint">OAuth2 client_credentials (токен кэшируется). Операции: list_mailing_lists, list_campaigns, get_balance.</div>
+        </>
+      )
+      case 'unisender': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">API key</label>
+            <input className="gg-input" type="password" value={unisenderApiKey} onChange={e => setUnisenderApiKey(e.target.value)} placeholder="Личный кабинет → Настройки → API" autoComplete="new-password" />
+          </div>
+          <div className="gg-settings-hint">Операции: get_lists, get_campaigns, get_campaign_stats.</div>
+        </>
+      )
+      case 'ga4': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Access token</label>
+            <input className="gg-input" type="password" value={ga4Token} onChange={e => setGa4Token(e.target.value)} placeholder="OAuth Bearer, scope analytics.readonly" autoComplete="new-password" />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Property ID</label>
+            <input className="gg-input" value={ga4PropertyId} onChange={e => setGa4PropertyId(e.target.value)} placeholder="Числовой ID ресурса GA4" spellCheck={false} />
+          </div>
+          <div className="gg-settings-hint">Операции: run_report (metrics/dimensions/период), get_realtime.</div>
+        </>
+      )
+      case 'notion': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Integration token</label>
+            <input className="gg-input" type="password" value={notionToken} onChange={e => setNotionToken(e.target.value)} placeholder="notion.so/my-integrations (Internal)" autoComplete="new-password" />
+          </div>
+          <div className="gg-settings-hint">Подключи интеграцию к нужным страницам. Операции: search, query_database, get_page.</div>
+        </>
+      )
+      case 'kontur_focus': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">API key</label>
+            <input className="gg-input" type="password" value={konturFocusKey} onChange={e => setKonturFocusKey(e.target.value)} placeholder="Ключ Focus API 3.0" autoComplete="new-password" />
+          </div>
+          <div className="gg-settings-hint">Операции: req (реквизиты по ИНН/ОГРН), analytics (риск-маркеры).</div>
+        </>
+      )
+      case 'mpstats': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Token</label>
+            <input className="gg-input" type="password" value={mpstatsToken} onChange={e => setMpstatsToken(e.target.value)} placeholder="X-Mpstats-TOKEN" autoComplete="new-password" />
+          </div>
+          <div className="gg-settings-hint">⚠️ Бета — проверь на своём аккаунте. Операции: аналитика категорий/товаров WB.</div>
+        </>
+      )
+      case 'ozon_performance': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Client ID</label>
+            <input className="gg-input" value={ozonPerfClientId} onChange={e => setOzonPerfClientId(e.target.value)} placeholder="client_id Performance API" spellCheck={false} />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Client Secret</label>
+            <input className="gg-input" type="password" value={ozonPerfClientSecret} onChange={e => setOzonPerfClientSecret(e.target.value)} placeholder="client_secret" autoComplete="new-password" />
+          </div>
+          <div className="gg-settings-hint">⚠️ Бета — проверь на аккаунте. Операции: list_campaigns, list_objects.</div>
+        </>
+      )
+      case 'jira': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Base URL</label>
+            <input className="gg-input" value={jiraBaseUrl} onChange={e => setJiraBaseUrl(e.target.value)} placeholder="https://company.atlassian.net" spellCheck={false} />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Email</label>
+            <input className="gg-input" value={jiraEmail} onChange={e => setJiraEmail(e.target.value)} placeholder="email Atlassian" spellCheck={false} />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">API token</label>
+            <input className="gg-input" type="password" value={jiraApiToken} onChange={e => setJiraApiToken(e.target.value)} placeholder="id.atlassian.com → API tokens" autoComplete="new-password" />
+          </div>
+          <div className="gg-settings-hint">Операции: search_issues (JQL), get_issue, list_projects.</div>
+        </>
+      )
+      case 'trello': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">API key</label>
+            <input className="gg-input" value={trelloApiKey} onChange={e => setTrelloApiKey(e.target.value)} placeholder="trello.com/app-key" spellCheck={false} />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Token</label>
+            <input className="gg-input" type="password" value={trelloToken} onChange={e => setTrelloToken(e.target.value)} placeholder="токен авторизации Trello" autoComplete="new-password" />
+          </div>
+          <div className="gg-settings-hint">Операции: list_boards, list_lists (board_id), list_cards (list_id).</div>
         </>
       )
       case 'ozon': return (

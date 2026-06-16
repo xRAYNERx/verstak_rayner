@@ -19,6 +19,17 @@ import { createWildberriesConnector } from './wildberries'
 import { createYooKassaConnector } from './yookassa'
 import { createVkConnector } from './vk'
 import { createAmoCrmConnector } from './amocrm'
+import { createMoySkladConnector } from './moysklad'
+import { createYandexTrackerConnector } from './yandex-tracker'
+import { createSendPulseConnector } from './sendpulse'
+import { createUniSenderConnector } from './unisender'
+import { createGa4Connector } from './ga4'
+import { createNotionConnector } from './notion'
+import { createKonturFocusConnector } from './kontur-focus'
+import { createMpStatsConnector } from './mpstats'
+import { createOzonPerformanceConnector } from './ozon-performance'
+import { createJiraConnector } from './jira'
+import { createTrelloConnector } from './trello'
 
 // Built-in connectors. Adding a new adapter = register it here.
 const BUILTINS: Connector[] = [
@@ -41,7 +52,18 @@ const BUILTINS: Connector[] = [
   createWildberriesConnector(),
   createYooKassaConnector(),
   createVkConnector(),
-  createAmoCrmConnector()
+  createAmoCrmConnector(),
+  createMoySkladConnector(),
+  createYandexTrackerConnector(),
+  createSendPulseConnector(),
+  createUniSenderConnector(),
+  createGa4Connector(),
+  createNotionConnector(),
+  createKonturFocusConnector(),
+  createMpStatsConnector(),
+  createOzonPerformanceConnector(),
+  createJiraConnector(),
+  createTrelloConnector()
 ]
 
 export interface ConnectorRegistry {
