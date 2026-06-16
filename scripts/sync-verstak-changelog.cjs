@@ -13,6 +13,16 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: 'db7802b',
+    deployed: '17.06.2026 02:43',
+    treeVersion: '1.5.5',
+    title: 'Скрытые проекты — минималистичный вид',
+    changes: [
+      'Возвращён прежний вид секции «Скрытые»: прозрачный toggle, tertiary-текст, без иконки папки.',
+      'Поведение при сворачивании rail сохранено — чипы скрываются, папка визуально закрыта.',
+    ],
+  },
+  {
     commit: '9d6e2e9',
     deployed: '17.06.2026 02:40',
     treeVersion: '1.5.5',
