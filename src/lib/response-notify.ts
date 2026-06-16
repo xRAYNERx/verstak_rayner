@@ -53,7 +53,7 @@ export async function notifyResponseReady(opts: {
   if (prefs.sound) void window.api.notify.playSound({ isError: !!opts.isError })
 
   if (prefs.toast) {
-    const title = opts.title ?? (opts.isError ? 'Grok Desktop — ошибка' : 'Grok Desktop')
+    const title = opts.title ?? (opts.isError ? 'Verstak — ошибка' : 'Verstak')
     const body = opts.body ?? (opts.isError ? 'Не удалось получить ответ' : 'Ответ готов')
     void window.api.notify.show({ title, body })
   }

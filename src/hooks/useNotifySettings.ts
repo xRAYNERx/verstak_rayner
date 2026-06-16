@@ -63,7 +63,7 @@ export function useNotifySettings(): {
     invalidateNotifyPrefsCache()
     const { notifyResponseReady } = await import('../lib/response-notify')
     await notifyResponseReady({
-      title: 'Grok Desktop',
+      title: 'Verstak',
       body: 'Тест: ответ готов',
       force: true
     })
