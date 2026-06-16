@@ -409,6 +409,7 @@ declare global {
           name: string
           body: string
           htmlUrl: string
+          publishedAt?: string
         }>>
         check(): Promise<{ available: boolean; version?: string; error?: string; phase?: string; pendingRelease?: boolean }>
         getState(): Promise<{ phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }>

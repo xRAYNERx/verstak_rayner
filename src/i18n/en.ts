@@ -188,6 +188,8 @@ export const en = {
     railReadyShort: 'Ready',
     whatsNewTitle: 'Update installed',
     whatsNewSubtitle: 'Version {version} — what\'s new',
+    whatsNewTitleMulti: 'Missed updates',
+    whatsNewSubtitleMulti: 'From v{from} to v{to} — {count} releases',
     releaseNotesTitleCurrent: 'What\'s new in v{version}',
     releaseNotesTitleAvailable: 'What\'s new in v{version} (available to install)',
     releaseNotesClose: 'Got it',

@@ -5066,12 +5066,31 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 }
 .gg-release-notes-version {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
   margin: 0 0 14px;
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+.gg-release-notes-version-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.gg-release-notes-name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.gg-release-notes-date {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--text-tertiary);
+  white-space: nowrap;
 }
 .gg-release-notes-tag {
   font-family: var(--font-mono);

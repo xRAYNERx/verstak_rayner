@@ -185,6 +185,8 @@ export const ru: Translations = {
     railReadyShort: 'Готово',
     whatsNewTitle: 'Обновление установлено',
     whatsNewSubtitle: 'Версия {version} — что нового',
+    whatsNewTitleMulti: 'Пропущенные обновления',
+    whatsNewSubtitleMulti: 'С v{from} до v{to} — {count} обновлений',
     releaseNotesTitleCurrent: 'Что нового в v{version}',
     releaseNotesTitleAvailable: 'Что нового в v{version} (доступно для установки)',
     releaseNotesClose: 'Понятно',
