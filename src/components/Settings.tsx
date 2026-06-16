@@ -298,6 +298,7 @@ const CONNECTORS: ConnectorDef[] = [
   { id: 'skills-server', name: 'Сервер скиллов', description: 'Удалённые AI-скиллы', icon: IconSkillsServer, configuredKey: 'skills_server_base' },
   { id: 'github', name: 'GitHub', description: 'Репозитории, issues, PR, code search', icon: IconGitHub, configuredKey: 'github_token' },
   { id: 'social-publish', name: 'Social Publish', description: 'Постинг в Telegram, VK, webhooks', icon: IconSocialPublish, configuredKey: 'social_publish_telegram_channels' },
+  { id: 'dadata', name: 'DaData', description: 'Контрагенты по ИНН, адреса, банки', icon: IconHTTP, configuredKey: 'dadata_api_key' },
 ]
 
 // ─── MCP Tab ─────────────────────────────────────────────────────────────────
@@ -1024,6 +1025,8 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
   const [sshKeyPath, setSshKeyPath] = useState('')
   const [bitrixWebhook, setBitrixWebhook] = useState('')
   const [yDirectToken, setYDirectToken] = useState('')
+  const [dadataApiKey, setDadataApiKey] = useState('')
+  const [dadataSecret, setDadataSecret] = useState('')
   const [yDirectLogin, setYDirectLogin] = useState('')
   const [skillsServerBase, setSkillsServerBase] = useState('')
   const [claudeOauthToken, setClaudeOauthToken] = useState('')
@@ -1112,6 +1115,8 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
       setSshKeyPath((await window.api.settings.getKey('ssh_key_path')) ?? '')
       setBitrixWebhook((await window.api.settings.getKey('bitrix24_webhook_url')) ?? '')
       setYDirectToken((await window.api.settings.getKey('yandex_direct_token')) ?? '')
+      setDadataApiKey((await window.api.settings.getKey('dadata_api_key')) ?? '')
+      setDadataSecret((await window.api.settings.getKey('dadata_secret')) ?? '')
       setYDirectLogin((await window.api.settings.getKey('yandex_direct_login')) ?? '')
       setSkillsServerBase((await window.api.settings.getKey('skills_server_base')) ?? '')
       setClaudeOauthToken((await window.api.settings.getKey('claude_code_oauth_token')) ?? '')
@@ -1230,6 +1235,8 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
     await window.api.settings.setKey('ssh_key_path', sshKeyPath)
     await window.api.settings.setKey('bitrix24_webhook_url', bitrixWebhook)
     await window.api.settings.setKey('yandex_direct_token', yDirectToken)
+    await window.api.settings.setKey('dadata_api_key', dadataApiKey)
+    await window.api.settings.setKey('dadata_secret', dadataSecret)
     await window.api.settings.setKey('yandex_direct_login', yDirectLogin)
     await window.api.settings.setKey('skills_server_base', skillsServerBase)
     await window.api.settings.setKey('claude_code_oauth_token', claudeOauthToken)
@@ -1474,6 +1481,37 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
           <div className="gg-settings-hint">
             Reports API асинхронный — connector polls до 30s. Если отчёт большой,
             возвращается <code>processing: true</code>, повторяй запрос.
+          </div>
+        </>
+      )
+      case 'dadata': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">API key</label>
+            <input
+              className="gg-input"
+              type="password"
+              value={dadataApiKey}
+              onChange={e => setDadataApiKey(e.target.value)}
+              placeholder="Token из dadata.ru/profile/#info"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">Secret (опц.)</label>
+            <input
+              className="gg-input"
+              type="password"
+              value={dadataSecret}
+              onChange={e => setDadataSecret(e.target.value)}
+              placeholder="Нужен только для clean_address (стандартизация)"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="gg-settings-hint">
+            Операции: find_party (контрагент по ИНН/ОГРН), suggest_party, suggest_address,
+            suggest_bank, clean_address. Подсказки работают по одному API key; clean_address
+            требует Secret.
           </div>
         </>
       )
