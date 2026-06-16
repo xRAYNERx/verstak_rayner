@@ -302,6 +302,7 @@ const CONNECTORS: ConnectorDef[] = [
   { id: 'ymetrika', name: 'Яндекс.Метрика', description: 'Веб-аналитика: трафик, источники, цели', icon: IconYandexDirect, configuredKey: 'yandex_metrika_token' },
   { id: 'avito', name: 'Avito', description: 'Объявления, статистика, баланс', icon: IconHTTP, configuredKey: 'avito_client_id' },
   { id: 'ywebmaster', name: 'Яндекс.Вебмастер', description: 'SEO: ИКС, проблемы, запросы', icon: IconYandexDirect, configuredKey: 'yandex_webmaster_token' },
+  { id: 'ywordstat', name: 'Яндекс.Wordstat', description: 'Частотность ключевых слов', icon: IconYandexDirect, configuredKey: 'yandex_wordstat_token' },
 ]
 
 // ─── MCP Tab ─────────────────────────────────────────────────────────────────
@@ -1034,6 +1035,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
   const [avitoClientId, setAvitoClientId] = useState('')
   const [avitoClientSecret, setAvitoClientSecret] = useState('')
   const [yWebmasterToken, setYWebmasterToken] = useState('')
+  const [yWordstatToken, setYWordstatToken] = useState('')
   const [yDirectLogin, setYDirectLogin] = useState('')
   const [skillsServerBase, setSkillsServerBase] = useState('')
   const [claudeOauthToken, setClaudeOauthToken] = useState('')
@@ -1128,6 +1130,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
       setAvitoClientId((await window.api.settings.getKey('avito_client_id')) ?? '')
       setAvitoClientSecret((await window.api.settings.getKey('avito_client_secret')) ?? '')
       setYWebmasterToken((await window.api.settings.getKey('yandex_webmaster_token')) ?? '')
+      setYWordstatToken((await window.api.settings.getKey('yandex_wordstat_token')) ?? '')
       setYDirectLogin((await window.api.settings.getKey('yandex_direct_login')) ?? '')
       setSkillsServerBase((await window.api.settings.getKey('skills_server_base')) ?? '')
       setClaudeOauthToken((await window.api.settings.getKey('claude_code_oauth_token')) ?? '')
@@ -1252,6 +1255,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
     await window.api.settings.setKey('avito_client_id', avitoClientId)
     await window.api.settings.setKey('avito_client_secret', avitoClientSecret)
     await window.api.settings.setKey('yandex_webmaster_token', yWebmasterToken)
+    await window.api.settings.setKey('yandex_wordstat_token', yWordstatToken)
     await window.api.settings.setKey('yandex_direct_login', yDirectLogin)
     await window.api.settings.setKey('skills_server_base', skillsServerBase)
     await window.api.settings.setKey('claude_code_oauth_token', claudeOauthToken)
@@ -1594,6 +1598,25 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
           <div className="gg-settings-hint">
             Операции: list_hosts, get_summary (ИКС + проблемы), get_queries (топ запросов
             с показами/кликами). host_id берётся из list_hosts.
+          </div>
+        </>
+      )
+      case 'ywordstat': return (
+        <>
+          <div className="gg-settings-row">
+            <label className="gg-settings-label">OAuth token</label>
+            <input
+              className="gg-input"
+              type="password"
+              value={yWordstatToken}
+              onChange={e => setYWordstatToken(e.target.value)}
+              placeholder="oauth.yandex.ru, scope direct (или оставь — возьмётся токен Директа)"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="gg-settings-hint">
+            Wordstat работает через Директ API (асинхронный отчёт). Если поле пустое —
+            используется yandex_direct_token. Операция: get_wordstat (phrases, geo_id).
           </div>
         </>
       )

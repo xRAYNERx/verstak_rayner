@@ -13,6 +13,7 @@ import { createDaDataConnector } from './dadata'
 import { createYandexMetrikaConnector } from './yandex-metrika'
 import { createAvitoConnector } from './avito'
 import { createYandexWebmasterConnector } from './yandex-webmaster'
+import { createYandexWordstatConnector } from './yandex-wordstat'
 
 // Built-in connectors. Adding a new adapter = register it here.
 const BUILTINS: Connector[] = [
@@ -29,7 +30,8 @@ const BUILTINS: Connector[] = [
   createDaDataConnector(),
   createYandexMetrikaConnector(),
   createAvitoConnector(),
-  createYandexWebmasterConnector()
+  createYandexWebmasterConnector(),
+  createYandexWordstatConnector()
 ]
 
 export interface ConnectorRegistry {
