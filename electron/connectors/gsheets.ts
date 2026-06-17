@@ -25,7 +25,28 @@ interface ServiceAccount {
 }
 
 // Кеш access_token в памяти модуля. Per-process, переживает между запросами.
-let cachedToken: { token: string; expiresAt: number } | null = null
+let cachedToken: { token: string; expiresAt: number; clientEmail: string } | null = null
+
+/** Кэш токена валиден только для ТОГО ЖЕ service account — иначе после ротации
+ *  креда (смены client_email) getAccessToken вернул бы чужой/протухший токен. */
+export function tokenCacheHit(
+  cache: { token: string; expiresAt: number; clientEmail: string } | null,
+  sa: { client_email: string },
+  now: number,
+): boolean {
+  return !!cache && cache.clientEmail === sa.client_email && cache.expiresAt > now
+}
+
+/** Маппит строки в 2D-массив значений по заголовкам. Поддерживает И объекты
+ *  {column: value}, И позиционные массивы [v0, v1, …] — раньше массив молча
+ *  давал строку ПУСТЫХ ячеек (r[headerName] === undefined). */
+export function rowsToValues2d(rows: unknown[], headers: string[]): string[][] {
+  return rows.map(r => {
+    if (Array.isArray(r)) return headers.map((_h, i) => String(r[i] ?? ''))
+    const obj = (r ?? {}) as Record<string, unknown>
+    return headers.map(h => String(obj[h] ?? ''))
+  })
+}
 
 const SHEETS_BASE = 'https://sheets.googleapis.com/v4/spreadsheets'
 const TOKEN_TTL_MS = 50 * 60 * 1000  // refresh за 10 минут до фактического expiry
@@ -138,7 +159,7 @@ async function appendRows(sa: ServiceAccount, args: Record<string, unknown>, ctx
   // Получаем headers из первой строки таблицы чтобы знать колонки
   const meta = await readAsRecords(sa, { ...args, headers_row: 1 }, ctx) as { headers: string[] }
   const headers = meta.headers
-  const values2d = rows.map(r => headers.map(h => String(r[h] ?? '')))
+  const values2d = rowsToValues2d(rows, headers)
   const token = await getAccessToken(sa, ctx)
   const url = `${SHEETS_BASE}/${encodeURIComponent(spreadsheet_id)}/values/${encodeURIComponent(sheet_name)}:append`
     + `?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`
@@ -231,7 +252,7 @@ function loadServiceAccount(ctx: ConnectorContext): ServiceAccount | null {
 }
 
 async function getAccessToken(sa: ServiceAccount, ctx: ConnectorContext): Promise<string> {
-  if (cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.token
+  if (tokenCacheHit(cachedToken, sa, Date.now())) return cachedToken!.token
   // Сборка JWT и обмен на access_token (Service Account flow).
   const now = Math.floor(Date.now() / 1000)
   const header = { alg: 'RS256', typ: 'JWT' }
@@ -262,7 +283,8 @@ async function getAccessToken(sa: ServiceAccount, ctx: ConnectorContext): Promis
   }
   cachedToken = {
     token: payload.access_token,
-    expiresAt: Date.now() + Math.min((payload.expires_in ?? 3600) * 1000 - 60_000, TOKEN_TTL_MS)
+    expiresAt: Date.now() + Math.min((payload.expires_in ?? 3600) * 1000 - 60_000, TOKEN_TTL_MS),
+    clientEmail: sa.client_email
   }
   return payload.access_token
 }
