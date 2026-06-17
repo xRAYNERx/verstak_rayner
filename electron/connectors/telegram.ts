@@ -149,6 +149,8 @@ async function reactToMessage(token: string, args: Record<string, unknown>, ctx:
   const messageId = Number(args.message_id ?? 0)
   const emoji = String(args.emoji ?? '👍')
   if (!chatId || !messageId) return { error: 'bad-args', message: 'react требует chat_id и message_id' }
+  const whitelistCheck = checkWhitelist(chatId, ctx)
+  if (whitelistCheck) return whitelistCheck
   return await callBot(token, 'setMessageReaction', {
     chat_id: chatId,
     message_id: messageId,
@@ -160,6 +162,8 @@ async function deleteMessage(token: string, args: Record<string, unknown>, ctx: 
   const chatId = String(args.chat_id ?? '')
   const messageId = Number(args.message_id ?? 0)
   if (!chatId || !messageId) return { error: 'bad-args', message: 'delete_message требует chat_id и message_id' }
+  const whitelistCheck = checkWhitelist(chatId, ctx)
+  if (whitelistCheck) return whitelistCheck
   return await callBot(token, 'deleteMessage', { chat_id: chatId, message_id: messageId }, ctx)
 }
 

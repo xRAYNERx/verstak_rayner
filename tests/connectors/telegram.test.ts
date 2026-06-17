@@ -37,6 +37,25 @@ describe('Telegram connector', () => {
     expect(res.error).toBe('not-whitelisted')
   })
 
+  // C1: delete_message и react раньше НЕ проверяли whitelist — деструктивная
+  // мутация (удаление/реакция) проходила в неодобрённый чат.
+  it('whitelist блокирует delete_message и react (без сетевого вызова)', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const conn = createTelegramConnector()
+    const del = await conn.query(
+      { op: 'delete_message', chat_id: '999', message_id: 5 },
+      withToken('["111"]')
+    ) as { error: string }
+    expect(del.error).toBe('not-whitelisted')
+    const react = await conn.query(
+      { op: 'react', chat_id: '999', message_id: 5, emoji: '👍' },
+      withToken('["111"]')
+    ) as { error: string }
+    expect(react.error).toBe('not-whitelisted')
+    expect(fetchSpy).not.toHaveBeenCalled() // гейт сработал ДО сети
+    fetchSpy.mockRestore()
+  })
+
   it('пустой whitelist (null) — пропускает (dev mode)', async () => {
     // С пустым whitelist - НЕ должно вернуть not-whitelisted (попытается
     // отправить и упадёт уже на fetch). Здесь мы тестируем именно whitelist
