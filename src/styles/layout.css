@@ -2420,6 +2420,125 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   display: flex;
   flex-direction: column;
 }
+.gg-composer-pending-bar {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--accent-muted) 55%, var(--bg-elevated));
+}
+.gg-composer-pending-bar-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 20px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.gg-composer-pending-bar-toggle:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+.gg-composer-pending-bar-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+.gg-composer-pending-bar-summary {
+  flex: 1;
+  min-width: 0;
+}
+.gg-composer-pending-bar-chevron {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+.gg-composer-pending-bar-panel {
+  padding: 0 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.gg-composer-pending-section-title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+.gg-composer-pending-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gg-composer-pending-list:not(.is-supplements) {
+  counter-reset: pending-queue;
+}
+.gg-composer-pending-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-base);
+  padding: 8px 10px;
+}
+.gg-composer-pending-item.is-supplement.is-accepted {
+  border-left: 2px solid var(--success);
+}
+.gg-composer-pending-item.is-supplement.is-deferred {
+  border-left: 2px solid var(--warning, #d4a017);
+}
+.gg-composer-pending-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+.gg-composer-pending-item-order,
+.gg-composer-pending-item-badge {
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+.gg-composer-pending-item-time {
+  margin-left: auto;
+  font-family: var(--font-mono);
+}
+.gg-composer-pending-item-remove {
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.gg-composer-pending-item-remove:hover {
+  color: var(--text-primary);
+}
+.gg-composer-pending-item-text {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.45;
+}
+.gg-msg.is-supplement .gg-msg-bubble {
+  border-left: 2px solid var(--success);
+  background: color-mix(in srgb, var(--success) 8%, var(--accent-muted));
+}
+.gg-msg-supplement-tag {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--success);
+  margin-bottom: 6px;
+  font-family: var(--font-mono);
+}
 .gg-chat-stream {
   flex: 1; overflow-y: auto;
   width: 100%;

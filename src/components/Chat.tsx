@@ -31,7 +31,15 @@ import {
   formatMessageDateTitle,
   isSameLocalDay,
 } from '../lib/chat-timestamps'
-import type { QueuedComposerMessage } from '../lib/composer-streaming'
+import { ComposerPendingBar } from './ComposerPendingBar'
+import {
+  formatSupplementForAgent,
+  nextComposerItemId,
+  parseSupplementMessage,
+  type PendingSupplement,
+  type PendingSupplementStatus,
+  type QueuedComposerMessage,
+} from '../lib/composer-streaming'
 
 function normalizeProjectPath(p: string): string {
   return p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
@@ -170,8 +178,10 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
   const screenshotCounter = useRef(0)
   const warningTimer = useRef<number | null>(null)
   const currentSendIdRef = useRef<number | null>(null)
-  const messageQueueRef = useRef<QueuedComposerMessage[]>([])
-  const [queueCount, setQueueCount] = useState(0)
+  const queuedMessagesRef = useRef<QueuedComposerMessage[]>([])
+  const [queuedMessages, setQueuedMessages] = useState<QueuedComposerMessage[]>([])
+  const [pendingSupplements, setPendingSupplements] = useState<PendingSupplement[]>([])
+  const [pendingBarExpanded, setPendingBarExpanded] = useState(false)
   const flushQueueRef = useRef<() => void>(() => {})
   // Resume задачи (Фаза 4): взводится при gg-resume-send, эффект ниже шлёт send().
   const resumeAutoSendRef = useRef(false)
@@ -514,6 +524,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
           store.setRunningPlanStep(null)
         }
         setStreaming(false)
+        setPendingSupplements([])
+        setPendingBarExpanded(false)
         store.forgetSendOwner(id)
         void notifyResponseReady({ projectName: projectNameForPath(store.path) })
         flushQueueRef.current()
@@ -536,6 +548,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
             ('message' in event ? event.message : '').slice(0, 600))
         }
         setStreaming(false)
+        setPendingSupplements([])
+        setPendingBarExpanded(false)
         store.forgetSendOwner(id)
         void notifyResponseReady({ projectName: projectNameForPath(store.path), isError: true })
         flushQueueRef.current()
@@ -879,21 +893,32 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     return { path: next.path, activeChatId: next.activeChatId }
   }
 
+  function setQueuedMessagesState(items: QueuedComposerMessage[]) {
+    queuedMessagesRef.current = items
+    setQueuedMessages(items)
+  }
+
   async function flushMessageQueue() {
-    if (messageQueueRef.current.length === 0) return
+    if (queuedMessagesRef.current.length === 0) return
     if (useProject.getState().isStreaming) return
-    const next = messageQueueRef.current.shift()!
-    setQueueCount(messageQueueRef.current.length)
+    const [next, ...rest] = queuedMessagesRef.current
+    setQueuedMessagesState(rest)
     await send({ text: next.text, fromQueue: true })
   }
 
   flushQueueRef.current = () => { void flushMessageQueue() }
 
   function queueFollowUp(text: string) {
-    messageQueueRef.current.push({ text })
-    setQueueCount(messageQueueRef.current.length)
+    const item: QueuedComposerMessage = { id: nextComposerItemId(), text, at: Date.now() }
+    setQueuedMessagesState([...queuedMessagesRef.current, item])
     setInput('')
+    setPendingBarExpanded(true)
+    flashWarning(t.chat.streamingQueueAdded)
     armAutoScrollForOutgoing()
+  }
+
+  function removeQueuedMessage(id: string) {
+    setQueuedMessagesState(queuedMessagesRef.current.filter(m => m.id !== id))
   }
 
   async function appendToCurrentContext() {
@@ -901,18 +926,32 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     if (!text || !isStreaming) return
     const sendId = currentSendIdRef.current
     const ctx = await ensureProjectForChat()
-    insertMessageBeforeLast({ role: 'user', content: text })
+    const formatted = formatSupplementForAgent(text)
+    insertMessageBeforeLast({ role: 'user', content: formatted })
     setInput('')
     armAutoScrollForOutgoing()
-    if (ctx?.path && ctx.activeChatId) {
-      await window.api.chats.append(ctx.activeChatId, ctx.path, 'user', text)
-    }
-    if (sendId == null) return
-    const res = await window.api.ai.appendContext(sendId, text)
-    if (!res.ok) {
-      if (provider.id.endsWith('-cli')) {
+
+    let status: PendingSupplementStatus = 'deferred'
+    if (sendId != null) {
+      const res = await window.api.ai.appendContext(sendId, text)
+      if (res.ok) {
+        status = 'accepted'
+        flashWarning(t.chat.streamingAppendAccepted)
+      } else if (provider.id.endsWith('-cli')) {
         flashWarning(t.chat.streamingAppendCliNote)
       }
+    }
+
+    setPendingSupplements(prev => [...prev, {
+      id: nextComposerItemId(),
+      text,
+      at: Date.now(),
+      status,
+    }])
+    setPendingBarExpanded(true)
+
+    if (ctx?.path && ctx.activeChatId) {
+      await window.api.chats.append(ctx.activeChatId, ctx.path, 'user', formatted)
     }
   }
 
@@ -1033,6 +1072,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     if (id == null) return
     await window.api.ai.stop(id)
     setStreaming(false)
+    setPendingSupplements([])
+    setPendingBarExpanded(false)
     // sendOwners cleanup: stop() = главное место где renderer знает, что
     // больше событий по этому sendId не придёт. Без этого owner повисал бы
     // в мапе, потому что done event на abort иногда теряется.
@@ -1138,6 +1179,15 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
       )}
 
       <div className="gg-chat-stream-area">
+        {isStreaming && (queuedMessages.length > 0 || pendingSupplements.length > 0) && (
+          <ComposerPendingBar
+            queueItems={queuedMessages}
+            supplements={pendingSupplements}
+            expanded={pendingBarExpanded}
+            onToggle={() => setPendingBarExpanded(v => !v)}
+            onRemoveQueueItem={removeQueuedMessage}
+          />
+        )}
         <div className="gg-chat-stream" ref={streamRef}>
         <div className="gg-chat-stream-inner">
         {/* Crash-resume: баннер «сессия прервана» (если есть зависшие прогоны). */}
@@ -1253,6 +1303,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
           const prevMsg = i > 0 ? messages[i - 1] : null
           const showDateDivider = m.createdAt != null
             && (prevMsg?.createdAt == null || !isSameLocalDay(prevMsg.createdAt, m.createdAt))
+          const supplement = m.role === 'user' && m.content ? parseSupplementMessage(m.content) : null
           return (
             <Fragment key={i}>
             {showDateDivider && (
@@ -1260,7 +1311,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
                 <span className="gg-chat-date-divider-label">{formatChatDateDivider(m.createdAt!)}</span>
               </div>
             )}
-            <div className={`gg-msg ${m.role === 'user' ? 'gg-msg-user' : 'gg-msg-assistant'}`}>
+            <div className={`gg-msg ${m.role === 'user' ? 'gg-msg-user' : 'gg-msg-assistant'}${supplement ? ' is-supplement' : ''}`}>
               {showActivity && (
                 <div className="gg-activity-list">
                   {activity.map(a => (
@@ -1404,7 +1455,14 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
                 {m.content
                   ? (m.role === 'assistant'
                       ? <Markdown text={m.content} />
-                      : <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span>)
+                      : supplement
+                        ? (
+                          <>
+                            <div className="gg-msg-supplement-tag">{supplement.tag}</div>
+                            <span style={{ whiteSpace: 'pre-wrap' }}>{supplement.body}</span>
+                          </>
+                        )
+                        : <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span>)
                   : isStreamingAssistant
                     ? <div className="gg-typing"><span /><span /><span /></div>
                     : null
@@ -1625,24 +1683,17 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
           />
         </div>
         <div className="gg-composer-hint">
-          {isStreaming && (input.trim() || queueCount > 0) && (
+          {isStreaming && input.trim() && (
             <div className="gg-composer-streaming-hint">
-              {input.trim() && (
-                <span>
-                  <kbd className="gg-kbd">Ctrl+Enter</kbd>
-                  {' — '}
-                  {t.chat.streamingAppendHint}
-                  {' · '}
-                  <kbd className="gg-kbd">Enter</kbd>
-                  {' — '}
-                  {t.chat.streamingQueueHint}
-                </span>
-              )}
-              {queueCount > 0 && (
-                <span className="gg-composer-queue-count">
-                  {t.chat.streamingQueueCount.replace('{n}', String(queueCount))}
-                </span>
-              )}
+              <span>
+                <kbd className="gg-kbd">Ctrl+Enter</kbd>
+                {' — '}
+                {t.chat.streamingAppendHint}
+                {' · '}
+                <kbd className="gg-kbd">Enter</kbd>
+                {' — '}
+                {t.chat.streamingQueueHint}
+              </span>
             </div>
           )}
           <div className="gg-composer-meta">
