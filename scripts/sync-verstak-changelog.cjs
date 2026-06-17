@@ -13,6 +13,17 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: '0bf3b12',
+    deployed: '17.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Задачи: живой прогресс, RU-first i18n, онбординг со сканом ПК',
+    changes: [
+      'Панель «Задачи»: строка прогресса на активных карточках — ход, текущий инструмент, время.',
+      'RU-first: русский по умолчанию; сайдбар, задачи, онбординг и auth-скан в i18n.',
+      'Онбординг шаг 2: скан CLI/локальных моделей + опциональные ключи Gemini/Anthropic/Yandex.',
+    ],
+  },
+  {
     commit: '5211c65',
     deployed: '17.06.2026',
     treeVersion: '1.5.5',
