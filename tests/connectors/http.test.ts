@@ -43,6 +43,17 @@ describe('HTTP connector', () => {
     expect(r.error).toBe('path-blocked')
   })
 
+  it('blocks `..` traversal that escapes the allow-list after URL normalization', async () => {
+    // Сырой путь startsWith '/v1/public/', но new URL схлопывает .. → /admin/keys.
+    const c = createHttpConnector()
+    const r = await c.query({ endpoint: 'api', path: '/v1/public/../../admin/keys' }, ctx({
+      http_endpoint_1_name: 'api',
+      http_endpoint_1_base: 'https://api.example.com',
+      http_endpoint_1_paths: '/v1/public'
+    })) as { error?: string }
+    expect(r.error).toBe('path-blocked')
+  })
+
   it('reports bad-args when endpoint is missing', async () => {
     const c = createHttpConnector()
     const r = await c.query({}, ctx({

@@ -152,6 +152,15 @@ export function createHttpConnector(): Connector {
           message: `Запрещено: путь "${path}" уводит запрос с ${baseParsed.host} на ${finalUrl.host}.`
         }
       }
+      // Повторная проверка allow-list по НОРМАЛИЗОВАННОМУ пути: `new URL` схлопывает
+      // `..`, поэтому сырой путь "/v1/public/../private" проходит гейт на строке 117,
+      // но реально бьёт в "/v1/private". Проверяем фактический pathname.
+      if (!pathAllowed(finalUrl.pathname, cfg.paths)) {
+        return {
+          error: 'path-blocked',
+          message: `Путь "${finalUrl.pathname}" не входит в allow-list эндпоинта "${cfg.name}" (после нормализации "..", сырой путь "${path}"). Разрешены: ${cfg.paths.join(', ') || '(пусто)'}`
+        }
+      }
       // Also block requests to loopback / link-local / private metadata services
       // EVEN if the user configured them as base (defence in depth — a user
       // misconfig shouldn't auto-grant the AI access to 169.254.169.254 etc.)
