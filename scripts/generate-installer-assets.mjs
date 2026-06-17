@@ -17,15 +17,12 @@ const THEME = {
   bgBase: '#2e3440',
   bgElevated: '#353c4a',
   bgOverlay: '#3b4252',
-  bgInput: '#2b313c',
   borderSubtle: '#353c4a',
   borderDefault: '#434c5e',
   borderStrong: '#4c566a',
-  textPrimary: '#eceff4',
   textSecondary: '#d8dee9',
   textTertiary: '#97a1b5',
   accent: '#88c0d0',
-  accentHover: '#9fd0de',
   error: '#bf616a',
 }
 
@@ -105,38 +102,6 @@ function headerSvg({ accent }) {
 </svg>`)
 }
 
-function buttonSvg(text, variant = 'primary') {
-  const w = variant === 'close' ? 46 : variant === 'wide' ? 120 : 96
-  const h = variant === 'close' ? 36 : 34
-  const r = variant === 'close' ? 8 : 10
-  const isPrimary = variant === 'primary' || variant === 'wide'
-  const isClose = variant === 'close'
-  const bg = isPrimary ? THEME.accent : isClose ? 'rgba(255,255,255,0.04)' : THEME.bgOverlay
-  const stroke = isPrimary ? THEME.accent : THEME.borderDefault
-  const fg = isPrimary ? THEME.bgBase : isClose ? THEME.textSecondary : THEME.textPrimary
-  const label = isClose ? '✕' : text
-  const fs = isClose ? 14 : h < 22 ? 8 : 12
-  return Buffer.from(`<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-  <rect width="${w}" height="${h}" rx="${r}" fill="${bg}" stroke="${stroke}" stroke-width="1"/>
-  <text x="${w / 2}" y="${h / 2 + (isClose ? 5 : 4)}" text-anchor="middle" fill="${fg}" font-family="Segoe UI,Inter,sans-serif" font-size="${fs}" font-weight="600">${label}</text>
-</svg>`)
-}
-
-function titlebarSvg() {
-  return Buffer.from(`<svg width="500" height="40" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="tb" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#3a4150"/>
-      <stop offset="100%" stop-color="${THEME.bgElevated}"/>
-    </linearGradient>
-  </defs>
-  <rect width="500" height="40" fill="url(#tb)"/>
-  <rect x="0" y="39" width="500" height="1" fill="${THEME.borderSubtle}"/>
-  <text x="42" y="25" fill="${THEME.textSecondary}" font-family="Segoe UI,Inter,sans-serif" font-size="11" font-weight="600" letter-spacing="2.4">VERSTAK</text>
-  <text x="488" y="25" text-anchor="end" fill="${THEME.textTertiary}" font-family="Segoe UI,Inter,sans-serif" font-size="9">Установка</text>
-</svg>`)
-}
-
 /** NSIS требует 24-bit uncompressed BMP. */
 function encodeBmp24(rgb, width, height) {
   const rowStride = Math.ceil((width * 3) / 4) * 4
@@ -178,10 +143,6 @@ async function toBmp(pipeline, width, height, flattenBg = THEME.bgBase) {
     throw new Error(`raw: expected ${width}×${height}×3, got ${info.width}×${info.height}×${info.channels}`)
   }
   return encodeBmp24(data, width, height)
-}
-
-async function svgToBmp(svg, w, h, flattenBg = THEME.bgBase) {
-  return toBmp(sharp(svg).png(), w, h, flattenBg)
 }
 
 async function compositeSidebar(logoBuf, variant) {
@@ -244,39 +205,11 @@ async function main() {
   const header = await compositeHeader(logoBuf, THEME.accent)
   const uninstallHeader = await compositeHeader(logoBuf, THEME.error)
 
-  const btnNext = await svgToBmp(buttonSvg('Далее', 'primary'), 96, 34, THEME.bgBase)
-  const btnBack = await svgToBmp(buttonSvg('Назад', 'ghost'), 96, 34, THEME.bgBase)
-  const btnCancel = await svgToBmp(buttonSvg('Отмена', 'ghost'), 96, 34, THEME.bgBase)
-  const btnInstall = await svgToBmp(buttonSvg('Установить', 'wide'), 120, 34, THEME.bgBase)
-  const btnFinish = await svgToBmp(buttonSvg('Готово', 'wide'), 120, 34, THEME.bgBase)
-  const btnClose = await svgToBmp(buttonSvg('', 'close'), 46, 36, THEME.bgElevated)
-  const btnBrowse = await svgToBmp(buttonSvg('Обзор…', 'ghost'), 64, 18, THEME.bgBase)
-  const titlebar = await svgToBmp(titlebarSvg(), 500, 40, THEME.bgElevated)
-
-  const titleLogo = await sharp(logoBuf)
-    .resize(18, 18, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .png()
-    .toBuffer()
-  const titlebarWithLogo = await toBmp(
-    sharp(titlebarSvg()).png().composite([{ input: titleLogo, top: 11, left: 14 }]),
-    500,
-    40,
-    THEME.bgElevated,
-  )
-
   for (const [buf, w, h, name] of [
     [sidebar, 164, 314, 'installerSidebar'],
     [uninstallSidebar, 164, 314, 'uninstallerSidebar'],
     [header, 150, 57, 'installerHeader'],
     [uninstallHeader, 150, 57, 'uninstallerHeader'],
-    [btnNext, 96, 34, 'btn-next'],
-    [btnBack, 96, 34, 'btn-back'],
-    [btnCancel, 96, 34, 'btn-cancel'],
-    [btnInstall, 120, 34, 'btn-install'],
-    [btnFinish, 120, 34, 'btn-finish'],
-    [btnClose, 46, 36, 'btn-close'],
-    [btnBrowse, 64, 18, 'btn-browse'],
-    [titlebarWithLogo, 500, 40, 'titlebar'],
   ]) {
     assertBmp(buf, w, h, name)
     fs.writeFileSync(path.join(OUT_DIR, `${name}.bmp`), buf)
