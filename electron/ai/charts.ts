@@ -67,11 +67,14 @@ function renderBar(input: ChartInput, w: number, h: number): string {
   const range = maxVal - minVal || 1
   const barWidth = (chartW / input.values.length) * 0.7
   const barGap = (chartW / input.values.length) * 0.3
+  // Нулевая линия в координатах шкалы: положительные бары рисуем вверх от неё,
+  // отрицательные — вниз. Иначе негативный бар уходил за нижний край viewBox (B3).
+  const zeroY = margin.top + chartH - ((0 - minVal) / range) * chartH
 
   const bars = input.values.map((v, i) => {
     const barH = (Math.abs(v) / range) * chartH
     const x = margin.left + (i + 0.5) * (chartW / input.values.length) - barWidth / 2
-    const y = margin.top + chartH - (v >= 0 ? barH : 0)
+    const y = v >= 0 ? zeroY - barH : zeroY
     return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barH.toFixed(1)}" fill="${PALETTE[i % PALETTE.length]}" rx="2"/>
       <text x="${(x + barWidth / 2).toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="#1a1d22">${formatNumber(v)}</text>`
   }).join('\n')
@@ -127,6 +130,8 @@ function renderPie(input: ChartInput, w: number, h: number): string {
   const radius = Math.min(w, h - (input.title ? 36 : 16) - 20) / 3
   const total = input.values.reduce((a, b) => a + b, 0)
   if (total === 0) return errorSvg('pie chart: сумма значений = 0')
+  // Отрицательные доли не имеют смысла в pie: давали обратную дугу и «-25%» (B6).
+  if (input.values.some(v => v < 0)) return errorSvg('pie chart: значения не могут быть отрицательными')
 
   let cumulative = 0
   const slices = input.values.map((v, i) => {

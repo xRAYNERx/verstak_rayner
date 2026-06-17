@@ -64,4 +64,30 @@ describe('renderChartSvg', () => {
     })
     expect(svg).toContain('2.5M')
   })
+
+  // B3: негативный бар раньше рисовался от низа вниз → уходил за нижний край viewBox.
+  it('bar chart с отрицательным значением держит бар внутри viewBox', () => {
+    const svg = renderChartSvg({ kind: 'bar', labels: ['x'], values: [-10] })
+    const m = svg.match(/<rect x="[\d.]+" y="([\d.]+)"[^>]*height="([\d.]+)"/)
+    expect(m).not.toBeNull()
+    const y = parseFloat(m![1]); const height = parseFloat(m![2])
+    expect(y + height).toBeLessThanOrEqual(360) // h по умолчанию
+    expect(y).toBeGreaterThanOrEqual(0)
+  })
+
+  it('bar chart с положительными значениями не регрессировал (бары внутри viewBox)', () => {
+    const svg = renderChartSvg({ kind: 'bar', labels: ['a', 'b'], values: [10, 20] })
+    const rects = [...svg.matchAll(/<rect x="[\d.]+" y="([\d.]+)"[^>]*height="([\d.]+)"/g)]
+    for (const r of rects) {
+      const y = parseFloat(r[1]); const height = parseFloat(r[2])
+      expect(y + height).toBeLessThanOrEqual(360)
+    }
+  })
+
+  // B6: отрицательное значение давало обратную дугу и «-25%».
+  it('pie chart с отрицательным значением → ошибка, без отрицательного процента', () => {
+    const svg = renderChartSvg({ kind: 'pie', labels: ['a', 'b', 'c'], values: [10, -5, 15] })
+    expect(svg).not.toMatch(/-\d+%/)
+    expect(svg).toContain('не могут быть отрицательными')
+  })
 })
