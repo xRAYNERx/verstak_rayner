@@ -26,3 +26,10 @@ export const INSTALLER_BOOT_MESSAGES = [
   'Считаем размер установки',
   'Готовим мастер установки',
 ] as const
+
+export const INSTALLER_WIZARD_STEPS = [
+  { key: 'welcome', label: 'Приветствие', hint: 'Ознакомление с программой' },
+  { key: 'directory', label: 'Папка', hint: 'Куда установить Verstak' },
+  { key: 'installing', label: 'Установка', hint: 'Копирование файлов' },
+  { key: 'finish', label: 'Готово', hint: 'Ярлыки и запуск' },
+] as const

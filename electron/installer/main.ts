@@ -96,10 +96,10 @@ function closeSplashWindow(): void {
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 780,
-    height: 520,
-    minWidth: 700,
-    minHeight: 480,
+    width: 860,
+    height: 600,
+    minWidth: 800,
+    minHeight: 540,
     resizable: false,
     maximizable: false,
     frame: false,

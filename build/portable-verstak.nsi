@@ -11,9 +11,8 @@ Function .onInit
   !insertmacro check64BitAndSetRegView
   InitPluginsDir
   SetOutPath $PLUGINSDIR
-  File "${BUILD_RESOURCES_DIR}\portable-splash.ps1"
-  File "${BUILD_RESOURCES_DIR}\icon.png"
-  ExecShell "" "powershell.exe" '-NoProfile -STA -ExecutionPolicy Bypass -File "$PLUGINSDIR\portable-splash.ps1"' SW_SHOW
+  File "${BUILD_RESOURCES_DIR}\portable-splash.hta"
+  ExecShell "" "mshta.exe" "$PLUGINSDIR\portable-splash.hta" SW_SHOW
 FunctionEnd
 
 Section

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { InstallDefaults, InstallProgress } from '../../electron/installer/types'
 import iconUrl from '../assets/icon.png'
-import { INSTALLER_VALUE_PROPS, MODEL_PROVIDER_COUNT } from './constants'
+import { INSTALLER_VALUE_PROPS, INSTALLER_WIZARD_STEPS, MODEL_PROVIDER_COUNT } from './constants'
 import { InstallerLoader } from './InstallerLoader'
 
 type Step = 'welcome' | 'directory' | 'installing' | 'finish'
@@ -217,25 +217,27 @@ export function SetupWizard() {
         <div className="gg-installer-logo-wrap">
           <img src={iconUrl} alt="" className="gg-installer-logo" />
         </div>
-        <div className="gg-installer-tagline">
-          IDE для разработки<br />с AI-агентами
-        </div>
-        <div className="gg-installer-features">
-          {INSTALLER_VALUE_PROPS.map((item) => (
-            <div key={item.title} className="gg-installer-feature">
-              <span className="gg-installer-feature-dot" />
-              <span className="gg-installer-feature-body">
-                <span className="gg-installer-feature-title">{item.title}</span>
-                <span className="gg-installer-feature-text">{item.text}</span>
-              </span>
-            </div>
-          ))}
-        </div>
-        <div className="gg-installer-steps">
-          {[0, 1, 2, 3].map((i) => (
-            <span key={i} className={`gg-installer-step${i <= activeStep ? ' is-active' : ''}`} />
-          ))}
-        </div>
+        <div className="gg-installer-sidebar-caption">Мастер установки</div>
+        <nav className="gg-installer-stepper" aria-label="Шаги установки">
+          {INSTALLER_WIZARD_STEPS.map((item, index) => {
+            const state = index < activeStep ? 'done' : index === activeStep ? 'current' : 'todo'
+            return (
+              <div key={item.key} className={`gg-installer-stepper-item is-${state}`}>
+                <span className="gg-installer-stepper-index">{index + 1}</span>
+                <span className="gg-installer-stepper-body">
+                  <span className="gg-installer-stepper-label">{item.label}</span>
+                  <span className="gg-installer-stepper-hint">{item.hint}</span>
+                </span>
+              </div>
+            )
+          })}
+        </nav>
+        {defaults ? (
+          <div className="gg-installer-sidebar-meta">
+            <span>Версия {defaults.version}</span>
+            <span>{formatBytes(defaults.payloadBytes)}</span>
+          </div>
+        ) : null}
       </aside>
 
       <section className="gg-installer-main">

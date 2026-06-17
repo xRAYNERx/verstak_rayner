@@ -109,10 +109,6 @@ function patchPortableNsisTemplate() {
     fs.copyFileSync(PORTABLE_NSIS, backup)
   }
   fs.copyFileSync(path.join(ROOT, 'build', 'portable-verstak.nsi'), PORTABLE_NSIS)
-  fs.copyFileSync(
-    path.join(ROOT, 'scripts', 'portable-splash.ps1'),
-    path.join(ROOT, 'resources', 'portable-splash.ps1'),
-  )
 }
 
 function restorePortableNsisTemplate() {
