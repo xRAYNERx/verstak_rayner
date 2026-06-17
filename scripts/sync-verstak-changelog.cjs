@@ -13,6 +13,18 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: '5211c65',
+    deployed: '17.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Полный Nord-редизайн NSIS-установщика',
+    changes: [
+      'Боковая панель: titlebar-полоска, glass-карточка с логотипом, фичи, шаги — как shell Verstak.',
+      'Отдельные ассеты установки и удаления (accent #88c0d0 / error #bf616a).',
+      'NSIS: тёмный фон всех страниц, progress bar в accent, dark mode title bar + контролы Windows.',
+      'Русские заголовки шагов: папка, копирование, завершение.',
+    ],
+  },
+  {
     commit: 'db7802b',
     deployed: '17.06.2026 02:43',
     treeVersion: '1.5.5',
