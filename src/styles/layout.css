@@ -3138,38 +3138,28 @@ html.gg-atelier .gg-settings-shell .gg-btn-primary:hover,
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 .gg-provider-caps-badge.is-cli {
-  position: relative;
   border-color: #d8a657;
   color: #d8a657;
 }
-.gg-provider-caps-badge.is-cli::after {
-  content: attr(data-cli-hint);
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 8px);
-  width: max-content;
-  max-width: min(300px, 70vw);
+.gg-cli-hint-tooltip {
+  position: fixed;
+  transform: translateY(-100%);
   padding: 8px 12px;
+  box-sizing: border-box;
   font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 400;
   line-height: 1.45;
-  letter-spacing: normal;
-  text-transform: none;
   color: #f0d9a8;
   background: color-mix(in srgb, #1a1408 88%, #d8a657 12%);
   border: 1px solid color-mix(in srgb, #d8a657 45%, transparent);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-md);
-  opacity: 0;
-  transform: translateY(4px);
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
   pointer-events: none;
-  transition: opacity 140ms ease, transform 140ms ease;
-  z-index: 60;
-}
-.gg-provider-caps-badge.is-cli:hover::after {
-  opacity: 1;
-  transform: translateY(0);
+  z-index: 10000;
 }
 /* Живой инструмент running-прогона в карточке «Задачи» (аудит P0 #3). */
 .gg-run-stat-livetool {

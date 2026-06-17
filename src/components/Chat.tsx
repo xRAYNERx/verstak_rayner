@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState, type DragEvent, type ClipboardEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { useProject, type PreflightCard } from '../store/projectStore'
 import { useProvider } from '../hooks/useProvider'
 import { estimateCost, costSeverity, costBreakdown } from '../lib/pricing'
@@ -1718,12 +1719,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
                   policy) НЕ действуют, вложения уходят текстовым хинтом. Бейдж
                   закрывает дыру «выглядит одинаково, ведёт себя по-разному». */}
               {provider.id.endsWith('-cli') && (
-                <span
-                  className="gg-provider-caps-badge is-cli"
-                  data-cli-hint={t.chat.cliStrip}
-                >
-                  CLI
-                </span>
+                <CliComposerBadge hint={t.chat.cliStrip} />
               )}
               <TierRecommendation input={input} />
             </div>
@@ -1731,6 +1727,52 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         </div>
       </div>
     </div>
+  )
+}
+
+function CliComposerBadge({ hint }: { hint: string }) {
+  const anchorRef = useRef<HTMLSpanElement>(null)
+  const [open, setOpen] = useState(false)
+  const [tip, setTip] = useState<{ top: number; left: number; width: number } | null>(null)
+
+  function placeTooltip() {
+    const el = anchorRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const width = Math.min(280, window.innerWidth - 24)
+    const left = Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12))
+    setTip({ top: rect.top - 8, left, width })
+    setOpen(true)
+  }
+
+  return (
+    <>
+      <span
+        ref={anchorRef}
+        className="gg-provider-caps-badge is-cli"
+        onMouseEnter={placeTooltip}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={placeTooltip}
+        onBlur={() => setOpen(false)}
+        tabIndex={0}
+      >
+        CLI
+      </span>
+      {open && tip && createPortal(
+        <div
+          className="gg-cli-hint-tooltip"
+          role="tooltip"
+          style={{
+            top: tip.top,
+            left: tip.left,
+            width: tip.width,
+          }}
+        >
+          {hint}
+        </div>,
+        document.body,
+      )}
+    </>
   )
 }
 
