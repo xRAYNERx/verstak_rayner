@@ -13,6 +13,17 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    version: '1.5.8',
+    build: '17.06.2026',
+    deployed: '17.06.2026',
+    title: 'Новый фирменный установщик Verstak (Nord UI)',
+    changes: [
+      'Установщик переписан как нативное приложение Verstak: тёмное Nord-окно, frameless, шаги установки в стиле самого приложения.',
+      'Анимированный splash при распаковке; для portable-версии — лёгкий splash загрузки.',
+      'Быстрее старт установщика, крупнее окно, понятные преимущества на экране установки.',
+    ],
+  },
+  {
     version: '1.5.7',
     build: '17.06.2026',
     deployed: '17.06.2026',
