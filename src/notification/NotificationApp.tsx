@@ -5,6 +5,7 @@ interface ToastPayload {
   title?: string
   body: string
   projectName?: string
+  projectPath?: string
   isError?: boolean
   theme?: 'nord' | 'light'
 }
@@ -63,8 +64,8 @@ export function NotificationApp() {
     })
   }
 
-  function openMain(id: number) {
-    window.toastApi.focusMain()
+  function openMain(id: number, projectPath?: string) {
+    window.toastApi.focusMain(projectPath)
     dismiss(id)
   }
 
@@ -78,7 +79,7 @@ export function NotificationApp() {
           className={`gg-app-toast ${toast.isError ? 'is-error' : 'is-ok'}`}
           data-theme={toast.theme ?? 'nord'}
           role="alert"
-          onClick={() => openMain(toast.id)}
+          onClick={() => openMain(toast.id, toast.projectPath)}
         >
           <div className="gg-app-toast-head">
             <div className="gg-app-toast-brand">

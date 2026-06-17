@@ -45,10 +45,20 @@ contextBridge.exposeInMainWorld('api', {
     }
   },
   notify: {
-    show: (opts: { title: string; body: string }) =>
-      ipcRenderer.invoke('notify:show', opts) as Promise<boolean>,
+    show: (opts: {
+      title?: string
+      body: string
+      projectName?: string
+      projectPath?: string
+      isError?: boolean
+    }) => ipcRenderer.invoke('notify:show', opts) as Promise<boolean>,
     playSound: (opts?: { isError?: boolean }) =>
-      ipcRenderer.invoke('notify:play-sound', opts) as Promise<boolean>
+      ipcRenderer.invoke('notify:play-sound', opts) as Promise<boolean>,
+    onOpenProject: (cb: (projectPath: string) => void) => {
+      const handler = (_e: unknown, projectPath: string) => cb(projectPath)
+      ipcRenderer.on('notify:open-project', handler)
+      return () => { ipcRenderer.removeListener('notify:open-project', handler) }
+    }
   },
   voice: {
     status: () => ipcRenderer.invoke('voice:status') as Promise<{
