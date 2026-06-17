@@ -2421,27 +2421,45 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   flex-direction: column;
 }
 .gg-composer-pending-bar {
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--border-subtle);
-  background: color-mix(in srgb, var(--accent-muted) 55%, var(--bg-elevated));
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  z-index: 12;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: stretch;
+  width: min(360px, calc(100% - 32px));
+  max-height: min(52vh, 420px);
+  pointer-events: none;
+}
+.gg-composer-pending-bar > * {
+  pointer-events: auto;
 }
 .gg-composer-pending-bar-toggle {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 8px 20px;
-  border: none;
-  background: transparent;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent-muted) 55%, var(--bg-elevated));
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
   color: var(--text-secondary);
   font-size: var(--text-sm);
   text-align: left;
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
 }
 .gg-composer-pending-bar-toggle:hover {
   background: var(--bg-elevated);
+  border-color: var(--border-default);
   color: var(--text-primary);
+}
+.gg-composer-pending-bar.is-expanded .gg-composer-pending-bar-toggle {
+  border-bottom-left-radius: var(--radius-sm);
+  border-bottom-right-radius: var(--radius-sm);
+  border-bottom-color: transparent;
 }
 .gg-composer-pending-bar-icon {
   font-size: 14px;
@@ -2456,10 +2474,17 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   font-size: 11px;
 }
 .gg-composer-pending-bar-panel {
-  padding: 0 20px 12px;
+  padding: 10px 10px 0;
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   gap: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--border-subtle);
+  border-bottom: none;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: color-mix(in srgb, var(--accent-muted) 40%, var(--bg-elevated));
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.18);
 }
 .gg-composer-pending-section-title {
   font-size: var(--text-xs);
@@ -2474,7 +2499,7 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   padding: 0;
   list-style: none;
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   gap: 8px;
 }
 .gg-composer-pending-list:not(.is-supplements) {

@@ -47,11 +47,32 @@ export function ComposerPendingBar({
       >
         <span className="gg-composer-pending-bar-icon" aria-hidden>⏳</span>
         <span className="gg-composer-pending-bar-summary">{summaryParts.join(' · ')}</span>
-        <span className="gg-composer-pending-bar-chevron" aria-hidden>{expanded ? '▴' : '▾'}</span>
+        <span className="gg-composer-pending-bar-chevron" aria-hidden>{expanded ? '▾' : '▴'}</span>
       </button>
 
       {expanded && (
         <div className="gg-composer-pending-bar-panel">
+          {supplementCount > 0 && (
+            <section className="gg-composer-pending-section">
+              <div className="gg-composer-pending-section-title">{t.chat.pendingBarSupplementSection}</div>
+              <ul className="gg-composer-pending-list is-supplements">
+                {supplements.map(item => (
+                  <li key={item.id} className={`gg-composer-pending-item is-supplement is-${item.status}`}>
+                    <div className="gg-composer-pending-item-head">
+                      <span className="gg-composer-pending-item-badge">
+                        {item.status === 'accepted'
+                          ? t.chat.pendingBarSupplementAccepted
+                          : t.chat.pendingBarSupplementDeferred}
+                      </span>
+                      <time className="gg-composer-pending-item-time">{formatItemTime(item.at)}</time>
+                    </div>
+                    <div className="gg-composer-pending-item-text">{item.text}</div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {queueCount > 0 && (
             <section className="gg-composer-pending-section">
               <div className="gg-composer-pending-section-title">{t.chat.pendingBarQueueSection}</div>
@@ -78,27 +99,6 @@ export function ComposerPendingBar({
                   </li>
                 ))}
               </ol>
-            </section>
-          )}
-
-          {supplementCount > 0 && (
-            <section className="gg-composer-pending-section">
-              <div className="gg-composer-pending-section-title">{t.chat.pendingBarSupplementSection}</div>
-              <ul className="gg-composer-pending-list is-supplements">
-                {supplements.map(item => (
-                  <li key={item.id} className={`gg-composer-pending-item is-supplement is-${item.status}`}>
-                    <div className="gg-composer-pending-item-head">
-                      <span className="gg-composer-pending-item-badge">
-                        {item.status === 'accepted'
-                          ? t.chat.pendingBarSupplementAccepted
-                          : t.chat.pendingBarSupplementDeferred}
-                      </span>
-                      <time className="gg-composer-pending-item-time">{formatItemTime(item.at)}</time>
-                    </div>
-                    <div className="gg-composer-pending-item-text">{item.text}</div>
-                  </li>
-                ))}
-              </ul>
             </section>
           )}
         </div>

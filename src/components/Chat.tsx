@@ -1179,15 +1179,6 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
       )}
 
       <div className="gg-chat-stream-area">
-        {isStreaming && (queuedMessages.length > 0 || pendingSupplements.length > 0) && (
-          <ComposerPendingBar
-            queueItems={queuedMessages}
-            supplements={pendingSupplements}
-            expanded={pendingBarExpanded}
-            onToggle={() => setPendingBarExpanded(v => !v)}
-            onRemoveQueueItem={removeQueuedMessage}
-          />
-        )}
         <div className="gg-chat-stream" ref={streamRef}>
         <div className="gg-chat-stream-inner">
         {/* Crash-resume: баннер «сессия прервана» (если есть зависшие прогоны). */}
@@ -1505,6 +1496,15 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
               <polyline points="6 9 12 15 18 9" />
             </svg>
           </button>
+        )}
+        {isStreaming && (queuedMessages.length > 0 || pendingSupplements.length > 0) && (
+          <ComposerPendingBar
+            queueItems={queuedMessages}
+            supplements={pendingSupplements}
+            expanded={pendingBarExpanded}
+            onToggle={() => setPendingBarExpanded(v => !v)}
+            onRemoveQueueItem={removeQueuedMessage}
+          />
         )}
       </div>
 
