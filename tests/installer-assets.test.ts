@@ -40,7 +40,7 @@ describe('installer BMP assets', () => {
     expect(nsh).toMatch(/!define MUI_BGCOLOR "2E3440"/)
     expect(nsh).toContain('Добро пожаловать в Verstak')
     expect(nsh).toContain('MUI_INSTFILESPAGE_PROGRESSBAR')
-    expect(nsh).toContain('VerstakApplyDarkChrome')
     expect(nsh).toContain('MUI_DIRECTORYPAGE_BGCOLOR')
+    expect(nsh).not.toContain('VerstakApplyDarkChrome')
   })
 })
