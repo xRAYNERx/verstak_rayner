@@ -13,6 +13,16 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: 'd7b141b',
+    deployed: '17.06.2026',
+    treeVersion: '1.5.5',
+    title: 'CLI-бейдж: янтарная обводка и всплывашка',
+    changes: [
+      'Убрана янтарная обводка с поля ввода — выделен только чип CLI в нижнем баре.',
+      'При наведении на CLI — всплывашка с предупреждением о внешнем агенте.',
+    ],
+  },
+  {
     commit: '74f647b',
     deployed: '17.06.2026',
     treeVersion: '1.5.5',
