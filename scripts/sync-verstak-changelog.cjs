@@ -13,6 +13,16 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: '6dda021',
+    deployed: '17.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Коннекторы: форма под выбранной карточкой',
+    changes: [
+      'Поля настройки раскрываются сразу под плашкой коннектора, а не внизу всего списка.',
+      'Раскрытый блок на всю ширину — остальные карточки сдвигаются вниз.',
+    ],
+  },
+  {
     commit: 'b901cf6',
     deployed: '17.06.2026',
     treeVersion: '1.5.5',
