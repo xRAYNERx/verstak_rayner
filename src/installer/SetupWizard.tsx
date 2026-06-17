@@ -1,15 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { InstallDefaults, InstallProgress } from '../../electron/installer/types'
 import iconUrl from '../assets/icon.png'
-import { MODEL_PROVIDER_COUNT } from './constants'
+import { INSTALLER_VALUE_PROPS, MODEL_PROVIDER_COUNT } from './constants'
+import { InstallerLoader } from './InstallerLoader'
 
 type Step = 'welcome' | 'directory' | 'installing' | 'finish'
-
-const FEATURES = [
-  `${MODEL_PROVIDER_COUNT} провайдеров AI-моделей`,
-  'Проекты и память',
-  'Skills и артефакты',
-]
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`
@@ -82,24 +77,31 @@ export function SetupWizard() {
   function renderContent() {
     if (!defaults) {
       return (
-        <div className="gg-installer-boot">
-          <div className="gg-installer-boot-spinner" aria-hidden="true" />
-          <p className="gg-installer-boot-title">Загрузка установщика…</p>
-          <p className="gg-installer-text">Сканирование пакета приложения.</p>
-        </div>
+        <InstallerLoader
+          title="Загрузка мастера установки"
+          hint="Секунду — проверяем пакет приложения на диске."
+        />
       )
     }
 
     if (step === 'welcome') {
       return (
         <>
-          <h1 className="gg-installer-title">Добро пожаловать в Verstak</h1>
+          <h1 className="gg-installer-title">Добро пожаловать</h1>
           <p className="gg-installer-lead">
-            IDE для AI-агентов с {MODEL_PROVIDER_COUNT} провайдерами моделей
+            Verstak — IDE для разработки с AI-агентами
           </p>
-          <p className="gg-installer-text">
-            Мастер установит Verstak на ваш компьютер.{'\n\n'}
-            Рекомендуется закрыть другие приложения перед продолжением.
+          <ul className="gg-installer-value-list">
+            {INSTALLER_VALUE_PROPS.map((item) => (
+              <li key={item.title} className="gg-installer-value-item">
+                <span className="gg-installer-value-title">{item.title}</span>
+                <span className="gg-installer-value-text">{item.text}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="gg-installer-text gg-installer-text-muted">
+            Мастер скопирует программу в выбранную папку и создаст ярлыки.
+            Перед установкой лучше закрыть другие тяжёлые приложения.
           </p>
         </>
       )
@@ -110,7 +112,7 @@ export function SetupWizard() {
         <>
           <h1 className="gg-installer-title">Папка установки</h1>
           <p className="gg-installer-text">
-            Укажите папку, в которую будет установлен Verstak. Требуется около {formatBytes(defaults.payloadBytes)} на диске.
+            Укажите, куда установить Verstak. Понадобится около {formatBytes(defaults.payloadBytes)} свободного места.
           </p>
           <div className="gg-installer-field">
             <label className="gg-installer-label" htmlFor="install-dir">Папка установки</label>
@@ -134,7 +136,7 @@ export function SetupWizard() {
       return (
         <>
           <h1 className="gg-installer-title">Установка Verstak</h1>
-          <p className="gg-installer-text">Копирование файлов на диск. Не закрывайте окно до завершения.</p>
+          <p className="gg-installer-text">Копируем файлы на диск. Не закрывайте окно до завершения.</p>
           <div className="gg-installer-progress">
             <div className="gg-installer-progress-track">
               <div className="gg-installer-progress-fill" style={{ width: `${percent}%` }} />
@@ -150,12 +152,11 @@ export function SetupWizard() {
 
     return (
       <>
-        <h1 className="gg-installer-title">Verstak установлен</h1>
-        <p className="gg-installer-lead">
-          {MODEL_PROVIDER_COUNT} провайдеров моделей готовы к подключению
-        </p>
+        <h1 className="gg-installer-title">Готово</h1>
+        <p className="gg-installer-lead">Verstak установлен</p>
         <p className="gg-installer-text">
           Ярлык появится в меню «Пуск» и на рабочем столе.
+          Подключите провайдеры в настройках — доступно {MODEL_PROVIDER_COUNT} вариантов.
         </p>
         <label className="gg-installer-check">
           <input type="checkbox" checked={runAfter} onChange={(e) => setRunAfter(e.target.checked)} />
@@ -216,16 +217,17 @@ export function SetupWizard() {
         <div className="gg-installer-logo-wrap">
           <img src={iconUrl} alt="" className="gg-installer-logo" />
         </div>
-        <div className="gg-installer-mode">
-          <div className="gg-installer-mode-title">УСТАНОВКА</div>
-          <div className="gg-installer-mode-stat">{MODEL_PROVIDER_COUNT}</div>
-          <div className="gg-installer-mode-sub">провайдеров AI-моделей</div>
+        <div className="gg-installer-tagline">
+          IDE для разработки<br />с AI-агентами
         </div>
         <div className="gg-installer-features">
-          {FEATURES.map((text) => (
-            <div key={text} className="gg-installer-feature">
+          {INSTALLER_VALUE_PROPS.map((item) => (
+            <div key={item.title} className="gg-installer-feature">
               <span className="gg-installer-feature-dot" />
-              <span>{text}</span>
+              <span className="gg-installer-feature-body">
+                <span className="gg-installer-feature-title">{item.title}</span>
+                <span className="gg-installer-feature-text">{item.text}</span>
+              </span>
             </div>
           ))}
         </div>

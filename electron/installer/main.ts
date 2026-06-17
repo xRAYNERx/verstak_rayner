@@ -1,64 +1,11 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { join, dirname } from 'path'
-import { fileURLToPath } from 'url'
+import { fileURLToPath, pathToFileURL } from 'url'
 import { getInstallDefaults, launchInstalledApp, runInstall } from './engine'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PRODUCT_NAME = 'Verstak Setup'
-
-const SPLASH_HTML = `<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body {
-    width: 100%; height: 100%;
-    background: #2e3440;
-    color: #eceff4;
-    font: 500 13px/1.4 Inter, "Segoe UI", system-ui, sans-serif;
-    user-select: none;
-    overflow: hidden;
-  }
-  .wrap {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 18px;
-    padding: 24px;
-  }
-  .logo {
-    width: 72px; height: 72px;
-    border-radius: 16px;
-    background: #3b4252;
-    border: 1px solid #4c566a;
-    display: grid; place-items: center;
-    font-size: 28px; font-weight: 700; color: #88c0d0;
-  }
-  .title { font-size: 18px; font-weight: 600; letter-spacing: 0.02em; }
-  .sub { font-size: 13px; color: #d8dee9; text-align: center; max-width: 280px; }
-  .spinner {
-    width: 28px; height: 28px;
-    border: 3px solid #4c566a;
-    border-top-color: #88c0d0;
-    border-radius: 50%;
-    animation: spin 0.9s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-</style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="logo">V</div>
-    <div class="title">Verstak Setup</div>
-    <div class="sub">Подготовка установщика…<br>Подождите несколько секунд.</div>
-    <div class="spinner" aria-hidden="true"></div>
-  </div>
-</body>
-</html>`
 
 function readAppVersion(): string {
   const candidates = [
@@ -94,10 +41,28 @@ function resolveRenderer(): string {
   return join(app.getAppPath(), 'out/renderer/installer.html')
 }
 
+function resolveSplashBundle(): { html: string; icon: string } {
+  const candidates = [
+    {
+      html: join(app.getAppPath(), 'splash', 'installer-splash.html'),
+      icon: join(app.getAppPath(), 'splash', 'icon.png'),
+    },
+    {
+      html: join(HERE, '../../resources/installer-splash.html'),
+      icon: join(HERE, '../../resources/icon.png'),
+    },
+  ]
+  for (const bundle of candidates) {
+    if (existsSync(bundle.html)) return bundle
+  }
+  throw new Error('Не найден installer-splash.html')
+}
+
 function createSplashWindow(): void {
+  const { html, icon } = resolveSplashBundle()
   splashWindow = new BrowserWindow({
-    width: 380,
-    height: 260,
+    width: 420,
+    height: 300,
     frame: false,
     resizable: false,
     maximizable: false,
@@ -114,7 +79,9 @@ function createSplashWindow(): void {
       sandbox: true,
     },
   })
-  void splashWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(SPLASH_HTML)}`)
+
+  const iconUrl = pathToFileURL(icon).href
+  void splashWindow.loadFile(html, { query: { icon: iconUrl } })
   splashWindow.on('closed', () => {
     splashWindow = null
   })
@@ -196,7 +163,14 @@ if (!gotLock) {
   })
 
   app.whenReady().then(() => {
-    createSplashWindow()
+    try {
+      createSplashWindow()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      dialog.showErrorBox('Verstak Setup', message)
+      app.quit()
+      return
+    }
     createWindow()
 
     ipcMain.handle('installer:getDefaults', async () => getInstallDefaults(readAppVersion(), 'Verstak'))

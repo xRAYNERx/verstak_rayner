@@ -13,6 +13,14 @@ const UNPACKED = path.join(ROOT, 'release', 'win-unpacked')
 const STAGING = path.join(ROOT, 'release', 'app-payload-staging')
 const APP_STAGING = path.join(ROOT, 'release', 'installer-app-staging')
 const INSTALLER_OUT = path.join(ROOT, 'release', 'installer-build')
+const PORTABLE_NSIS = path.join(
+  ROOT,
+  'node_modules',
+  'app-builder-lib',
+  'templates',
+  'nsis',
+  'portable.nsi',
+)
 
 function run(cmd, args, opts = {}) {
   const result = spawnSync(cmd, args, {
@@ -86,6 +94,32 @@ function prepareInstallerAppStaging(version) {
   for (const sub of ['installer', 'preload', 'renderer']) {
     copyDir(path.join(ROOT, 'out', sub), path.join(APP_STAGING, 'out', sub))
   }
+  const splashDir = path.join(APP_STAGING, 'splash')
+  fs.mkdirSync(splashDir, { recursive: true })
+  fs.copyFileSync(
+    path.join(ROOT, 'resources', 'installer-splash.html'),
+    path.join(splashDir, 'installer-splash.html'),
+  )
+  fs.copyFileSync(path.join(ROOT, 'resources', 'icon.png'), path.join(splashDir, 'icon.png'))
+}
+
+function patchPortableNsisTemplate() {
+  const backup = `${PORTABLE_NSIS}.bak-verstak`
+  if (!fs.existsSync(backup)) {
+    fs.copyFileSync(PORTABLE_NSIS, backup)
+  }
+  fs.copyFileSync(path.join(ROOT, 'build', 'portable-verstak.nsi'), PORTABLE_NSIS)
+  fs.copyFileSync(
+    path.join(ROOT, 'scripts', 'portable-splash.ps1'),
+    path.join(ROOT, 'resources', 'portable-splash.ps1'),
+  )
+}
+
+function restorePortableNsisTemplate() {
+  const backup = `${PORTABLE_NSIS}.bak-verstak`
+  if (fs.existsSync(backup)) {
+    fs.copyFileSync(backup, PORTABLE_NSIS)
+  }
 }
 
 if (!fs.existsSync(path.join(UNPACKED, 'Verstak.exe'))) {
@@ -102,9 +136,6 @@ fs.writeFileSync(
 )
 console.log(`[build-setup] payload: ${(manifest.payloadBytes / (1024 * 1024)).toFixed(1)} MB, ${manifest.fileCount} files`)
 
-console.log('[build-setup] installer splash bmp')
-require('./generate-installer-splash.cjs')
-
 console.log('[build-setup] vite build (installer)')
 run(NPX, ['electron-vite', 'build', '--config', 'electron.vite.installer.config.ts'])
 
@@ -112,8 +143,12 @@ const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
 console.log('[build-setup] prepare installer-app-staging')
 prepareInstallerAppStaging(pkg.version)
 
+console.log('[build-setup] patch portable.nsi (animated splash)')
+patchPortableNsisTemplate()
+
 console.log('[build-setup] electron-builder portable setup')
 fs.rmSync(INSTALLER_OUT, { recursive: true, force: true })
+try {
 run(NPX, [
   'electron-builder',
   '--config',
@@ -122,6 +157,9 @@ run(NPX, [
   'portable',
   '--x64',
 ])
+} finally {
+  restorePortableNsisTemplate()
+}
 
 const setupName = `Verstak-Setup-${pkg.version}-x64.exe`
 const built = path.join(INSTALLER_OUT, setupName)
