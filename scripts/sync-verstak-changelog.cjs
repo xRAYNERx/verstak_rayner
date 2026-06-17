@@ -13,6 +13,16 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    version: '1.5.11',
+    build: '18.06.2026',
+    deployed: '18.06.2026',
+    title: 'Терминал наконец работает на Windows',
+    changes: [
+      'Встроенный терминал заработал: нативный модуль node-pty не собирался на Windows (winpty не находил вспомогательный скрипт из-за системной env-переменной + отсутствовали Spectre-библиотеки VS) — pty не запускался, терминал был «мёртвым». Теперь собирается и работает.',
+      'Терминал стабильно показывает приглашение шелла сразу при открытии; размер синхронизируется с окном (ResizeObserver).',
+    ],
+  },
+  {
     version: '1.5.10',
     build: '18.06.2026',
     deployed: '18.06.2026',

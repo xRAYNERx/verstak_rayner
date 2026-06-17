@@ -1,6 +1,6 @@
 {
   "name": "verstak",
-  "version": "1.5.10",
+  "version": "1.5.11",
   "description": "Desktop AI coding agent: 15+ model providers (API + CLI + local), full control & transparency, connectors, skills",
   "main": "out/main/main.mjs",
   "scripts": {
@@ -12,7 +12,7 @@
     "test:fast": "vitest run",
     "type": "tsc --noEmit",
     "rebuild:node": "npm rebuild better-sqlite3 --runtime=node --update-binary",
-    "electron-rebuild": "electron-rebuild -f -o better-sqlite3",
+    "electron-rebuild": "node scripts/rebuild-native.cjs",
     "predev": "npm run electron-rebuild",
     "dist": "npm run electron-rebuild && npm run build && electron-builder",
     "dist:win": "npm run generate:icon && npm run electron-rebuild && npm run build && electron-builder --win --x64 && node scripts/build-setup.cjs",
