@@ -1452,12 +1452,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
       <TimelineBar />
       <ReviewPanel />
 
-      <div className={`gg-composer${provider.id.endsWith('-cli') ? ' has-cli-strip' : ''}`}>
-        {provider.id.endsWith('-cli') && (
-          <div className="gg-composer-cli-strip" role="note">
-            {t.chat.cliStrip}
-          </div>
-        )}
+      <div className={`gg-composer${provider.id.endsWith('-cli') ? ' has-cli-model' : ''}`}>
         {attachments.length > 0 && (
           <div className="gg-attach-row">
             {attachments.map((a, i) => (
@@ -1491,7 +1486,10 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
             </div>
           </div>
         )}
-        <div className="gg-composer-inner">
+        <div
+          className="gg-composer-inner"
+          {...(provider.id.endsWith('-cli') ? { 'data-cli-hint': t.chat.cliStrip } : {})}
+        >
           <SlashCommandPopup
             text={input}
             onClear={() => setInput('')}
