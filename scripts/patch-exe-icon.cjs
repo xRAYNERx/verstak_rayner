@@ -33,8 +33,13 @@ async function patchExeIcon(exePath, icoPath) {
 /** @param {import('app-builder-lib').AfterPackContext} context */
 module.exports = async function afterPack(context) {
   if (context.electronPlatformName !== 'win32') return
-  if (context.packager.config.appId === 'ru.verstak.installer') return
   const name = context.packager.appInfo.productFilename
+  if (context.packager.config.appId === 'ru.verstak.installer') {
+    const exe = path.join(context.appOutDir, `${name}.exe`)
+    const ico = path.join(context.packager.projectDir, 'resources', 'icon.ico')
+    await patchExeIcon(exe, ico)
+    return
+  }
   const exe = path.join(context.appOutDir, `${name}.exe`)
   const ico = path.join(context.packager.projectDir, 'resources', 'icon.ico')
   await patchExeIcon(exe, ico)

@@ -11,6 +11,7 @@ const ROOT = path.join(__dirname, '..')
 const NPX = process.platform === 'win32' ? 'npx.cmd' : 'npx'
 const UNPACKED = path.join(ROOT, 'release', 'win-unpacked')
 const STAGING = path.join(ROOT, 'release', 'app-payload-staging')
+const APP_STAGING = path.join(ROOT, 'release', 'installer-app-staging')
 const INSTALLER_OUT = path.join(ROOT, 'release', 'installer-build')
 
 function run(cmd, args, opts = {}) {
@@ -39,6 +40,35 @@ function copyDirFiltered(src, dest) {
   }
 }
 
+function copyDir(src, dest) {
+  fs.mkdirSync(dest, { recursive: true })
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const from = path.join(src, entry.name)
+    const to = path.join(dest, entry.name)
+    if (entry.isDirectory()) copyDir(from, to)
+    else if (entry.isFile()) fs.copyFileSync(from, to)
+  }
+}
+
+function prepareInstallerAppStaging(version) {
+  fs.rmSync(APP_STAGING, { recursive: true, force: true })
+  fs.mkdirSync(APP_STAGING, { recursive: true })
+  const installerPkg = {
+    name: 'verstak-setup',
+    version,
+    description: 'Verstak installer',
+    main: 'out/installer/main.mjs',
+    private: true,
+  }
+  fs.writeFileSync(
+    path.join(APP_STAGING, 'package.json'),
+    `${JSON.stringify(installerPkg, null, 2)}\n`,
+  )
+  for (const sub of ['installer', 'preload', 'renderer']) {
+    copyDir(path.join(ROOT, 'out', sub), path.join(APP_STAGING, 'out', sub))
+  }
+}
+
 if (!fs.existsSync(path.join(UNPACKED, 'Verstak.exe'))) {
   die('Нет release/win-unpacked — сначала соберите приложение (electron-builder --win --x64).')
 }
@@ -49,6 +79,10 @@ copyDirFiltered(UNPACKED, STAGING)
 
 console.log('[build-setup] vite build (installer)')
 run(NPX, ['electron-vite', 'build', '--config', 'electron.vite.installer.config.ts'])
+
+const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
+console.log('[build-setup] prepare installer-app-staging')
+prepareInstallerAppStaging(pkg.version)
 
 console.log('[build-setup] electron-builder portable setup')
 fs.rmSync(INSTALLER_OUT, { recursive: true, force: true })
@@ -61,7 +95,6 @@ run(NPX, [
   '--x64',
 ])
 
-const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
 const setupName = `Verstak-Setup-${pkg.version}-x64.exe`
 const built = path.join(INSTALLER_OUT, setupName)
 const dest = path.join(ROOT, 'release', setupName)
