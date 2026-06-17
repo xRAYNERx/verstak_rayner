@@ -4353,6 +4353,32 @@ html.gg-atelier .gg-settings-shell .gg-btn-primary:hover,
   border-color: var(--success);
   color: var(--success);
 }
+.gg-terminal-bar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-elevated) 85%, transparent);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.gg-terminal-bar-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+.gg-terminal-bar-btn.is-open {
+  border-color: var(--success);
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 10%, var(--bg-elevated));
+}
 
 /* ─── Attachments ─── */
 .gg-attach-row {
@@ -6137,19 +6163,35 @@ html.gg-atelier .gg-settings-shell .gg-btn-primary:hover,
 /* Right-docked parallel chat — mirrors the .gg-terminal-wrap 460px column,
    with its own scrollable message stream + composer pinned at the bottom. */
 .gg-sidechat {
-  background: var(--bg-base);
-  border-left: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--bg-base) 90%, var(--bg-elevated));
+  border-left: 1px solid color-mix(in srgb, var(--border-subtle) 45%, transparent);
+  box-shadow: inset 2px 0 10px -4px rgba(0, 0, 0, 0.1);
   width: 460px; flex-shrink: 0;
   display: flex; flex-direction: column;
   min-height: 0;
 }
 .gg-sidechat-header {
-  padding: 6px 14px;
-  background: var(--bg-elevated);
-  border-bottom: 1px solid var(--border-subtle);
+  padding: 8px 14px;
+  background: color-mix(in srgb, var(--bg-elevated) 55%, var(--bg-base));
+  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 40%, transparent);
   font-size: var(--text-sm);
   color: var(--text-secondary);
   display: flex; align-items: center; gap: 8px;
+}
+.gg-sidechat-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 0;
+}
+.gg-sidechat-title-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
 }
 /* Independent model picker in the side chat header — own provider/model,
    does not touch the main chat's selection. */
@@ -6229,11 +6271,16 @@ html.gg-atelier .gg-settings-shell .gg-btn-primary:hover,
   padding: 12px 12px 4px;
   display: flex; flex-direction: column; gap: 10px;
 }
-.gg-sidechat-empty {
+.gg-sidechat-hint {
   color: var(--text-tertiary);
-  font-size: var(--text-sm);
-  text-align: center;
-  padding: 24px 12px;
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  padding: 0 2px 8px;
+}
+.gg-sidechat-composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
 }
 .gg-sidechat-msg { display: flex; }
 .gg-sidechat-msg.is-user { justify-content: flex-end; }
@@ -6256,10 +6303,11 @@ html.gg-atelier .gg-settings-shell .gg-btn-primary:hover,
   color: var(--text-primary);
 }
 .gg-sidechat-composer {
-  border-top: 1px solid var(--border-subtle);
-  padding: 8px 10px;
-  display: flex; align-items: flex-end; gap: 8px;
-  background: var(--bg-base);
+  border-top: 1px solid color-mix(in srgb, var(--border-subtle) 45%, transparent);
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--bg-base) 92%, var(--bg-elevated));
 }
 .gg-sidechat-textarea {
   flex: 1; min-width: 0;

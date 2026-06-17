@@ -183,8 +183,17 @@ export function App() {
     if (!path) return
     if (sideChatId == null) {
       try {
-        const created = await window.api.chatSessions.create(path, { title: 'Боковой чат' })
+        const currentProvider = await window.api.settings.getKey('provider')
+        const currentModel = currentProvider
+          ? await window.api.settings.getKey(`model_${currentProvider}`)
+          : null
+        const created = await window.api.chatSessions.create(path, {
+          title: t.chat.sideChatTitle,
+          providerId: currentProvider ?? null,
+          model: currentModel ?? null,
+        })
         setSideChatId(created.id)
+        await useProject.getState().refreshChatSessions()
       } catch { return }
     }
     setRightPanel('sidechat')
