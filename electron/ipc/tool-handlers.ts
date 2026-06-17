@@ -2574,7 +2574,7 @@ function stripHtml(html: string): string {
     .slice(0, 10000)
 }
 
-const convertFileHandler: ToolHandler = {
+export const convertFileHandler: ToolHandler = {
   mode: 'parallel-read',
   async handle(call, ctx) {
     try {
@@ -2585,6 +2585,11 @@ const convertFileHandler: ToolHandler = {
       if (!relPath) {
         return { id: call.id, name: call.name, result: '', error: 'convert_file: path обязателен' }
       }
+      // Тот же рубеж, что read_file/read_spreadsheet: convert_file иначе отдавал
+      // creds*.json / cookies.json / credentials.json модели в обход политики.
+      if (isForbiddenPath(relPath)) {
+        return { id: call.id, name: call.name, result: '', error: `Доступ запрещён политикой безопасности: ${relPath} (secrets/credentials)` }
+      }
       const filePath = await safeRealJoin(ctx.projectPath, relPath)
       if (!existsSync(filePath)) {
         return { id: call.id, name: call.name, result: '', error: `convert_file: файл не найден: ${relPath}` }
@@ -2594,7 +2599,7 @@ const convertFileHandler: ToolHandler = {
       if (ext === '.csv') {
         const text = readFileSync(filePath, 'utf-8')
         const lines = text.split('\n').filter(l => l.trim()).slice(0, 50)
-        const result = csvToMarkdown(lines)
+        const result = scanText(csvToMarkdown(lines)).redacted
         emitActivity(ctx, call, 'ok', 'convert_file', `${relPath} · CSV → table`)
         return { id: call.id, name: call.name, result }
       }
@@ -2602,7 +2607,7 @@ const convertFileHandler: ToolHandler = {
       if (ext === '.html' || ext === '.htm') {
         const html = readFileSync(filePath, 'utf-8')
         emitActivity(ctx, call, 'ok', 'convert_file', `${relPath} · HTML → text`)
-        return { id: call.id, name: call.name, result: stripHtml(html) }
+        return { id: call.id, name: call.name, result: scanText(stripHtml(html)).redacted }
       }
 
       if (ext === '.docx') {
@@ -2611,19 +2616,19 @@ const convertFileHandler: ToolHandler = {
         const mammoth = require('mammoth') as { extractRawText: (opts: { path: string }) => Promise<{ value: string }> }
         const result = await mammoth.extractRawText({ path: filePath })
         emitActivity(ctx, call, 'ok', 'convert_file', `${relPath} · DOCX → text`)
-        return { id: call.id, name: call.name, result: result.value.slice(0, 20000) }
+        return { id: call.id, name: call.name, result: scanText(result.value.slice(0, 20000)).redacted }
       }
 
       if (ext === '.json') {
         const text = readFileSync(filePath, 'utf-8')
         emitActivity(ctx, call, 'ok', 'convert_file', `${relPath} · JSON`)
-        return { id: call.id, name: call.name, result: '```json\n' + text.slice(0, 10000) + '\n```' }
+        return { id: call.id, name: call.name, result: '```json\n' + scanText(text.slice(0, 10000)).redacted + '\n```' }
       }
 
       if (ext === '.xml') {
         const text = readFileSync(filePath, 'utf-8')
         emitActivity(ctx, call, 'ok', 'convert_file', `${relPath} · XML`)
-        return { id: call.id, name: call.name, result: text.slice(0, 10000) }
+        return { id: call.id, name: call.name, result: scanText(text.slice(0, 10000)).redacted }
       }
 
       return {
