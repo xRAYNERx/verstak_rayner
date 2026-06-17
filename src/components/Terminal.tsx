@@ -23,23 +23,42 @@ export function Terminal() {
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.open(ref.current)
-    fit.fit()
-    const onResize = () => { try { fit.fit() } catch { /* ignore */ } }
-    window.addEventListener('resize', onResize)
 
     let termId = -1
-    let offData: (() => void) | null = null
+    const buffered: Array<{ id: number; data: string }> = []
+    // Регистрируем onData ДО spawn: pty эмитит приглашение шелла сразу после
+    // старта, а spawn() — async IPC. Раньше listener вешался только после резолва
+    // → раннее приглашение терялось (пустой чёрный терминал, «так себе работает»).
+    // До получения termId буферим, потом сливаем подходящие по id.
+    const offData = window.api.term.onData((msg) => {
+      if (termId === -1) { buffered.push(msg); return }
+      if (msg.id === termId) term.write(msg.data)
+    })
+
+    // fit + синхронизация реального размера xterm в pty (раньше pty жил фиксированным
+    // 100×30 — resize вообще не вызывался, отсюда кривой перенос строк).
+    const doFit = () => {
+      try {
+        fit.fit()
+        if (termId > 0) void window.api.term.resize(termId, term.cols, term.rows)
+      } catch { /* ignore */ }
+    }
+    // fit после первой раскладки контейнера (панель только что появилась → размер ещё 0).
+    const raf = requestAnimationFrame(doFit)
+    window.addEventListener('resize', doFit)
+
     void window.api.term.spawn(path).then(id => {
       termId = id
-      offData = window.api.term.onData(({ id: gotId, data }) => {
-        if (gotId === termId) term.write(data)
-      })
+      for (const msg of buffered) { if (msg.id === termId) term.write(msg.data) }
+      buffered.length = 0
       term.onData(d => { void window.api.term.write(termId, d) })
+      doFit() // сообщаем pty реальный размер после спавна
     })
 
     return () => {
-      window.removeEventListener('resize', onResize)
-      offData?.()
+      cancelAnimationFrame(raf)
+      window.removeEventListener('resize', doFit)
+      offData()
       if (termId > 0) void window.api.term.kill(termId)
       term.dispose()
     }
