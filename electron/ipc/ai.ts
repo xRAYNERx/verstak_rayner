@@ -618,7 +618,7 @@ export function registerAiIpc(deps: AiDeps): void {
       // (и сохраняет совместимость с эвристикой session_start для легаси-строк).
       if (auditFn) auditFn('session_start', JSON.stringify({ runId, sendId }))
       void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.readJournal, deps.saveMemory, deps.searchMemories, deps.searchConversations, deps.connectors, deps.getAgentMode(), turnsBudget, deps.skillRegistry, deps.getSecret, costGuard, providerId, model,
-        smartFallbackEnabled ? { getNextProvider: makeFallbackProvider, configuredProviders: new Set(getConfiguredApiProviders(deps.getSecret)), triedProviders: new Set([providerId]) } : undefined,
+        smartFallbackEnabled ? { getNextProvider: makeFallbackProvider, getProviderModel: (id) => deps.getProviderModel(id) ?? PROVIDERS[id]?.defaultModel ?? null, configuredProviders: new Set(getConfiguredApiProviders(deps.getSecret)), triedProviders: new Set([providerId]) } : undefined,
         deps.mcpClient,
         auditFn,
         deps.trackToolPattern,
@@ -632,7 +632,7 @@ export function registerAiIpc(deps: AiDeps): void {
       ).finally(cleanup)
     } else {
       void runPlainConversation(taggedSender, sendId, provider, projectPath, messagesWithSystem, ctrl.signal, deps.recordJournal, costGuard, providerId, model,
-        smartFallbackEnabled ? { getNextProvider: makeFallbackProvider, configuredProviders: new Set(getConfiguredApiProviders(deps.getSecret)), triedProviders: new Set([providerId]) } : undefined,
+        smartFallbackEnabled ? { getNextProvider: makeFallbackProvider, getProviderModel: (id) => deps.getProviderModel(id) ?? PROVIDERS[id]?.defaultModel ?? null, configuredProviders: new Set(getConfiguredApiProviders(deps.getSecret)), triedProviders: new Set([providerId]) } : undefined,
         deps.agentRuns,
         runId
       ).finally(cleanup)
@@ -771,6 +771,9 @@ function exitReasonToStatus(reason: ExitReason): AgentRunStatus {
 interface FallbackOpts {
   /** Создаёт провайдера для указанного fallback-кандидата (null если нет ключа). */
   getNextProvider: (id: ProviderId) => ChatProvider | null
+  /** Модель fallback-кандидата — чтобы cost-guard/журнал прогона считались по
+   *  РЕАЛЬНОЙ модели fallback'а, а не по модели упавшего провайдера (#7). */
+  getProviderModel: (id: ProviderId) => string | null
   /** Провайдеры с настроенными ключами. */
   configuredProviders: Set<ProviderId>
   /** Уже попробованные провайдеры (мутируется по ходу). */
@@ -861,7 +864,9 @@ async function runPlainConversation(
             event: { type: 'info', text: `⚡ ${providerId} недоступен, переключаюсь на ${nextId}` }
           })
           fallbackOpts.triedProviders.add(nextId)
-          return runPlainConversation(sender, sendId, nextProvider, projectPath, messages, signal, recordJournal, costGuard, nextId, model, fallbackOpts)
+          // #7: модель fallback-провайдера, а не упавшего — для верного cost/журнала.
+          const nextModel = fallbackOpts.getProviderModel(nextId) ?? model
+          return runPlainConversation(sender, sendId, nextProvider, projectPath, messages, signal, recordJournal, costGuard, nextId, nextModel, fallbackOpts)
         }
       }
     }
@@ -1456,12 +1461,15 @@ async function runApiConversation(
           fallbackOpts.triedProviders.add(nextId)
           // Передаём tools из замыкания — они привязаны к projectPath и signal, не к провайдеру.
           const fallbackTools = createFileTools(projectPath, signal)
+          // #7: модель fallback-провайдера, а не упавшего — иначе cost-guard/журнал
+          // считаются по тарифу чужой модели (cost cap не срабатывает).
+          const nextModel = fallbackOpts.getProviderModel(nextId) ?? model
           // Ревью P0: agentRuns/runId — undefined НАМЕРЕННО (finish пишется ровно
           // раз во внешнем finally, см. ниже). НО verifications и toolsAllow
           // прокидываем РЕАЛЬНЫЕ: capability-фильтр (M4, безопасность — read-only
           // скилл не должен получить write/run_command в fallback-прогоне) и
           // индексация attest-артефактов обязаны действовать и при фолбэке.
-          return runApiConversation(sender, sendId, nextProvider, fallbackTools, projectPath, initialMessages, signal, recordWrite, recordPlan, recordJournal, readJournal, saveMemory, searchMemories, searchConversations, connectors, agentMode, turnsBudget, skillRegistry, getSecretForDelegate, costGuard, nextId, model, fallbackOpts, mcpClientRef, appendAuditFn, trackToolPatternFn, parentChatId, subSessions, sessionTodos, undefined, undefined, verifications, toolsAllow)
+          return runApiConversation(sender, sendId, nextProvider, fallbackTools, projectPath, initialMessages, signal, recordWrite, recordPlan, recordJournal, readJournal, saveMemory, searchMemories, searchConversations, connectors, agentMode, turnsBudget, skillRegistry, getSecretForDelegate, costGuard, nextId, nextModel, fallbackOpts, mcpClientRef, appendAuditFn, trackToolPatternFn, parentChatId, subSessions, sessionTodos, undefined, undefined, verifications, toolsAllow)
         }
       }
     }
