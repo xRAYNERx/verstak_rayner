@@ -165,8 +165,14 @@ async function loadFromServer(serverBase: string): Promise<Skill[]> {
     }
     const out: Skill[] = []
     for (const entry of payload.skills) {
-      const skill = parseSkillFile(entry.raw, entry.sourceRef ?? `server:${entry.id}`, 'server')
-      if (skill) out.push(skill)
+      // Per-entry try/catch (как в loadFromDir): один битый серверный скилл
+      // (например без поля raw) не должен ронять загрузку ВСЕХ остальных (B8).
+      try {
+        const skill = parseSkillFile(entry.raw, entry.sourceRef ?? `server:${entry.id}`, 'server')
+        if (skill) out.push(skill)
+      } catch (err) {
+        console.error(`[skills] server skill ${entry?.id ?? '?'} failed:`, err)
+      }
     }
     return out
   } finally {
