@@ -350,6 +350,7 @@ export const ru: Translations = {
     autoScrollOff: 'Автопрокрутка выключена — чат остаётся на месте при ответе агента',
     dockTerminal: 'Терминал',
     dockSideChat: 'Параллельный чат',
+    panelDockLabel: 'Терминал и параллельный чат',
     visionBannerTitle: 'Эта модель не видит изображения',
     visionBannerBody: '{current} принимает только текст — прикреплённые скриншоты не попадут в запрос. Переключитесь на модель {family} с распознаванием картинок:',
     visionBannerSwitchTo: 'Модели с vision:',

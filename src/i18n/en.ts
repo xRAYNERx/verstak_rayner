@@ -360,6 +360,7 @@ export const en = {
     autoScrollOff: 'Auto-scroll off — the chat will not jump to new messages',
     dockTerminal: 'Terminal',
     dockSideChat: 'Parallel chat',
+    panelDockLabel: 'Terminal and parallel chat',
     visionBannerTitle: 'Images are not sent to this model',
     visionBannerBody: '{current} only receives text — attached screenshots will not be analyzed. Switch to a vision-capable {family} model:',
     visionBannerSwitchTo: 'Vision models:',
