@@ -1537,13 +1537,14 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
               type="password"
               value={yWordstatToken}
               onChange={e => setYWordstatToken(e.target.value)}
-              placeholder="oauth.yandex.ru, scope direct (или оставь — возьмётся токен Директа)"
+              placeholder="OAuth-токен приложения Wordstat API"
               autoComplete="new-password"
             />
           </div>
           <div className="gg-settings-hint">
-            Wordstat работает через Директ API (асинхронный отчёт). Если поле пустое —
-            используется yandex_direct_token. Операция: get_wordstat (phrases, geo_id).
+            Новый Wordstat API (api.wordstat.yandex.net): OAuth-приложение на oauth.yandex.ru
+            и заявка на доступ по ClientID. Операции: get_top_requests, get_wordstat (phrases, geo_id),
+            get_dynamics, get_regions, get_regions_tree.
           </div>
         </>
       )
