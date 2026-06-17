@@ -138,7 +138,15 @@ async function rawCall(webhook: string, args: Record<string, unknown>, ctx: Conn
 // (crm.deal.add/update, crm.activity.add), denylist ловил только 5 *.delete.
 // Гейт по write-глаголу в единственном chokepoint делает ВЕСЬ коннектор
 // read-only разом — независимо от op и от generic call.
-const WRITE_VERBS = new Set(['add', 'update', 'delete', 'set', 'import', 'register', 'unregister', 'bind', 'unbind', 'start', 'finish', 'save'])
+const WRITE_VERBS = new Set([
+  'add', 'update', 'delete', 'set', 'import', 'register', 'unregister', 'bind', 'unbind', 'start', 'finish', 'save',
+  // Мутирующие методы Bitrix, чей последний сегмент — НЕ add/update/delete:
+  // задачи (tasks.task.*) и общие модульные операции под allowed-префиксами.
+  'create', 'complete', 'renew', 'defer', 'approve', 'disapprove', 'delegate', 'pause',
+  'send', 'attach', 'move', 'copy', 'rename', 'upload', 'uploadfile', 'commit',
+  'close', 'cancel', 'archive', 'restore', 'merge', 'transfer', 'expose',
+  'startwatch', 'stopwatch', 'mute', 'unmute', 'pin', 'unpin',
+])
 
 async function callMethod(webhook: string, method: string, params: Record<string, unknown>, ctx: ConnectorContext): Promise<unknown> {
   if (DENIED_METHODS.has(method)) {

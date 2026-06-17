@@ -62,6 +62,16 @@ describe('Bitrix24 connector', () => {
     expect(upd.error).toBe('read-only')
   })
 
+  // #9: мутирующие методы Bitrix, чей последний сегмент НЕ add/update/delete,
+  // раньше проходили гейт (tasks.task.complete/delegate/defer, *.create и т.п.).
+  it('read-only гейт ловит мутации с нестандартным глаголом (complete/delegate/create/send)', async () => {
+    const conn = createBitrix24Connector()
+    for (const method of ['tasks.task.complete', 'tasks.task.delegate', 'tasks.task.defer', 'crm.deal.create', 'crm.activity.send']) {
+      const res = await conn.query({ op: 'call', method, params: {} }, ctx) as { error: string }
+      expect(res.error, method).toBe('read-only')
+    }
+  })
+
   it('info() возвращает корректный label', () => {
     const conn = createBitrix24Connector()
     const info = conn.info()
