@@ -86,7 +86,10 @@ export function createYandexWordstatConnector(): Connector {
 // ----------------------------------------------------------------- ops
 
 async function getWordstatBatch(token: string, args: Record<string, unknown>, ctx: ConnectorContext): Promise<unknown> {
-  const phrases = (args.phrases as string[] | undefined)?.filter(p => typeof p === 'string' && p.trim()) ?? []
+  // phrases переданный строкой/числом раньше ронял .filter (?. не спасает от не-массива) —
+  // приводим к массиву, не-массив → пустой → понятный bad-args ниже (C5).
+  const phrases = (Array.isArray(args.phrases) ? args.phrases : [])
+    .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
   if (phrases.length === 0) {
     return { error: 'bad-args', message: 'get_wordstat требует phrases: string[] (ключевые фразы).' }
   }

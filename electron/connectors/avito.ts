@@ -24,12 +24,14 @@ const API = 'https://api.avito.ru'
 
 export function createAvitoConnector(): Connector {
   // Кэш токена и user_id живут в замыкании коннектора (один на процесс).
-  let cachedToken: { value: string; expiresAt: number } | null = null
+  let cachedToken: { value: string; expiresAt: number; id: string } | null = null
   let cachedUserId: number | null = null
 
   async function getToken(id: string, secret: string, ctx: ConnectorContext): Promise<string> {
     const now = Date.now()
-    if (cachedToken && cachedToken.expiresAt > now + 30_000) return cachedToken.value
+    // Кэш токена валиден только для ТОГО ЖЕ client_id — иначе после смены креда
+    // вернулся бы токен чужого аккаунта (а getUserId отдал бы старый userId) (C4).
+    if (cachedToken && cachedToken.id === id && cachedToken.expiresAt > now + 30_000) return cachedToken.value
     const body = new URLSearchParams({ grant_type: 'client_credentials', client_id: id, client_secret: secret })
     const res = await fetch(`${API}/token`, {
       method: 'POST',
@@ -41,7 +43,8 @@ export function createAvitoConnector(): Connector {
     if (!res.ok) throw new Error(`Avito auth ${res.status} (проверь client_id/secret): ${text.slice(0, 200)}`)
     const json = JSON.parse(text) as { access_token?: string; expires_in?: number }
     if (!json.access_token) throw new Error('Avito не вернул access_token')
-    cachedToken = { value: json.access_token, expiresAt: now + (json.expires_in ?? 86400) * 1000 }
+    cachedToken = { value: json.access_token, expiresAt: now + (json.expires_in ?? 86400) * 1000, id }
+    cachedUserId = null // новый токен (возможно другой аккаунт) → сбрасываем связанный userId
     return cachedToken.value
   }
 

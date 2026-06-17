@@ -409,7 +409,9 @@ async function getFile(token: string, args: Record<string, unknown>, signal?: Ab
   const { data, rateRemaining } = await githubApi(token, 'GET', apiPath, undefined, signal)
   const file = data as Record<string, unknown>
 
-  if (file.type === 'dir') {
+  // GitHub отдаёт листинг директории МАССИВОМ (у него нет поля .type) — раньше
+  // ветка по file.type==='dir' была мёртвой, dir-листинг ломался (C3).
+  if (Array.isArray(data)) {
     // Директория — возвращаем список файлов
     const entries = (data as Array<Record<string, unknown>>).map(e => ({
       name: e.name,

@@ -71,4 +71,28 @@ describe('Avito connector', () => {
     expect(r.real).toBe(1500)
     expect(r.bonus).toBe(200)
   })
+
+  // C4: cachedToken/cachedUserId не были привязаны к client_id — после смены
+  // креда возвращался токен и userId ЧУЖОГО аккаунта (кросс-аккаунтная путаница).
+  it('смена креда → новый userId в stats-запросе (не кэш чужого аккаунта)', async () => {
+    let selfN = 0
+    const statsUrls: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const u = String(url)
+      if (u.includes('/token')) return { ok: true, status: 200, text: async () => JSON.stringify({ access_token: 'at', expires_in: 86400 }) }
+      if (u.includes('/accounts/self')) { selfN++; return { ok: true, status: 200, text: async () => JSON.stringify({ id: 100 + selfN }) } }
+      if (u.includes('/stats/')) { statsUrls.push(u); return { ok: true, status: 200, text: async () => JSON.stringify({ result: { items: [] } }) } }
+      return { ok: true, status: 200, text: async () => JSON.stringify({}) }
+    }) as unknown as typeof fetch)
+
+    const conn = createAvitoConnector()
+    const ctxA = { getSecret: (k: string) => k === 'avito_client_id' ? 'cidA' : k === 'avito_client_secret' ? 'secA' : null, signal: new AbortController().signal }
+    const ctxB = { getSecret: (k: string) => k === 'avito_client_id' ? 'cidB' : k === 'avito_client_secret' ? 'secB' : null, signal: new AbortController().signal }
+    await conn.query({ op: 'get_stats', item_ids: [1] }, ctxA)
+    await conn.query({ op: 'get_stats', item_ids: [1] }, ctxB)
+
+    expect(statsUrls).toHaveLength(2)
+    expect(statsUrls[0]).toContain('/accounts/101/')
+    expect(statsUrls[1]).toContain('/accounts/102/') // НЕ 101 — userId сброшен при смене креда
+  })
 })

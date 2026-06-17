@@ -75,6 +75,13 @@ describe('Yandex.Wordstat connector (new API)', () => {
     expect(r.error).toBe('bad-args')
   })
 
+  // C5: phrases строкой (а не массивом) раньше ронял .filter (?. не спасает) →
+  // request-failed «filter is not a function» вместо понятного bad-args.
+  it('get_wordstat с phrases-строкой — bad-args, не краш', async () => {
+    const r = await createYandexWordstatConnector().query({ op: 'get_wordstat', phrases: 'купить диван' }, ctx) as { error: string }
+    expect(r.error).toBe('bad-args')
+  })
+
   it('get_top_requests парсит topRequests и associations', async () => {
     mockWordstatHttps((path) => {
       expect(path).toBe('/v1/topRequests')
