@@ -98,15 +98,41 @@ export function isBenignUpdaterError(message: string): boolean {
   )
 }
 
-export async function releaseArtifactsReady(version: string): Promise<boolean> {
+export type ReleaseArtifactMeta = {
+  version: string
+  fileName: string
+  sha512: string
+  size: number
+}
+
+export function parseLatestYmlArtifact(yml: string, version: string): ReleaseArtifactMeta | null {
+  const pathMatch = yml.match(/^path:\s*(.+)$/m)
+  const shaMatch = yml.match(/^sha512:\s*(.+)$/m)
+  const sizeMatch = yml.match(/^\s+size:\s*(\d+)$/m)
+  if (!pathMatch?.[1] || !shaMatch?.[1]) return null
+  return {
+    version: normalizeVersion(version),
+    fileName: pathMatch[1].trim(),
+    sha512: shaMatch[1].trim(),
+    size: sizeMatch?.[1] ? Number(sizeMatch[1]) : 0,
+  }
+}
+
+export async function fetchReleaseArtifactMeta(version: string): Promise<ReleaseArtifactMeta | null> {
   try {
     const res = await fetch(`${releaseFeedBase(version)}/latest.yml`, {
       headers: { 'User-Agent': 'Verstak-Updater' },
     })
-    return res.ok
+    if (!res.ok) return null
+    const yml = await res.text()
+    return parseLatestYmlArtifact(yml, version)
   } catch {
-    return false
+    return null
   }
+}
+
+export async function releaseArtifactsReady(version: string): Promise<boolean> {
+  return (await fetchReleaseArtifactMeta(version)) != null
 }
 
 export type ReleaseNote = {

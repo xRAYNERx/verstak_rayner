@@ -13,6 +13,17 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: 'PLACEHOLDER',
+    deployed: '17.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Обновления: починка зависшего скачивания 1.5.7',
+    changes: [
+      'Установщик 1.5.7 уже лежал в кэше, но UI зависал на 0% — добавлен reconcile по sha512.',
+      'Отключено дифференциальное скачивание (blockmap), добавлен app-update.yml в сборку.',
+      'Таймаут зависшей загрузки, ошибки в rail-индикаторе; rail больше не прыгает в «скачивание» до старта.',
+    ],
+  },
+  {
     commit: 'd7b141b',
     deployed: '17.06.2026',
     treeVersion: '1.5.5',

@@ -36,6 +36,12 @@
       "output": "release",
       "buildResources": "resources"
     },
+    "extraResources": [
+      {
+        "from": "resources/app-update.yml",
+        "to": "app-update.yml"
+      }
+    ],
     "files": [
       "out/**/*",
       "package.json",

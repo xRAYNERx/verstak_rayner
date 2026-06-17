@@ -4,6 +4,7 @@ import {
   isBenignUpdaterError,
   maxSemver,
   normalizeVersion,
+  parseLatestYmlArtifact,
   releaseFeedBase,
   semverGt,
 } from '../electron/update-remote'
@@ -34,6 +35,25 @@ describe('cleanReleaseBody', () => {
   it('strips install footer after horizontal rule', () => {
     const raw = '## Verstak 1.4.0\n\n- Feature A\n\n---\nУстановка: setup.exe'
     expect(cleanReleaseBody(raw)).toBe('## Verstak 1.4.0\n\n- Feature A')
+  })
+})
+
+describe('parseLatestYmlArtifact', () => {
+  it('parses path, sha512 and size', () => {
+    const yml = `version: 1.5.7
+files:
+  - url: Verstak-Setup-1.5.7-x64.exe
+    sha512: abc==
+    size: 253272554
+path: Verstak-Setup-1.5.7-x64.exe
+sha512: abc==
+`
+    expect(parseLatestYmlArtifact(yml, '1.5.7')).toEqual({
+      version: '1.5.7',
+      fileName: 'Verstak-Setup-1.5.7-x64.exe',
+      sha512: 'abc==',
+      size: 253272554,
+    })
   })
 })
 
