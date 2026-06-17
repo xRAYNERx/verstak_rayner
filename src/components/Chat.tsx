@@ -1452,7 +1452,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
       <TimelineBar />
       <ReviewPanel />
 
-      <div className={`gg-composer${provider.id.endsWith('-cli') ? ' has-cli-model' : ''}`}>
+      <div className="gg-composer">
         {attachments.length > 0 && (
           <div className="gg-attach-row">
             {attachments.map((a, i) => (
@@ -1486,10 +1486,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
             </div>
           </div>
         )}
-        <div
-          className="gg-composer-inner"
-          {...(provider.id.endsWith('-cli') ? { 'data-cli-hint': t.chat.cliStrip } : {})}
-        >
+        <div className="gg-composer-inner">
           <SlashCommandPopup
             text={input}
             onClear={() => setInput('')}
@@ -1722,8 +1719,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
                   закрывает дыру «выглядит одинаково, ведёт себя по-разному». */}
               {provider.id.endsWith('-cli') && (
                 <span
-                  className="gg-provider-caps-badge"
-                  title="CLI-провайдер: правки выполняет внешний агент. Контроль Verstak (per-file undo, checkpoint, подтверждение write, mode-policy) не действует. Вложения уходят текстовым хинтом, не картинкой."
+                  className="gg-provider-caps-badge is-cli"
+                  data-cli-hint={t.chat.cliStrip}
                 >
                   CLI
                 </span>
