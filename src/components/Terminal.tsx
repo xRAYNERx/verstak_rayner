@@ -20,32 +20,37 @@ export function Terminal() {
         selectionBackground: 'rgba(91, 141, 255, 0.25)'
       }
     })
+    const container = ref.current
     const fit = new FitAddon()
     term.loadAddon(fit)
-    term.open(ref.current)
+    term.open(container)
 
     let termId = -1
     const buffered: Array<{ id: number; data: string }> = []
     // Регистрируем onData ДО spawn: pty эмитит приглашение шелла сразу после
     // старта, а spawn() — async IPC. Раньше listener вешался только после резолва
-    // → раннее приглашение терялось (пустой чёрный терминал, «так себе работает»).
-    // До получения termId буферим, потом сливаем подходящие по id.
+    // → раннее приглашение терялось. До получения termId буферим, потом сливаем.
     const offData = window.api.term.onData((msg) => {
       if (termId === -1) { buffered.push(msg); return }
       if (msg.id === termId) term.write(msg.data)
     })
 
     // fit + синхронизация реального размера xterm в pty (раньше pty жил фиксированным
-    // 100×30 — resize вообще не вызывался, отсюда кривой перенос строк).
+    // 100×30 — resize не вызывался, отсюда кривой перенос/невидимый prompt).
     const doFit = () => {
+      // Контейнер ещё не разложен (height/width = 0) → fit дал бы 0 строк и текст
+      // был бы невидим. Ждём реального размера (ResizeObserver вызовет снова).
+      if (container.clientHeight === 0 || container.clientWidth === 0) return
       try {
         fit.fit()
         if (termId > 0) void window.api.term.resize(termId, term.cols, term.rows)
       } catch { /* ignore */ }
     }
-    // fit после первой раскладки контейнера (панель только что появилась → размер ещё 0).
-    const raf = requestAnimationFrame(doFit)
-    window.addEventListener('resize', doFit)
+    // ResizeObserver надёжно ловит момент, когда панель получает реальный размер
+    // (появилась с нулевым → размер пришёл позже) — не угадываем через rAF.
+    const ro = new ResizeObserver(() => doFit())
+    ro.observe(container)
+    doFit()
 
     void window.api.term.spawn(path).then(id => {
       termId = id
@@ -56,8 +61,7 @@ export function Terminal() {
     })
 
     return () => {
-      cancelAnimationFrame(raf)
-      window.removeEventListener('resize', doFit)
+      ro.disconnect()
       offData()
       if (termId > 0) void window.api.term.kill(termId)
       term.dispose()
