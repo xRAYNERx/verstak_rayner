@@ -179,6 +179,34 @@ describe('dev-task ipc (Фаза 2)', () => {
       const res = await invoke<Promise<{ ok: boolean; error?: string }>>('devtask:commit', task!.id, { message: 'wip' })
       expect(res.error ?? '').not.toMatch(/dod-gate/)
     })
+
+    // Mandatory DoD mode (настройка dod_mode): off / block.
+    function reRegister(dodMode: string) {
+      handlers.clear()
+      registerDevTaskIpc({
+        tasks, getProjectRoot: () => dir, undoStack: createUndoStack(db),
+        runCheck: async () => ({ exitCode: 0, stdout: '', stderr: '' }),
+        recordAudit: (action, detail) => auditEvents.push({ action, detail }),
+        getSecret: (k) => (k === 'dod_mode' ? dodMode : null)
+      })
+    }
+
+    it('dod_mode=off: красные проверки НЕ блокируют commit', async () => {
+      const task = await invoke<Promise<DevTask | null>>('devtask:open', { title: 'off' })
+      tasks.addCheck(task!.id, { label: 'tsc', command: 'x', status: 'fail', exitCode: 1 })
+      reRegister('off')
+      const res = await invoke<Promise<{ ok: boolean; error?: string }>>('devtask:commit', task!.id, { message: 'wip' })
+      expect(res.error ?? '').not.toMatch(/dod-gate/)
+    })
+
+    it('dod_mode=block: overrideReason НЕ обходит — строгий блок', async () => {
+      const task = await invoke<Promise<DevTask | null>>('devtask:open', { title: 'block' })
+      tasks.addCheck(task!.id, { label: 'tsc', command: 'x', status: 'fail', exitCode: 1 })
+      reRegister('block')
+      const res = await invoke<Promise<{ ok: boolean; error?: string }>>('devtask:commit', task!.id, { message: 'wip', overrideReason: 'очень надо' })
+      expect(res.ok).toBe(false)
+      expect(res.error).toMatch(/Mandatory DoD = block/)
+    })
   })
 
   // Ревью (тест-дыры): критичные пути Фазы 3-4 branch→package→PR без тестов.

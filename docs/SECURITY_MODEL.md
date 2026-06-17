@@ -74,7 +74,9 @@ Verstak — десктопный агент, исполняющий инстру
 - **`gitAdd`** прогоняет каждый path через `isForbiddenPath` → секреты не уезжают в
   коммит и при push в публичный PR.
 - **DoD-гейт** (`devtask:commit`, ревью F2): коммит блокируется при fail/pending/running
-  проверках; обход только явным `overrideReason` → запись в `audit_log`.
+  проверках. Режим — настройка `dod_mode`: `warn` (дефолт — обход через
+  `overrideReason` → запись в `audit_log`), `block` (Mandatory DoD — обход
+  запрещён), `off` (без гейта).
 
 ## 7. Иконки проектов — `electron/storage/project-icons.ts`
 

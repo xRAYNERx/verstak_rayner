@@ -327,14 +327,20 @@ export function registerDevTaskIpc(deps: DevTaskDeps): void {
     if (!message) return { ok: false, error: 'empty-message' }
     // Ревью F2 (P0): backend DoD gate. UI предупреждает перед коммитом поверх
     // красных проверок, но это клиентская валидация (обходится через devtools).
-    // Жёсткая проверка статуса checks ЗДЕСЬ: fail/pending/running блокируют
-    // коммит, обойти можно только явным overrideReason (с audit-записью).
+    // Жёсткая проверка статуса checks ЗДЕСЬ. Поведение управляется настройкой
+    // Mandatory DoD (dod_mode): 'warn' (дефолт — блок, обход overrideReason →
+    // audit), 'block' (строго — обход запрещён, доводи до зелёного), 'off' (без
+    // гейта). Дефолт = текущее поведение, никого не ломает.
+    const dodMode = (getSecret?.('dod_mode') ?? 'warn')
     const blocking = tasks.listChecks(id).filter(c => c.status === 'fail' || c.status === 'pending' || c.status === 'running')
     const overrideReason = String(opts?.overrideReason ?? '').trim()
-    if (blocking.length > 0 && !overrideReason) {
-      return {
-        ok: false,
-        error: `dod-gate: ${blocking.length} проверок не зелёные (${blocking.map(c => `${c.label}:${c.status}`).join(', ')}). Чтобы закоммитить поверх — передай overrideReason.`
+    if (dodMode !== 'off' && blocking.length > 0) {
+      const list = blocking.map(c => `${c.label}:${c.status}`).join(', ')
+      if (dodMode === 'block') {
+        return { ok: false, error: `dod-gate (Mandatory DoD = block): ${blocking.length} проверок не зелёные (${list}). Обход запрещён — доведи проверки до зелёного.` }
+      }
+      if (!overrideReason) {
+        return { ok: false, error: `dod-gate: ${blocking.length} проверок не зелёные (${list}). Чтобы закоммитить поверх — передай overrideReason.` }
       }
     }
     // paths: явные или из текущего diff рабочего дерева (только новые правки).
