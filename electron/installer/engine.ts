@@ -141,15 +141,50 @@ async function createShortcuts(installDir: string): Promise<void> {
   }
 }
 
+/** Папку безопасно стереть целиком при откате ТОЛЬКО если установщик её создал
+ *  (не существовала) или она была ПУСТА. Иначе (обновление поверх старой версии
+ *  или пользователь выбрал папку с личными файлами) — трогать чужое нельзя (B1). */
+export async function dirIsOursToWipe(dir: string): Promise<boolean> {
+  try {
+    const entries = await readdir(dir)
+    return entries.length === 0
+  } catch {
+    return true // папки нет — создаст установщик, при откате можно убрать
+  }
+}
+
+/** Откат установки. ownDir → убрать папку целиком; иначе удалить ТОЛЬКО
+ *  записанные payload-файлы + uninstall-скрипт, не затрагивая чужие файлы. */
+export async function rollbackInstall(installDir: string, payloadRoot: string, ownDir: boolean): Promise<void> {
+  if (ownDir) {
+    await rm(installDir, { recursive: true, force: true })
+    return
+  }
+  let files: FileEntry[] = []
+  try {
+    files = await walkFiles(payloadRoot)
+  } catch {
+    return // нет payload-манифеста — безопаснее ничего не удалять
+  }
+  for (const f of files) {
+    await rm(join(installDir, f.rel), { force: true }).catch(() => {})
+  }
+  await rm(join(installDir, uninstallScriptName()), { force: true }).catch(() => {})
+}
+
 export async function runInstall(
   installDir: string,
   version: string,
   onProgress: (p: InstallProgress) => void,
 ): Promise<InstallResult> {
+  const normalized = installDir.trim()
+  if (!normalized) return { ok: false, error: 'Укажите папку установки.' }
+  // B1: фиксируем ДО любых записей, можно ли при откате стирать папку целиком —
+  // иначе сбой копирования в существующую непустую папку удалял бы чужие данные.
+  const ownDir = await dirIsOursToWipe(normalized)
+  let payloadRoot = ''
   try {
-    const payloadRoot = resolvePayloadRoot()
-    const normalized = installDir.trim()
-    if (!normalized) return { ok: false, error: 'Укажите папку установки.' }
+    payloadRoot = resolvePayloadRoot()
 
     emit(onProgress, { phase: 'preparing' }, 0, 0, 0, 0, '')
 
@@ -177,7 +212,7 @@ export async function runInstall(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     try {
-      await rm(installDir, { recursive: true, force: true })
+      await rollbackInstall(normalized, payloadRoot, ownDir)
     } catch {
       // ignore cleanup errors
     }
