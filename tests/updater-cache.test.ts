@@ -32,6 +32,22 @@ describe('updater-cache', () => {
     expect(existsSync(pending)).toBe(false)
   })
 
+  it('reconcileCachedDownload accepts installer.exe without remote sha512', async () => {
+    const {
+      getUpdaterCacheRoot,
+      reconcileCachedDownload,
+    } = await import('../electron/updater-cache')
+    const root = getUpdaterCacheRoot()
+    mkdirSync(root, { recursive: true })
+    const payload = 'loose-installer-payload'
+    writeFileSync(join(root, 'installer.exe'), payload)
+
+    const repaired = await reconcileCachedDownload('Verstak-Setup-9.9.9-x64.exe', '', 0)
+
+    expect(repaired).toBe(join(root, 'pending', 'Verstak-Setup-9.9.9-x64.exe'))
+    expect(existsSync(join(root, 'pending', 'update-info.json'))).toBe(true)
+  })
+
   it('reconcileCachedDownload repairs installer.exe in cache root', async () => {
     const {
       getUpdaterCacheRoot,

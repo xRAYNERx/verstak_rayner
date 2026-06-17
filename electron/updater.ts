@@ -181,8 +181,15 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
   }
 
   const tryAnnounceCachedDownload = async (version: string): Promise<boolean> => {
-    const meta = await fetchReleaseArtifactMeta(version)
-    if (!meta) return false
+    let meta = await fetchReleaseArtifactMeta(version)
+    if (!meta) {
+      const fileName = `Verstak-Setup-${version}-x64.exe`
+      const cached = await reconcileCachedDownload(fileName, '', 0)
+      if (!cached) return false
+      console.info('[updater] using locally reconciled installer for', version)
+      announceDownloaded(version)
+      return true
+    }
     const cached = await reconcileCachedDownload(meta.fileName, meta.sha512, meta.size)
     if (!cached) return false
     console.info('[updater] using reconciled cached installer for', version)

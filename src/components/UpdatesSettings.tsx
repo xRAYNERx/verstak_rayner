@@ -36,8 +36,10 @@ export function UpdatesSettings() {
 
   useEffect(() => {
     const isNewerThanInstalled = (v?: string) => {
+      if (!v) return false
       const installed = version.replace(/^v/, '')
-      return !!v && installed !== '…' && semverGt(v, installed)
+      if (installed === '…') return true
+      return semverGt(v, installed)
     }
 
     const applyPhase = (

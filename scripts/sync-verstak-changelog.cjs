@@ -13,6 +13,18 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: '340497d',
+    deployed: '17.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Обновления: починка зависшего 1.5.7 и деплой фикса',
+    changes: [
+      'Установщик 1.5.7 уже был в кэше (253 МБ), но UI показывал 0% — восстановлен pending/update-info.json.',
+      'reconcileCachedDownload: fallback без latest.yml, если installer.exe уже скачан.',
+      'UpdatesSettings: не показывать «актуальная версия», пока не загрузилась текущая.',
+      'Скрипт scripts/repair-updater-cache.mjs для ручного восстановления кэша.',
+    ],
+  },
+  {
     commit: '6dda021',
     deployed: '17.06.2026',
     treeVersion: '1.5.5',
