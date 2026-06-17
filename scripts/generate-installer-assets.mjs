@@ -25,7 +25,7 @@ const THEME = {
   textSecondary: '#d8dee9',
   textTertiary: '#97a1b5',
   accent: '#88c0d0',
-  accentMuted: 'rgba(136, 192, 208, 0.14)',
+  accentHover: '#9fd0de',
   error: '#bf616a',
 }
 
@@ -69,34 +69,21 @@ function sidebarSvg({ accent, modeLabel, modeSub, features, stepCount = 4, activ
     </radialGradient>
     ${noiseFilter('noise')}
   </defs>
-
   <rect width="164" height="314" fill="url(#shell)"/>
   <rect width="164" height="314" fill="url(#glow)"/>
   <rect width="164" height="314" filter="url(#noise)" opacity="0.55"/>
-
-  <!-- rail accent -->
   <rect x="0" y="0" width="3" height="314" fill="${accent}" opacity="0.72"/>
   <rect x="3" y="0" width="1" height="314" fill="${accent}" opacity="0.18"/>
-
-  <!-- titlebar strip -->
   <rect x="3" y="0" width="161" height="36" fill="url(#titlebar)"/>
   <line x1="3" y1="36" x2="164" y2="36" stroke="${THEME.borderSubtle}" stroke-width="1"/>
   <text x="14" y="23" fill="${THEME.textSecondary}" font-family="Segoe UI,Inter,sans-serif" font-size="8" font-weight="600" letter-spacing="2.2">VERSTAK</text>
-
-  <!-- glass card -->
   <rect x="18" y="52" width="128" height="128" rx="14" fill="${THEME.bgOverlay}" opacity="0.55"/>
   <rect x="18" y="52" width="128" height="128" rx="14" fill="none" stroke="${THEME.borderDefault}" stroke-width="1" opacity="0.65"/>
   <rect x="19" y="53" width="126" height="40" rx="13" fill="rgba(255,255,255,0.03)"/>
-
-  <!-- mode label -->
   <text x="82" y="196" text-anchor="middle" fill="${accent}" font-family="Segoe UI,Inter,sans-serif" font-size="10.5" font-weight="700" letter-spacing="1.8">${modeLabel}</text>
   <text x="82" y="210" text-anchor="middle" fill="${THEME.textTertiary}" font-family="Segoe UI,Inter,sans-serif" font-size="7.5">${modeSub}</text>
-
-  <!-- features -->
   <rect x="16" y="202" width="132" height="62" rx="10" fill="rgba(0,0,0,0.18)" stroke="${THEME.borderSubtle}" stroke-width="1" opacity="0.7"/>
   ${featureRows}
-
-  <!-- steps -->
   ${steps}
 </svg>`)
 }
@@ -115,7 +102,38 @@ function headerSvg({ accent }) {
   <rect x="0" y="0" width="3" height="57" fill="${accent}" opacity="0.9"/>
   <rect x="0" y="0" width="150" height="1" fill="rgba(236,239,244,0.07)"/>
   <line x1="0" y1="56" x2="150" y2="56" stroke="${THEME.borderDefault}" stroke-width="1"/>
-  <!-- logo slot: 12..46 -->
+</svg>`)
+}
+
+function buttonSvg(text, variant = 'primary') {
+  const w = variant === 'close' ? 46 : variant === 'wide' ? 120 : 96
+  const h = variant === 'close' ? 36 : 34
+  const r = variant === 'close' ? 8 : 10
+  const isPrimary = variant === 'primary' || variant === 'wide'
+  const isClose = variant === 'close'
+  const bg = isPrimary ? THEME.accent : isClose ? 'rgba(255,255,255,0.04)' : THEME.bgOverlay
+  const stroke = isPrimary ? THEME.accent : THEME.borderDefault
+  const fg = isPrimary ? THEME.bgBase : isClose ? THEME.textSecondary : THEME.textPrimary
+  const label = isClose ? '✕' : text
+  const fs = isClose ? 14 : h < 22 ? 8 : 12
+  return Buffer.from(`<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+  <rect width="${w}" height="${h}" rx="${r}" fill="${bg}" stroke="${stroke}" stroke-width="1"/>
+  <text x="${w / 2}" y="${h / 2 + (isClose ? 5 : 4)}" text-anchor="middle" fill="${fg}" font-family="Segoe UI,Inter,sans-serif" font-size="${fs}" font-weight="600">${label}</text>
+</svg>`)
+}
+
+function titlebarSvg() {
+  return Buffer.from(`<svg width="396" height="40" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="tb" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a4150"/>
+      <stop offset="100%" stop-color="${THEME.bgElevated}"/>
+    </linearGradient>
+  </defs>
+  <rect width="396" height="40" fill="url(#tb)"/>
+  <rect x="0" y="39" width="396" height="1" fill="${THEME.borderSubtle}"/>
+  <text x="42" y="25" fill="${THEME.textSecondary}" font-family="Segoe UI,Inter,sans-serif" font-size="11" font-weight="600" letter-spacing="2.4">VERSTAK</text>
+  <text x="396" y="25" text-anchor="end" fill="${THEME.textTertiary}" font-family="Segoe UI,Inter,sans-serif" font-size="9">Установка</text>
 </svg>`)
 }
 
@@ -162,6 +180,10 @@ async function toBmp(pipeline, width, height, flattenBg = THEME.bgBase) {
   return encodeBmp24(data, width, height)
 }
 
+async function svgToBmp(svg, w, h, flattenBg = THEME.bgBase) {
+  return toBmp(sharp(svg).png(), w, h, flattenBg)
+}
+
 async function compositeSidebar(logoBuf, variant) {
   const isUninstall = variant === 'uninstall'
   const accent = isUninstall ? THEME.error : THEME.accent
@@ -172,7 +194,7 @@ async function compositeSidebar(logoBuf, variant) {
     features: isUninstall
       ? ['Удаление файлов', 'Очистка ярлыков', 'Данные приложения']
       : ['AI-агенты и модели', 'Проекты и память', 'Skills и артефакты'],
-    activeStep: isUninstall ? 0 : 0,
+    activeStep: 0,
   })).png().toBuffer()
 
   const logo = await sharp(logoBuf)
@@ -180,11 +202,7 @@ async function compositeSidebar(logoBuf, variant) {
     .png()
     .toBuffer()
 
-  return toBmp(
-    sharp(bg).composite([{ input: logo, top: 78, left: 46 }]),
-    164,
-    314,
-  )
+  return toBmp(sharp(bg).composite([{ input: logo, top: 78, left: 46 }]), 164, 314)
 }
 
 async function compositeHeader(logoBuf, accent = THEME.accent) {
@@ -195,7 +213,7 @@ async function compositeHeader(logoBuf, accent = THEME.accent) {
     .toBuffer()
 
   return toBmp(
-    sharp(bg).composite([{ input: logo, top: 13, left: 14 }]).flatten({ background: THEME.bgElevated }),
+    sharp(bg).composite([{ input: logo, top: 11, left: 12 }]).flatten({ background: THEME.bgElevated }),
     150,
     57,
     THEME.bgElevated,
@@ -226,20 +244,44 @@ async function main() {
   const header = await compositeHeader(logoBuf, THEME.accent)
   const uninstallHeader = await compositeHeader(logoBuf, THEME.error)
 
-  assertBmp(sidebar, 164, 314, 'installerSidebar')
-  assertBmp(uninstallSidebar, 164, 314, 'uninstallerSidebar')
-  assertBmp(header, 150, 57, 'installerHeader')
-  assertBmp(uninstallHeader, 150, 57, 'uninstallerHeader')
+  const btnNext = await svgToBmp(buttonSvg('Далее', 'primary'), 96, 34, THEME.bgBase)
+  const btnBack = await svgToBmp(buttonSvg('Назад', 'ghost'), 96, 34, THEME.bgBase)
+  const btnCancel = await svgToBmp(buttonSvg('Отмена', 'ghost'), 96, 34, THEME.bgBase)
+  const btnInstall = await svgToBmp(buttonSvg('Установить', 'wide'), 120, 34, THEME.bgBase)
+  const btnFinish = await svgToBmp(buttonSvg('Готово', 'wide'), 120, 34, THEME.bgBase)
+  const btnClose = await svgToBmp(buttonSvg('', 'close'), 46, 36, THEME.bgElevated)
+  const btnBrowse = await svgToBmp(buttonSvg('Обзор…', 'ghost'), 64, 18, THEME.bgBase)
+  const titlebar = await svgToBmp(titlebarSvg(), 396, 40, THEME.bgElevated)
 
-  fs.writeFileSync(path.join(OUT_DIR, 'installerSidebar.bmp'), sidebar)
-  fs.writeFileSync(path.join(OUT_DIR, 'uninstallerSidebar.bmp'), uninstallSidebar)
-  fs.writeFileSync(path.join(OUT_DIR, 'installerHeader.bmp'), header)
-  fs.writeFileSync(path.join(OUT_DIR, 'uninstallerHeader.bmp'), uninstallHeader)
+  const titleLogo = await sharp(logoBuf)
+    .resize(18, 18, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toBuffer()
+  const titlebarWithLogo = await toBmp(
+    sharp(titlebarSvg()).png().composite([{ input: titleLogo, top: 11, left: 14 }]),
+    396,
+    40,
+    THEME.bgElevated,
+  )
 
-  console.log('OK: build/installerSidebar.bmp (164×314)')
-  console.log('OK: build/uninstallerSidebar.bmp (164×314)')
-  console.log('OK: build/installerHeader.bmp (150×57)')
-  console.log('OK: build/uninstallerHeader.bmp (150×57)')
+  for (const [buf, w, h, name] of [
+    [sidebar, 164, 314, 'installerSidebar'],
+    [uninstallSidebar, 164, 314, 'uninstallerSidebar'],
+    [header, 150, 57, 'installerHeader'],
+    [uninstallHeader, 150, 57, 'uninstallerHeader'],
+    [btnNext, 96, 34, 'btn-next'],
+    [btnBack, 96, 34, 'btn-back'],
+    [btnCancel, 96, 34, 'btn-cancel'],
+    [btnInstall, 120, 34, 'btn-install'],
+    [btnFinish, 120, 34, 'btn-finish'],
+    [btnClose, 46, 36, 'btn-close'],
+    [btnBrowse, 64, 18, 'btn-browse'],
+    [titlebarWithLogo, 396, 40, 'titlebar'],
+  ]) {
+    assertBmp(buf, w, h, name)
+    fs.writeFileSync(path.join(OUT_DIR, `${name}.bmp`), buf)
+    console.log(`OK: build/${name}.bmp (${w}×${h})`)
+  }
 }
 
 main().catch((err) => {

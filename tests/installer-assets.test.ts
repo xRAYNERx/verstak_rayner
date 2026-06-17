@@ -13,34 +13,42 @@ function readBmpSize(buf: Buffer) {
 }
 
 describe('installer BMP assets', () => {
-  it('sidebar/header exist with NSIS dimensions after generate:installer', () => {
-    const sidebar = path.join(BUILD, 'installerSidebar.bmp')
-    const uninstallSidebar = path.join(BUILD, 'uninstallerSidebar.bmp')
-    const header = path.join(BUILD, 'installerHeader.bmp')
-    const uninstallHeader = path.join(BUILD, 'uninstallerHeader.bmp')
+  it('sidebar/header/buttons exist with NSIS dimensions after generate:installer', () => {
+    const files: Array<[string, number, number]> = [
+      ['installerSidebar.bmp', 164, 314],
+      ['uninstallerSidebar.bmp', 164, 314],
+      ['installerHeader.bmp', 150, 57],
+      ['uninstallerHeader.bmp', 150, 57],
+      ['btn-next.bmp', 96, 34],
+      ['btn-back.bmp', 96, 34],
+      ['btn-cancel.bmp', 96, 34],
+      ['btn-install.bmp', 120, 34],
+      ['btn-finish.bmp', 120, 34],
+      ['btn-close.bmp', 46, 36],
+      ['btn-browse.bmp', 64, 18],
+      ['titlebar.bmp', 396, 40],
+    ]
 
-    for (const file of [sidebar, uninstallSidebar, header, uninstallHeader]) {
-      expect(fs.existsSync(file)).toBe(true)
+    for (const [name, w, h] of files) {
+      const file = path.join(BUILD, name)
+      expect(fs.existsSync(file), name).toBe(true)
+      const size = readBmpSize(fs.readFileSync(file))
+      expect(size).toEqual({ width: w, height: h, bpp: 24 })
     }
-
-    const sb = readBmpSize(fs.readFileSync(sidebar))
-    const usb = readBmpSize(fs.readFileSync(uninstallSidebar))
-    const hd = readBmpSize(fs.readFileSync(header))
-    const uhd = readBmpSize(fs.readFileSync(uninstallHeader))
-
-    expect(sb).toEqual({ width: 164, height: 314, bpp: 24 })
-    expect(usb).toEqual({ width: 164, height: 314, bpp: 24 })
-    expect(hd).toEqual({ width: 150, height: 57, bpp: 24 })
-    expect(uhd).toEqual({ width: 150, height: 57, bpp: 24 })
   })
 
-  it('installer.nsh defines Verstak Nord branding', () => {
+  it('custom NSIS UI scripts define Verstak branding', () => {
     const nsh = fs.readFileSync(path.join(BUILD, 'installer.nsh'), 'utf8')
-    expect(nsh).toContain('customWelcomePage')
+    const ui = fs.readFileSync(path.join(BUILD, 'verstak-ui.nsh'), 'utf8')
+
     expect(nsh).toMatch(/!define MUI_BGCOLOR "2E3440"/)
-    expect(nsh).toContain('Добро пожаловать в Verstak')
-    expect(nsh).toContain('MUI_INSTFILESPAGE_PROGRESSBAR')
+    expect(nsh).toContain('customWelcomePage')
+    expect(nsh).toContain('customFinishPage')
     expect(nsh).toContain('MUI_DIRECTORYPAGE_BGCOLOR')
     expect(nsh).not.toContain('VerstakApplyDarkChrome')
+
+    expect(ui).toContain('VerstakApplyBorderless')
+    expect(ui).toContain('Добро пожаловать в Verstak')
+    expect(ui).toContain('${NSD_CreateBitmap}')
   })
 })
