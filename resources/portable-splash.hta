@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<hta:application
+  id="app"
+  applicationname="Verstak Setup Loader"
+  border="dialog"
+  borderstyle="normal"
+  caption="no"
+  contextmenu="no"
+  innerborder="no"
+  maximizebutton="no"
+  minimizebutton="no"
+  navigable="no"
+  scroll="no"
+  selection="no"
+  showintaskbar="no"
+  singleinstance="yes"
+  sysmenu="no"
+  version="1.0"
+  windowstate="normal"
+/>
+<title>Verstak Setup Loader</title>
+<style>
+  html, body {
+    margin: 0;
+    overflow: hidden;
+    background: #2e3440;
+    color: #eceff4;
+    font: 500 13px/1.45 "Segoe UI", system-ui, sans-serif;
+    user-select: none;
+  }
+  .wrap {
+    width: 392px;
+    height: 188px;
+    box-sizing: border-box;
+    padding: 24px 28px 24px;
+    display: flex;
+    flex-direction: column;
+  }
+  .head {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .brand {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.24em;
+    color: #81a1c1;
+    line-height: 1.4;
+  }
+  .title {
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+  .status {
+    font-size: 13px;
+    color: #d8dee9;
+    min-height: 18px;
+    line-height: 1.45;
+  }
+  .hint {
+    font-size: 11px;
+    color: #a7b0c0;
+    margin-top: 12px;
+    line-height: 1.4;
+  }
+  .track {
+    height: 6px;
+    border-radius: 999px;
+    background: #3b4252;
+    border: 1px solid #4c566a;
+    overflow: hidden;
+    position: relative;
+  }
+  .shimmer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 42%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, #88c0d0, #81a1c1, transparent);
+    animation: slide 1.35s ease-in-out infinite;
+  }
+  @keyframes slide {
+    0% { left: -45%; }
+    100% { left: 105%; }
+  }
+</style>
+<script type="text/javascript">
+  var W = 392;
+  var H = 188;
+  var msgs = ['Распаковка файлов', 'Подготовка мастера', 'Запуск установщика'];
+  var msgIndex = 0;
+  var statusEl;
+  var dots = 0;
+  var started = new Date().getTime();
+
+  function layoutWindow() {
+    try {
+      window.resizeTo(W, H);
+      window.moveTo(
+        Math.round((screen.availWidth - W) / 2),
+        Math.round((screen.availHeight - H) / 2)
+      );
+    } catch (e) {}
+  }
+
+  function setStatus(text) {
+    if (statusEl) statusEl.innerHTML = text;
+  }
+
+  function hasSetupProcess() {
+    try {
+      var locator = new ActiveXObject('WbemScripting.SWbemLocator');
+      var service = locator.ConnectServer('.', 'root\\cimv2');
+      var items = service.ExecQuery("SELECT Name FROM Win32_Process WHERE Name='VerstakSetup.exe'");
+      var e = new Enumerator(items);
+      for (; !e.atEnd(); e.moveNext()) return true;
+    } catch (err) {}
+    return false;
+  }
+
+  function shouldClose() {
+    if (hasSetupProcess()) return true;
+    return (new Date().getTime() - started) > 120000;
+  }
+
+  function tick() {
+    if (shouldClose()) {
+      window.close();
+      return;
+    }
+    dots = (dots + 1) % 4;
+    var tail = '';
+    for (var i = 0; i < dots; i++) tail += '.';
+    setStatus(msgs[msgIndex] + tail);
+  }
+
+  function rotateMsg() {
+    msgIndex = (msgIndex + 1) % msgs.length;
+  }
+
+  function init() {
+    layoutWindow();
+    statusEl = document.getElementById('status');
+    window.setInterval(tick, 400);
+    window.setInterval(rotateMsg, 2200);
+    tick();
+  }
+
+  window.onload = init;
+</script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="head">
+      <div class="brand">VERSTAK</div>
+      <div class="title">Подготовка установщика</div>
+      <div id="status" class="status">Распаковка файлов</div>
+    </div>
+    <div class="track"><div class="shimmer"></div></div>
+    <div class="hint">Обычно 10–20 секунд</div>
+  </div>
+</body>
+</html>

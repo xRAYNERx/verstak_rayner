@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src file: data:">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #2e3440;
+    color: #eceff4;
+    font: 500 13px/1.45 "Segoe UI", system-ui, sans-serif;
+    user-select: none;
+    overflow: hidden;
+  }
+  .panel {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 24px 28px;
+  }
+  .brand {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.24em;
+    color: #81a1c1;
+  }
+  .icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    object-fit: contain;
+  }
+  .title {
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .status {
+    min-height: 18px;
+    font-size: 13px;
+    color: #d8dee9;
+    text-align: center;
+  }
+  .dots::after {
+    content: '';
+    animation: dots 1.4s steps(4, end) infinite;
+  }
+  .track {
+    width: 280px;
+    height: 6px;
+    border-radius: 999px;
+    background: #3b4252;
+    border: 1px solid #4c566a;
+    overflow: hidden;
+    position: relative;
+  }
+  .track::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    width: 42%;
+    background: linear-gradient(90deg, transparent, #88c0d0, #81a1c1, transparent);
+    animation: slide 1.35s ease-in-out infinite;
+  }
+  @keyframes slide {
+    0% { transform: translateX(-120%); }
+    100% { transform: translateX(280%); }
+  }
+  @keyframes dots {
+    0% { content: ''; }
+    25% { content: '.'; }
+    50% { content: '..'; }
+    75% { content: '...'; }
+  }
+</style>
+</head>
+<body>
+  <div class="panel">
+    <div class="brand">VERSTAK</div>
+    <img class="icon" id="icon" alt="" />
+    <div class="title">Установка Verstak</div>
+    <div class="status"><span id="msg">Запуск</span><span class="dots"></span></div>
+    <div class="track" aria-hidden="true"></div>
+  </div>
+  <script>
+    const icon = document.getElementById('icon')
+    const msg = document.getElementById('msg')
+    const params = new URLSearchParams(location.search)
+    const iconPath = params.get('icon')
+    if (iconPath) icon.src = iconPath
+    const msgs = ['Запуск', 'Подготовка', 'Почти готово']
+    let i = 0
+    setInterval(() => { i = (i + 1) % msgs.length; msg.textContent = msgs[i] }, 2200)
+  </script>
+</body>
+</html>

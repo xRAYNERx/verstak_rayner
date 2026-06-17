@@ -1,0 +1,377 @@
+.gg-installer-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+
+.gg-installer-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 248px 1fr;
+}
+
+.gg-installer-sidebar {
+  background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-base) 55%, #262b33 100%);
+  border-right: 1px solid var(--border-subtle);
+  padding: 14px 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+}
+
+.gg-installer-sidebar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--accent);
+  opacity: 0.75;
+}
+
+.gg-installer-brand {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: var(--text-secondary);
+  padding-left: 6px;
+}
+
+.gg-installer-logo-wrap {
+  margin: 8px auto 0;
+  width: 128px;
+  height: 128px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-overlay) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-default) 65%, transparent);
+  display: grid;
+  place-items: center;
+}
+
+.gg-installer-logo {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+}
+
+.gg-installer-sidebar-caption {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.gg-installer-stepper {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 8px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.16);
+  border: 1px solid var(--border-subtle);
+}
+
+.gg-installer-stepper-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  opacity: 0.55;
+}
+
+.gg-installer-stepper-item.is-current {
+  opacity: 1;
+}
+
+.gg-installer-stepper-item.is-done {
+  opacity: 0.82;
+}
+
+.gg-installer-stepper-index {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+}
+
+.gg-installer-stepper-item.is-current .gg-installer-stepper-index {
+  color: var(--bg-base);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.gg-installer-stepper-item.is-done .gg-installer-stepper-index {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.gg-installer-stepper-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gg-installer-stepper-label {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.gg-installer-stepper-hint {
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--text-tertiary);
+}
+
+.gg-installer-sidebar-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  text-align: center;
+  padding-top: 4px;
+}
+
+.gg-installer-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bg-base);
+}
+
+.gg-installer-content {
+  flex: 1;
+  min-height: 0;
+  padding: 28px 32px 16px;
+  overflow: auto;
+}
+
+.gg-installer-title {
+  margin: 0 0 10px;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.gg-installer-lead {
+  margin: 0 0 14px;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--accent);
+}
+
+.gg-installer-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 280px;
+  text-align: center;
+}
+
+.gg-installer-loader-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.gg-installer-loader-status {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.gg-installer-loader-dots::after {
+  content: '';
+  animation: gg-installer-dots 1.4s steps(4, end) infinite;
+}
+
+.gg-installer-loader-hint {
+  margin: 0;
+  max-width: 360px;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.gg-installer-loader-track {
+  width: min(320px, 100%);
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+  position: relative;
+}
+
+.gg-installer-loader-shimmer {
+  position: absolute;
+  inset: 0;
+  width: 42%;
+  background: linear-gradient(90deg, transparent, var(--accent), var(--accent-hover), transparent);
+  animation: gg-installer-slide 1.35s ease-in-out infinite;
+}
+
+.gg-installer-value-list {
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gg-installer-value-item {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-elevated) 55%, transparent);
+  border: 1px solid var(--border-subtle);
+}
+
+.gg-installer-value-title {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.gg-installer-value-text {
+  display: block;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.gg-installer-text-muted {
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+}
+
+@keyframes gg-installer-slide {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(280%); }
+}
+
+@keyframes gg-installer-dots {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+}
+
+.gg-installer-text {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: 1.55;
+  color: var(--text-secondary);
+  white-space: pre-line;
+}
+
+.gg-installer-field {
+  margin-top: 22px;
+}
+
+.gg-installer-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.gg-installer-path-row {
+  display: flex;
+  gap: 8px;
+}
+
+.gg-installer-path-row .gg-input {
+  flex: 1;
+}
+
+.gg-installer-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.gg-installer-check input {
+  accent-color: var(--accent);
+}
+
+.gg-installer-progress {
+  margin-top: 24px;
+}
+
+.gg-installer-progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-input);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+}
+
+.gg-installer-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+  transition: width 180ms ease;
+}
+
+.gg-installer-progress-meta {
+  margin-top: 10px;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.gg-installer-error {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--error-muted);
+  border: 1px solid color-mix(in srgb, var(--error) 35%, transparent);
+  color: #f0b0b6;
+  font-size: var(--text-sm);
+}
+
+.gg-installer-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 16px 28px 20px;
+  border-top: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--bg-elevated) 40%, var(--bg-base));
+  flex-shrink: 0;
+}
+
+.gg-installer-footer .gg-btn {
+  min-width: 104px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.gg-installer-footer .gg-btn-primary {
+  min-width: 128px;
+}

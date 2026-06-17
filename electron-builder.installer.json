@@ -1,0 +1,43 @@
+{
+  "extends": null,
+  "appId": "ru.verstak.installer",
+  "productName": "VerstakSetup",
+  "copyright": "Copyright © 2026 Pavel Frolov",
+  "beforeBuild": "scripts/installer-before-build.cjs",
+  "afterPack": "scripts/patch-exe-icon.cjs",
+  "directories": {
+    "app": "release/installer-app-staging",
+    "output": "release/installer-build",
+    "buildResources": "resources"
+  },
+  "files": [
+    "**/*"
+  ],
+  "extraMetadata": {
+    "main": "out/installer/main.mjs",
+    "name": "verstak-setup",
+    "description": "Verstak installer"
+  },
+  "asar": true,
+  "extraResources": [
+    {
+      "from": "release/app-payload-staging",
+      "to": "app-payload",
+      "filter": ["**/*"]
+    }
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "resources/icon.ico",
+    "artifactName": "Verstak-Setup-${version}-${arch}.${ext}",
+    "signAndEditExecutable": false
+  },
+  "portable": {
+    "artifactName": "Verstak-Setup-${version}-${arch}.${ext}"
+  }
+}

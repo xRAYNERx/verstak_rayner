@@ -15,7 +15,9 @@
     "electron-rebuild": "electron-rebuild -f -o better-sqlite3",
     "predev": "npm run electron-rebuild",
     "dist": "npm run electron-rebuild && npm run build && electron-builder",
-    "dist:win": "npm run generate:icon && npm run generate:installer && npm run electron-rebuild && npm run build && electron-builder --win --x64",
+    "dist:win": "npm run generate:icon && npm run electron-rebuild && npm run build && electron-builder --win --x64 && node scripts/build-setup.cjs",
+    "build:setup": "node scripts/build-setup.cjs",
+    "dev:installer": "node scripts/dev-installer.cjs",
     "patch:exe-icon": "node scripts/patch-exe-icon.cjs",
     "dist:linux": "npm run build && electron-builder --linux --x64",
     "dist:mac": "npm run build && electron-builder --mac --x64 --arm64",
@@ -23,8 +25,7 @@
     "deploy:local": "node scripts/deploy-local.cjs",
     "sync:shortcuts": "node scripts/sync-windows-shortcuts.cjs",
     "sync:changelog": "node scripts/sync-verstak-changelog.cjs",
-    "generate:icon": "node scripts/generate-app-icon.mjs",
-    "generate:installer": "node scripts/generate-installer-assets.mjs"
+    "generate:icon": "node scripts/generate-app-icon.mjs"
   },
   "build": {
     "afterPack": "scripts/patch-exe-icon.cjs",
@@ -52,7 +53,7 @@
     "win": {
       "target": [
         {
-          "target": "nsis",
+          "target": "dir",
           "arch": [
             "x64"
           ]
@@ -66,27 +67,6 @@
       ],
       "icon": "resources/icon.ico",
       "signAndEditExecutable": false
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "deleteAppDataOnUninstall": false,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Verstak",
-      "artifactName": "Verstak-Setup-${version}-${arch}.${ext}",
-      "language": "1049",
-      "installerLanguages": [
-        "ru_RU",
-        "en_US"
-      ],
-      "installerIcon": "resources/icon.ico",
-      "uninstallerIcon": "resources/icon.ico",
-      "installerHeader": "build/installerHeader.bmp",
-      "installerSidebar": "build/installerSidebar.bmp",
-      "uninstallerSidebar": "build/uninstallerSidebar.bmp",
-      "include": "build/installer.nsh"
     },
     "portable": {
       "artifactName": "Verstak-Portable-${version}-${arch}.${ext}"
