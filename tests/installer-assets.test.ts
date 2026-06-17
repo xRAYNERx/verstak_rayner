@@ -15,20 +15,32 @@ function readBmpSize(buf: Buffer) {
 describe('installer BMP assets', () => {
   it('sidebar/header exist with NSIS dimensions after generate:installer', () => {
     const sidebar = path.join(BUILD, 'installerSidebar.bmp')
+    const uninstallSidebar = path.join(BUILD, 'uninstallerSidebar.bmp')
     const header = path.join(BUILD, 'installerHeader.bmp')
-    expect(fs.existsSync(sidebar)).toBe(true)
-    expect(fs.existsSync(header)).toBe(true)
+    const uninstallHeader = path.join(BUILD, 'uninstallerHeader.bmp')
+
+    for (const file of [sidebar, uninstallSidebar, header, uninstallHeader]) {
+      expect(fs.existsSync(file)).toBe(true)
+    }
 
     const sb = readBmpSize(fs.readFileSync(sidebar))
+    const usb = readBmpSize(fs.readFileSync(uninstallSidebar))
     const hd = readBmpSize(fs.readFileSync(header))
+    const uhd = readBmpSize(fs.readFileSync(uninstallHeader))
+
     expect(sb).toEqual({ width: 164, height: 314, bpp: 24 })
+    expect(usb).toEqual({ width: 164, height: 314, bpp: 24 })
     expect(hd).toEqual({ width: 150, height: 57, bpp: 24 })
+    expect(uhd).toEqual({ width: 150, height: 57, bpp: 24 })
   })
 
-  it('installer.nsh defines Verstak branding macros', () => {
+  it('installer.nsh defines Verstak Nord branding', () => {
     const nsh = fs.readFileSync(path.join(BUILD, 'installer.nsh'), 'utf8')
     expect(nsh).toContain('customWelcomePage')
     expect(nsh).toMatch(/!define MUI_BGCOLOR "2E3440"/)
     expect(nsh).toContain('Добро пожаловать в Verstak')
+    expect(nsh).toContain('MUI_INSTFILESPAGE_PROGRESSBAR')
+    expect(nsh).toContain('VerstakApplyDarkChrome')
+    expect(nsh).toContain('MUI_DIRECTORYPAGE_BGCOLOR')
   })
 })
