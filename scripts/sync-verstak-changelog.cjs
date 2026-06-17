@@ -113,6 +113,17 @@ const ENTRIES = [
     ],
   },
   {
+    commit: '9f7152f',
+    deployed: '17.06.2026 18:20',
+    treeVersion: '1.5.5',
+    title: 'Wordstat: новый API api.wordstat.yandex.net',
+    changes: [
+      'Коннектор переписан с устаревшего Direct Live v4 на официальный Wordstat API 2025+.',
+      'TLS: SNI wordstat.yandex.ru для api.wordstat.yandex.net. Операции: get_top_requests, get_dynamics, get_regions, get_regions_tree; get_wordstat — совместимость.',
+      'Настройки: убран fallback на yandex_direct_token, обновлена подсказка про заявку ClientID.',
+    ],
+  },
+  {
     commit: 'caaefd4',
     deployed: '17.06.2026 17:05',
     treeVersion: '1.5.5',
