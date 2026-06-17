@@ -204,6 +204,10 @@ declare global {
       doctor: {
         run: () => Promise<DoctorReport>
       }
+      connectors: {
+        /** Проверка токена/доступа коннектора (Settings card id). */
+        test: (uiId: string) => Promise<{ ok: boolean; message: string }>
+      }
       router: {
         /** Рекомендует тир+провайдера+модель под текст задачи. null = нет подходящего. */
         recommend: (taskText: string) => Promise<TierRecommendation | null>

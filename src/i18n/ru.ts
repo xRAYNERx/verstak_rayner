@@ -381,6 +381,15 @@ export const ru: Translations = {
   connectors: {
     connected: 'Подключён',
     add: 'Добавить',
+    sectionConfigured: 'С токеном — проверено Verstak',
+    sectionAvailable: 'Доступные коннекторы',
+    apply: 'Применить',
+    applying: 'Проверяем…',
+    applyOk: 'Токен работает',
+    applyFail: 'Не работает',
+    healthOk: 'Токен проверен — работает',
+    healthError: 'Токен не работает',
+    healthChecking: 'Проверка…',
   },
   common: {
     close: 'Закрыть',

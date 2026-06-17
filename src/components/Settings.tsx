@@ -890,6 +890,10 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
   const [socialWebhooks, setSocialWebhooks] = useState('')
   const [costCap, setCostCap] = useState('')
   const [configuredConnectors, setConfiguredConnectors] = useState<Set<string>>(new Set())
+  type ConnectorHealth = 'unknown' | 'checking' | 'ok' | 'error'
+  const [connectorHealth, setConnectorHealth] = useState<Record<string, ConnectorHealth>>({})
+  const [connectorHealthMsg, setConnectorHealthMsg] = useState<Record<string, string>>({})
+  const [connectorApplying, setConnectorApplying] = useState<string | null>(null)
   const [openConnector, setOpenConnector] = useState<string | null>(null)
   // Детали коннектора рендерятся ПОД гридом из 31 карточки — при клике по
   // карточке вверху панель появлялась за экраном («ничего не происходит»).
@@ -1110,16 +1114,204 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
     })()
   }, [tab, activeProjectPath])
 
-  // Detect which connectors are configured (for card badges)
+  async function isConnectorConfiguredId(c: ConnectorDef): Promise<boolean> {
+    if (c.id === 'http') {
+      for (let i = 1; i <= 4; i++) {
+        const base = await window.api.settings.getKey(`http_endpoint_${i}_base`)
+        if (base?.trim()) return true
+      }
+      return false
+    }
+    if (c.id === 'social-publish') {
+      for (const k of ['social_publish_telegram_channels', 'social_publish_vk_token', 'social_publish_webhooks']) {
+        const v = await window.api.settings.getKey(k)
+        if (v?.trim()) return true
+      }
+      return false
+    }
+    if (!c.configuredKey) return false
+    const val = await window.api.settings.getKey(c.configuredKey)
+    return !!val?.trim()
+  }
+
+  async function refreshConfiguredConnectors(): Promise<Set<string>> {
+    const results = await Promise.all(CONNECTORS.map(async c =>
+      (await isConnectorConfiguredId(c)) ? c.id : null
+    ))
+    const next = new Set(results.filter(Boolean) as string[])
+    setConfiguredConnectors(next)
+    return next
+  }
+
+  async function runConnectorTest(uiId: string): Promise<{ ok: boolean; message: string }> {
+    setConnectorHealth(h => ({ ...h, [uiId]: 'checking' }))
+    try {
+      const result = await window.api.connectors.test(uiId)
+      setConnectorHealth(h => ({ ...h, [uiId]: result.ok ? 'ok' : 'error' }))
+      setConnectorHealthMsg(m => ({ ...m, [uiId]: result.message }))
+      return result
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Ошибка проверки'
+      setConnectorHealth(h => ({ ...h, [uiId]: 'error' }))
+      setConnectorHealthMsg(m => ({ ...m, [uiId]: message }))
+      return { ok: false, message }
+    }
+  }
+
+  async function persistConnector(uiId: string): Promise<void> {
+    switch (uiId) {
+      case 'claude-oauth':
+        await window.api.settings.setKey('claude_code_oauth_token', claudeOauthToken)
+        break
+      case 'onec':
+        await window.api.settings.setKey('onec_base_url', onec.url)
+        await window.api.settings.setKey('onec_username', onec.user)
+        await window.api.settings.setKey('onec_password', onec.pass)
+        break
+      case 'http':
+        for (let i = 0; i < httpEndpoints.length; i++) {
+          const e = httpEndpoints[i]
+          await window.api.settings.setKey(`http_endpoint_${i + 1}_name`, e.name)
+          await window.api.settings.setKey(`http_endpoint_${i + 1}_base`, e.base)
+          await window.api.settings.setKey(`http_endpoint_${i + 1}_auth`, e.auth)
+          await window.api.settings.setKey(`http_endpoint_${i + 1}_paths`, e.paths)
+        }
+        break
+      case 'gsheets':
+        await window.api.settings.setKey('gsheets_service_account_json', gsheetsJson)
+        break
+      case 'telegram':
+        await window.api.settings.setKey('telegram_bot_token', telegramBotToken)
+        await window.api.settings.setKey('telegram_chat_whitelist', telegramWhitelist)
+        break
+      case 'ssh':
+        await window.api.settings.setKey('ssh_default_host', sshHost)
+        await window.api.settings.setKey('ssh_key_path', sshKeyPath)
+        break
+      case 'bitrix':
+        await window.api.settings.setKey('bitrix24_webhook_url', bitrixWebhook)
+        break
+      case 'ydirect':
+        await window.api.settings.setKey('yandex_direct_token', yDirectToken)
+        await window.api.settings.setKey('yandex_direct_login', yDirectLogin)
+        break
+      case 'ydisk':
+        await window.api.settings.setKey('yandex_disk_token', yDiskToken)
+        break
+      case 'skills-server':
+        await window.api.settings.setKey('skills_server_base', skillsServerBase)
+        break
+      case 'github':
+        await window.api.settings.setKey('github_token', githubToken)
+        break
+      case 'social-publish':
+        await window.api.settings.setKey('social_publish_telegram_channels', socialTgChannels)
+        await window.api.settings.setKey('social_publish_vk_token', socialVkToken)
+        await window.api.settings.setKey('social_publish_vk_group_id', socialVkGroupId)
+        await window.api.settings.setKey('social_publish_webhooks', socialWebhooks)
+        break
+      case 'dadata':
+        await window.api.settings.setKey('dadata_api_key', dadataApiKey)
+        await window.api.settings.setKey('dadata_secret', dadataSecret)
+        break
+      case 'ymetrika':
+        await window.api.settings.setKey('yandex_metrika_token', yMetrikaToken)
+        break
+      case 'avito':
+        await window.api.settings.setKey('avito_client_id', avitoClientId)
+        await window.api.settings.setKey('avito_client_secret', avitoClientSecret)
+        break
+      case 'ywebmaster':
+        await window.api.settings.setKey('yandex_webmaster_token', yWebmasterToken)
+        break
+      case 'ywordstat':
+        await window.api.settings.setKey('yandex_wordstat_token', yWordstatToken)
+        break
+      case 'ozon':
+        await window.api.settings.setKey('ozon_client_id', ozonClientId)
+        await window.api.settings.setKey('ozon_api_key', ozonApiKey)
+        break
+      case 'wildberries':
+        await window.api.settings.setKey('wildberries_token', wbToken)
+        break
+      case 'yookassa':
+        await window.api.settings.setKey('yookassa_shop_id', yookassaShopId)
+        await window.api.settings.setKey('yookassa_secret_key', yookassaSecretKey)
+        break
+      case 'vk':
+        await window.api.settings.setKey('vk_access_token', vkToken)
+        break
+      case 'amocrm':
+        await window.api.settings.setKey('amocrm_subdomain', amocrmSubdomain)
+        await window.api.settings.setKey('amocrm_access_token', amocrmToken)
+        break
+      case 'moysklad':
+        await window.api.settings.setKey('moysklad_token', moyskladToken)
+        break
+      case 'yandex_tracker':
+        await window.api.settings.setKey('yandex_tracker_token', yTrackerToken)
+        await window.api.settings.setKey('yandex_tracker_org_id', yTrackerOrgId)
+        break
+      case 'sendpulse':
+        await window.api.settings.setKey('sendpulse_client_id', sendpulseClientId)
+        await window.api.settings.setKey('sendpulse_client_secret', sendpulseClientSecret)
+        break
+      case 'unisender':
+        await window.api.settings.setKey('unisender_api_key', unisenderApiKey)
+        break
+      case 'ga4':
+        await window.api.settings.setKey('ga4_access_token', ga4Token)
+        await window.api.settings.setKey('ga4_property_id', ga4PropertyId)
+        break
+      case 'notion':
+        await window.api.settings.setKey('notion_token', notionToken)
+        break
+      case 'kontur_focus':
+        await window.api.settings.setKey('kontur_focus_api_key', konturFocusKey)
+        break
+      case 'mpstats':
+        await window.api.settings.setKey('mpstats_token', mpstatsToken)
+        break
+      case 'ozon_performance':
+        await window.api.settings.setKey('ozon_perf_client_id', ozonPerfClientId)
+        await window.api.settings.setKey('ozon_perf_client_secret', ozonPerfClientSecret)
+        break
+      case 'jira':
+        await window.api.settings.setKey('jira_base_url', jiraBaseUrl)
+        await window.api.settings.setKey('jira_email', jiraEmail)
+        await window.api.settings.setKey('jira_api_token', jiraApiToken)
+        break
+      case 'trello':
+        await window.api.settings.setKey('trello_api_key', trelloApiKey)
+        await window.api.settings.setKey('trello_token', trelloToken)
+        break
+      default:
+        break
+    }
+  }
+
+  async function applyConnector(uiId: string): Promise<void> {
+    setConnectorApplying(uiId)
+    try {
+      await persistConnector(uiId)
+      await refreshConfiguredConnectors()
+      await runConnectorTest(uiId)
+    } finally {
+      setConnectorApplying(null)
+    }
+  }
+
+  // Коннекторы: список настроенных + фоновая проверка токенов
   useEffect(() => {
     if (tab !== 'connectors') return
-    void Promise.all(CONNECTORS.map(async c => {
-      if (!c.configuredKey) return null
-      const val = await window.api.settings.getKey(c.configuredKey)
-      return val ? c.id : null
-    })).then(results => {
-      setConfiguredConnectors(new Set(results.filter(Boolean) as string[]))
-    })
+    let cancelled = false
+    void (async () => {
+      const configured = await refreshConfiguredConnectors()
+      if (cancelled) return
+      await Promise.all([...configured].map(id => runConnectorTest(id)))
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab])
 
   async function save() {
@@ -1937,10 +2129,18 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
             </div>
           </div>
 
-          {/* Card grid — Codex-style marketplace */}
-          <div className="gg-connector-grid">
-            {CONNECTORS.map(c => {
+          {(() => {
+            const configuredList = CONNECTORS.filter(c => configuredConnectors.has(c.id))
+            const availableList = CONNECTORS.filter(c => !configuredConnectors.has(c.id))
+
+            const renderConnectorCard = (c: ConnectorDef) => {
               const configured = configuredConnectors.has(c.id)
+              const health = connectorHealth[c.id] ?? 'unknown'
+              const healthTitle = connectorHealthMsg[c.id]
+                ?? (health === 'checking' ? t.connectors.healthChecking
+                  : health === 'ok' ? t.connectors.healthOk
+                  : health === 'error' ? t.connectors.healthError
+                  : '')
               return (
                 <button
                   key={c.id}
@@ -1953,12 +2153,43 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
                     <div className="gg-connector-card-desc">{c.description}</div>
                   </div>
                   <div className="gg-connector-card-status">
-                    {configured ? <span className="gg-badge-connected">&#10003;</span> : <span className="gg-badge-add">+</span>}
+                    {configured && (
+                      <span
+                        className={`gg-connector-health ${health === 'ok' ? 'is-ok' : health === 'error' ? 'is-error' : health === 'checking' ? 'is-checking' : ''}`}
+                        title={healthTitle}
+                        aria-label={healthTitle}
+                      />
+                    )}
+                    {configured
+                      ? <span className="gg-badge-connected">&#10003;</span>
+                      : <span className="gg-badge-add">+</span>}
                   </div>
                 </button>
               )
-            })}
-          </div>
+            }
+
+            return (
+              <>
+                {configuredList.length > 0 && (
+                  <>
+                    <div className="gg-connector-section-title">{t.connectors.sectionConfigured}</div>
+                    <div className="gg-connector-grid">
+                      {configuredList.map(renderConnectorCard)}
+                    </div>
+                    {availableList.length > 0 && <div className="gg-connector-section-divider" />}
+                  </>
+                )}
+                {availableList.length > 0 && (
+                  <>
+                    <div className="gg-connector-section-title">{t.connectors.sectionAvailable}</div>
+                    <div className="gg-connector-grid">
+                      {availableList.map(renderConnectorCard)}
+                    </div>
+                  </>
+                )}
+              </>
+            )
+          })()}
 
           {/* Expanded settings panel below the grid */}
           {openConnector && (
@@ -1969,6 +2200,24 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
               </div>
               <div className="gg-connector-detail-body">
                 {renderConnectorForm(openConnector)}
+                <div className="gg-connector-detail-actions">
+                  {connectorApplying === openConnector && <div className="gg-connector-progress" aria-hidden />}
+                  <div className="gg-connector-detail-actions-row">
+                    <button
+                      type="button"
+                      className="gg-btn gg-btn-primary"
+                      disabled={connectorApplying === openConnector}
+                      onClick={() => void applyConnector(openConnector)}
+                    >
+                      {connectorApplying === openConnector ? t.connectors.applying : t.connectors.apply}
+                    </button>
+                    {connectorHealthMsg[openConnector] && connectorApplying !== openConnector && (
+                      <span className={`gg-connector-test-msg ${connectorHealth[openConnector] === 'ok' ? 'is-ok' : connectorHealth[openConnector] === 'error' ? 'is-error' : ''}`}>
+                        {connectorHealthMsg[openConnector]}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}

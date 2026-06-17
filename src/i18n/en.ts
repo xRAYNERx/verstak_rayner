@@ -397,6 +397,15 @@ export const en = {
   connectors: {
     connected: 'Connected',
     add: 'Add',
+    sectionConfigured: 'With API token — verified by Verstak',
+    sectionAvailable: 'Available connectors',
+    apply: 'Apply',
+    applying: 'Checking…',
+    applyOk: 'Token works',
+    applyFail: 'Not working',
+    healthOk: 'Token verified — working',
+    healthError: 'Token not working',
+    healthChecking: 'Checking…',
   },
 
   // Common

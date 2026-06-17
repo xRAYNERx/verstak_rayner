@@ -87,6 +87,9 @@ contextBridge.exposeInMainWorld('api', {
   doctor: {
     run: () => ipcRenderer.invoke('doctor:run')
   },
+  connectors: {
+    test: (uiId: string) => ipcRenderer.invoke('connectors:test', uiId) as Promise<{ ok: boolean; message: string }>
+  },
   router: {
     recommend: (taskText: string) => ipcRenderer.invoke('router:recommend', taskText)
   },
