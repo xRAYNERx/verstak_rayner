@@ -14,42 +14,47 @@ Var Verstak.RunCheck
 
 Var Verstak.ParentTitlebar
 Var Verstak.ParentSidebar
-Var Verstak.ParentBtnNext
-Var Verstak.ParentBtnBack
-Var Verstak.ParentBtnCancel
 
 !define VERSTAK_GWL_STYLE -16
-!define VERSTAK_WS_CAPTION 0x00C00000
-!define VERSTAK_WS_THICKFRAME 0x00040000
 !define VERSTAK_WM_CLOSE 0x0010
 !define VERSTAK_BM_CLICK 0x00F5
 !define VERSTAK_SW_HIDE 0
 !define VERSTAK_SW_SHOW 5
-!define VERSTAK_WS_CHILD 0x40000000
-!define VERSTAK_WS_VISIBLE 0x10000000
-!define VERSTAK_SS_BITMAP 0x0000000E
+!define VERSTAK_STATIC_STYLE 0x5000000E
 !define VERSTAK_STM_SETIMAGE 0x0172
 !define VERSTAK_IMAGE_BITMAP 0
 !define VERSTAK_LR_LOADFROMFILE 0x0010
-!define VERSTAK_STATIC_STYLE 0x5000000E
+
+; Окно и футер в пикселях (sidebar 164 + контент 336)
+!define VERSTAK_WIN_W 500
+!define VERSTAK_WIN_H 340
+!define VERSTAK_FOOTER_Y_PX 286
+!define VERSTAK_BTN_BACK_X_PX 172
+!define VERSTAK_BTN_CANCEL_X_PX 276
+!define VERSTAK_BTN_NEXT_X_PX 380
+!define VERSTAK_BTN_W_PX 96
+!define VERSTAK_BTN_W_WIDE_PX 120
+!define VERSTAK_BTN_H_PX 34
+
+; nsDialogs: отступ от низа страницы до футера
+!define VERSTAK_FOOTER_Y -46u
+!define VERSTAK_BTN_BACK_X 172u
+!define VERSTAK_BTN_CANCEL_X 276u
+!define VERSTAK_BTN_NEXT_X 380u
+!define VERSTAK_BTN_W 96u
+!define VERSTAK_BTN_W_WIDE 120u
+!define VERSTAK_BTN_H 34u
 
 Function VerstakLoadBmpToHwnd
   Exch $1
   Exch
   Exch $0
   System::Call 'user32::LoadImage(p 0, t r0, i 0, i 0, i 0, i ${VERSTAK_LR_LOADFROMFILE}) i .r2'
+  StrCmp $2 0 bmpFail
   SendMessage $1 ${VERSTAK_STM_SETIMAGE} ${VERSTAK_IMAGE_BITMAP} $2
+  bmpFail:
   Pop $0
   Pop $1
-FunctionEnd
-
-Function VerstakHideMuiNav
-  GetDlgItem $0 $HWNDPARENT 1
-  ShowWindow $0 ${VERSTAK_SW_HIDE}
-  GetDlgItem $0 $HWNDPARENT 2
-  ShowWindow $0 ${VERSTAK_SW_HIDE}
-  GetDlgItem $0 $HWNDPARENT 3
-  ShowWindow $0 ${VERSTAK_SW_HIDE}
 FunctionEnd
 
 Function VerstakHideMuiHeader
@@ -70,6 +75,7 @@ Function VerstakApplyBorderless
   IntOp $0 $0 & -12582913
   IntOp $0 $0 & -262145
   System::Call 'user32::SetWindowLong(p $HWNDPARENT, i ${VERSTAK_GWL_STYLE}, i r0)'
+  System::Call 'user32::SetWindowPos(p $HWNDPARENT, p 0, i 0, i 0, i ${VERSTAK_WIN_W}, i ${VERSTAK_WIN_H}, i 0x26)'
   System::Call 'user32::SetWindowPos(p $HWNDPARENT, p 0, i 0, i 0, i 0, i 0, i 0x27)'
   System::Call 'dwmapi::DwmSetWindowAttribute(p $HWNDPARENT, i 20, *i 1, i 4)'
 FunctionEnd
@@ -93,6 +99,40 @@ Function VerstakClickCancel
   SendMessage $0 ${VERSTAK_BM_CLICK} 0 0
 FunctionEnd
 
+; MUI-кнопки под bitmap — видимы для BM_CLICK, позиция в пикселях
+Function VerstakPlaceMuiFooter
+  GetDlgItem $0 $HWNDPARENT 1
+  StrCmp $0 0 +3
+  ShowWindow $0 ${VERSTAK_SW_SHOW}
+  System::Call 'user32::SetWindowPos(p r0, p 0, i ${VERSTAK_BTN_BACK_X_PX}, i ${VERSTAK_FOOTER_Y_PX}, i ${VERSTAK_BTN_W_PX}, i ${VERSTAK_BTN_H_PX}, i 0x14)'
+
+  GetDlgItem $0 $HWNDPARENT 3
+  StrCmp $0 0 +3
+  ShowWindow $0 ${VERSTAK_SW_SHOW}
+  System::Call 'user32::SetWindowPos(p r0, p 0, i ${VERSTAK_BTN_CANCEL_X_PX}, i ${VERSTAK_FOOTER_Y_PX}, i ${VERSTAK_BTN_W_PX}, i ${VERSTAK_BTN_H_PX}, i 0x14)'
+
+  GetDlgItem $0 $HWNDPARENT 2
+  StrCmp $0 0 +3
+  ShowWindow $0 ${VERSTAK_SW_SHOW}
+  System::Call 'user32::SetWindowPos(p r0, p 0, i ${VERSTAK_BTN_NEXT_X_PX}, i ${VERSTAK_FOOTER_Y_PX}, i ${VERSTAK_BTN_W_WIDE_PX}, i ${VERSTAK_BTN_H_PX}, i 0x14)'
+FunctionEnd
+
+Function VerstakStyleMuiFooter
+  Call VerstakPlaceMuiFooter
+  GetDlgItem $0 $HWNDPARENT 1
+  SetCtlColors $0 0xECEFF4 0x3B4252
+  GetDlgItem $0 $HWNDPARENT 3
+  SetCtlColors $0 0xECEFF4 0x3B4252
+  GetDlgItem $0 $HWNDPARENT 2
+  SetCtlColors $0 0x2E3440 0x88C0D0
+FunctionEnd
+
+Function VerstakResetFooterVars
+  StrCpy $Verstak.BtnNext ""
+  StrCpy $Verstak.BtnBack ""
+  StrCpy $Verstak.BtnCancel ""
+FunctionEnd
+
 Function VerstakCreateBitmapOverlay
   Pop $5
   Pop $4
@@ -111,32 +151,21 @@ Function VerstakDestroyParentChrome
   StrCmp $Verstak.ParentTitlebar "" +2
   System::Call 'user32::DestroyWindow(p $Verstak.ParentTitlebar)'
   StrCpy $Verstak.ParentTitlebar ""
-  StrCmp $Verstak.ParentSidebar "" +2
+  StrCmp $Verstak.ParentSidebar "" chromeDone
   System::Call 'user32::DestroyWindow(p $Verstak.ParentSidebar)'
   StrCpy $Verstak.ParentSidebar ""
-  StrCmp $Verstak.ParentBtnBack "" +2
-  System::Call 'user32::DestroyWindow(p $Verstak.ParentBtnBack)'
-  StrCpy $Verstak.ParentBtnBack ""
-  StrCmp $Verstak.ParentBtnCancel "" +2
-  System::Call 'user32::DestroyWindow(p $Verstak.ParentBtnCancel)'
-  StrCpy $Verstak.ParentBtnCancel ""
-  StrCmp $Verstak.ParentBtnNext "" chromeDone
-  System::Call 'user32::DestroyWindow(p $Verstak.ParentBtnNext)'
-  StrCpy $Verstak.ParentBtnNext ""
   chromeDone:
 FunctionEnd
 
 Function VerstakCreateParentChrome
   Call VerstakDestroyParentChrome
-
   Push "$PLUGINSDIR\titlebar.bmp"
   Push 0
   Push 0
-  Push 396
+  Push ${VERSTAK_WIN_W}
   Push 40
   Call VerstakCreateBitmapOverlay
   Pop $Verstak.ParentTitlebar
-
   Push "$PLUGINSDIR\installerSidebar.bmp"
   Push 0
   Push 40
@@ -146,85 +175,51 @@ Function VerstakCreateParentChrome
   Pop $Verstak.ParentSidebar
 FunctionEnd
 
-Function VerstakStyleMuiFooter
-  GetDlgItem $0 $HWNDPARENT 1
-  ShowWindow $0 ${VERSTAK_SW_SHOW}
-  System::Call 'user32::SetWindowPos(p r0, p 0, i 12, i 254, i 96, i 34, i 0x14)'
-  SetCtlColors $0 0xECEFF4 0x3B4252
-  GetDlgItem $0 $HWNDPARENT 3
-  ShowWindow $0 ${VERSTAK_SW_SHOW}
-  System::Call 'user32::SetWindowPos(p r0, p 0, i 300, i 254, i 96, i 34, i 0x14)'
-  SetCtlColors $0 0xECEFF4 0x3B4252
-  GetDlgItem $0 $HWNDPARENT 2
-  ShowWindow $0 ${VERSTAK_SW_SHOW}
-  System::Call 'user32::SetWindowPos(p r0, p 0, i 384, i 254, i 120, i 34, i 0x14)'
-  SetCtlColors $0 0x2E3440 0x88C0D0
-FunctionEnd
-
-Function VerstakDirectoryMuiShow
-  Call VerstakEnsureChrome
-  Call VerstakCreateParentChrome
-  Call VerstakStyleMuiFooter
-  GetDlgItem $0 $HWNDPARENT 1019
-  SetCtlColors $0 0xECEFF4 0x2B313C
-FunctionEnd
-
 Function VerstakCreateTitlebar
   ${NSD_CreateBitmap} 0 0 100% 40u ""
   Pop $0
-  ${NSD_SetBitmap} $0 "$PLUGINSDIR\titlebar.bmp" $1
-
+  ${NSD_SetBitmap} $0 "$PLUGINSDIR\titlebar.bmp" $R0
   ${NSD_CreateBitmap} 94% 2u 46u 36u ""
   Pop $Verstak.BtnClose
-  ${NSD_SetBitmap} $Verstak.BtnClose "$PLUGINSDIR\btn-close.bmp" $1
+  ${NSD_SetBitmap} $Verstak.BtnClose "$PLUGINSDIR\btn-close.bmp" $R0
   ${NSD_OnClick} $Verstak.BtnClose VerstakClickClose
 FunctionEnd
 
 Function VerstakCreateSidebar
   ${NSD_CreateBitmap} 0 40u 164u 260u ""
   Pop $0
-  ${NSD_SetBitmap} $0 "$PLUGINSDIR\installerSidebar.bmp" $1
+  ${NSD_SetBitmap} $0 "$PLUGINSDIR\installerSidebar.bmp" $R0
 FunctionEnd
 
 Function VerstakCreateFooter
-  StrCmp $Verstak.BtnNext "" 0 footerReuse
+  Call VerstakResetFooterVars
 
-  ${NSD_CreateBitmap} 12u -46u 96u 34u ""
+  ${NSD_CreateBitmap} ${VERSTAK_BTN_BACK_X} ${VERSTAK_FOOTER_Y} ${VERSTAK_BTN_W} ${VERSTAK_BTN_H} ""
   Pop $Verstak.BtnBack
-  ${NSD_SetBitmap} $Verstak.BtnBack "$PLUGINSDIR\btn-back.bmp" $1
+  ${NSD_SetBitmap} $Verstak.BtnBack "$PLUGINSDIR\btn-back.bmp" $R0
   ${NSD_OnClick} $Verstak.BtnBack VerstakClickBack
 
-  ${NSD_CreateBitmap} -108u -46u 96u 34u ""
+  ${NSD_CreateBitmap} ${VERSTAK_BTN_CANCEL_X} ${VERSTAK_FOOTER_Y} ${VERSTAK_BTN_W} ${VERSTAK_BTN_H} ""
   Pop $Verstak.BtnCancel
-  ${NSD_SetBitmap} $Verstak.BtnCancel "$PLUGINSDIR\btn-cancel.bmp" $1
+  ${NSD_SetBitmap} $Verstak.BtnCancel "$PLUGINSDIR\btn-cancel.bmp" $R0
   ${NSD_OnClick} $Verstak.BtnCancel VerstakClickCancel
 
-  ${NSD_CreateBitmap} -20u -46u 120u 34u ""
+  ${NSD_CreateBitmap} ${VERSTAK_BTN_NEXT_X} ${VERSTAK_FOOTER_Y} ${VERSTAK_BTN_W_WIDE} ${VERSTAK_BTN_H} ""
   Pop $Verstak.BtnNext
-  ${NSD_SetBitmap} $Verstak.BtnNext "$PLUGINSDIR\btn-next.bmp" $1
+  ${NSD_SetBitmap} $Verstak.BtnNext "$PLUGINSDIR\btn-next.bmp" $R0
   ${NSD_OnClick} $Verstak.BtnNext VerstakClickNext
-  Return
 
-  footerReuse:
-  ShowWindow $Verstak.BtnBack ${VERSTAK_SW_SHOW}
-  ShowWindow $Verstak.BtnCancel ${VERSTAK_SW_SHOW}
-  ShowWindow $Verstak.BtnNext ${VERSTAK_SW_SHOW}
+  Call VerstakPlaceMuiFooter
 FunctionEnd
 
 Function VerstakSetFooterPrimary
   Exch $0
-  ${NSD_SetBitmap} $Verstak.BtnNext "$PLUGINSDIR\$0" $1
+  ${NSD_SetBitmap} $Verstak.BtnNext "$PLUGINSDIR\$0" $R0
   Pop $0
-FunctionEnd
-
-Function VerstakStyleField
-  Pop $0
-  SetCtlColors $0 0xECEFF4 0x2B313C
 FunctionEnd
 
 Function VerstakEnsureChrome
   Call VerstakApplyBorderless
-  Call VerstakHideMuiNav
   Call VerstakHideMuiHeader
 FunctionEnd
 
@@ -238,16 +233,27 @@ FunctionEnd
 
 Function VerstakWelcomeCreate
   Call VerstakPageInit
-  ${NSD_CreateLabel} 180u 58u 280u 22u "Добро пожаловать в Verstak"
+  ${NSD_CreateLabel} 180u 58u 300u 22u "Добро пожаловать в Verstak"
   Pop $0
-  ${NSD_CreateLabel} 180u 88u 280u 120u "Мастер установит Verstak — IDE для AI-агентов — на ваш компьютер.$\r$\n$\r$\nРекомендуется закрыть другие приложения перед продолжением."
+  ${NSD_CreateLabel} 180u 88u 300u 120u "Мастер установит Verstak — IDE для AI-агентов — на ваш компьютер.$\r$\n$\r$\nРекомендуется закрыть другие приложения перед продолжением."
   Pop $0
   Call VerstakCreateFooter
   ShowWindow $Verstak.BtnBack ${VERSTAK_SW_HIDE}
+  GetDlgItem $0 $HWNDPARENT 1
+  ShowWindow $0 ${VERSTAK_SW_HIDE}
   nsDialogs::Show
 FunctionEnd
 
 Function VerstakWelcomeLeave
+  Call VerstakResetFooterVars
+FunctionEnd
+
+Function VerstakDirectoryMuiShow
+  Call VerstakEnsureChrome
+  Call VerstakCreateParentChrome
+  Call VerstakStyleMuiFooter
+  GetDlgItem $0 $HWNDPARENT 1019
+  SetCtlColors $0 0xECEFF4 0x2B313C
 FunctionEnd
 
 Function VerstakInstFilesPre
@@ -268,7 +274,7 @@ Function VerstakInstFilesShow
   ShowWindow $0 ${VERSTAK_SW_HIDE}
   GetDlgItem $0 $HWNDPARENT 3
   ShowWindow $0 ${VERSTAK_SW_SHOW}
-  System::Call 'user32::SetWindowPos(p r0, p 0, i 384, i 254, i 96, i 34, i 0x14)'
+  System::Call 'user32::SetWindowPos(p r0, p 0, i ${VERSTAK_BTN_CANCEL_X_PX}, i ${VERSTAK_FOOTER_Y_PX}, i ${VERSTAK_BTN_W_PX}, i ${VERSTAK_BTN_H_PX}, i 0x14)'
   SetCtlColors $0 0xECEFF4 0x3B4252
   GetDlgItem $0 $HWNDPARENT 1004
   SetCtlColors $0 0xECEFF4 0x2E3440
@@ -284,24 +290,27 @@ FunctionEnd
 
 Function VerstakFinishCreate
   Call VerstakPageInit
-  ${NSD_CreateLabel} 180u 58u 280u 22u "Verstak установлен"
+  ${NSD_CreateLabel} 180u 58u 300u 22u "Verstak установлен"
   Pop $0
-  ${NSD_CreateLabel} 180u 88u 280u 72u "IDE для AI-агентов готова к работе. Ярлык появится в меню «Пуск» и на рабочем столе."
+  ${NSD_CreateLabel} 180u 88u 300u 72u "IDE для AI-агентов готова к работе. Ярлык появится в меню «Пуск» и на рабочем столе."
   Pop $0
-  ${NSD_CreateCheckbox} 180u 170u 280u 14u "Запустить Verstak"
+  ${NSD_CreateCheckbox} 180u 170u 300u 14u "Запустить Verstak"
   Pop $Verstak.RunCheck
   ${NSD_Check} $Verstak.RunCheck
-  Push $Verstak.RunCheck
-  Call VerstakStyleField
   Call VerstakCreateFooter
   ShowWindow $Verstak.BtnBack ${VERSTAK_SW_HIDE}
   ShowWindow $Verstak.BtnCancel ${VERSTAK_SW_HIDE}
+  GetDlgItem $0 $HWNDPARENT 1
+  ShowWindow $0 ${VERSTAK_SW_HIDE}
+  GetDlgItem $0 $HWNDPARENT 3
+  ShowWindow $0 ${VERSTAK_SW_HIDE}
   Push "btn-finish.bmp"
   Call VerstakSetFooterPrimary
   nsDialogs::Show
 FunctionEnd
 
 Function VerstakFinishLeave
+  Call VerstakResetFooterVars
   ${NSD_GetState} $Verstak.RunCheck $0
   ${If} $0 == ${BST_CHECKED}
     Call StartApp

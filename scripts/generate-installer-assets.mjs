@@ -123,17 +123,17 @@ function buttonSvg(text, variant = 'primary') {
 }
 
 function titlebarSvg() {
-  return Buffer.from(`<svg width="396" height="40" xmlns="http://www.w3.org/2000/svg">
+  return Buffer.from(`<svg width="500" height="40" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="tb" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#3a4150"/>
       <stop offset="100%" stop-color="${THEME.bgElevated}"/>
     </linearGradient>
   </defs>
-  <rect width="396" height="40" fill="url(#tb)"/>
-  <rect x="0" y="39" width="396" height="1" fill="${THEME.borderSubtle}"/>
+  <rect width="500" height="40" fill="url(#tb)"/>
+  <rect x="0" y="39" width="500" height="1" fill="${THEME.borderSubtle}"/>
   <text x="42" y="25" fill="${THEME.textSecondary}" font-family="Segoe UI,Inter,sans-serif" font-size="11" font-weight="600" letter-spacing="2.4">VERSTAK</text>
-  <text x="396" y="25" text-anchor="end" fill="${THEME.textTertiary}" font-family="Segoe UI,Inter,sans-serif" font-size="9">Установка</text>
+  <text x="488" y="25" text-anchor="end" fill="${THEME.textTertiary}" font-family="Segoe UI,Inter,sans-serif" font-size="9">Установка</text>
 </svg>`)
 }
 
@@ -251,7 +251,7 @@ async function main() {
   const btnFinish = await svgToBmp(buttonSvg('Готово', 'wide'), 120, 34, THEME.bgBase)
   const btnClose = await svgToBmp(buttonSvg('', 'close'), 46, 36, THEME.bgElevated)
   const btnBrowse = await svgToBmp(buttonSvg('Обзор…', 'ghost'), 64, 18, THEME.bgBase)
-  const titlebar = await svgToBmp(titlebarSvg(), 396, 40, THEME.bgElevated)
+  const titlebar = await svgToBmp(titlebarSvg(), 500, 40, THEME.bgElevated)
 
   const titleLogo = await sharp(logoBuf)
     .resize(18, 18, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
@@ -259,7 +259,7 @@ async function main() {
     .toBuffer()
   const titlebarWithLogo = await toBmp(
     sharp(titlebarSvg()).png().composite([{ input: titleLogo, top: 11, left: 14 }]),
-    396,
+    500,
     40,
     THEME.bgElevated,
   )
@@ -276,7 +276,7 @@ async function main() {
     [btnFinish, 120, 34, 'btn-finish'],
     [btnClose, 46, 36, 'btn-close'],
     [btnBrowse, 64, 18, 'btn-browse'],
-    [titlebarWithLogo, 396, 40, 'titlebar'],
+    [titlebarWithLogo, 500, 40, 'titlebar'],
   ]) {
     assertBmp(buf, w, h, name)
     fs.writeFileSync(path.join(OUT_DIR, `${name}.bmp`), buf)

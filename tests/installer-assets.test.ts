@@ -26,7 +26,7 @@ describe('installer BMP assets', () => {
       ['btn-finish.bmp', 120, 34],
       ['btn-close.bmp', 46, 36],
       ['btn-browse.bmp', 64, 18],
-      ['titlebar.bmp', 396, 40],
+      ['titlebar.bmp', 500, 40],
     ]
 
     for (const [name, w, h] of files) {
@@ -50,5 +50,8 @@ describe('installer BMP assets', () => {
     expect(ui).toContain('VerstakApplyBorderless')
     expect(ui).toContain('Добро пожаловать в Verstak')
     expect(ui).toContain('${NSD_CreateBitmap}')
+    expect(ui).toContain('VERSTAK_WIN_W 500')
+    expect(ui).not.toContain('VerstakHideMuiNav')
+    expect(ui).not.toContain('footerReuse')
   })
 })
