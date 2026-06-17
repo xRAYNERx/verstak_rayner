@@ -43,7 +43,7 @@ const DENY_RULES: DenyRule[] = [
   { pattern: /\bsudo\s+rm\b/i,                                           reason: 'Запрещено: sudo rm' },
   { pattern: /\bgit\s+push\s+.*--force\b/i,                              reason: 'Запрещено: git push --force (фиксить вручную при необходимости)' },
   { pattern: /\bgit\s+(reset\s+--hard\s+HEAD~|clean\s+-fdx|filter-(repo|branch))/i, reason: 'Запрещено: разрушающие git операции' },
-  { pattern: /\.ssh|\.ss\*|\bid_(?:rsa|ed25519|ecdsa|dsa)\b|\bid_[a-z0-9]*\*|\.aws[\/\\]|\.npmrc|\.netrc|\.gnupg|authorized_keys|known_hosts/i, reason: 'Запрещено: чтение/копирование ключей и токенов' },
+  { pattern: /\.ssh|\.ss\*|\bid_(?:rsa|ed25519|ecdsa|dsa)\b|\bid_[a-z0-9]*\*|\.aws[\/\\]|\.kube[\/\\]|\.docker[\/\\]|\.azure[\/\\]|\.config[\/\\]gcloud|kubeconfig|\.npmrc|\.netrc|\.gnupg|authorized_keys|known_hosts/i, reason: 'Запрещено: чтение/копирование ключей и токенов' },
   // PowerShell EncodedCommand bypass: payload is base64, denylist can't inspect contents.
   // Аудит M13: штатный бинарь PowerShell 7 на Win11 называется pwsh — без него обход.
   { pattern: /\b(?:powershell|pwsh)(\.exe)?\b[^\n]*\s-[eE](?:nc(?:oded(?:command)?)?)?\b/i, reason: 'Запрещено: powershell/pwsh -EncodedCommand (запутанная команда)' },

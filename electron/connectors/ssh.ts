@@ -33,6 +33,15 @@ import { classifyCommand } from '../ai/command-policy'
 
 const DEFAULT_TIMEOUT_MS = 60_000
 const MAX_TIMEOUT_MS = 600_000
+const MIN_TIMEOUT_MS = 1_000
+
+/** Нормализует timeout_ms из аргументов: некорректные/отрицательные/NaN значения
+ *  раньше уходили в Math.min как есть → setTimeout(NaN|<0) убивал ssh мгновенно. */
+export function clampSshTimeout(raw: unknown): number {
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_TIMEOUT_MS
+  return Math.min(MAX_TIMEOUT_MS, Math.max(MIN_TIMEOUT_MS, n))
+}
 const MAX_OUTPUT_BYTES = 64 * 1024
 
 /** Жёсткий denylist — независимо от режима agent mode. */
@@ -123,7 +132,7 @@ async function runRemote(args: Record<string, unknown>, ctx: ConnectorContext): 
   }
 
   const keyPath = String(args.key_path ?? ctx.getSecret('ssh_key_path') ?? join(homedir(), '.ssh', 'id_ed25519'))
-  const timeoutMs = Math.min(MAX_TIMEOUT_MS, Number(args.timeout_ms ?? DEFAULT_TIMEOUT_MS))
+  const timeoutMs = clampSshTimeout(args.timeout_ms)
 
   const sshArgs = [
     '-i', keyPath,

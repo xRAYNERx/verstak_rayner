@@ -1,5 +1,20 @@
 import { describe, it, expect } from 'vitest'
-import { isDangerousCommand } from '../../electron/connectors/ssh'
+import { isDangerousCommand, clampSshTimeout } from '../../electron/connectors/ssh'
+
+describe('clampSshTimeout (#18: некорректный timeout → не мгновенный kill)', () => {
+  it('отрицательный / ноль / NaN / undefined → дефолт (60s), не мгновенный kill', () => {
+    expect(clampSshTimeout(-5000)).toBe(60_000)
+    expect(clampSshTimeout(0)).toBe(60_000)
+    expect(clampSshTimeout('abc')).toBe(60_000)
+    expect(clampSshTimeout(undefined)).toBe(60_000)
+    expect(clampSshTimeout(null)).toBe(60_000)
+  })
+  it('валидный таймаут клампится в [1s, 600s]', () => {
+    expect(clampSshTimeout(30_000)).toBe(30_000)
+    expect(clampSshTimeout(500)).toBe(1_000)       // ниже минимума
+    expect(clampSshTimeout(9_999_999)).toBe(600_000) // выше максимума
+  })
+})
 
 describe('isDangerousCommand', () => {
   it('блокирует rm -rf /', () => {

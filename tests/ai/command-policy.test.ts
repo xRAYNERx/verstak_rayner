@@ -63,6 +63,17 @@ describe('classifyCommand', () => {
     expect(classifyCommand('cat .npmrc').allowed).toBe(false)
   })
 
+  // #19: денилист должен покрывать те же cloud-config директории, что secret-scanner
+  // числит секретными (FORBIDDEN_DIRS: .kube/.docker/.azure/.config/gcloud).
+  it('blocks reading cloud credential dirs (.kube/.docker/.azure/gcloud)', () => {
+    expect(classifyCommand('cat ~/.kube/config').allowed).toBe(false)
+    expect(classifyCommand('cat ~/.docker/config.json').allowed).toBe(false)
+    expect(classifyCommand('cat ~/.azure/accessTokens.json').allowed).toBe(false)
+    expect(classifyCommand('cat ~/.config/gcloud/credentials.db').allowed).toBe(false)
+    // не ломаем легитимные docker-команды (нет `.docker/`):
+    expect(classifyCommand('docker build .').allowed).toBe(true)
+  })
+
   it('rejects empty commands', () => {
     expect(classifyCommand('').allowed).toBe(false)
     expect(classifyCommand('   ').allowed).toBe(false)
