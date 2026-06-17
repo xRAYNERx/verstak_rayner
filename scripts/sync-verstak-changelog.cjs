@@ -13,6 +13,17 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: '15be0c6',
+    deployed: '17.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Фикс: JavaScript error при старте (updater IPC)',
+    changes: [
+      'registerReleaseNotesIpc + initAutoUpdater до первого кадра renderer — убрана гонка IPC.',
+      'tryAnnounceCachedDownload и startup probe в try/catch — main не падает на rejection.',
+      'UpdatesSettings: versionLoaded + catch на getState.',
+    ],
+  },
+  {
     commit: '340497d',
     deployed: '17.06.2026',
     treeVersion: '1.5.5',

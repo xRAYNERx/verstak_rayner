@@ -369,6 +369,12 @@ app.whenReady().then(() => {
   bindUiScaleToWindow(mainWindow, settings)
   initNotificationWindow(() => mainWindow)
 
+  // Release notes + updater IPC до первого кадра renderer (WhatsNew / Update* на mount).
+  registerReleaseNotesIpc()
+  if (!process.env.VITE_DEV_SERVER_URL) {
+    initAutoUpdater(mainWindow)
+  }
+
   const registerDeferredIpc = () => {
   registerAiIpc({
     getSecret,
@@ -535,14 +541,8 @@ app.whenReady().then(() => {
   registerAuditIpc(db)
   registerDebugIpc(db, chats)
   registerSuggestionsIpc(db)
-  registerReleaseNotesIpc()
   registerVoiceIpc()
   registerNotifyIpc(() => mainWindow, settings)
-
-  if (!process.env.VITE_DEV_SERVER_URL) {
-    // Авто-обновления только в production (не в npm run dev)
-    initAutoUpdater(mainWindow)
-  }
   }
 
   setImmediate(registerDeferredIpc)

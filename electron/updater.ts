@@ -181,20 +181,25 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
   }
 
   const tryAnnounceCachedDownload = async (version: string): Promise<boolean> => {
-    let meta = await fetchReleaseArtifactMeta(version)
-    if (!meta) {
-      const fileName = `Verstak-Setup-${version}-x64.exe`
-      const cached = await reconcileCachedDownload(fileName, '', 0)
+    try {
+      let meta = await fetchReleaseArtifactMeta(version)
+      if (!meta) {
+        const fileName = `Verstak-Setup-${version}-x64.exe`
+        const cached = await reconcileCachedDownload(fileName, '', 0)
+        if (!cached) return false
+        console.info('[updater] using locally reconciled installer for', version)
+        announceDownloaded(version)
+        return true
+      }
+      const cached = await reconcileCachedDownload(meta.fileName, meta.sha512, meta.size)
       if (!cached) return false
-      console.info('[updater] using locally reconciled installer for', version)
+      console.info('[updater] using reconciled cached installer for', version)
       announceDownloaded(version)
       return true
+    } catch (err) {
+      console.warn('[updater] tryAnnounceCachedDownload failed:', err)
+      return false
     }
-    const cached = await reconcileCachedDownload(meta.fileName, meta.sha512, meta.size)
-    if (!cached) return false
-    console.info('[updater] using reconciled cached installer for', version)
-    announceDownloaded(version)
-    return true
   }
 
   const ensureDownload = async (version: string): Promise<void> => {
@@ -425,15 +430,20 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     })
   }
 
-  void evaluateProbe().then(async (probe) => {
-    if (!probe.newer) {
+  void evaluateProbe()
+    .then(async (probe) => {
+      if (!probe.newer) {
+        announceNotAvailable()
+        return
+      }
+      if (probe.version) {
+        await tryAnnounceCachedDownload(probe.version)
+      }
+    })
+    .catch((err) => {
+      console.warn('[updater] startup probe failed:', err)
       announceNotAvailable()
-      return
-    }
-    if (probe.version) {
-      await tryAnnounceCachedDownload(probe.version)
-    }
-  })
+    })
 
   mainWindow.webContents.once('did-finish-load', () => {
     pushSnapshot()

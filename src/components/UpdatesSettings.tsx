@@ -24,6 +24,7 @@ function friendlyUpdateError(raw: string, fallback: string, noRelease: string): 
 export function UpdatesSettings() {
   const t = useT()
   const [version, setVersion] = useState('…')
+  const [versionLoaded, setVersionLoaded] = useState(false)
   const [status, setStatus] = useState<Status>('idle')
   const [remoteVersion, setRemoteVersion] = useState('')
   const [percent, setPercent] = useState(0)
@@ -36,10 +37,8 @@ export function UpdatesSettings() {
 
   useEffect(() => {
     const isNewerThanInstalled = (v?: string) => {
-      if (!v) return false
-      const installed = version.replace(/^v/, '')
-      if (installed === '…') return true
-      return semverGt(v, installed)
+      if (!v || !versionLoaded) return false
+      return semverGt(v, version.replace(/^v/, ''))
     }
 
     const applyPhase = (
@@ -81,8 +80,15 @@ export function UpdatesSettings() {
       }
     }
 
-    void window.api.app.getVersion().then(setVersion)
-    void window.api.updater.getState().then(s => applyPhase(s.phase, s.version, s.percent, s.error, s.pendingRelease))
+    void window.api.app.getVersion()
+      .then((v) => {
+        setVersion(v)
+        setVersionLoaded(true)
+      })
+      .catch(() => setVersionLoaded(true))
+    void window.api.updater.getState()
+      .then(s => applyPhase(s.phase, s.version, s.percent, s.error, s.pendingRelease))
+      .catch(() => {})
 
     const offState = window.api.updater.onState(s => applyPhase(s.phase, s.version, s.percent, s.error, s.pendingRelease))
     const offAvailable = window.api.updater.onAvailable(({ version: v, pendingRelease }) => {
@@ -120,7 +126,7 @@ export function UpdatesSettings() {
       offNotAvailable()
       offError()
     }
-  }, [version])
+  }, [version, versionLoaded, t.settings.updateError, t.settings.updateNoRelease])
 
   const viewReleaseNotes = useCallback(async () => {
     setNotesLoading(true)
