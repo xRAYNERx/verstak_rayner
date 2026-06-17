@@ -36,9 +36,10 @@ describe('revertToCheckpoint (safety-критичный откат)', () => {
     expect(readFileSync(join(dir, 'a.txt'), 'utf8')).toBe('original')
   })
 
-  it('удаляет новый файл (beforeContent=null → unlink)', async () => {
+  it('удаляет новый файл (beforeContent=пусто → unlink)', async () => {
+    // Новый файл в реальном API пушится с before='' → revert трактует как unlink.
     writeFileSync(join(dir, 'new.txt'), 'content')
-    stack.push(dir, 'new.txt', null, 'content')
+    stack.push(dir, 'new.txt', '', 'content')
     const res = await revertToCheckpoint(stack, dir, 0)
     expect(res.ok).toBe(true)
     expect(existsSync(join(dir, 'new.txt'))).toBe(false)
