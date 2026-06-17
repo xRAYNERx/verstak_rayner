@@ -13,6 +13,17 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: '74f647b',
+    deployed: '17.06.2026',
+    treeVersion: '1.5.5',
+    title: 'UX: выравнивание модели, CLI-обводка, починка скачивания обновлений',
+    changes: [
+      'Сайдбар: выровнен текст в нижнем баре выбора модели (flex, line-height, padding).',
+      'Composer: убрана большая янтарная полоска CLI — обводка поля ввода + всплывашка при наведении.',
+      'Обновления: ensureDownload вместо зависания на «начинаю скачивание»; ошибки загрузки показываются в UI.',
+    ],
+  },
+  {
     commit: 'c5c71ee',
     deployed: '17.06.2026',
     treeVersion: '1.5.5',
