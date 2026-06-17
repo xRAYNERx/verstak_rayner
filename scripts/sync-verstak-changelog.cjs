@@ -13,6 +13,16 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: '449e77d',
+    deployed: '17.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Настройки: убрана серая полоса при первом открытии',
+    changes: [
+      'Suspense fallback для Settings — модальная оболочка вместо gg-view-loading в потоке main.',
+      'Префетч чанка Settings после авторизации — открытие без задержки.',
+    ],
+  },
+  {
     commit: 'c5f9fd1',
     deployed: '17.06.2026',
     treeVersion: '1.5.5',
