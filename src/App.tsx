@@ -33,7 +33,8 @@ import { useSkills as useSkillsStore } from './store/skillStore'
 const AUTH_CACHE_KEY = 'gg.auth_completed'
 
 const AuthScreen = lazy(() => import('./components/AuthScreen').then(m => ({ default: m.AuthScreen })))
-const Settings = lazy(() => import('./components/Settings').then(m => ({ default: m.Settings })))
+const settingsImport = () => import('./components/Settings')
+const Settings = lazy(() => settingsImport().then(m => ({ default: m.Settings })))
 const Terminal = lazy(() => import('./components/Terminal').then(m => ({ default: m.Terminal })))
 const BrowserView = lazy(() => import('./components/BrowserView').then(m => ({ default: m.BrowserView })))
 const DesignView = lazy(() => import('./components/DesignView').then(m => ({ default: m.DesignView })))
@@ -45,6 +46,23 @@ const WorkflowsPanel = lazy(() => import('./components/WorkflowsPanel').then(m =
 
 function ViewFallback() {
   return <div className="gg-view-loading" aria-busy="true" />
+}
+
+/** Модальная оболочка настроек — не gg-view-loading в потоке main (серая полоса на полэкрана). */
+function SettingsFallback() {
+  return (
+    <div className="gg-modal-backdrop" aria-busy="true" aria-label="Loading settings">
+      <div className="gg-modal gg-modal-large" onClick={e => e.stopPropagation()}>
+        <div className="gg-modal-header">
+          <div className="gg-boot-line gg-boot-line--short" />
+        </div>
+        <div className="gg-settings-shell">
+          <aside className="gg-settings-nav" aria-hidden />
+          <div className="gg-settings-content" aria-hidden />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 const SIDEBAR_MIN = 200
@@ -131,6 +149,7 @@ export function App() {
   useEffect(() => {
     if (!authDone) return
     void prefetchDetectedClis()
+    void settingsImport()
   }, [authDone])
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     const stored = parseInt(localStorage.getItem(SIDEBAR_WIDTH_KEY) || '0', 10)
@@ -376,7 +395,7 @@ export function App() {
         )}
       </main>
       {showSettings && (
-        <Suspense fallback={<ViewFallback />}>
+        <Suspense fallback={<SettingsFallback />}>
           <Settings
             initialTab={settingsInitialTab}
             onClose={() => {
