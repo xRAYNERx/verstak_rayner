@@ -24,6 +24,7 @@ import { registerTasksIpc } from './ipc/tasks'
 import { registerJournalIpc } from './ipc/journal'
 import { getActiveProjectPath } from './state/project-state'
 import { registerSettingsIpc } from './ipc/settings'
+import { registerConnectorsIpc } from './ipc/connectors'
 import { registerCliAuthIpc } from './ipc/cli-auth'
 import { registerAiIpc, abortSend } from './ipc/ai'
 import { registerChatsIpc } from './ipc/chats'
@@ -360,6 +361,7 @@ app.whenReady().then(() => {
 
   // Минимальный IPC для первого кадра UI — окно открываем до тяжёлой регистрации.
   registerSettingsIpc(settings)
+  registerConnectorsIpc(connectorRegistry, settings)
   registerCliAuthIpc(settings)
   registerUserProfilesIpc(userProfiles)
   registerProjectIpc(projects, projectGroups, db)

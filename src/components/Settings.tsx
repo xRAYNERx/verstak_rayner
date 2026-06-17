@@ -908,13 +908,15 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
   const [socialWebhooks, setSocialWebhooks] = useState('')
   const [costCap, setCostCap] = useState('')
   const [configuredConnectors, setConfiguredConnectors] = useState<Set<string>>(new Set())
+  type ConnectorHealth = 'unknown' | 'checking' | 'ok' | 'error'
+  const [connectorHealth, setConnectorHealth] = useState<Record<string, ConnectorHealth>>({})
+  const [connectorHealthMsg, setConnectorHealthMsg] = useState<Record<string, string>>({})
+  const [connectorApplying, setConnectorApplying] = useState<string | null>(null)
   const [openConnector, setOpenConnector] = useState<string | null>(null)
-  // Детали коннектора рендерятся ПОД гридом из 31 карточки — при клике по
-  // карточке вверху панель появлялась за экраном («ничего не происходит»).
-  // Скроллим к ней, чтобы поля настройки сразу были видны.
+  // Форма коннектора раскрывается сразу под карточкой — скроллим к ней при открытии.
   const connectorDetailRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
-    if (openConnector) connectorDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (openConnector) connectorDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [openConnector])
   // Custom OpenAI-compatible: base URL + список моделей через запятую.
   // Сохраняется в settings.custom_openai_baseurl / custom_openai_models.
@@ -1139,16 +1141,204 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
     })()
   }, [tab, activeProjectPath])
 
-  // Detect which connectors are configured (for card badges)
+  async function isConnectorConfiguredId(c: ConnectorDef): Promise<boolean> {
+    if (c.id === 'http') {
+      for (let i = 1; i <= 4; i++) {
+        const base = await window.api.settings.getKey(`http_endpoint_${i}_base`)
+        if (base?.trim()) return true
+      }
+      return false
+    }
+    if (c.id === 'social-publish') {
+      for (const k of ['social_publish_telegram_channels', 'social_publish_vk_token', 'social_publish_webhooks']) {
+        const v = await window.api.settings.getKey(k)
+        if (v?.trim()) return true
+      }
+      return false
+    }
+    if (!c.configuredKey) return false
+    const val = await window.api.settings.getKey(c.configuredKey)
+    return !!val?.trim()
+  }
+
+  async function refreshConfiguredConnectors(): Promise<Set<string>> {
+    const results = await Promise.all(CONNECTORS.map(async c =>
+      (await isConnectorConfiguredId(c)) ? c.id : null
+    ))
+    const next = new Set(results.filter(Boolean) as string[])
+    setConfiguredConnectors(next)
+    return next
+  }
+
+  async function runConnectorTest(uiId: string): Promise<{ ok: boolean; message: string }> {
+    setConnectorHealth(h => ({ ...h, [uiId]: 'checking' }))
+    try {
+      const result = await window.api.connectors.test(uiId)
+      setConnectorHealth(h => ({ ...h, [uiId]: result.ok ? 'ok' : 'error' }))
+      setConnectorHealthMsg(m => ({ ...m, [uiId]: result.message }))
+      return result
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Ошибка проверки'
+      setConnectorHealth(h => ({ ...h, [uiId]: 'error' }))
+      setConnectorHealthMsg(m => ({ ...m, [uiId]: message }))
+      return { ok: false, message }
+    }
+  }
+
+  async function persistConnector(uiId: string): Promise<void> {
+    switch (uiId) {
+      case 'claude-oauth':
+        await window.api.settings.setKey('claude_code_oauth_token', claudeOauthToken)
+        break
+      case 'onec':
+        await window.api.settings.setKey('onec_base_url', onec.url)
+        await window.api.settings.setKey('onec_username', onec.user)
+        await window.api.settings.setKey('onec_password', onec.pass)
+        break
+      case 'http':
+        for (let i = 0; i < httpEndpoints.length; i++) {
+          const e = httpEndpoints[i]
+          await window.api.settings.setKey(`http_endpoint_${i + 1}_name`, e.name)
+          await window.api.settings.setKey(`http_endpoint_${i + 1}_base`, e.base)
+          await window.api.settings.setKey(`http_endpoint_${i + 1}_auth`, e.auth)
+          await window.api.settings.setKey(`http_endpoint_${i + 1}_paths`, e.paths)
+        }
+        break
+      case 'gsheets':
+        await window.api.settings.setKey('gsheets_service_account_json', gsheetsJson)
+        break
+      case 'telegram':
+        await window.api.settings.setKey('telegram_bot_token', telegramBotToken)
+        await window.api.settings.setKey('telegram_chat_whitelist', telegramWhitelist)
+        break
+      case 'ssh':
+        await window.api.settings.setKey('ssh_default_host', sshHost)
+        await window.api.settings.setKey('ssh_key_path', sshKeyPath)
+        break
+      case 'bitrix':
+        await window.api.settings.setKey('bitrix24_webhook_url', bitrixWebhook)
+        break
+      case 'ydirect':
+        await window.api.settings.setKey('yandex_direct_token', yDirectToken)
+        await window.api.settings.setKey('yandex_direct_login', yDirectLogin)
+        break
+      case 'ydisk':
+        await window.api.settings.setKey('yandex_disk_token', yDiskToken)
+        break
+      case 'skills-server':
+        await window.api.settings.setKey('skills_server_base', skillsServerBase)
+        break
+      case 'github':
+        await window.api.settings.setKey('github_token', githubToken)
+        break
+      case 'social-publish':
+        await window.api.settings.setKey('social_publish_telegram_channels', socialTgChannels)
+        await window.api.settings.setKey('social_publish_vk_token', socialVkToken)
+        await window.api.settings.setKey('social_publish_vk_group_id', socialVkGroupId)
+        await window.api.settings.setKey('social_publish_webhooks', socialWebhooks)
+        break
+      case 'dadata':
+        await window.api.settings.setKey('dadata_api_key', dadataApiKey)
+        await window.api.settings.setKey('dadata_secret', dadataSecret)
+        break
+      case 'ymetrika':
+        await window.api.settings.setKey('yandex_metrika_token', yMetrikaToken)
+        break
+      case 'avito':
+        await window.api.settings.setKey('avito_client_id', avitoClientId)
+        await window.api.settings.setKey('avito_client_secret', avitoClientSecret)
+        break
+      case 'ywebmaster':
+        await window.api.settings.setKey('yandex_webmaster_token', yWebmasterToken)
+        break
+      case 'ywordstat':
+        await window.api.settings.setKey('yandex_wordstat_token', yWordstatToken)
+        break
+      case 'ozon':
+        await window.api.settings.setKey('ozon_client_id', ozonClientId)
+        await window.api.settings.setKey('ozon_api_key', ozonApiKey)
+        break
+      case 'wildberries':
+        await window.api.settings.setKey('wildberries_token', wbToken)
+        break
+      case 'yookassa':
+        await window.api.settings.setKey('yookassa_shop_id', yookassaShopId)
+        await window.api.settings.setKey('yookassa_secret_key', yookassaSecretKey)
+        break
+      case 'vk':
+        await window.api.settings.setKey('vk_access_token', vkToken)
+        break
+      case 'amocrm':
+        await window.api.settings.setKey('amocrm_subdomain', amocrmSubdomain)
+        await window.api.settings.setKey('amocrm_access_token', amocrmToken)
+        break
+      case 'moysklad':
+        await window.api.settings.setKey('moysklad_token', moyskladToken)
+        break
+      case 'yandex_tracker':
+        await window.api.settings.setKey('yandex_tracker_token', yTrackerToken)
+        await window.api.settings.setKey('yandex_tracker_org_id', yTrackerOrgId)
+        break
+      case 'sendpulse':
+        await window.api.settings.setKey('sendpulse_client_id', sendpulseClientId)
+        await window.api.settings.setKey('sendpulse_client_secret', sendpulseClientSecret)
+        break
+      case 'unisender':
+        await window.api.settings.setKey('unisender_api_key', unisenderApiKey)
+        break
+      case 'ga4':
+        await window.api.settings.setKey('ga4_access_token', ga4Token)
+        await window.api.settings.setKey('ga4_property_id', ga4PropertyId)
+        break
+      case 'notion':
+        await window.api.settings.setKey('notion_token', notionToken)
+        break
+      case 'kontur_focus':
+        await window.api.settings.setKey('kontur_focus_api_key', konturFocusKey)
+        break
+      case 'mpstats':
+        await window.api.settings.setKey('mpstats_token', mpstatsToken)
+        break
+      case 'ozon_performance':
+        await window.api.settings.setKey('ozon_perf_client_id', ozonPerfClientId)
+        await window.api.settings.setKey('ozon_perf_client_secret', ozonPerfClientSecret)
+        break
+      case 'jira':
+        await window.api.settings.setKey('jira_base_url', jiraBaseUrl)
+        await window.api.settings.setKey('jira_email', jiraEmail)
+        await window.api.settings.setKey('jira_api_token', jiraApiToken)
+        break
+      case 'trello':
+        await window.api.settings.setKey('trello_api_key', trelloApiKey)
+        await window.api.settings.setKey('trello_token', trelloToken)
+        break
+      default:
+        break
+    }
+  }
+
+  async function applyConnector(uiId: string): Promise<void> {
+    setConnectorApplying(uiId)
+    try {
+      await persistConnector(uiId)
+      await refreshConfiguredConnectors()
+      await runConnectorTest(uiId)
+    } finally {
+      setConnectorApplying(null)
+    }
+  }
+
+  // Коннекторы: список настроенных + фоновая проверка токенов
   useEffect(() => {
     if (tab !== 'connectors') return
-    void Promise.all(CONNECTORS.map(async c => {
-      if (!c.configuredKey) return null
-      const val = await window.api.settings.getKey(c.configuredKey)
-      return val ? c.id : null
-    })).then(results => {
-      setConfiguredConnectors(new Set(results.filter(Boolean) as string[]))
-    })
+    let cancelled = false
+    void (async () => {
+      const configured = await refreshConfiguredConnectors()
+      if (cancelled) return
+      await Promise.all([...configured].map(id => runConnectorTest(id)))
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab])
 
   async function save() {
@@ -1572,13 +1762,14 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
               type="password"
               value={yWordstatToken}
               onChange={e => setYWordstatToken(e.target.value)}
-              placeholder="oauth.yandex.ru, scope direct (или оставь — возьмётся токен Директа)"
+              placeholder="OAuth-токен приложения Wordstat API"
               autoComplete="new-password"
             />
           </div>
           <div className="gg-settings-hint">
-            Wordstat работает через Директ API (асинхронный отчёт). Если поле пустое —
-            используется yandex_direct_token. Операция: get_wordstat (phrases, geo_id).
+            Новый Wordstat API (api.wordstat.yandex.net): OAuth-приложение на oauth.yandex.ru
+            и заявка на доступ по ClientID. Операции: get_top_requests, get_wordstat (phrases, geo_id),
+            get_dynamics, get_regions, get_regions_tree.
           </div>
         </>
       )
@@ -1971,41 +2162,107 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
             </div>
           </div>
 
-          {/* Card grid — Codex-style marketplace */}
-          <div className="gg-connector-grid">
-            {CONNECTORS.map(c => {
-              const configured = configuredConnectors.has(c.id)
-              return (
-                <button
-                  key={c.id}
-                  className={`gg-connector-card ${configured ? 'is-connected' : ''} ${openConnector === c.id ? 'is-open' : ''}`}
-                  onClick={() => setOpenConnector(openConnector === c.id ? null : c.id)}
-                >
-                  <div className="gg-connector-card-icon"><c.icon size={32} /></div>
-                  <div className="gg-connector-card-body">
-                    <div className="gg-connector-card-name">{c.name}</div>
-                    <div className="gg-connector-card-desc">{c.description}</div>
-                  </div>
-                  <div className="gg-connector-card-status">
-                    {configured ? <span className="gg-badge-connected">&#10003;</span> : <span className="gg-badge-add">+</span>}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
+          {(() => {
+            const configuredList = CONNECTORS.filter(c => configuredConnectors.has(c.id))
+            const availableList = CONNECTORS.filter(c => !configuredConnectors.has(c.id))
 
-          {/* Expanded settings panel below the grid */}
-          {openConnector && (
-            <div className="gg-connector-detail" ref={connectorDetailRef}>
-              <div className="gg-connector-detail-header">
-                {(() => { const def = CONNECTORS.find(c => c.id === openConnector); return def ? <><def.icon size={20} /> {def.name}</> : null })()}
-                <button className="gg-connector-detail-close" onClick={() => setOpenConnector(null)}>×</button>
+            const renderConnectorDetail = (id: string) => (
+              <div
+                className="gg-connector-detail"
+                ref={openConnector === id ? connectorDetailRef : undefined}
+              >
+                <div className="gg-connector-detail-header">
+                  {(() => {
+                    const def = CONNECTORS.find(c => c.id === id)
+                    return def ? <><def.icon size={20} /> {def.name}</> : null
+                  })()}
+                  <button className="gg-connector-detail-close" onClick={() => setOpenConnector(null)}>×</button>
+                </div>
+                <div className="gg-connector-detail-body">
+                  {renderConnectorForm(id)}
+                  <div className="gg-connector-detail-actions">
+                    {connectorApplying === id && <div className="gg-connector-progress" aria-hidden />}
+                    <div className="gg-connector-detail-actions-row">
+                      <button
+                        type="button"
+                        className="gg-btn gg-btn-primary"
+                        disabled={connectorApplying === id}
+                        onClick={() => void applyConnector(id)}
+                      >
+                        {connectorApplying === id ? t.connectors.applying : t.connectors.apply}
+                      </button>
+                      {connectorHealthMsg[id] && connectorApplying !== id && (
+                        <span className={`gg-connector-test-msg ${connectorHealth[id] === 'ok' ? 'is-ok' : connectorHealth[id] === 'error' ? 'is-error' : ''}`}>
+                          {connectorHealthMsg[id]}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="gg-connector-detail-body">
-                {renderConnectorForm(openConnector)}
-              </div>
-            </div>
-          )}
+            )
+
+            const renderConnectorItem = (c: ConnectorDef) => {
+              const configured = configuredConnectors.has(c.id)
+              const health = connectorHealth[c.id] ?? 'unknown'
+              const healthTitle = connectorHealthMsg[c.id]
+                ?? (health === 'checking' ? t.connectors.healthChecking
+                  : health === 'ok' ? t.connectors.healthOk
+                  : health === 'error' ? t.connectors.healthError
+                  : '')
+              const isOpen = openConnector === c.id
+              return (
+                <div key={c.id} className={`gg-connector-item${isOpen ? ' is-expanded' : ''}`}>
+                  <button
+                    type="button"
+                    className={`gg-connector-card ${configured ? 'is-connected' : ''} ${isOpen ? 'is-open' : ''}`}
+                    onClick={() => setOpenConnector(isOpen ? null : c.id)}
+                  >
+                    <div className="gg-connector-card-icon"><c.icon size={32} /></div>
+                    <div className="gg-connector-card-body">
+                      <div className="gg-connector-card-name">{c.name}</div>
+                      <div className="gg-connector-card-desc">{c.description}</div>
+                    </div>
+                    <div className="gg-connector-card-status">
+                      {configured && (
+                        <span
+                          className={`gg-connector-health ${health === 'ok' ? 'is-ok' : health === 'error' ? 'is-error' : health === 'checking' ? 'is-checking' : ''}`}
+                          title={healthTitle}
+                          aria-label={healthTitle}
+                        />
+                      )}
+                      {configured
+                        ? <span className="gg-badge-connected">&#10003;</span>
+                        : <span className="gg-badge-add">+</span>}
+                    </div>
+                  </button>
+                  {isOpen && renderConnectorDetail(c.id)}
+                </div>
+              )
+            }
+
+            return (
+              <>
+                {configuredList.length > 0 && (
+                  <>
+                    <div className="gg-connector-section-title">{t.connectors.sectionConfigured}</div>
+                    <div className="gg-connector-list">
+                      {configuredList.map(renderConnectorItem)}
+                    </div>
+                    {availableList.length > 0 && <div className="gg-connector-section-divider" />}
+                  </>
+                )}
+                {availableList.length > 0 && (
+                  <>
+                    <div className="gg-connector-section-title">{t.connectors.sectionAvailable}</div>
+                    <div className="gg-connector-list">
+                      {availableList.map(renderConnectorItem)}
+                    </div>
+                  </>
+                )}
+              </>
+            )
+          })()}
         </div>
         )}
 
@@ -2492,6 +2749,7 @@ type CliId = 'claude-cli' | 'gemini-cli' | 'grok-cli' | 'codex-cli'
 type CliStatusMap = Record<CliId, { installed: boolean; loggedIn: boolean; credPath?: string }>
 
 function ProvidersPage(props: ProvidersPageProps) {
+  const t = useT()
   const { providers, keys, setKeys, activeProvider, setActiveProvider,
           customOpenaiBaseUrl, setCustomOpenaiBaseUrl,
           customOpenaiModels, setCustomOpenaiModels } = props
@@ -2503,7 +2761,7 @@ function ProvidersPage(props: ProvidersPageProps) {
   // null = ещё не загружено (показываем "Среда" по дефолту).
   const [cliStatus, setCliStatus] = useState<CliStatusMap | null>(null)
   // Обнаруженные CLI-инструменты на компьютере пользователя.
-  const [detectedClis, setDetectedClis] = useState<DetectedCli[] | null>(null)
+  const [detectedClis, setDetectedClis] = useState<DetectedCli[]>([])
 
   async function loadCliStatus() {
     try {
@@ -2513,7 +2771,7 @@ function ProvidersPage(props: ProvidersPageProps) {
   }
   useEffect(() => {
     void loadCliStatus()
-    window.api.cli.detect().then(setDetectedClis).catch(() => {})
+    void import('../lib/prefetch-cli').then(m => m.getDetectedClisCached().then(setDetectedClis))
   }, [])
 
   // «Подключён» = доступен для отправки запросов:
@@ -2650,6 +2908,12 @@ function ProvidersPage(props: ProvidersPageProps) {
               <div className="gg-prov-card-main">
                 <div className="gg-prov-card-name">
                   {p.name}
+                  <span
+                    className={`gg-models-caps-badge ${p.transport === 'CLI' ? 'is-cli' : 'is-api'}`}
+                    title={p.transport === 'CLI' ? t.settings.capsCliHint : t.settings.capsFullHint}
+                  >
+                    {p.transport === 'CLI' ? t.settings.capsCli : t.settings.capsFull}
+                  </span>
                   <span className={`gg-prov-badge is-${badge.tone}`} title={badge.title}>{badge.label}</span>
                 </div>
                 <div className="gg-prov-card-desc">{p.description}</div>
@@ -2705,7 +2969,16 @@ function ProvidersPage(props: ProvidersPageProps) {
         {available.map(p => (
           <div key={p.id} className="gg-prov-card">
             <div className="gg-prov-card-main">
-              <div className="gg-prov-card-name">{p.name}<span className="gg-prov-badge is-recommended">Рекомендуемый</span></div>
+              <div className="gg-prov-card-name">
+                {p.name}
+                <span
+                  className={`gg-models-caps-badge is-api`}
+                  title={t.settings.capsFullHint}
+                >
+                  {t.settings.capsFull}
+                </span>
+                <span className="gg-prov-badge is-recommended">Рекомендуемый</span>
+              </div>
               <div className="gg-prov-card-desc">{p.description}</div>
             </div>
             <div className="gg-prov-card-actions">
@@ -2735,7 +3008,7 @@ function ProvidersPage(props: ProvidersPageProps) {
         CLI-провайдеры (Gemini CLI / Claude Code / Grok Build / Codex) подключаются установкой соответствующего CLI вне приложения и логином через подписку. После этого они появляются как «Среда».
       </div>
 
-      {detectedClis !== null && detectedClis.length > 0 && (
+      {detectedClis.length > 0 && (
         <div className="gg-prov-detected">
           <div className="gg-settings-section-title" style={{ marginTop: 22 }}>Обнаруженные CLI</div>
           <div className="gg-prov-detected-list">
@@ -2910,6 +3183,7 @@ interface ModelsPageProps {
 type ModelsCliStatusMap = Partial<Record<CliAuthId, CliAuthStatus>>
 
 function ModelsPage(props: ModelsPageProps) {
+  const t = useT()
   const {
     providers, enabledModels, setEnabledModels, models, setModels,
     activeProvider, setActiveProvider, keys, customOpenaiBaseUrl, onGoToProviders
@@ -3068,7 +3342,12 @@ function ModelsPage(props: ModelsPageProps) {
               <div className="gg-models-card-head">
                 <div className="gg-models-card-title">
                   <span className="gg-models-card-name">{p.name}</span>
-                  <span className={`gg-models-card-transport is-${p.transport.toLowerCase()}`}>{p.transport}</span>
+                  <span
+                    className={`gg-models-caps-badge ${p.transport === 'CLI' ? 'is-cli' : 'is-api'}`}
+                    title={p.transport === 'CLI' ? t.settings.capsCliHint : t.settings.capsFullHint}
+                  >
+                    {p.transport === 'CLI' ? t.settings.capsCli : t.settings.capsFull}
+                  </span>
                   {isActiveProvider && <span className="gg-models-card-active">текущий</span>}
                 </div>
                 <div className="gg-models-card-meta">

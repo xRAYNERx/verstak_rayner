@@ -1,0 +1,4 @@
+provider: github
+owner: frolofpavel
+repo: verstak
+updaterCacheDirName: verstak-updater

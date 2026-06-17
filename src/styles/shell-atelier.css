@@ -477,12 +477,23 @@ html[data-theme="nord"] .gg-app-atelier .gg-chat-empty-modes {
 
 /* ─── Right panels ─── */
 .gg-app-atelier .gg-terminal-wrap,
-.gg-app-atelier .gg-files-panel,
-.gg-app-atelier .gg-sidechat {
+.gg-app-atelier .gg-files-panel {
   border-left: 1px solid var(--border-subtle);
   background: var(--vol-glass);
   backdrop-filter: var(--vol-blur);
   box-shadow: inset 4px 0 12px rgba(0, 0, 0, 0.2);
+}
+.gg-app-atelier .gg-sidechat {
+  border-left: 1px solid color-mix(in srgb, var(--border-subtle) 38%, transparent);
+  background: color-mix(in srgb, var(--vol-glass) 42%, var(--bg-base));
+  backdrop-filter: blur(10px);
+  box-shadow: inset 2px 0 12px -4px rgba(0, 0, 0, 0.14);
+}
+.gg-app-atelier .gg-sidechat-header {
+  background: color-mix(in srgb, var(--vol-glass-deep, var(--bg-elevated)) 35%, var(--bg-base));
+}
+.gg-app-atelier .gg-sidechat-composer {
+  background: color-mix(in srgb, var(--bg-base) 88%, var(--bg-elevated));
 }
 
 .gg-app-atelier .gg-terminal-header {
@@ -554,9 +565,11 @@ html[data-theme="light"] .gg-app-atelier .gg-rail-chip:not(.is-shell-expanded).i
 }
 
 html[data-theme="light"] .gg-app-atelier .gg-terminal-wrap,
-html[data-theme="light"] .gg-app-atelier .gg-files-panel,
-html[data-theme="light"] .gg-app-atelier .gg-sidechat {
+html[data-theme="light"] .gg-app-atelier .gg-files-panel {
   box-shadow: inset 4px 0 10px -2px rgba(15, 25, 40, 0.05);
+}
+html[data-theme="light"] .gg-app-atelier .gg-sidechat {
+  box-shadow: inset 2px 0 10px -4px rgba(15, 25, 40, 0.04);
 }
 
 html[data-theme="light"] .gg-app-atelier .gg-chat-empty-modes {

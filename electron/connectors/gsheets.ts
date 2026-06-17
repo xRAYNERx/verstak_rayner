@@ -77,6 +77,9 @@ export function createGSheetsConnector(): Connector {
       }
       try {
         switch (op) {
+          case 'ping':
+            await getAccessToken(sa, ctx)
+            return { ok: true, message: 'Service account авторизован в Google' }
           case 'read_sheet':       return await readSheet(sa, args, ctx)
           case 'read_as_records':  return await readAsRecords(sa, args, ctx)
           case 'get_row':          return await getRow(sa, args, ctx)

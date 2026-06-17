@@ -63,16 +63,19 @@ export function registerNotifyIpc(getMainWindow: () => BrowserWindow | null, set
     title?: string
     body: string
     projectName?: string
+    projectPath?: string
     isError?: boolean
   }) => {
     const title = (opts.title ?? 'Verstak').slice(0, 120)
     const body = (opts.body ?? '').slice(0, 240)
     const projectName = opts.projectName?.slice(0, 80)
+    const projectPath = opts.projectPath?.slice(0, 512)
 
     showAppToast({
       title,
       body,
       projectName,
+      projectPath,
       isError: !!opts.isError,
       theme: readTheme(settings)
     })

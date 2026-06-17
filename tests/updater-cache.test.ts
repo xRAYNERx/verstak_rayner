@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { createHash } from 'crypto'
 import { existsSync, mkdirSync, writeFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
@@ -29,5 +30,23 @@ describe('updater-cache', () => {
     clearPendingUpdateCache()
 
     expect(existsSync(pending)).toBe(false)
+  })
+
+  it('reconcileCachedDownload repairs installer.exe in cache root', async () => {
+    const {
+      getUpdaterCacheRoot,
+      reconcileCachedDownload,
+    } = await import('../electron/updater-cache')
+    const root = getUpdaterCacheRoot()
+    mkdirSync(root, { recursive: true })
+    const payload = 'fake-installer-payload'
+    const sha512 = createHash('sha512').update(payload).digest('base64')
+    writeFileSync(join(root, 'installer.exe'), payload)
+
+    const repaired = await reconcileCachedDownload('Verstak-Setup-1.5.7-x64.exe', sha512, payload.length)
+
+    expect(repaired).toBe(join(root, 'pending', 'Verstak-Setup-1.5.7-x64.exe'))
+    expect(existsSync(join(root, 'pending', 'update-info.json'))).toBe(true)
+    expect(existsSync(join(root, 'installer.exe'))).toBe(false)
   })
 })

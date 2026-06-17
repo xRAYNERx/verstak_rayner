@@ -48,6 +48,7 @@ export async function notifyResponseReady(opts: {
   title?: string
   body?: string
   projectName?: string
+  projectPath?: string
   isError?: boolean
   force?: boolean
 }): Promise<void> {
@@ -66,6 +67,7 @@ export async function notifyResponseReady(opts: {
       title: opts.title ?? 'Verstak',
       body: buildBody(opts),
       projectName: opts.projectName,
+      projectPath: opts.projectPath,
       isError: !!opts.isError
     })
   }

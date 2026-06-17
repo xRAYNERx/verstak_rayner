@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState, type DragEvent, type ClipboardEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { useProject, type PreflightCard } from '../store/projectStore'
 import { useProvider } from '../hooks/useProvider'
 import { estimateCost, costSeverity, costBreakdown } from '../lib/pricing'
@@ -30,7 +31,15 @@ import {
   formatMessageDateTitle,
   isSameLocalDay,
 } from '../lib/chat-timestamps'
-import type { QueuedComposerMessage } from '../lib/composer-streaming'
+import { ComposerPendingBar } from './ComposerPendingBar'
+import {
+  formatSupplementForAgent,
+  nextComposerItemId,
+  parseSupplementMessage,
+  type PendingSupplement,
+  type PendingSupplementStatus,
+  type QueuedComposerMessage,
+} from '../lib/composer-streaming'
 
 function normalizeProjectPath(p: string): string {
   return p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
@@ -58,7 +67,7 @@ function readAutoScrollPref(): boolean {
 
 const ACCEPTED_MIME_PREFIXES = ['image/', 'text/', 'application/pdf', 'application/json']
 
-type RightPanel = 'none' | 'terminal' | 'files' | 'sidechat'
+type RightPanel = 'none' | 'terminal' | 'sidechat'
 
 interface ChatProps {
   onOpenSettings: () => void
@@ -139,9 +148,6 @@ Out of scope: общие best practices, рефакторинги ради кр�
 
 export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSideChat }: ChatProps) {
   const t = useT()
-  // Codex-style right-panel menu anchored to the top-right header button.
-  const [panelMenuOpen, setPanelMenuOpen] = useState(false)
-  const panelMenuRef = useRef<HTMLDivElement>(null)
   const { messages, addMessage, insertMessageBeforeLast, updateLastAssistant, isStreaming, setStreaming, activity, preflights, subagentRuns, sessionUsage, path: activePath, chatSessions, activeChatId } = useProject()
   const { mode: agentMode, setMode: setAgentMode } = useAgentMode()
   const projectName = activePath ? activePath.replace(/^.*[\\/]/, '') : null
@@ -169,8 +175,10 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
   const screenshotCounter = useRef(0)
   const warningTimer = useRef<number | null>(null)
   const currentSendIdRef = useRef<number | null>(null)
-  const messageQueueRef = useRef<QueuedComposerMessage[]>([])
-  const [queueCount, setQueueCount] = useState(0)
+  const queuedMessagesRef = useRef<QueuedComposerMessage[]>([])
+  const [queuedMessages, setQueuedMessages] = useState<QueuedComposerMessage[]>([])
+  const [pendingSupplements, setPendingSupplements] = useState<PendingSupplement[]>([])
+  const [pendingBarExpanded, setPendingBarExpanded] = useState(false)
   const flushQueueRef = useRef<() => void>(() => {})
   // Resume задачи (Фаза 4): взводится при gg-resume-send, эффект ниже шлёт send().
   const resumeAutoSendRef = useRef(false)
@@ -268,9 +276,9 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         // мапа растёт при каждом переключении проекта во время активного
         // стрима в фоне.
         if (event.type === 'done') {
-          void notifyResponseReady({ projectName: projectNameForPath(projectPath) })
+          void notifyResponseReady({ projectName: projectNameForPath(projectPath), projectPath })
         } else if (event.type === 'error') {
-          void notifyResponseReady({ projectName: projectNameForPath(projectPath), isError: true })
+          void notifyResponseReady({ projectName: projectNameForPath(projectPath), projectPath, isError: true })
         }
         if (event.type === 'done' || event.type === 'error') store.forgetSendOwner(id)
         return
@@ -280,9 +288,9 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
       if (owner?.kind === 'chat' && owner.chatId !== store.activeChatId) {
         store.applyEventToChat(owner.chatId, event as unknown as { type: string; [k: string]: unknown })
         if (event.type === 'done') {
-          void notifyResponseReady({ projectName: projectNameForPath(store.path) })
+          void notifyResponseReady({ projectName: projectNameForPath(store.path), projectPath: store.path ?? undefined })
         } else if (event.type === 'error') {
-          void notifyResponseReady({ projectName: projectNameForPath(store.path), isError: true })
+          void notifyResponseReady({ projectName: projectNameForPath(store.path), projectPath: store.path ?? undefined, isError: true })
         }
         if (event.type === 'done' || event.type === 'error') store.forgetSendOwner(id)
         return
@@ -513,8 +521,10 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
           store.setRunningPlanStep(null)
         }
         setStreaming(false)
+        setPendingSupplements([])
+        setPendingBarExpanded(false)
         store.forgetSendOwner(id)
-        void notifyResponseReady({ projectName: projectNameForPath(store.path) })
+        void notifyResponseReady({ projectName: projectNameForPath(store.path), projectPath: store.path ?? undefined })
         flushQueueRef.current()
       }
       else if (event.type === 'error') {
@@ -535,8 +545,10 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
             ('message' in event ? event.message : '').slice(0, 600))
         }
         setStreaming(false)
+        setPendingSupplements([])
+        setPendingBarExpanded(false)
         store.forgetSendOwner(id)
-        void notifyResponseReady({ projectName: projectNameForPath(store.path), isError: true })
+        void notifyResponseReady({ projectName: projectNameForPath(store.path), projectPath: store.path ?? undefined, isError: true })
         flushQueueRef.current()
       }
     })
@@ -747,18 +759,6 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
   // Cleanup warning timer on unmount
   useEffect(() => () => { if (warningTimer.current) window.clearTimeout(warningTimer.current) }, [])
 
-  // Close the right-panel menu on outside click.
-  useEffect(() => {
-    if (!panelMenuOpen) return
-    function onDown(e: MouseEvent) {
-      if (panelMenuRef.current && !panelMenuRef.current.contains(e.target as Node)) {
-        setPanelMenuOpen(false)
-      }
-    }
-    window.addEventListener('mousedown', onDown)
-    return () => window.removeEventListener('mousedown', onDown)
-  }, [panelMenuOpen])
-
   // Live token preview: debounce text changes (400ms) and ask the main process
   // to count tokens for the current draft. Gemini API gives an exact count;
   // CLI / other providers get a rough 4-chars-per-token estimate.
@@ -878,21 +878,32 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     return { path: next.path, activeChatId: next.activeChatId }
   }
 
+  function setQueuedMessagesState(items: QueuedComposerMessage[]) {
+    queuedMessagesRef.current = items
+    setQueuedMessages(items)
+  }
+
   async function flushMessageQueue() {
-    if (messageQueueRef.current.length === 0) return
+    if (queuedMessagesRef.current.length === 0) return
     if (useProject.getState().isStreaming) return
-    const next = messageQueueRef.current.shift()!
-    setQueueCount(messageQueueRef.current.length)
+    const [next, ...rest] = queuedMessagesRef.current
+    setQueuedMessagesState(rest)
     await send({ text: next.text, fromQueue: true })
   }
 
   flushQueueRef.current = () => { void flushMessageQueue() }
 
   function queueFollowUp(text: string) {
-    messageQueueRef.current.push({ text })
-    setQueueCount(messageQueueRef.current.length)
+    const item: QueuedComposerMessage = { id: nextComposerItemId(), text, at: Date.now() }
+    setQueuedMessagesState([...queuedMessagesRef.current, item])
     setInput('')
+    setPendingBarExpanded(true)
+    flashWarning(t.chat.streamingQueueAdded)
     armAutoScrollForOutgoing()
+  }
+
+  function removeQueuedMessage(id: string) {
+    setQueuedMessagesState(queuedMessagesRef.current.filter(m => m.id !== id))
   }
 
   async function appendToCurrentContext() {
@@ -900,18 +911,32 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     if (!text || !isStreaming) return
     const sendId = currentSendIdRef.current
     const ctx = await ensureProjectForChat()
-    insertMessageBeforeLast({ role: 'user', content: text })
+    const formatted = formatSupplementForAgent(text)
+    insertMessageBeforeLast({ role: 'user', content: formatted })
     setInput('')
     armAutoScrollForOutgoing()
-    if (ctx?.path && ctx.activeChatId) {
-      await window.api.chats.append(ctx.activeChatId, ctx.path, 'user', text)
-    }
-    if (sendId == null) return
-    const res = await window.api.ai.appendContext(sendId, text)
-    if (!res.ok) {
-      if (provider.id.endsWith('-cli')) {
+
+    let status: PendingSupplementStatus = 'deferred'
+    if (sendId != null) {
+      const res = await window.api.ai.appendContext(sendId, text)
+      if (res.ok) {
+        status = 'accepted'
+        flashWarning(t.chat.streamingAppendAccepted)
+      } else if (provider.id.endsWith('-cli')) {
         flashWarning(t.chat.streamingAppendCliNote)
       }
+    }
+
+    setPendingSupplements(prev => [...prev, {
+      id: nextComposerItemId(),
+      text,
+      at: Date.now(),
+      status,
+    }])
+    setPendingBarExpanded(true)
+
+    if (ctx?.path && ctx.activeChatId) {
+      await window.api.chats.append(ctx.activeChatId, ctx.path, 'user', formatted)
     }
   }
 
@@ -1034,6 +1059,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     if (id == null) return
     await window.api.ai.stop(id)
     setStreaming(false)
+    setPendingSupplements([])
+    setPendingBarExpanded(false)
     // sendOwners cleanup: stop() = главное место где renderer знает, что
     // больше событий по этому sendId не придёт. Без этого owner повисал бы
     // в мапе, потому что done event на abort иногда теряется.
@@ -1088,53 +1115,22 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
               <span className="gg-chat-project-chat">{activeChatTitle}</span>
             </>
           )}
-          <div className="gg-chat-project-actions">
-          {/* Меню панелей — файлы / терминал / параллельный чат */}
-          <div className="gg-panel-menu" ref={panelMenuRef}>
-            <button
-              type="button"
-              className={`gg-terminal-toggle ${rightPanel !== 'none' ? 'is-open' : ''}`}
-              onClick={() => setPanelMenuOpen(v => !v)}
-              title="Панели — файлы, терминал, параллельный чат"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="4 17 10 11 4 5" />
-                <line x1="12" y1="19" x2="20" y2="19" />
-              </svg>
-            </button>
-            {panelMenuOpen && (
-              <div className="gg-panel-menu-pop">
-                <button
-                  type="button"
-                  className="gg-panel-menu-item"
-                  onClick={() => { onSelectRightPanel(rightPanel === 'files' ? 'none' : 'files'); setPanelMenuOpen(false) }}
-                >
-                  <span className="gg-panel-menu-icon">📁</span>
-                  <span className="gg-panel-menu-label">Файлы</span>
-                  {rightPanel === 'files' && <span className="gg-panel-menu-check">✓</span>}
-                </button>
-                <button
-                  type="button"
-                  className="gg-panel-menu-item"
-                  onClick={() => { onSelectRightPanel(rightPanel === 'terminal' ? 'none' : 'terminal'); setPanelMenuOpen(false) }}
-                >
-                  <span className="gg-panel-menu-icon">▱</span>
-                  <span className="gg-panel-menu-label">Терминал</span>
-                  {rightPanel === 'terminal' && <span className="gg-panel-menu-check">✓</span>}
-                </button>
-                <button
-                  type="button"
-                  className="gg-panel-menu-item"
-                  onClick={() => { onOpenSideChat(); setPanelMenuOpen(false) }}
-                >
-                  <span className="gg-panel-menu-icon">💬</span>
-                  <span className="gg-panel-menu-label">Параллельный чат</span>
-                  {rightPanel === 'sidechat' && <span className="gg-panel-menu-check">✓</span>}
-                </button>
-              </div>
-            )}
-          </div>
-          </div>
+          {activePath && (
+            <div className="gg-chat-project-actions">
+              <button
+                type="button"
+                className={`gg-terminal-bar-btn ${rightPanel === 'terminal' ? 'is-open' : ''}`}
+                onClick={() => onSelectRightPanel(rightPanel === 'terminal' ? 'none' : 'terminal')}
+                title={t.chat.dockTerminal}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <polyline points="4 17 10 11 4 5" />
+                  <line x1="12" y1="19" x2="20" y2="19" />
+                </svg>
+                <span>{t.chat.dockTerminal}</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -1254,6 +1250,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
           const prevMsg = i > 0 ? messages[i - 1] : null
           const showDateDivider = m.createdAt != null
             && (prevMsg?.createdAt == null || !isSameLocalDay(prevMsg.createdAt, m.createdAt))
+          const supplement = m.role === 'user' && m.content ? parseSupplementMessage(m.content) : null
           return (
             <Fragment key={i}>
             {showDateDivider && (
@@ -1261,7 +1258,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
                 <span className="gg-chat-date-divider-label">{formatChatDateDivider(m.createdAt!)}</span>
               </div>
             )}
-            <div className={`gg-msg ${m.role === 'user' ? 'gg-msg-user' : 'gg-msg-assistant'}`}>
+            <div className={`gg-msg ${m.role === 'user' ? 'gg-msg-user' : 'gg-msg-assistant'}${supplement ? ' is-supplement' : ''}`}>
               {showActivity && (
                 <div className="gg-activity-list">
                   {activity.map(a => (
@@ -1405,7 +1402,14 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
                 {m.content
                   ? (m.role === 'assistant'
                       ? <Markdown text={m.content} />
-                      : <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span>)
+                      : supplement
+                        ? (
+                          <>
+                            <div className="gg-msg-supplement-tag">{supplement.tag}</div>
+                            <span style={{ whiteSpace: 'pre-wrap' }}>{supplement.body}</span>
+                          </>
+                        )
+                        : <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span>)
                   : isStreamingAssistant
                     ? <div className="gg-typing"><span /><span /><span /></div>
                     : null
@@ -1448,6 +1452,15 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
               <polyline points="6 9 12 15 18 9" />
             </svg>
           </button>
+        )}
+        {isStreaming && (queuedMessages.length > 0 || pendingSupplements.length > 0) && (
+          <ComposerPendingBar
+            queueItems={queuedMessages}
+            supplements={pendingSupplements}
+            expanded={pendingBarExpanded}
+            onToggle={() => setPendingBarExpanded(v => !v)}
+            onRemoveQueueItem={removeQueuedMessage}
+          />
         )}
       </div>
 
@@ -1626,24 +1639,17 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
           />
         </div>
         <div className="gg-composer-hint">
-          {isStreaming && (input.trim() || queueCount > 0) && (
+          {isStreaming && input.trim() && (
             <div className="gg-composer-streaming-hint">
-              {input.trim() && (
-                <span>
-                  <kbd className="gg-kbd">Ctrl+Enter</kbd>
-                  {' — '}
-                  {t.chat.streamingAppendHint}
-                  {' · '}
-                  <kbd className="gg-kbd">Enter</kbd>
-                  {' — '}
-                  {t.chat.streamingQueueHint}
-                </span>
-              )}
-              {queueCount > 0 && (
-                <span className="gg-composer-queue-count">
-                  {t.chat.streamingQueueCount.replace('{n}', String(queueCount))}
-                </span>
-              )}
+              <span>
+                <kbd className="gg-kbd">Ctrl+Enter</kbd>
+                {' — '}
+                {t.chat.streamingAppendHint}
+                {' · '}
+                <kbd className="gg-kbd">Enter</kbd>
+                {' — '}
+                {t.chat.streamingQueueHint}
+              </span>
             </div>
           )}
           <div className="gg-composer-meta">
@@ -1720,19 +1726,80 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
                   policy) НЕ действуют, вложения уходят текстовым хинтом. Бейдж
                   закрывает дыру «выглядит одинаково, ведёт себя по-разному». */}
               {provider.id.endsWith('-cli') && (
-                <span
-                  className="gg-provider-caps-badge"
-                  title="CLI-провайдер: правки выполняет внешний агент. Контроль Verstak (per-file undo, checkpoint, подтверждение write, mode-policy) не действует. Вложения уходят текстовым хинтом, не картинкой."
-                >
-                  CLI
-                </span>
+                <CliComposerBadge hint={t.chat.cliStrip} />
               )}
               <TierRecommendation input={input} />
             </div>
           </div>
         </div>
       </div>
+
+      {activePath && (
+        <div className="gg-chat-sidechat-dock">
+          <button
+            type="button"
+            className={`gg-chat-sidechat-dock-btn ${rightPanel === 'sidechat' ? 'is-active' : ''}`}
+            onClick={() => {
+              if (rightPanel === 'sidechat') onSelectRightPanel('none')
+              else onOpenSideChat()
+            }}
+            title={t.chat.dockSideChat}
+          >
+            <svg className="gg-chat-sidechat-dock-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <rect x="3" y="4" width="8" height="16" rx="1.5" />
+              <path d="M13 8h6a2 2 0 0 1 2 2v8l-3-2.5H13a2 2 0 0 1-2-2V8z" />
+            </svg>
+            <span>{t.chat.dockSideChat}</span>
+          </button>
+        </div>
+      )}
     </div>
+  )
+}
+
+function CliComposerBadge({ hint }: { hint: string }) {
+  const anchorRef = useRef<HTMLSpanElement>(null)
+  const [open, setOpen] = useState(false)
+  const [tip, setTip] = useState<{ top: number; left: number; width: number } | null>(null)
+
+  function placeTooltip() {
+    const el = anchorRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const width = Math.min(280, window.innerWidth - 24)
+    const left = Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12))
+    setTip({ top: rect.top - 8, left, width })
+    setOpen(true)
+  }
+
+  return (
+    <>
+      <span
+        ref={anchorRef}
+        className="gg-provider-caps-badge is-cli"
+        onMouseEnter={placeTooltip}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={placeTooltip}
+        onBlur={() => setOpen(false)}
+        tabIndex={0}
+      >
+        CLI
+      </span>
+      {open && tip && createPortal(
+        <div
+          className="gg-cli-hint-tooltip"
+          role="tooltip"
+          style={{
+            top: tip.top,
+            left: tip.left,
+            width: tip.width,
+          }}
+        >
+          {hint}
+        </div>,
+        document.body,
+      )}
+    </>
   )
 }
 

@@ -20,9 +20,8 @@ import { CommandConfirm } from './components/CommandConfirm'
 
 import { UpdateAvailableModal } from './components/UpdateAvailableModal'
 import { WhatsNewModal } from './components/WhatsNewModal'
-import { FilesPanel } from './components/FilesPanel'
 import { SideChat } from './components/SideChat'
-import { OnboardingWizard } from './components/OnboardingWizard'
+import { prefetchDetectedClis } from './lib/prefetch-cli'
 import { ModelRequiredPrompt } from './components/ModelRequiredPrompt'
 import { WindowShell } from './components/TitleBar'
 import { ArtifactPreviewContainer } from './components/ArtifactPreview'
@@ -33,7 +32,8 @@ import { useSkills as useSkillsStore } from './store/skillStore'
 const AUTH_CACHE_KEY = 'gg.auth_completed'
 
 const AuthScreen = lazy(() => import('./components/AuthScreen').then(m => ({ default: m.AuthScreen })))
-const Settings = lazy(() => import('./components/Settings').then(m => ({ default: m.Settings })))
+const settingsImport = () => import('./components/Settings')
+const Settings = lazy(() => settingsImport().then(m => ({ default: m.Settings })))
 const Terminal = lazy(() => import('./components/Terminal').then(m => ({ default: m.Terminal })))
 const BrowserView = lazy(() => import('./components/BrowserView').then(m => ({ default: m.BrowserView })))
 const DesignView = lazy(() => import('./components/DesignView').then(m => ({ default: m.DesignView })))
@@ -45,6 +45,23 @@ const WorkflowsPanel = lazy(() => import('./components/WorkflowsPanel').then(m =
 
 function ViewFallback() {
   return <div className="gg-view-loading" aria-busy="true" />
+}
+
+/** Модальная оболочка настроек — не gg-view-loading в потоке main (серая полоса на полэкрана). */
+function SettingsFallback() {
+  return (
+    <div className="gg-modal-backdrop" aria-busy="true" aria-label="Loading settings">
+      <div className="gg-modal gg-modal-large" onClick={e => e.stopPropagation()}>
+        <div className="gg-modal-header">
+          <div className="gg-boot-line gg-boot-line--short" />
+        </div>
+        <div className="gg-settings-shell">
+          <aside className="gg-settings-nav" aria-hidden />
+          <div className="gg-settings-content" aria-hidden />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 const SIDEBAR_MIN = 200
@@ -66,13 +83,13 @@ export function App() {
   const [settingsInitialTab, setSettingsInitialTab] = useState<'models' | undefined>()
   const [modelPromptRecheck, setModelPromptRecheck] = useState(0)
   const [projectSettingsTarget, setProjectSettingsTarget] = useState<ProjectMeta | null>(null)
-  // Right docked panel: one of terminal / files / sidechat / none (Codex-style selector).
-  const [rightPanel, setRightPanel] = useState<'none' | 'terminal' | 'files' | 'sidechat'>('none')
+  // Right docked panel: terminal or parallel side-chat.
+  const [rightPanel, setRightPanel] = useState<'none' | 'terminal' | 'sidechat'>('none')
   // Lazily-created dedicated side-chat session id. Created on first open of the
   // side-chat panel, reused while the panel stays open within a project.
   const [sideChatId, setSideChatId] = useState<number | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(readSidebarOpen)
-  const [lang, setLang] = useState<Lang>('en')
+  const [lang, setLang] = useState<Lang>('ru')
 
   useEffect(() => {
     window.api.settings.getKey('app_language').then(v => {
@@ -128,24 +145,28 @@ export function App() {
     }
   }, [])
 
-  // Onboarding: показывается при первом запуске пока не помечен completed
-  // в settings. После — больше не появляется.
-  const [showOnboarding, setShowOnboarding] = useState(false)
   useEffect(() => {
     if (!authDone) return
-    void (async () => {
-      try {
-        const done = await window.api.settings.getKey('onboarding_completed')
-        if (!done) setShowOnboarding(true)
-      } catch { /* первый запуск, settings ещё нет */ setShowOnboarding(true) }
-    })()
+    void prefetchDetectedClis()
+    void settingsImport()
   }, [authDone])
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     const stored = parseInt(localStorage.getItem(SIDEBAR_WIDTH_KEY) || '0', 10)
     return stored >= SIDEBAR_MIN && stored <= SIDEBAR_MAX ? stored : SIDEBAR_DEFAULT
   })
   const dragRef = useRef<{ startX: number; startW: number } | null>(null)
-  const { path, activeView, setActiveView, isStreaming, setStreaming, clearPendingWrites, setPendingCommand } = useProject()
+  const { path, activeView, setActiveView, isStreaming, setStreaming, clearPendingWrites, setPendingCommand, setProject } = useProject()
+
+  useEffect(() => {
+    if (!authDone) return
+    const norm = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+    const off = window.api.notify.onOpenProject((projectPath) => {
+      if (!projectPath) return
+      if (path && norm(path) === norm(projectPath)) return
+      void setProject(projectPath)
+    })
+    return off
+  }, [authDone, path, setProject])
   // Panels require an open project (the terminal/file tree are project-scoped).
   const effectiveRightPanel = path ? rightPanel : 'none'
 
@@ -162,8 +183,17 @@ export function App() {
     if (!path) return
     if (sideChatId == null) {
       try {
-        const created = await window.api.chatSessions.create(path, { title: 'Боковой чат' })
+        const currentProvider = await window.api.settings.getKey('provider')
+        const currentModel = currentProvider
+          ? await window.api.settings.getKey(`model_${currentProvider}`)
+          : null
+        const created = await window.api.chatSessions.create(path, {
+          title: t.chat.sideChatTitle,
+          providerId: currentProvider ?? null,
+          model: currentModel ?? null,
+        })
         setSideChatId(created.id)
+        await useProject.getState().refreshChatSessions()
       } catch { return }
     }
     setRightPanel('sidechat')
@@ -320,9 +350,6 @@ export function App() {
                 </div>
               </div>
             )}
-            {effectiveRightPanel === 'files' && (
-              <FilesPanel onClose={() => setRightPanel('none')} />
-            )}
             {effectiveRightPanel === 'sidechat' && sideChatId != null && (
               <SideChat sideChatId={sideChatId} onClose={() => setRightPanel('none')} />
             )}
@@ -384,7 +411,7 @@ export function App() {
         )}
       </main>
       {showSettings && (
-        <Suspense fallback={<ViewFallback />}>
+        <Suspense fallback={<SettingsFallback />}>
           <Settings
             initialTab={settingsInitialTab}
             onClose={() => {
@@ -396,7 +423,7 @@ export function App() {
         </Suspense>
       )}
       <ModelRequiredPrompt
-        active={authDone === true && !showOnboarding && !showSettings}
+        active={authDone === true && !showSettings}
         recheckToken={modelPromptRecheck}
         onOpenModelsSettings={() => {
           setSettingsInitialTab('models')
@@ -410,7 +437,7 @@ export function App() {
           onProjectUpdated={setProjectSettingsTarget}
         />
       )}
-      {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}
+
       <ArtifactPreviewContainer />
       <TerminalErrorToast />
       <DiffView />

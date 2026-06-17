@@ -809,47 +809,96 @@ async function runPlainConversation(
   agentRuns?: AgentRuns,
   runId?: string
 ): Promise<void> {
+  const currentMessages = [...messages]
+  const pendingSupplements: string[] = []
+  registerConversationSupplements(sendId, (text: string) => {
+    pendingSupplements.push(text)
+  })
+  const drainSupplements = (): boolean => {
+    let added = false
+    while (pendingSupplements.length > 0) {
+      const text = pendingSupplements.shift()!
+      currentMessages.push({
+        role: 'user',
+        content: `[Дополнение к текущей задаче]\n${text}`
+      })
+      added = true
+      if (agentRuns && runId) {
+        try { agentRuns.appendEvent(runId, 'user_msg', { detail: text.slice(0, 500) }) } catch { /* best-effort */ }
+      }
+    }
+    return added
+  }
+
   let lastAssistantText = ''
   const sessionUsage: { inputTokens: number; outputTokens: number; cachedInputTokens: number } = {
     inputTokens: 0, outputTokens: 0, cachedInputTokens: 0
   }
   let exitReason: ExitReason = 'completed'
   try {
-    for await (const event of provider.send(messages, [], undefined, signal)) {
+    while (!signal.aborted) {
+      drainSupplements()
+      let roundText = ''
+      let roundHadError = false
+
+      for await (const event of provider.send(currentMessages, [])) {
+        if (signal.aborted) {
+          exitReason = 'aborted'
+          sender.send('ai:event', { id: sendId, event: { type: 'done' } })
+          return
+        }
+        // Accumulate stream into lastAssistantText so journal has a real summary.
+        // CLI providers stream text in chunks via { type: 'text' } — same shape
+        // as API providers.
+        if (event.type === 'text' && typeof event.text === 'string') {
+          roundText += event.text
+          lastAssistantText += event.text
+        } else if (event.type === 'usage' && event.usage) {
+          sessionUsage.inputTokens += event.usage.inputTokens ?? 0
+          sessionUsage.outputTokens += event.usage.outputTokens ?? 0
+          sessionUsage.cachedInputTokens += event.usage.cachedInputTokens ?? 0
+          // Cost guard check — abort если превышен лимит.
+          if (costGuard && providerId) {
+            const check = costGuard.recordAndCheck(
+              providerId, model ?? '', event.usage.inputTokens ?? 0,
+              event.usage.outputTokens ?? 0, event.usage.cachedInputTokens ?? 0
+            )
+            if (check.exceeded) {
+              exitReason = 'error'
+              sender.send('ai:event', { id: sendId, event: { type: 'error', message: check.message ?? 'cost cap exceeded' } })
+              sender.send('ai:event', { id: sendId, event: { type: 'done' } })
+              return
+            }
+          }
+        } else if (event.type === 'error') {
+          exitReason = 'error'
+          roundHadError = true
+        }
+        if (event.type !== 'done') {
+          sender.send('ai:event', { id: sendId, event })
+        }
+        if (event.type === 'done' || event.type === 'error') break
+      }
+
       if (signal.aborted) {
         exitReason = 'aborted'
         sender.send('ai:event', { id: sendId, event: { type: 'done' } })
         return
       }
-      // Accumulate stream into lastAssistantText so journal has a real summary.
-      // CLI providers stream text in chunks via { type: 'text' } — same shape
-      // as API providers.
-      if (event.type === 'text' && typeof event.text === 'string') {
-        lastAssistantText += event.text
-      } else if (event.type === 'usage' && event.usage) {
-        sessionUsage.inputTokens += event.usage.inputTokens ?? 0
-        sessionUsage.outputTokens += event.usage.outputTokens ?? 0
-        sessionUsage.cachedInputTokens += event.usage.cachedInputTokens ?? 0
-        // Cost guard check — abort если превышен лимит.
-        if (costGuard && providerId) {
-          const check = costGuard.recordAndCheck(
-            providerId, model ?? '', event.usage.inputTokens ?? 0,
-            event.usage.outputTokens ?? 0, event.usage.cachedInputTokens ?? 0
-          )
-          if (check.exceeded) {
-            exitReason = 'error'
-            sender.send('ai:event', { id: sendId, event: { type: 'error', message: check.message ?? 'cost cap exceeded' } })
-            sender.send('ai:event', { id: sendId, event: { type: 'done' } })
-            return
-          }
-        }
-      } else if (event.type === 'error') {
-        exitReason = 'error'
+      if (roundHadError) {
+        sender.send('ai:event', { id: sendId, event: { type: 'done' } })
+        return
       }
-      sender.send('ai:event', { id: sendId, event })
-      if (event.type === 'done' || event.type === 'error') return
+
+      if (roundText.trim()) {
+        currentMessages.push({ role: 'assistant', content: roundText })
+      }
+
+      if (!drainSupplements()) {
+        sender.send('ai:event', { id: sendId, event: { type: 'done' } })
+        return
+      }
     }
-    sender.send('ai:event', { id: sendId, event: { type: 'done' } })
   } catch (err) {
     // Smart fallback: если ошибка retriable и есть ещё кандидаты — пробуем.
     if (fallbackOpts && providerId && (fallbackOpts.triedProviders.size - 1) < MAX_FALLBACK_ATTEMPTS) {
@@ -877,6 +926,7 @@ async function runPlainConversation(
     })
     sender.send('ai:event', { id: sendId, event: { type: 'done' } })
   } finally {
+    unregisterConversationSupplements(sendId)
     // Same guarantee as runApiConversation: every exit path writes a journal
     // entry. Skipped when there's no projectPath (background sessions in the
     // future may not have one).

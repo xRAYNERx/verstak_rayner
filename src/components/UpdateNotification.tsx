@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useT } from '../i18n'
 import { semverGt } from '../lib/semver'
 
-type Phase = 'idle' | 'downloading' | 'ready'
+type Phase = 'idle' | 'downloading' | 'ready' | 'error'
 
 interface Props {
   /** Развёрнут ли левый rail — влияет на подпись и ширину. */
@@ -17,6 +17,7 @@ export function UpdateNotification({ railExpanded }: Props) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [version, setVersion] = useState('')
   const [percent, setPercent] = useState(0)
+  const [error, setError] = useState('')
   const [currentVersion, setCurrentVersion] = useState('')
 
   useEffect(() => {
@@ -24,15 +25,24 @@ export function UpdateNotification({ railExpanded }: Props) {
 
     const isNewer = (v?: string) => !!v && !!currentVersion && semverGt(v, currentVersion)
 
-    const apply = (state: { phase: string; version?: string; percent?: number; pendingRelease?: boolean }) => {
+    const apply = (state: { phase: string; version?: string; percent?: number; pendingRelease?: boolean; error?: string }) => {
       if (state.phase === 'downloaded' && state.version && isNewer(state.version)) {
         setVersion(state.version)
         setPhase('ready')
         setPercent(100)
+        setError('')
       } else if (state.phase === 'downloading') {
         if (state.version) setVersion(state.version)
         setPhase('downloading')
-        if (state.percent != null) setPercent(state.percent)
+        setPercent(state.percent ?? 0)
+        setError('')
+      } else if (state.phase === 'error') {
+        if (state.version) setVersion(state.version)
+        setError(state.error || t.settings.updateError)
+        setPhase('error')
+      } else if (state.phase === 'not-available' || state.phase === 'checking' || state.phase === 'idle') {
+        setPhase('idle')
+        setError('')
       }
     }
 
@@ -42,52 +52,64 @@ export function UpdateNotification({ railExpanded }: Props) {
     const offProgress = window.api.updater.onProgress(({ percent: p }) => {
       setPercent(p)
       setPhase('downloading')
+      setError('')
     })
     const offDownloaded = window.api.updater.onDownloaded(({ version: v }) => {
-      if (!isNewer(v)) return
+      if (!isNewer(v)) {
+        setPhase('idle')
+        return
+      }
       setVersion(v)
       setPhase('ready')
       setPercent(100)
+      setError('')
     })
-    const offAvailable = window.api.updater.onAvailable(({ version: v, pendingRelease }) => {
-      if (!pendingRelease) {
-        setVersion(v)
-        setPhase('downloading')
-      }
+    const offNotAvailable = window.api.updater.onNotAvailable(() => {
+      setPhase('idle')
+      setError('')
+    })
+    const offError = window.api.updater.onError(({ error: e }) => {
+      setError(e || t.settings.updateError)
+      setPhase('error')
     })
 
     return () => {
       offState()
       offProgress()
       offDownloaded()
-      offAvailable()
+      offNotAvailable()
+      offError()
     }
-  }, [currentVersion])
+  }, [currentVersion, t.settings.updateError])
 
   if (phase === 'idle') return null
 
   const title =
     phase === 'ready'
       ? t.updates.readyBar.replace('{version}', version)
-      : t.updates.downloadingBar.replace('{version}', version).replace('{percent}', String(percent))
+      : phase === 'error'
+        ? error
+        : t.updates.downloadingBar.replace('{version}', version).replace('{percent}', String(percent))
 
   const label =
     phase === 'ready'
       ? (railExpanded
         ? t.updates.readyBar.replace('{version}', version)
         : t.updates.railReadyShort)
-      : (railExpanded
-        ? t.updates.downloadingBar.replace('{version}', version).replace('{percent}', String(percent))
-        : t.updates.railPercent.replace('{percent}', String(percent)))
+      : phase === 'error'
+        ? (railExpanded ? error : '!')
+        : (railExpanded
+          ? t.updates.downloadingBar.replace('{version}', version).replace('{percent}', String(percent))
+          : t.updates.railPercent.replace('{percent}', String(percent)))
 
   return (
     <div
-      className={`gg-update-rail ${railExpanded ? 'is-expanded' : ''}`}
+      className={`gg-update-rail ${railExpanded ? 'is-expanded' : ''}${phase === 'error' ? ' is-error' : ''}`}
       title={title}
       role="status"
     >
       <div className="gg-update-rail-row">
-        <span className="gg-update-rail-icon" aria-hidden>⬆</span>
+        <span className="gg-update-rail-icon" aria-hidden>{phase === 'error' ? '!' : '⬆'}</span>
         <span className="gg-update-rail-label">{label}</span>
         {phase === 'ready' && (
           <button

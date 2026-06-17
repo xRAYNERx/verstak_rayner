@@ -194,15 +194,14 @@ export function UpdatesSettings() {
             {status === 'checking' ? t.settings.checkingUpdates : t.settings.checkUpdates}
           </button>
           {status === 'current' && <span className="gg-settings-hint">{t.settings.upToDate}</span>}
-          {status === 'available' && remoteVersion && (
-            <span className="gg-settings-hint">{t.settings.updateAvailable.replace('{version}', remoteVersion)}</span>
-          )}
           {status === 'pending' && remoteVersion && (
             <span className="gg-settings-hint">{t.settings.updatePendingRelease.replace('{version}', remoteVersion)}</span>
           )}
-          {status === 'downloading' && remoteVersion && (
+          {(status === 'available' || status === 'downloading') && remoteVersion && (
             <span className="gg-settings-hint">
-              {t.settings.downloadingUpdate.replace('{version}', remoteVersion).replace('{percent}', String(percent))}
+              {t.settings.downloadingUpdate
+                .replace('{version}', remoteVersion)
+                .replace('{percent}', String(status === 'downloading' ? percent : 0))}
             </span>
           )}
           {status === 'ready' && remoteVersion && (
