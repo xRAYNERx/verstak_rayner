@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { compactToolHistory, diffSize } from '../../electron/ai/compact-history'
+import { compactToolHistory, diffSize, smartCompressResult, shouldAutoCompact } from '../../electron/ai/compact-history'
 import type { ChatMessage } from '../../electron/ai/types'
 
 function bigResult(name: string, size: number): ChatMessage {
@@ -95,5 +95,46 @@ describe('compactToolHistory', () => {
     const stats = diffSize(msgs, out)
     expect(stats.savedChars).toBeGreaterThan(20_000)
     expect(stats.pct).toBeGreaterThan(30)
+  })
+})
+
+describe('smartCompressResult — жёсткий потолок по символам', () => {
+  // keepTail: однострочный run_command (curl/минифицированный JSON/base64) без
+  // переносов раньше обходил FRESH_RESULT_HARD_CAP целиком (push-then-check).
+  it('keepTail режет однострочный run_command без \\n до max', () => {
+    expect(smartCompressResult('run_command', 'A'.repeat(100_000), 12_000).length).toBeLessThanOrEqual(12_000)
+    expect(smartCompressResult('run_command', 'short\n' + 'B'.repeat(50_000), 12_000).length).toBeLessThanOrEqual(12_000)
+  })
+
+  it('capFreshResults (production path) режет жирный однострочный run_command', () => {
+    const out = compactToolHistory(
+      [{ role: 'user', content: '', toolResults: [{ id: 'x', name: 'run_command', result: 'A'.repeat(100_000) }] }],
+      0,
+    )
+    expect((out[0].toolResults![0].result as string).length).toBeLessThanOrEqual(12_000)
+  })
+
+  // truncateList: немного длинных строк раньше давали вывод БОЛЬШЕ входа и
+  // отрицательный счётчик "(-147 more results)".
+  it('truncateList не раздувает вывод и не печатает отрицательный счётчик', () => {
+    const fewLong = ['A'.repeat(5000), 'B'.repeat(5000), 'C'.repeat(5000)].join('\n')
+    const out = smartCompressResult('list_directory', fewLong, 12_000)
+    expect(out.length).toBeLessThanOrEqual(12_000)
+    expect(out).not.toMatch(/-\d+ more results/)
+  })
+})
+
+describe('shouldAutoCompact — учёт args tool-вызовов', () => {
+  it('считает полное содержимое файла в args write_file/apply_patch', () => {
+    const msgs: ChatMessage[] = []
+    for (let i = 0; i < 9; i++) msgs.push({ role: 'assistant', content: '' })
+    msgs.push({
+      role: 'assistant',
+      content: '',
+      toolCalls: [{ id: 'w1', name: 'write_file', args: { path: 'big.ts', content: 'A'.repeat(40_000) } }],
+    })
+    // moonshot-v1-8k: лимит 8000, порог 0.95 → 7600 токенов. 40000 симв args = 10000 токенов.
+    // Без учёта args estimateTotalTokens ≈ 0 → false; с учётом → true.
+    expect(shouldAutoCompact(msgs, 'moonshot-v1-8k')).toBe(true)
   })
 })

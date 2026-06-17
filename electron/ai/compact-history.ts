@@ -69,14 +69,23 @@ function keepTail(text: string, max: number): string {
     len += lines[i].length + 1
   }
   const omitted = lines.length - result.length
-  return omitted > 0 ? `(${omitted} lines omitted)\n` + result.join('\n') : result.join('\n')
+  const marker = omitted > 0 ? `(${omitted} lines omitted)\n` : ''
+  // Жёсткий потолок по символам: одна гигантская строка без переносов
+  // (curl, минифицированный JSON, base64) иначе попадает в result целиком
+  // и обходит max (push-then-check в цикле выше).
+  const budget = Math.max(0, max - marker.length)
+  const body = result.join('\n')
+  return marker + (body.length > budget ? body.slice(body.length - budget) : body)
 }
 
 function truncateList(text: string, max: number): string {
   if (text.length <= max) return text
   const lines = text.split('\n').filter(l => l.trim())
-  const keepN = Math.max(10, Math.floor(max / 80))
-  return lines.slice(0, keepN).join('\n') + `\n... (${lines.length - keepN} more results)`
+  const keepN = Math.min(lines.length, Math.max(10, Math.floor(max / 80)))
+  const remaining = lines.length - keepN
+  const kept = lines.slice(0, keepN).join('\n') + (remaining > 0 ? `\n... (${remaining} more results)` : '')
+  // Немного очень длинных строк сами по себе превышают max — финальный потолок.
+  return kept.length > max ? truncateWithContext(kept, max) : kept
 }
 
 /**
@@ -186,6 +195,13 @@ function estimateTotalTokens(messages: ChatMessage[]): number {
   let total = 0
   for (const m of messages) {
     total += estimateTokens(m.content ?? '')
+    if (m.toolCalls) {
+      // args write_file/apply_patch несут полное содержимое файла — без их учёта
+      // shouldAutoCompact недосчитывает и не срабатывает вовремя.
+      for (const c of m.toolCalls) {
+        total += estimateTokens(c.name + JSON.stringify(c.args ?? {}))
+      }
+    }
     if (m.toolResults) {
       for (const r of m.toolResults) {
         const raw = typeof r.result === 'string' ? r.result : JSON.stringify(r.result)
