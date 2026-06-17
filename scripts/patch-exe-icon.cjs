@@ -9,6 +9,13 @@ const path = require('path')
 const fs = require('fs')
 const rcedit = require('rcedit')
 
+const WIN_VERSION_STRINGS = {
+  FileDescription: 'VERSTAK',
+  ProductName: 'VERSTAK',
+  InternalName: 'VERSTAK',
+  OriginalFilename: 'Verstak.exe',
+}
+
 async function patchExeIcon(exePath, icoPath) {
   if (!fs.existsSync(exePath)) {
     throw new Error(`exe not found: ${exePath}`)
@@ -16,8 +23,11 @@ async function patchExeIcon(exePath, icoPath) {
   if (!fs.existsSync(icoPath)) {
     throw new Error(`ico not found: ${icoPath}`)
   }
-  await rcedit(exePath, { icon: icoPath })
-  console.log('OK: icon →', exePath)
+  await rcedit(exePath, {
+    icon: icoPath,
+    'version-string': WIN_VERSION_STRINGS,
+  })
+  console.log('OK: icon + metadata →', exePath)
 }
 
 /** @param {import('app-builder-lib').AfterPackContext} context */

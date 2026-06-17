@@ -11,7 +11,27 @@ import { useT } from '../i18n'
 const RAIL_EXPANDED_KEY = 'gg-rail-expanded'
 const RAIL_WIDTH_COLLAPSED = '76px'
 const RAIL_WIDTH_EXPANDED = '248px'
-const SHELL_MS = 280
+
+/**
+ * ═══ КОНТРАКТ АНИМАЦИИ RAIL — ЗАМОРОЖЕН 17.06.2026 (RAYNER: «тупо топ») ═══
+ * Не менять без ручной проверки открытия И закрытия.
+ *
+ * Единственный переключатель: railExpanded (кнопка-шеврон в toolbar).
+ *
+ * Открытие и закрытие СИММЕТРИЧНЫ:
+ *   railExpanded меняется → в том же тике React:
+ *     • useEffect → shellExpanded + contentExpanded = railExpanded (без setTimeout/rAF-очередей)
+ *     • useEffect → --gg-rail-w = 248px | 76px на documentElement
+ *   Вся плавность — только CSS: --shell-dur (280ms), --shell-ease в layout.css.
+ *
+ * Группы и «Скрытые»: expanded = contentExpanded && localOpen — при свёрнутом rail
+ *   папки визуально закрыты; состояние в БД / hiddenOpen не сбрасываем.
+ *
+ * ЗАПРЕЩЕНО: staged setTimeout между shell/content/шириной; разная логика open vs close;
+ *   анимировать ширину в JS; отдельные transition-duration для open/close.
+ *
+ * Skill: .grok/skills/verstak/SKILL.md → «Контракт анимации rail».
+ */
 
 function readRailExpanded(): boolean {
   try {
@@ -33,7 +53,8 @@ function buildRailView(
   query: string,
   activePath: string | null
 ): RailView {
-  const byPath = new Map(projects.map(p => [p.path, p]))
+  const visibleProjects = projects.filter(p => !p.hidden)
+  const byPath = new Map(visibleProjects.map(p => [p.path, p]))
   const inGroup = new Set<string>()
   for (const g of groups) {
     for (const path of g.projectPaths) inGroup.add(path)
@@ -60,7 +81,7 @@ function buildRailView(
     return []
   })
 
-  let ungrouped = projects.filter(p => !inGroup.has(p.path))
+  let ungrouped = visibleProjects.filter(p => !inGroup.has(p.path))
   if (q) {
     ungrouped = ungrouped.filter(
       p => p.name.toLowerCase().includes(q) || p.path.toLowerCase().includes(q)
@@ -68,6 +89,10 @@ function buildRailView(
   }
 
   if (activePath) {
+    const activeMeta = projects.find(p => p.path === activePath)
+    if (activeMeta?.hidden) {
+      return { groups: visibleGroups, ungrouped, visibleCount: countVisible(visibleGroups, ungrouped) }
+    }
     const inVisible = ungrouped.some(p => p.path === activePath)
       || visibleGroups.some(v => v.projects.some(p => p.path === activePath))
     if (!inVisible) {
@@ -318,6 +343,14 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
     () => buildRailView(projectGroups, projectList, projectQuery, path),
     [projectGroups, projectList, projectQuery, path]
   )
+  const hiddenProjects = useMemo(
+    () => projectList.filter(p => p.hidden),
+    [projectList]
+  )
+  const [hiddenOpen, setHiddenOpen] = useState(false)
+  useEffect(() => {
+    if (path && hiddenProjects.some(p => p.path === path)) setHiddenOpen(true)
+  }, [path, hiddenProjects])
   const showSearch = projectList.length >= 2
   const hasActiveFilter = projectQuery.trim().length > 0
   const showSearchTool = !contentExpanded && showSearch
@@ -335,21 +368,18 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
   }
 
   useEffect(() => {
-    document.documentElement.style.setProperty('--gg-rail-w', railExpanded ? RAIL_WIDTH_EXPANDED : RAIL_WIDTH_COLLAPSED)
+    document.documentElement.style.setProperty(
+      '--gg-rail-w',
+      railExpanded ? RAIL_WIDTH_EXPANDED : RAIL_WIDTH_COLLAPSED
+    )
     try {
       localStorage.setItem(RAIL_EXPANDED_KEY, railExpanded ? '1' : '0')
     } catch { /* ignore */ }
   }, [railExpanded])
 
   useEffect(() => {
-    if (railExpanded) {
-      setShellExpanded(true)
-      setContentExpanded(true)
-      return
-    }
-    setContentExpanded(false)
-    const shellId = window.setTimeout(() => setShellExpanded(false), SHELL_MS)
-    return () => clearTimeout(shellId)
+    setShellExpanded(railExpanded)
+    setContentExpanded(railExpanded)
   }, [railExpanded])
 
   useEffect(() => {
@@ -537,6 +567,49 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
             />
           )
         })}
+        {hiddenProjects.length > 0 && (() => {
+          const hiddenExpanded = contentExpanded && hiddenOpen
+          return (
+          <div className={`gg-rail-hidden ${hiddenExpanded ? 'is-open' : ''} ${contentExpanded ? 'is-expanded' : ''}`}>
+            <button
+              type="button"
+              className="gg-rail-hidden-toggle"
+              onClick={() => {
+                if (!contentExpanded) {
+                  setRailExpanded(true)
+                  return
+                }
+                setHiddenOpen(v => !v)
+              }}
+              title={contentExpanded
+                ? t.rail.hiddenProjects
+                : `${t.rail.hiddenProjects} (${hiddenProjects.length})`}
+              aria-expanded={hiddenExpanded}
+            >
+              <span className={`gg-rail-group-chevron ${hiddenExpanded ? 'is-open' : ''}`} aria-hidden>›</span>
+              <span className="gg-rail-hidden-label" aria-hidden={!contentExpanded}>{t.rail.hiddenProjects}</span>
+              <span className="gg-rail-hidden-count" aria-hidden={!contentExpanded}>{hiddenProjects.length}</span>
+            </button>
+            {hiddenExpanded && hiddenProjects.map(p => {
+              const session = sessions[p.path]
+              return (
+                <ProjectChip
+                  key={p.path}
+                  project={p}
+                  active={path === p.path}
+                  unread={!!session?.hasUnread}
+                  streaming={!!session?.isStreaming}
+                  shellExpanded={shellExpanded}
+                  contentExpanded={contentExpanded}
+                  nested
+                  onClick={() => { if (path !== p.path) void setProject(p.path) }}
+                  onSettings={() => onOpenProjectSettings(p)}
+                />
+              )
+            })}
+          </div>
+          )
+        })()}
         <button
           type="button"
           className="gg-rail-add"

@@ -1,4 +1,11 @@
 /* ─── App shell ─── */
+/*
+ * Rail animation contract (frozen 17.06.2026 — do not break):
+ * Ширина колонки — @property --gg-rail-w на html (transition ниже).
+ * JS (ProjectRail.tsx) выставляет 76px|248px синхронно с railExpanded.
+ * Визуал rail (padding, labels, chips, footer) — transition на --shell-dur/--shell-ease.
+ * Не добавлять отдельные тайминги open/close; не анимировать ширину из JS.
+ */
 @property --gg-rail-w {
   syntax: '<length>';
   inherits: true;
@@ -605,8 +612,9 @@ html {
   padding: 4px 2px 6px 0;
   gap: 5px;
   scrollbar-gutter: auto;
-  flex: 0 1 auto;
-  overflow-y: visible;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 .gg-rail.is-shell-expanded .gg-rail-list {
   align-items: stretch;
@@ -976,6 +984,27 @@ html {
   color: var(--text-tertiary); font-size: 11px;
   line-height: 1.4;
   flex: 1 1 100%;
+}
+.gg-ps-section-hint-block {
+  margin: 0 0 10px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+.gg-ps-toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+.gg-ps-toggle-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 .gg-ps-path {
   display: flex; align-items: center; gap: 8px;
@@ -1491,35 +1520,83 @@ html {
   background: var(--accent-muted);
   transform: translateY(-1px);
 }
+.gg-rail-hidden {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed color-mix(in srgb, var(--border-subtle) 70%, transparent);
+}
+.gg-rail-hidden-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+.gg-rail:not(.is-expanded) .gg-rail-hidden .gg-rail-chip {
+  display: none !important;
+}
+.gg-rail:not(.is-expanded) .gg-rail-hidden {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+.gg-rail-hidden-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+.gg-rail-hidden-label {
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gg-rail:not(.is-expanded) .gg-rail-hidden-label,
+.gg-rail:not(.is-expanded) .gg-rail-hidden-count {
+  display: none;
+}
+.gg-rail-hidden-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-disabled);
+}
 .gg-rail-footer {
   flex-shrink: 0;
   width: 100%;
   margin-top: auto;
-  padding: 10px 0 2px;
+  padding: 8px 0 2px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   align-items: stretch;
-  border-top: 1px solid color-mix(in srgb, var(--border-subtle) 80%, transparent);
-}
-.gg-rail:not(.is-expanded) .gg-rail-expand-panel {
-  display: none;
-  height: 0;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-}
-.gg-rail:not(.is-shell-expanded) .gg-rail-expand-panel {
-  display: none;
+  border-top: none;
+  background: transparent;
+  box-shadow: none;
 }
 .gg-rail:not(.is-expanded) .gg-rail-footer,
 .gg-rail:not(.is-shell-expanded) .gg-rail-footer {
   align-items: center;
-  border-top: none;
-  padding-top: 0;
-  margin-top: 0;
+  padding-top: 4px;
   gap: 6px;
+}
+.gg-rail:not(.is-expanded) .gg-update-rail {
+  border-color: transparent;
   background: transparent;
+}
+.gg-rail:not(.is-expanded) .gg-update-rail-track {
+  display: none;
 }
 .gg-rail:not(.is-expanded) .gg-rail-add {
   width: 36px;
@@ -1532,9 +1609,6 @@ html {
   width: 40px;
   padding: 4px;
   margin: 0 auto;
-}
-.gg-rail:not(.is-expanded) .gg-update-rail-track {
-  margin-top: 3px;
 }
 .gg-rail-app-settings {
   flex-shrink: 0;
@@ -1571,6 +1645,14 @@ html {
     color 150ms ease,
     border-color 150ms ease,
     transform 150ms ease;
+}
+.gg-rail:not(.is-shell-expanded) .gg-rail-app-settings {
+  width: 40px;
+  min-width: 40px;
+  max-width: 40px;
+  padding: 0;
+  gap: 0;
+  justify-content: center;
 }
 .gg-rail-app-settings:hover {
   color: var(--text-primary);
@@ -1966,6 +2048,9 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 .gg-settings-extra {
   padding: 14px 22px 4px;
   border-top: 1px solid var(--border-subtle);
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .gg-settings-section-title {
   font-size: var(--text-xs);
@@ -2829,7 +2914,22 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 }
 .gg-settings-nav-icon { width: 16px; text-align: center; opacity: 0.85; display: flex; align-items: center; justify-content: center; }
 .gg-settings-nav-icon svg { vertical-align: middle; }
-.gg-settings-content { flex: 1; overflow-y: auto; }
+.gg-settings-content {
+  flex: 1;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+/* Settings: плоские кнопки без accent-glow */
+.gg-settings-shell .gg-btn-primary,
+.gg-settings-shell .gg-btn-primary:hover,
+.gg-settings-shell .gg-btn-primary:active,
+html.gg-atelier .gg-settings-shell .gg-btn-primary,
+html.gg-atelier .gg-settings-shell .gg-btn-primary:hover,
+.gg-app-atelier .gg-settings-shell .gg-btn-primary,
+.gg-app-atelier .gg-settings-shell .gg-btn-primary:hover {
+  box-shadow: var(--shadow-sm);
+}
 .gg-settings-page-title {
   font-size: 18px;
   font-weight: 600;
@@ -3445,6 +3545,41 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 .gg-composer-meta > * > button,
 .gg-composer-meta .gg-composer-meta-cluster > * > button {
   min-height: 28px;
+}
+.gg-composer-meta .gg-usage-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 11px;
+  box-sizing: border-box;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1;
+  flex-shrink: 0;
+  margin: 0;
+}
+.gg-composer-meta .gg-usage-pill.is-preview {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
+  background: color-mix(in srgb, var(--accent-muted) 45%, var(--bg-base));
+}
+.gg-composer-meta .gg-usage-pill.is-preview.is-cost-hint {
+  padding: 0 8px;
+  min-width: 0;
+}
+.gg-usage-meter-icon {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.gg-usage-meter-label {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* Единый стиль чипов: Инструменты · Режим · Модель (автопрокрутка — отдельно). */
@@ -7055,14 +7190,16 @@ textarea.gg-input {
 }
 .gg-connector-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin: 16px 0;
+  max-width: 100%;
 }
 .gg-connector-card {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
   padding: 14px 16px;
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
@@ -7137,6 +7274,10 @@ textarea.gg-input {
   border-radius: 10px;
   padding: 20px;
   margin-top: 8px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
   background: var(--bg-raised, var(--bg-surface));
 }
 .gg-connector-detail-header {
@@ -8661,55 +8802,64 @@ textarea.gg-input {
 /* === Tier Recommendation === */
 /* Pill рядом с ModelPicker в тулбаре composer'а: рекомендует тир+провайдера+модель
    под текст задачи. Рекомендация, не autopilot — переключает только «применить». */
-.gg-tier-rec {
-  display: inline-flex;
+.gg-composer-meta .gg-tier-rec {
+  cursor: default;
+  min-width: 0;
+  max-width: min(320px, 100%);
+  gap: 5px;
+  padding-right: 4px;
+  overflow: hidden;
   align-items: center;
-  gap: 6px;
-  border: 1px solid var(--border-default);
-  border-radius: 999px;
-  padding: 2px 4px 2px 9px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.01em;
-  background: var(--bg-elevated);
   animation: gg-fade-in 140ms ease-out;
-  max-width: 280px;
+}
+.gg-composer-meta .gg-tier-rec.tier-cheap {
+  border-color: color-mix(in srgb, var(--success) 45%, var(--border-subtle));
+}
+.gg-composer-meta .gg-tier-rec.tier-frontier {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-subtle));
+}
+.gg-composer-meta .gg-tier-rec.tier-private {
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--border-subtle));
 }
 .gg-tier-rec-text {
+  flex: 1 1 auto;
+  min-width: 0;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-/* Тиры: эконом = зелёный, топ = акцент, приватно = янтарный. */
-.gg-tier-rec.tier-cheap    { border-color: var(--success); }
-.gg-tier-rec.tier-cheap    .gg-tier-rec-text { color: var(--success); }
-.gg-tier-rec.tier-frontier { border-color: var(--accent-border); }
-.gg-tier-rec.tier-frontier .gg-tier-rec-text { color: var(--accent); }
-.gg-tier-rec.tier-private  { border-color: var(--warning); }
-.gg-tier-rec.tier-private  .gg-tier-rec-text { color: var(--warning); }
-.gg-tier-rec-apply {
-  border: none;
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
   font-weight: 500;
-  cursor: pointer;
-  background: var(--accent-muted);
-  color: var(--accent);
-  transition: all 120ms ease;
-  white-space: nowrap;
 }
-.gg-tier-rec-apply:hover {
-  background: var(--accent);
-  color: #fff;
+.gg-composer-meta .gg-tier-rec .gg-tier-rec-apply {
+  align-self: center;
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, var(--border-default) 55%, var(--border-subtle));
+  border-radius: var(--radius-sm);
+  height: 18px;
+  min-height: 18px;
+  padding: 0 7px;
+  margin: 0;
+  font-family: inherit;
+  font-size: 9.5px;
+  font-weight: 600;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--bg-hover) 40%, var(--bg-base));
+  color: color-mix(in srgb, var(--text-primary) 18%, var(--text-secondary));
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+  white-space: nowrap;
+  line-height: 18px;
+  box-sizing: border-box;
+}
+.gg-composer-meta .gg-tier-rec .gg-tier-rec-apply:hover {
+  background: color-mix(in srgb, var(--bg-hover) 65%, var(--bg-base));
+  border-color: var(--border-default);
+  color: var(--text-primary);
 }
 .gg-tier-rec-ok {
   color: var(--success);
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
-  padding-right: 4px;
+  flex-shrink: 0;
 }
 
 /* === Provider Health Matrix === */

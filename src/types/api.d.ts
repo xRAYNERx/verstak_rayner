@@ -50,6 +50,7 @@ export interface ProjectMeta {
   color: string
   iconPath: string | null
   lastOpenedAt: number
+  hidden: boolean
 }
 
 export interface ProjectGroup {
@@ -132,7 +133,7 @@ declare global {
         setCurrent: (path: string | null) => Promise<void>
         list: () => Promise<ProjectMeta[]>
         rename: (path: string, name: string) => Promise<void>
-        updateMeta: (path: string, patch: { name?: string }) => Promise<ProjectMeta | null>
+        updateMeta: (path: string, patch: { name?: string; hidden?: boolean }) => Promise<ProjectMeta | null>
         pickIcon: (path: string) => Promise<ProjectMeta | null>
         clearIcon: (path: string) => Promise<ProjectMeta | null>
         remove: (path: string, options?: { deleteData?: boolean }) => Promise<{ ok: boolean; error?: string }>

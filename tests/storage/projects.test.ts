@@ -58,6 +58,18 @@ describe('projects', () => {
     expect(projects.list().map(p => p.name)).toEqual(['Автор', 'ГК Остов', 'Alpha'])
   })
 
+  it('updateMeta can hide and unhide a project', () => {
+    db = openDb(join(dir, 't5.db'))
+    const projects = createProjects(db)
+    projects.upsert('C:\\Clients\\Hidden')
+    expect(projects.list()[0].hidden).toBe(false)
+    const hidden = projects.updateMeta('C:\\Clients\\Hidden', { hidden: true })
+    expect(hidden?.hidden).toBe(true)
+    expect(projects.list()[0].hidden).toBe(true)
+    const visible = projects.updateMeta('C:\\Clients\\Hidden', { hidden: false })
+    expect(visible?.hidden).toBe(false)
+  })
+
   it('updateMeta renames and stores icon path without touching folder', () => {
     db = openDb(join(dir, 't2.db'))
     const projects = createProjects(db)

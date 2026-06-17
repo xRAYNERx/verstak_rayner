@@ -69,12 +69,12 @@ export function TierRecommendation({ input }: Props) {
   const isCurrent = rec.providerId === provider.id && rec.model === provider.model
 
   return (
-    <div className={`gg-tier-rec tier-${rec.tier}`} title={rec.reason}>
+    <div className={`gg-tier-rec gg-tools-pill tier-${rec.tier}`} title={rec.reason}>
       <span className="gg-tier-rec-text">
-        💡 {TIER_LABEL[rec.tier]}: {rec.providerId} · {shortModel(rec.model)}
+        💡 {TIER_LABEL[rec.tier]} · {shortModel(rec.model)}
       </span>
       {isCurrent ? (
-        <span className="gg-tier-rec-ok" title={rec.reason}>✓ уже оптимально</span>
+        <span className="gg-tier-rec-ok" title={rec.reason}>✓</span>
       ) : (
         <button
           type="button"

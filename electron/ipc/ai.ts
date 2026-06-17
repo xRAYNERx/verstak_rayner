@@ -993,17 +993,27 @@ async function runApiConversation(
   registerConversationSupplements(sendId, (text: string) => {
     pendingSupplements.push(text)
   })
-  const drainSupplements = () => {
+  const drainSupplements = (): boolean => {
+    let added = false
     while (pendingSupplements.length > 0) {
       const text = pendingSupplements.shift()!
       currentMessages.push({
         role: 'user',
         content: `[Дополнение к текущей задаче]\n${text}`
       })
+      added = true
       if (agentRuns && runId) {
         try { agentRuns.appendEvent(runId, 'user_msg', { detail: text.slice(0, 500) }) } catch { /* best-effort */ }
       }
     }
+    return added
+  }
+  const continueAfterPlainReply = (text: string): boolean => {
+    if (text.trim()) {
+      currentMessages.push({ role: 'assistant', content: text })
+      lastAssistantText = text
+    }
+    return drainSupplements()
   }
   // Loop detection: per-signature occurrence counter across the whole agent
   // loop. We block when a single tool+args combination has been called 3 times
@@ -1129,6 +1139,10 @@ async function runApiConversation(
         }
       } else if (event.type === 'done') {
         if (toolCalls.length === 0) {
+          if (continueAfterPlainReply(assistantText)) {
+            assistantText = ''
+            continue
+          }
           exitReason = 'completed'
           sender.send('ai:event', { id: sendId, event })
           // Cross-verify: запускаем асинхронно ПОСЛЕ отправки done,
@@ -1143,6 +1157,10 @@ async function runApiConversation(
       }
     }
     if (toolCalls.length === 0) {
+      if (continueAfterPlainReply(assistantText)) {
+        assistantText = ''
+        continue
+      }
       exitReason = 'completed'
       sender.send('ai:event', { id: sendId, event: { type: 'done' } })
       // Cross-verify: запускаем асинхронно ПОСЛЕ отправки done.

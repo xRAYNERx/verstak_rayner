@@ -67,6 +67,14 @@ function detectErrorInBuffer(buf: string): DetectedError | null {
   return null
 }
 
+export function killAllTerminalSessions(): void {
+  for (const [id, p] of [...sessions.entries()]) {
+    try { p.kill() } catch { /* already dead */ }
+    sessions.delete(id)
+    errBuffers.delete(id)
+  }
+}
+
 export function registerTerminalIpc(getKnownRoots: () => string[] = () => []): void {
   ipcMain.handle('term:spawn', (e, cwd: string) => {
     const win = BrowserWindow.fromWebContents(e.sender)
