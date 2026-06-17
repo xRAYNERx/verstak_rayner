@@ -696,15 +696,19 @@ export function applySearchReplaceBlocks(input: string, diff: string, anchorHash
       // reconstruction that was unreliable on \r\n files and mixed tabs/spaces).
       const stripTrailing = (s: string) => s.replace(/\r\n/g, '\n').split('\n').map(l => l.replace(/[\t ]+$/, '')).join('\n')
       const normSearch = stripTrailing(search)
-      const normResult = stripTrailing(result)
+      // Нормализуем result С КАРТОЙ позиций обратно в оригинал: splice'им только
+      // matched-регион, а не переписываем весь файл из normResult — иначе нетронутые
+      // строки теряли \r (CRLF→LF) и trailing whitespace (#5 data-loss на CRLF-проекте).
+      const { norm: normResult, pos } = stripTrailingWithMap(result)
       const normFirst = normResult.indexOf(normSearch)
       if (normFirst !== -1) {
         const normNext = normResult.indexOf(normSearch, normFirst + 1)
         if (normNext !== -1) {
           throw new Error(`apply_patch: SEARCH блок #${applied + 1} после нормализации whitespace встречается несколько раз (позиции ${normFirst} и ${normNext}). Добавь контекста.`)
         }
-        // Operate on the normalized content — single safe substitution.
-        result = normResult.slice(0, normFirst) + replace + normResult.slice(normFirst + normSearch.length)
+        const origStart = pos[normFirst]
+        const origEnd = pos[normFirst + normSearch.length]
+        result = result.slice(0, origStart) + replace + result.slice(origEnd)
         applied++
         continue
       }
@@ -726,6 +730,32 @@ export function applySearchReplaceBlocks(input: string, diff: string, anchorHash
     throw new Error('apply_patch: в diff не найдено ни одного валидного SEARCH/REPLACE блока. Формат: <<<<<<< SEARCH ... ======= ... >>>>>>> REPLACE')
   }
   return result
+}
+
+/**
+ * Аналог stripTrailing (\r\n→\n + срез trailing [\t ] на каждой строке), но с
+ * картой `pos`: pos[k] = индекс в ОРИГИНАЛЕ символа, ставшего norm[k] (pos[norm.length]
+ * = длина оригинала). Позволяет whitespace-fallback'у apply_patch заменить только
+ * matched-регион, сохранив байты (CRLF/trailing ws) на остальных строках.
+ */
+function stripTrailingWithMap(s: string): { norm: string; pos: number[] } {
+  const out: string[] = []
+  const pos: number[] = []
+  let pending: Array<{ c: string; at: number }> = []
+  let i = 0
+  const n = s.length
+  while (i < n) {
+    let ch = s[i]
+    let at = i
+    if (ch === '\r' && s[i + 1] === '\n') { ch = '\n'; at = i + 1; i += 2 } else { i += 1 }
+    if (ch === '\t' || ch === ' ') { pending.push({ c: ch, at }); continue }
+    if (ch === '\n') { pending = []; out.push('\n'); pos.push(at); continue }
+    for (const w of pending) { out.push(w.c); pos.push(w.at) }
+    pending = []
+    out.push(ch); pos.push(at)
+  }
+  pos.push(n) // sentinel: позиция за концом
+  return { norm: out.join(''), pos }
 }
 
 // safeJoin / safeRealJoin moved to ./path-policy.ts — see import above.

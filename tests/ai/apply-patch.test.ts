@@ -117,4 +117,17 @@ x = 99
 >>>>>>> REPLACE`
     expect(() => applySearchReplaceBlocks(before, diff)).toThrow(/несколько раз/)
   })
+
+  // #5: whitespace-fallback раньше переписывал ВЕСЬ файл из normResult → нетронутые
+  // строки теряли \r (CRLF→LF) и trailing whitespace. На CRLF-проекте (норма здесь)
+  // любой patch с LF-SEARCH срабатывал по fallback и корраптил весь файл.
+  it('whitespace fallback НЕ трогает нетронутые строки (CRLF + trailing ws сохранены)', () => {
+    const before = 'header   \r\nfunction foo() {\r\n  return 1;\r\n}\r\nfooter   \r\n'
+    const diff = '<<<<<<< SEARCH\nfunction foo() {\n  return 1;\n}\n=======\nfunction foo() {\n  return 42;\n}\n>>>>>>> REPLACE'
+    const after = applySearchReplaceBlocks(before, diff)
+    expect(after).toContain('return 42')
+    expect(after).toContain('header   \r\n')  // \r и trailing-пробелы нетронутой строки сохранены
+    expect(after).toContain('footer   \r\n')
+    expect(after).not.toContain('return 1;')
+  })
 })
