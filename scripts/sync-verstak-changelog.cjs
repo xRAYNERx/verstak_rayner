@@ -13,6 +13,17 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: 'bce8d3b',
+    deployed: '18.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Справка: режим План и без инструментов',
+    changes: [
+      'В «?» режим агента зафиксирован на «План» — pill не кликается, Shift+Tab не переключает.',
+      'Меню «Инструменты» скрыто в справке; slash-команды только /help (verstak-guide).',
+      'Отправка из справки: noTools + agentMode plan на бэкенде; глобальный режим проекта не трогаем.',
+    ],
+  },
+  {
     commit: '73cfdf7',
     deployed: '18.06.2026',
     treeVersion: '1.5.5',
