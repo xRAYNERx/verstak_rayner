@@ -40,6 +40,11 @@ import {
   type PendingSupplementStatus,
   type QueuedComposerMessage,
 } from '../lib/composer-streaming'
+import {
+  blobToAttachment,
+  CHAT_FILE_ACCEPT,
+  isLegacyDoc,
+} from '../lib/chat-attachments'
 
 function normalizeProjectPath(p: string): string {
   return p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
@@ -64,8 +69,6 @@ function readAutoScrollPref(): boolean {
   } catch { /* private mode */ }
   return true
 }
-
-const ACCEPTED_MIME_PREFIXES = ['image/', 'text/', 'application/pdf', 'application/json']
 
 type RightPanel = 'none' | 'terminal' | 'sidechat'
 
@@ -104,27 +107,6 @@ function TokenPreviewMeter({ tokens, exact, title }: { tokens: number; exact: bo
       <span className="gg-usage-meter-label">{exact ? '' : '≈'}{formatTokens(tokens)}</span>
     </span>
   )
-}
-
-function isAcceptable(mime: string): boolean {
-  return ACCEPTED_MIME_PREFIXES.some(p => mime.startsWith(p))
-}
-
-async function blobToAttachment(blob: Blob, fallbackName: string): Promise<Attachment | null> {
-  if (blob.size > MAX_BYTES_PER_FILE) return null
-  const mimeType = blob.type || 'application/octet-stream'
-  if (!isAcceptable(mimeType)) return null
-  const buffer = await blob.arrayBuffer()
-  const bytes = new Uint8Array(buffer)
-  let binary = ''
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-  const data = btoa(binary)
-  return {
-    name: (blob as File).name || fallbackName,
-    mimeType,
-    data,
-    size: blob.size
-  }
 }
 
 /**
@@ -227,11 +209,15 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         flashWarning(`Можно прикрепить максимум ${MAX_ATTACHMENTS} файлов`)
         break
       }
+      if (isLegacyDoc(nameHint)) {
+        flashWarning(`${nameHint}: старый .doc не поддерживается — сохраните как .docx`)
+        continue
+      }
       if (blob.size > MAX_BYTES_PER_FILE) {
         flashWarning(`${nameHint}: больше ${formatSize(MAX_BYTES_PER_FILE)}, пропущен`)
         continue
       }
-      const att = await blobToAttachment(blob, nameHint)
+      const att = await blobToAttachment(blob, nameHint, MAX_BYTES_PER_FILE)
       if (!att) {
         flashWarning(`${nameHint}: формат не поддерживается, пропущен`)
         continue
@@ -1636,7 +1622,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
             type="file"
             multiple
             style={{ display: 'none' }}
-            accept="image/*,application/pdf,text/*,.json,.md,.csv"
+            accept={CHAT_FILE_ACCEPT}
             onChange={onFilesPicked}
           />
         </div>

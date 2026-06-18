@@ -23,6 +23,7 @@ import { estimateComplexity, recommendModel, complexityLabel } from '../ai/smart
 import { type ExitReason, callSignature, detectVerifyScriptsForHint, writeSessionJournal } from '../ai/session-journal'
 import type { AgentRuns, AgentRunOwner, AgentRunStatus } from '../storage/agent-runs'
 import { pickResumeGuardTool } from '../storage/agent-runs'
+import { expandOfficeAttachments } from '../ai/attachment-text'
 
 export type { ProviderId } from '../ai/registry'
 
@@ -246,7 +247,8 @@ export function registerAiIpc(deps: AiDeps): void {
     effortLevel?: 'quick' | 'standard' | 'deep'
   }
 
-  ipcMain.handle('ai:send', async (e, messages: ChatMessage[], projectPath: string | null, budget?: number, overrides?: AiSendOverrides, chatId?: string) => {
+  ipcMain.handle('ai:send', async (e, incomingMessages: ChatMessage[], projectPath: string | null, budget?: number, overrides?: AiSendOverrides, chatId?: string) => {
+    const messages = await expandOfficeAttachments(incomingMessages)
     const providerId = overrides?.providerId ?? deps.getProviderId()
     const descriptor = PROVIDERS[providerId]
     const sendId = ++currentSendId
