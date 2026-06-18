@@ -1124,7 +1124,7 @@ async function runApiConversation(
 
   try {
 
-  for (let turn = 0; turn < turnsBudget; turn++) {
+  turnLoop: for (let turn = 0; turn < turnsBudget; turn++) {
     drainSupplements()
     if (signal.aborted) {
       exitReason = 'aborted'
@@ -1211,8 +1211,11 @@ async function runApiConversation(
       } else if (event.type === 'done') {
         if (toolCalls.length === 0) {
           if (continueAfterPlainReply(assistantText)) {
+            // #14: continue должен перезапустить TURN (обработать догруженные
+            // supplements в currentMessages), а не for-await стрим-цикл — иначе
+            // стрим тут же завершался и догруженный контекст терялся.
             assistantText = ''
-            continue
+            continue turnLoop
           }
           exitReason = 'completed'
           sender.send('ai:event', { id: sendId, event })
