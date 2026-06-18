@@ -22,7 +22,7 @@ import type { Attachment, Suggestion } from '../types/api'
 import iconUrl from '../assets/icon.png'
 import { useT } from '../i18n'
 import { notifyResponseReady } from '../lib/response-notify'
-import { HELP_PROJECT_PATH } from '../lib/help-scope'
+import { HELP_AGENT_MODE, HELP_CHAT_SEND_OVERRIDES, HELP_PROJECT_PATH } from '../lib/help-scope'
 import { VisionAttachmentBanner } from './VisionAttachmentBanner'
 import { isImageAttachment, providerSupportsVision } from '../lib/vision-support'
 import type { ProviderId } from '../hooks/useProvider'
@@ -177,9 +177,6 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     ? t.help.emptyTitle
     : (chatSessions.find(s => s.id === activeChatId)?.title ?? null)
   const provider = useProvider()
-  useEffect(() => {
-    if (isHelpChat) setAgentMode('plan')
-  }, [isHelpChat, setAgentMode])
   const [input, setInput] = useState('')
   /** Live token-count preview for whatever is in the composer right now. */
   const [previewTokens, setPreviewTokens] = useState<{ tokens: number; exact: boolean } | null>(null)
@@ -1050,6 +1047,9 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         : null
       let sendId: number
       const antiStallNudge = '\n\n---\nВАЖНО (Verstak): если пользователь дал ясный прямой запрос — выполни его прямо в этом чате и выдай результат. Не зацикливайся, прося оформить «пакет задачи», «одну фразу цели» или ждать отдельного «ок», если намерение уже понятно.'
+      const helpOverrides: Parameters<typeof window.api.ai.sendWithOverrides>[2] = {
+        ...HELP_CHAT_SEND_OVERRIDES,
+      }
       if (activeSkill) {
         const currentProvider = await window.api.settings.getKey('provider')
         const skillProvider = activeSkill.default_provider
@@ -1060,20 +1060,16 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
           ? skillProvider
           : undefined
         const overrideModel = overrideProvider ? (activeSkill.default_model ?? null) : null
-        sendId = await window.api.ai.sendWithOverrides(allMessages, null, {
+        Object.assign(helpOverrides, {
           systemPrompt: activeSkill.systemPrompt + antiStallNudge,
           ...(overrideProvider ? { providerId: overrideProvider } : {}),
           ...(overrideModel !== null ? { model: overrideModel } : {}),
-          effortLevel: store.effortLevel
-        }, String(helpChatId))
-      } else {
-        const effort = store.effortLevel
-        if (effort !== 'standard') {
-          sendId = await window.api.ai.sendWithOverrides(allMessages, null, { effortLevel: effort }, String(helpChatId))
-        } else {
-          sendId = await window.api.ai.send(allMessages, null, String(helpChatId))
-        }
+          effortLevel: store.effortLevel,
+        })
+      } else if (store.effortLevel !== 'standard') {
+        helpOverrides.effortLevel = store.effortLevel
       }
+      sendId = await window.api.ai.sendWithOverrides(allMessages, null, helpOverrides, String(helpChatId))
       currentSendIdRef.current = sendId
       registerChatSendOwner(sendId, helpChatId, true)
       return
@@ -1679,7 +1675,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
             onClear={() => setInput('')}
             onInject={text => setInput(text)}
             projectPath={activePath}
-            systemCommands={[
+            helpScope={isHelpChat}
+            systemCommands={isHelpChat ? [] : [
               {
                 kind: 'system',
                 trigger: 'new',
@@ -1889,8 +1886,12 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
               <DevTaskBadge />
             </div>
             <div className="gg-composer-meta-cluster gg-composer-meta-cluster--end">
-              <ComposerToolsMenu onInject={injectTemplate} />
-              <ModePicker mode={agentMode} onChange={setAgentMode} />
+              {!isHelpChat && <ComposerToolsMenu onInject={injectTemplate} />}
+              <ModePicker
+                mode={isHelpChat ? HELP_AGENT_MODE : agentMode}
+                onChange={setAgentMode}
+                locked={isHelpChat}
+              />
               <ModelPicker onOpenSettings={onOpenSettings} />
               {/* Бейдж возможностей провайдера (аудит P1 #12): у CLI-провайдеров
                   правки делает внешний агент в субпроцессе — контрольные гарантии

@@ -40,9 +40,11 @@ interface Props {
   mode: AgentMode
   /** Called when user picks a different mode. */
   onChange: (next: AgentMode) => void
+  /** Справка: режим зафиксирован, переключение недоступно. */
+  locked?: boolean
 }
 
-export function ModePicker({ mode, onChange }: Props) {
+export function ModePicker({ mode, onChange, locked = false }: Props) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
 
@@ -57,7 +59,7 @@ export function ModePicker({ mode, onChange }: Props) {
 
   // Keyboard shortcuts 1-5 when popover is open
   useEffect(() => {
-    if (!open) return
+    if (!open || locked) return
     function onKey(e: KeyboardEvent) {
       const idx = parseInt(e.key, 10)
       if (idx >= 1 && idx <= MODES.length) {
@@ -68,21 +70,25 @@ export function ModePicker({ mode, onChange }: Props) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, onChange])
+  }, [open, onChange, locked])
 
   return (
     <div className="gg-mp-wrap" ref={wrapRef}>
       <button
         type="button"
-        className={`gg-mode-pill is-mode-${mode}`}
-        onClick={() => setOpen(v => !v)}
-        title={`Режим агента: ${shortLabel(mode)}. Клик чтобы сменить.`}
+        className={`gg-mode-pill is-mode-${mode}${locked ? ' is-locked' : ''}`}
+        onClick={() => { if (!locked) setOpen(v => !v) }}
+        disabled={locked}
+        aria-disabled={locked}
+        title={locked
+          ? `Режим справки: ${shortLabel(mode)} (заблокирован)`
+          : `Режим агента: ${shortLabel(mode)}. Клик чтобы сменить.`}
       >
         <span className="gg-mode-icon">{shortIcon(mode)}</span>
         <span className="gg-mode-label">{shortLabel(mode)}</span>
       </button>
 
-      {open && (
+      {open && !locked && (
         <div className="gg-mp-popover gg-mp-popover-opaque">
           <div className="gg-mp-section">
             <div className="gg-mp-section-title">Режим работы агента</div>

@@ -198,6 +198,8 @@ export function App() {
       } else if (e.key === 'Tab' && e.shiftKey && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
         // Shift+Tab — cycle через agent mode (как в Claude Code). Игнорируем
         // когда фокус в input/textarea (там Shift+Tab — обычная навигация).
+        // В справке режим зафиксирован на «План» — не переключаем глобально.
+        if (useProject.getState().helpMode) return
         e.preventDefault()
         const modes: Array<'ask' | 'accept-edits' | 'plan' | 'auto' | 'bypass'> = ['ask', 'accept-edits', 'plan', 'auto', 'bypass']
         void (async () => {

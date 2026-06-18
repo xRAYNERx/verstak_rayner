@@ -245,6 +245,8 @@ export function registerAiIpc(deps: AiDeps): void {
     useReviewerPrompt?: boolean
     /** Уровень усилий: quick / standard / deep. Влияет на max_tokens и extended thinking. */
     effortLevel?: 'quick' | 'standard' | 'deep'
+    /** Режим агента для этого send; по умолчанию — из settings. */
+    agentMode?: AgentMode
   }
 
   ipcMain.handle('ai:send', async (e, incomingMessages: ChatMessage[], projectPath: string | null, budget?: number, overrides?: AiSendOverrides, chatId?: string) => {
@@ -252,6 +254,7 @@ export function registerAiIpc(deps: AiDeps): void {
     const providerId = overrides?.providerId ?? deps.getProviderId()
     const descriptor = PROVIDERS[providerId]
     const sendId = ++currentSendId
+    const agentMode: AgentMode = overrides?.agentMode ?? deps.getAgentMode()
     // runId — стабильный идентификатор этого агентного запуска (один ai:send =
     // один run). Штампуется на audit-записи, чтобы инспектор группировал run'ы
     // явно, а не по эвристике (gap/chatId). Закладка под Debug Packet / Workflow.
@@ -503,7 +506,7 @@ export function registerAiIpc(deps: AiDeps): void {
         gigachatClientSecret,
         memories: descriptor.transport === 'CLI' ? memories : undefined,
         effortLevel: overrides?.effortLevel,
-        agentMode: deps.getAgentMode()
+        agentMode
       })
     } catch (err) {
       taggedSender.send('ai:event', {
@@ -543,7 +546,7 @@ export function registerAiIpc(deps: AiDeps): void {
         sendId,
         // Crash-resume: режим прогона — гард деструктива в баннере возобновления
         // (auto/bypass → авто-resume запрещён).
-        agentMode: deps.getAgentMode()
+        agentMode
       })
       // Timeline: исходный запрос пользователя первым событием — чтобы лента
       // читалась как нарратив (запрос → действия → итог), а не только механика.
@@ -589,7 +592,7 @@ export function registerAiIpc(deps: AiDeps): void {
           projectSystemPrompt: projectSystemPromptForProvider,
           skillPrompt: skillPromptForProvider,
           effortLevel: overrides?.effortLevel,
-          agentMode: deps.getAgentMode()
+          agentMode
         })
       } catch {
         return null
@@ -610,7 +613,7 @@ export function registerAiIpc(deps: AiDeps): void {
       // Инспектор группирует по runId; этот маркер также даёт точку отсчёта run'а
       // (и сохраняет совместимость с эвристикой session_start для легаси-строк).
       if (auditFn) auditFn('session_start', JSON.stringify({ runId, sendId }))
-      void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.readJournal, deps.saveMemory, deps.searchMemories, deps.searchConversations, deps.connectors, deps.getAgentMode(), turnsBudget, deps.skillRegistry, deps.getSecret, costGuard, providerId, model,
+      void runApiConversation(taggedSender, sendId, provider, tools, projectPath, messagesWithSystem, ctrl.signal, deps.recordWrite, deps.recordPlan, deps.recordJournal, deps.readJournal, deps.saveMemory, deps.searchMemories, deps.searchConversations, deps.connectors, agentMode, turnsBudget, deps.skillRegistry, deps.getSecret, costGuard, providerId, model,
         smartFallbackEnabled ? { getNextProvider: makeFallbackProvider, configuredProviders: new Set(getConfiguredApiProviders(deps.getSecret)), triedProviders: new Set([providerId]) } : undefined,
         deps.mcpClient,
         auditFn,
