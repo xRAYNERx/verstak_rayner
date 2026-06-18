@@ -459,5 +459,6 @@ export const ru: Translations = {
     verifyFail: 'Проверки красные',
     reattest: 'Дожать проверку',
     proceedAnyway: 'Продолжить',
+    cliGate: 'Pipeline нужен API-провайдер: полный контроль + Proof. CLI-провайдер делает правки во внешнем процессе — выбери Claude (API) / Gemini API / OpenAI и т.п.',
   },
 }

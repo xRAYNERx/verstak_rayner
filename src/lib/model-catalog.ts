@@ -144,6 +144,17 @@ export function connectionStatus(
 export type CliAuthId = 'claude-cli' | 'gemini-cli' | 'grok-cli' | 'codex-cli'
 export type CliAuthStatus = { installed: boolean; loggedIn: boolean; credPath?: string }
 
+/** CLI-провайдеры: правки делает внешний агент в субпроцессе → контрольные
+ *  гарантии Verstak (per-file undo / verification / Proof) недоступны. */
+export const CLI_PROVIDER_IDS: ReadonlySet<ProviderId> = new Set<ProviderId>([
+  'claude-cli', 'gemini-cli', 'grok-cli', 'codex-cli',
+])
+
+/** true если провайдер — CLI (без полного контроля Verstak). */
+export function isCliProvider(id: ProviderId | string | null | undefined): boolean {
+  return !!id && CLI_PROVIDER_IDS.has(id as ProviderId)
+}
+
 /** Сайт подписки / получения доступа для CLI-провайдеров. */
 export const CLI_SUBSCRIPTION_LINKS: Partial<Record<ProviderId, { url: string; label: string }>> = {
   'grok-cli': { url: 'https://grok.com', label: 'grok.com' },

@@ -30,6 +30,7 @@ import { VisionAttachmentBanner } from './VisionAttachmentBanner'
 import { isImageAttachment, providerSupportsVision } from '../lib/vision-support'
 import { resolveSkillOverride } from '../lib/skill-override'
 import { buildPipelineSend, resolveProofRunId } from '../lib/pipeline-brief'
+import { isCliProvider } from '../lib/model-catalog'
 import type { PipelineRun, PipelineStep } from '../types/api'
 import type { ProviderId } from '../hooks/useProvider'
 import {
@@ -2016,7 +2017,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
                   type="button"
                   className="gg-btn gg-btn-ghost gg-btn-xs gg-pipeline-entry"
                   onClick={() => setPipelineWizardOpen(true)}
-                  title={t.pipeline.title}
+                  disabled={isCliProvider(provider.id)}
+                  title={isCliProvider(provider.id) ? t.pipeline.cliGate : t.pipeline.title}
                 >
                   ▶ Pipeline
                 </button>

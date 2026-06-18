@@ -477,6 +477,7 @@ export const en = {
     verifyFail: 'Checks failed',
     reattest: 'Re-run verify',
     proceedAnyway: 'Proceed',
+    cliGate: 'Pipeline needs an API provider: full control + Proof. CLI providers run edits in an external process — pick Claude (API) / Gemini API / OpenAI, etc.',
   },
 }
 
