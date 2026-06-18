@@ -139,6 +139,11 @@ export function UpdatesSettings() {
     setStatus('checking')
     setError('')
     const result = await window.api.updater.check()
+    if (result.rateLimited) {
+      setError('Лимит запросов к GitHub исчерпан (60/час на IP). Проверка обновлений возобновится автоматически через ~час.')
+      setStatus('error')
+      return
+    }
     if (result.error) {
       setError(friendlyUpdateError(result.error, t.settings.updateError, t.settings.updateNoRelease))
       setStatus('error')

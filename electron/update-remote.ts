@@ -35,11 +35,31 @@ export function releaseFeedBase(version: string): string {
   return `https://github.com/${UPDATE_OWNER}/${UPDATE_REPO}/releases/download/v${normalizeVersion(version)}`
 }
 
+// GitHub API без авторизации = 60 запросов/час на IP. Частые проверки (старт +
+// каждые 4ч + error-handler + release-notes) исчерпывали лимит → 403 → апдейтер
+// «не видел» обновления. Детектим rate-limit и backoff'имся; версию берём из
+// raw package.json (CDN, не ест лимит API), API — только как fallback.
+let rateLimitedUntil = 0
+let versionCache: { version: string | null; at: number } | null = null
+const VERSION_CACHE_MS = 20 * 60 * 1000
+
+/** True, если GitHub API сейчас в rate-limit (для понятного сообщения в UI). */
+export function isGithubRateLimited(): boolean {
+  return Date.now() < rateLimitedUntil
+}
+
 async function fetchJson<T>(url: string): Promise<T | null> {
+  if (isGithubRateLimited()) return null
   try {
     const res = await fetch(url, {
       headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Verstak-Updater' },
     })
+    // 403 + X-RateLimit-Remaining: 0 → лимит исчерпан, не дёргаем API до reset.
+    if ((res.status === 403 || res.status === 429) && res.headers.get('x-ratelimit-remaining') === '0') {
+      const reset = Number(res.headers.get('x-ratelimit-reset')) * 1000
+      rateLimitedUntil = Number.isFinite(reset) && reset > Date.now() ? reset : Date.now() + 30 * 60 * 1000
+      return null
+    }
     if (!res.ok) return null
     return await res.json() as T
   } catch {
@@ -61,27 +81,32 @@ async function fetchPackageJsonVersion(): Promise<string | null> {
   return null
 }
 
-/** Последняя версия: max(GitHub Release, semver-теги, package.json на main). */
+/**
+ * Последняя версия. Источник №1 — raw package.json на main (CDN, НЕ ест лимит
+ * GitHub API): package.json бампится вместе с релизом, поэтому отражает последнюю
+ * версию. API (releases/latest) дёргаем только если raw не дал результат и мы не
+ * в rate-limit. Результат кэшируется на 20 мин — частые проверки не палят лимит.
+ */
 export async function fetchRemoteVersion(): Promise<string | null> {
+  if (versionCache && Date.now() - versionCache.at < VERSION_CACHE_MS) return versionCache.version
+
   const candidates: string[] = []
-
-  const latestRelease = await fetchJson<{ tag_name?: string; name?: string }>(
-    `https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}/releases/latest`,
-  )
-  if (latestRelease?.tag_name || latestRelease?.name) {
-    candidates.push(normalizeVersion(latestRelease.tag_name || latestRelease.name || ''))
-  }
-
-  const tags = await fetchJson<Array<{ name: string }>>(
-    `https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}/tags?per_page=30`,
-  )
-  const fromTags = maxSemver((tags ?? []).map(t => t.name))
-  if (fromTags) candidates.push(fromTags)
-
   const fromPkg = await fetchPackageJsonVersion()
   if (fromPkg) candidates.push(fromPkg)
 
-  return maxSemver(candidates)
+  // API — только как fallback, когда raw недоступен и лимит не исчерпан.
+  if (!fromPkg && !isGithubRateLimited()) {
+    const latestRelease = await fetchJson<{ tag_name?: string; name?: string }>(
+      `https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}/releases/latest`,
+    )
+    if (latestRelease?.tag_name || latestRelease?.name) {
+      candidates.push(normalizeVersion(latestRelease.tag_name || latestRelease.name || ''))
+    }
+  }
+
+  const version = maxSemver(candidates)
+  versionCache = { version, at: Date.now() }
+  return version
 }
 
 /** electron-updater часто падает, если на GitHub ещё нет Release с latest.yml — это не сбой для пользователя. */

@@ -7,6 +7,7 @@ import {
   fetchReleaseNotesSince,
   fetchRemoteVersion,
   isBenignUpdaterError,
+  isGithubRateLimited,
   releaseArtifactsReady,
   releaseFeedBase,
   semverGt,
@@ -326,6 +327,7 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
         phase: snapshot.phase,
         error: snapshot.error,
         pendingRelease: snapshot.pendingRelease,
+        rateLimited: isGithubRateLimited(),
       }
     })
 

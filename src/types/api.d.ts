@@ -429,7 +429,7 @@ declare global {
           htmlUrl: string
           publishedAt?: string
         }>>
-        check(): Promise<{ available: boolean; version?: string; error?: string; phase?: string; pendingRelease?: boolean }>
+        check(): Promise<{ available: boolean; version?: string; error?: string; phase?: string; pendingRelease?: boolean; rateLimited?: boolean }>
         getState(): Promise<{ phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }>
         onState(cb: (data: { phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }) => void): () => void
         onAvailable(cb: (data: { version: string; pendingRelease?: boolean }) => void): () => void
