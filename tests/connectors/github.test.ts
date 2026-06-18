@@ -53,4 +53,14 @@ describe('GitHub connector', () => {
     expect(r.count).toBe(2)
     expect(r.entries).toHaveLength(2)
   })
+
+  // C2: инвариант read-only — create_issue/create_pr больше не пишут в чужой репо.
+  it('create_issue / create_pr заблокированы (read-only), без сетевого вызова', async () => {
+    const conn = createGitHubConnector()
+    for (const op of ['create_issue', 'create_pr']) {
+      const r = await conn.query({ op, repo: 'victim/repo', title: 'x', head: 'f', base: 'main' }, ctx) as { error?: string }
+      expect(r.error, op).toBe('read-only')
+    }
+    expect(requestMock).not.toHaveBeenCalled()
+  })
 })

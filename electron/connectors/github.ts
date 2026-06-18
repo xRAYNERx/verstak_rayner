@@ -11,7 +11,8 @@
  *
  * Безопасность:
  * - Токен никогда не попадает в ответ (secret-scanner + он только в headers).
- * - Write-операции (create_issue, create_pr) требуют явных аргументов.
+ * - Read-only: create_issue/create_pr заблокированы (инвариант «коннекторы
+ *   read-only», как bitrix24) — запись в чужой репо недопустима.
  * - Ответы обрезаются до MAX_FIELD_BYTES на поле.
  */
 
@@ -264,29 +265,6 @@ async function getIssue(token: string, args: Record<string, unknown>, signal?: A
   return rateWarning(issueResp.rateRemaining, result)
 }
 
-async function createIssue(token: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<unknown> {
-  const repo = requireString(args, 'repo')
-  const title = requireString(args, 'title')
-  const body = optString(args, 'body', '')
-  const labels = args.labels  // string[] | undefined
-
-  const payload: Record<string, unknown> = { title, body }
-  if (Array.isArray(labels) && labels.length > 0) payload.labels = labels
-  if (args.assignees && Array.isArray(args.assignees)) payload.assignees = args.assignees
-  if (args.milestone && typeof args.milestone === 'number') payload.milestone = args.milestone
-
-  const { data, rateRemaining } = await githubApi(token, 'POST', `/repos/${repo}/issues`, payload, signal)
-  const i = data as Record<string, unknown>
-
-  return rateWarning(rateRemaining, {
-    created: true,
-    number: i.number,
-    url: i.html_url,
-    title: i.title,
-    state: i.state
-  })
-}
-
 async function listPRs(token: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<unknown> {
   const repo = requireString(args, 'repo')
   const state = optString(args, 'state', 'open')  // open | closed | all
@@ -344,29 +322,6 @@ async function getPR(token: string, args: Record<string, unknown>, signal?: Abor
     updated_at: pr.updated_at,
     merged_at: pr.merged_at,
     url: pr.html_url
-  })
-}
-
-async function createPR(token: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<unknown> {
-  const repo = requireString(args, 'repo')
-  const title = requireString(args, 'title')
-  const head = requireString(args, 'head')   // ветка источник (feature)
-  const base = requireString(args, 'base')   // ветка назначение (main)
-  const body = optString(args, 'body', '')
-  const draft = typeof args.draft === 'boolean' ? args.draft : false
-
-  const payload: Record<string, unknown> = { title, head, base, body, draft }
-
-  const { data, rateRemaining } = await githubApi(token, 'POST', `/repos/${repo}/pulls`, payload, signal)
-  const pr = data as Record<string, unknown>
-
-  return rateWarning(rateRemaining, {
-    created: true,
-    number: pr.number,
-    url: pr.html_url,
-    title: pr.title,
-    state: pr.state,
-    draft: pr.draft
   })
 }
 
@@ -500,17 +455,21 @@ export function createGitHubConnector(): Connector {
           case 'list_repos':    return await listRepos(token, args, ctx.signal)
           case 'list_issues':   return await listIssues(token, args, ctx.signal)
           case 'get_issue':     return await getIssue(token, args, ctx.signal)
-          case 'create_issue':  return await createIssue(token, args, ctx.signal)
           case 'list_prs':      return await listPRs(token, args, ctx.signal)
           case 'get_pr':        return await getPR(token, args, ctx.signal)
-          case 'create_pr':     return await createPR(token, args, ctx.signal)
           case 'list_commits':  return await listCommits(token, args, ctx.signal)
           case 'get_file':      return await getFile(token, args, ctx.signal)
           case 'search_code':   return await searchCode(token, args, ctx.signal)
+          // Инвариант: все коннекторы read-only (как bitrix24). create_issue/
+          // create_pr реально писали POST в чужой репо — в auto/bypass без
+          // подтверждения. Блокируем, как write-операции Битрикс24 (C2).
+          case 'create_issue':
+          case 'create_pr':
+            return { error: 'read-only', message: `GitHub-коннектор — read-only. Операция «${op}» (запись в чужой репозиторий) недоступна.` }
           default:
             return {
               error: 'unknown-op',
-              message: `Неизвестная операция «${op}». Доступно: list_repos, list_issues, get_issue, create_issue, list_prs, get_pr, create_pr, list_commits, get_file, search_code.`
+              message: `Неизвестная операция «${op}». Доступно (read-only): list_repos, list_issues, get_issue, list_prs, get_pr, list_commits, get_file, search_code.`
             }
         }
       } catch (err) {
