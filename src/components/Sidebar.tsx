@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent, type ReactElement } from 'react'
+import { useEffect, useRef, useState, type MouseEvent, type ReactElement, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useProject, type ViewId } from '../store/projectStore'
 import { ModelPicker } from './ModelPicker'
@@ -277,6 +277,98 @@ interface NavItem {
   badge?: string
 }
 
+const SIDEBAR_SECTIONS_KEY = 'gg.sidebar.sections'
+
+function readSectionOpen(sectionId: string, defaultOpen = true): boolean {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_SECTIONS_KEY)
+    if (!raw) return defaultOpen
+    const data = JSON.parse(raw) as Record<string, boolean>
+    return data[sectionId] ?? defaultOpen
+  } catch {
+    return defaultOpen
+  }
+}
+
+function writeSectionOpen(sectionId: string, open: boolean) {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_SECTIONS_KEY)
+    const data = raw ? JSON.parse(raw) as Record<string, boolean> : {}
+    data[sectionId] = open
+    localStorage.setItem(SIDEBAR_SECTIONS_KEY, JSON.stringify(data))
+  } catch { /* ignore */ }
+}
+
+function SidebarNavSection({
+  sectionId,
+  title,
+  activeView,
+  viewIds,
+  children,
+}: {
+  sectionId: string
+  title: string
+  activeView: ViewId
+  viewIds: ReadonlySet<ViewId>
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(() => readSectionOpen(sectionId))
+
+  useEffect(() => {
+    if (viewIds.has(activeView)) setOpen(true)
+  }, [activeView, viewIds])
+
+  function toggle() {
+    setOpen(v => {
+      const next = !v
+      writeSectionOpen(sectionId, next)
+      return next
+    })
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className="gg-sidebar-section-collapsible"
+        onClick={toggle}
+        aria-expanded={open}
+      >
+        <span className="gg-sidebar-section-caret">{open ? '▾' : '▸'}</span>
+        <span className="gg-sidebar-section-title">{title}</span>
+      </button>
+      {open && children}
+    </>
+  )
+}
+
+function NavButtons({ items, activeView, onSelect }: {
+  items: NavItem[]
+  activeView: ViewId
+  onSelect: (id: ViewId) => void
+}) {
+  return (
+    <div className="gg-nav">
+      {items.map(item => (
+        <button
+          key={item.id}
+          type="button"
+          className={`gg-nav-item ${activeView === item.id ? 'is-active' : ''}`}
+          onClick={() => onSelect(item.id)}
+        >
+          <span className="gg-nav-icon">{item.icon}</span>
+          <span className="gg-nav-label">{item.label}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+const WORK_VIEW_IDS = new Set<ViewId>(['chat', 'plan', 'tasks', 'skills', 'workflow'])
+const CONTROL_VIEW_IDS = new Set<ViewId>(['journal', 'tasks-manager', 'inspector', 'agents'])
+const PROJECT_VIEW_IDS = new Set<ViewId>(['project-map', 'memory-gov', 'files'])
+const TOOLS_VIEW_IDS = new Set<ViewId>(['browser', 'design', 'feedback'])
+
 const ChatIcon = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -445,70 +537,42 @@ export function Sidebar({ onOpenSettings, 'aria-hidden': ariaHidden }: SidebarPr
 
         {path && (
           <>
-            <div className="gg-sidebar-section">
-              <div className="gg-sidebar-section-title">{t.sidebar.workSection}</div>
-            </div>
-            <ChatNavSection />
-            <div className="gg-nav">
-              {WORK_NAV.map(item => (
-                <button
-                  key={item.id}
-                  className={`gg-nav-item ${activeView === item.id ? 'is-active' : ''}`}
-                  onClick={() => setActiveView(item.id)}
-                >
-                  <span className="gg-nav-icon">{item.icon}</span>
-                  <span className="gg-nav-label">{item.label}</span>
-                </button>
-              ))}
-            </div>
+            <SidebarNavSection
+              sectionId="work"
+              title={t.sidebar.workSection}
+              activeView={activeView}
+              viewIds={WORK_VIEW_IDS}
+            >
+              <ChatNavSection />
+              <NavButtons items={WORK_NAV} activeView={activeView} onSelect={setActiveView} />
+            </SidebarNavSection>
 
-            <div className="gg-sidebar-section">
-              <div className="gg-sidebar-section-title">{t.sidebar.controlSection}</div>
-            </div>
-            <div className="gg-nav">
-              {CONTROL_NAV.map(item => (
-                <button
-                  key={item.id}
-                  className={`gg-nav-item ${activeView === item.id ? 'is-active' : ''}`}
-                  onClick={() => setActiveView(item.id)}
-                >
-                  <span className="gg-nav-icon">{item.icon}</span>
-                  <span className="gg-nav-label">{item.label}</span>
-                </button>
-              ))}
-            </div>
+            <SidebarNavSection
+              sectionId="control"
+              title={t.sidebar.controlSection}
+              activeView={activeView}
+              viewIds={CONTROL_VIEW_IDS}
+            >
+              <NavButtons items={CONTROL_NAV} activeView={activeView} onSelect={setActiveView} />
+            </SidebarNavSection>
 
-            <div className="gg-sidebar-section">
-              <div className="gg-sidebar-section-title">{t.sidebar.projectSection}</div>
-            </div>
-            <div className="gg-nav">
-              {PROJECT_NAV.map(item => (
-                <button
-                  key={item.id}
-                  className={`gg-nav-item ${activeView === item.id ? 'is-active' : ''}`}
-                  onClick={() => setActiveView(item.id)}
-                >
-                  <span className="gg-nav-icon">{item.icon}</span>
-                  <span className="gg-nav-label">{item.label}</span>
-                </button>
-              ))}
-            </div>
+            <SidebarNavSection
+              sectionId="project"
+              title={t.sidebar.projectSection}
+              activeView={activeView}
+              viewIds={PROJECT_VIEW_IDS}
+            >
+              <NavButtons items={PROJECT_NAV} activeView={activeView} onSelect={setActiveView} />
+            </SidebarNavSection>
 
-            <div className="gg-sidebar-section">
-              <div className="gg-sidebar-section-title">{t.sidebar.toolsSection}</div>
-            </div>
-            <div className="gg-nav">
-              {TOOLS_NAV.map(item => (
-                <button
-                  key={item.id}
-                  className={`gg-nav-item ${activeView === item.id ? 'is-active' : ''}`}
-                  onClick={() => setActiveView(item.id)}
-                >
-                  <span className="gg-nav-icon">{item.icon}</span>
-                  <span className="gg-nav-label">{item.label}</span>
-                </button>
-              ))}
-            </div>
+            <SidebarNavSection
+              sectionId="tools"
+              title={t.sidebar.toolsSection}
+              activeView={activeView}
+              viewIds={TOOLS_VIEW_IDS}
+            >
+              <NavButtons items={TOOLS_NAV} activeView={activeView} onSelect={setActiveView} />
+            </SidebarNavSection>
           </>
         )}
       </div>

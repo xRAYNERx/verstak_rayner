@@ -13,6 +13,17 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: 'PENDING',
+    deployed: '18.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Подсказка очереди и сворачиваемый сайдбар',
+    changes: [
+      'Голубая подсказка — половина ширины колонки чата, правый край по концу переписки, стрелка к панели очереди.',
+      'Блоки Работа / Контроль / Проект / Инструменты сворачиваются; План и Чеклист внутри «Работа».',
+      'Состояние свёрнутости сохраняется в localStorage.',
+    ],
+  },
+  {
     commit: '433bdeb',
     deployed: '18.06.2026',
     treeVersion: '1.5.5',

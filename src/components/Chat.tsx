@@ -1453,14 +1453,16 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
           </button>
         )}
         {queueNotice && (
-          <div className="gg-chat-queue-notice" role="status" aria-live="polite">
-            <span className="gg-chat-queue-notice-text">{queueNotice}</span>
-            <span className="gg-chat-queue-notice-arrow" aria-hidden>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
-            </span>
+          <div className="gg-chat-queue-notice-anchor">
+            <div className="gg-chat-queue-notice" role="status" aria-live="polite">
+              <span className="gg-chat-queue-notice-text">{queueNotice}</span>
+              <span className="gg-chat-queue-notice-arrow" aria-hidden>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
+              </span>
+            </div>
           </div>
         )}
         {isStreaming && (queuedMessages.length > 0 || pendingSupplements.length > 0) && (
