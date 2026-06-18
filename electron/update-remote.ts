@@ -36,11 +36,19 @@ export function releaseFeedBase(version: string): string {
   return `https://github.com/${UPDATE_OWNER}/${UPDATE_REPO}/releases/download/v${normalizeVersion(version)}`
 }
 
+async function electronFetch(url: string, init?: RequestInit): Promise<Response> {
+  if (process.versions.electron) {
+    const { net } = await import('electron')
+    return net.fetch(url, init)
+  }
+  return fetch(url, init)
+}
+
 async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   try {
-    return await fetch(url, { ...init, signal: controller.signal })
+    return await electronFetch(url, { ...init, signal: controller.signal })
   } catch {
     return null
   } finally {
@@ -74,8 +82,7 @@ async function fetchPackageJsonVersion(): Promise<string | null> {
   }
 }
 
-/** Последняя версия: max(package.json на main, GitHub Release, semver-теги). */
-export async function fetchRemoteVersion(): Promise<string | null> {
+async function fetchRemoteVersionOnce(): Promise<string | null> {
   const candidates: string[] = []
 
   const fromPkg = await fetchPackageJsonVersion()
@@ -95,6 +102,18 @@ export async function fetchRemoteVersion(): Promise<string | null> {
   if (fromTags) candidates.push(fromTags)
 
   return maxSemver(candidates)
+}
+
+/** Последняя версия: max(package.json на main, GitHub Release, semver-теги). */
+export async function fetchRemoteVersion(): Promise<string | null> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const version = await fetchRemoteVersionOnce()
+    if (version) return version
+    if (attempt < 2) {
+      await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)))
+    }
+  }
+  return null
 }
 
 /** electron-updater часто падает, если на GitHub ещё нет Release с latest.yml — это не сбой для пользователя. */

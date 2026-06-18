@@ -13,6 +13,17 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: '0a42dd3',
+    deployed: '18.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Обновления: без вылета при закрытии, net.fetch, автопроверка без ложной ошибки',
+    changes: [
+      'Кэш updater сбрасывается только при выходе (не при старте) — убран зомби-процесс и двойной запуск.',
+      'Перед очисткой кэша: shutdown updater, removeAllListeners, без IPC в renderer.',
+      'Версия с GitHub через net.fetch + retry; ошибка сети только при ручной «Проверить».',
+    ],
+  },
+  {
     commit: '501bff7',
     deployed: '18.06.2026',
     treeVersion: '1.5.5',

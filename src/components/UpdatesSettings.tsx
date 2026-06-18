@@ -150,8 +150,8 @@ export function UpdatesSettings() {
     error?: string
     pendingRelease?: boolean
   }) => {
-    if (result.error) {
-      setError(friendlyUpdateError(result.error, t.settings.updateError, t.settings.updateNoRelease))
+    if (result.error || result.phase === 'error') {
+      setError(friendlyUpdateError(result.error || '', t.settings.updateError, t.settings.updateNoRelease))
       setStatus('error')
       return
     }

@@ -58,10 +58,10 @@ export function clearPendingIfWrongVersion(targetVersion: string): void {
 
 /** Полный сброс %LOCALAPPDATA%\\verstak-updater — чистый поиск при следующем запуске. */
 export function clearAllUpdaterCache(): void {
-  const root = getUpdaterCacheRoot()
-  if (!existsSync(root)) return
   try {
-    rmSync(root, { recursive: true, force: true })
+    const root = getUpdaterCacheRoot()
+    if (!existsSync(root)) return
+    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
   } catch (err) {
     console.warn('[updater] clear all cache failed:', err)
   }

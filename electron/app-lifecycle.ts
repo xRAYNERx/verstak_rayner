@@ -35,4 +35,7 @@ export function installGlobalQuitHandlers(): void {
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()
   })
+  process.on('unhandledRejection', (reason) => {
+    console.warn('[app] unhandledRejection:', reason)
+  })
 }

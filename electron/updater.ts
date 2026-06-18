@@ -52,18 +52,37 @@ let releaseNotesIpcRegistered = false
 let updaterIpcRegistered = false
 let quitCleanupRegistered = false
 let quittingForInstall = false
+let shuttingDown = false
+let periodicCheckTimer: ReturnType<typeof setInterval> | null = null
 let checkPromise: Promise<void> | null = null
 
 const NETWORK_CHECK_ERROR = 'Не удалось проверить обновления. Проверьте интернет и попробуйте снова.'
+
+function shutdownUpdater(): void {
+  if (shuttingDown) return
+  shuttingDown = true
+  if (periodicCheckTimer) {
+    clearInterval(periodicCheckTimer)
+    periodicCheckTimer = null
+  }
+  clearStallTimer()
+  checkInFlight = false
+  downloadInFlight = false
+  try {
+    autoUpdater.removeAllListeners()
+  } catch (err) {
+    console.warn('[updater] removeAllListeners failed:', err)
+  }
+  if (app.isPackaged && !quittingForInstall) {
+    clearAllUpdaterCache()
+  }
+}
 
 /** Сброс кэша при выходе (кроме quitAndInstall). Вызывается из initAutoUpdater. */
 export function registerUpdaterQuitCleanup(): void {
   if (quitCleanupRegistered) return
   quitCleanupRegistered = true
-  app.on('before-quit', () => {
-    if (!app.isPackaged || quittingForInstall) return
-    clearAllUpdaterCache()
-  })
+  app.on('before-quit', () => shutdownUpdater())
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -132,9 +151,8 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
   registerUpdaterQuitCleanup()
   if (!app.isPackaged) return
 
-  clearAllUpdaterCache()
-
   const pushSnapshot = () => {
+    if (shuttingDown) return
     sendToRenderer(mainWindow, 'update:state', snapshot)
   }
 
@@ -294,13 +312,17 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     }
   }
 
-  const evaluateProbe = async (): Promise<{ newer: boolean; version: string | null; pendingRelease: boolean }> => {
+  const evaluateProbe = async (
+    opts?: { reportNetworkError?: boolean },
+  ): Promise<{ newer: boolean; version: string | null; pendingRelease: boolean }> => {
     const current = app.getVersion()
     const remote = await fetchRemoteVersion()
     lastProbeVersion = remote
     if (!remote) {
       lastProbePending = false
-      announceDownloadError(undefined, NETWORK_CHECK_ERROR)
+      if (opts?.reportNetworkError) {
+        announceDownloadError(undefined, NETWORK_CHECK_ERROR)
+      }
       return { newer: false, version: null, pendingRelease: false }
     }
     if (!semverGt(remote, current)) {
@@ -329,17 +351,20 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     await ensureDownload(remote)
   }
 
-  const runCheckBody = async () => {
-    if (downloadInFlight) return
+  const runCheckBody = async (manual = false) => {
+    if (shuttingDown || downloadInFlight) return
     if (!downloadInFlight) resetFeedToGithub()
 
     setSnapshot({ phase: 'checking' })
     sendToRenderer(mainWindow, 'update:checking')
 
-    const probe = await evaluateProbe()
+    const probe = await evaluateProbe({ reportNetworkError: manual })
 
     if (!probe.newer) {
       if (probe.version != null) announceNotAvailable()
+      else if (manual && snapshot.phase !== 'error') {
+        announceDownloadError(undefined, NETWORK_CHECK_ERROR)
+      }
       return
     }
     if (!probe.version) return
@@ -371,22 +396,24 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     }
   }
 
-  const runCheck = async () => {
+  const runCheck = async (manual = false) => {
+    if (shuttingDown) return
     if (checkInFlight && checkPromise) {
       await checkPromise
       return
     }
     checkInFlight = true
-    checkPromise = withTimeout(runCheckBody(), CHECK_TIMEOUT_MS, 'update check')
+    checkPromise = withTimeout(runCheckBody(manual), CHECK_TIMEOUT_MS, 'update check')
       .catch(async (err) => {
         console.warn('[updater] runCheck failed:', err)
-        if (snapshot.phase === 'checking') {
-          const remote = lastProbeVersion
-          if (remote && isNewerThanInstalled(remote)) {
-            await finalizeIfStillChecking()
-          } else {
-            announceNotAvailable()
-          }
+        if (shuttingDown || snapshot.phase !== 'checking') return
+        const remote = lastProbeVersion
+        if (remote && isNewerThanInstalled(remote)) {
+          await finalizeIfStillChecking()
+        } else if (manual && !remote) {
+          announceDownloadError(undefined, NETWORK_CHECK_ERROR)
+        } else {
+          announceNotAvailable()
         }
       })
       .finally(() => {
@@ -414,7 +441,7 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     ipcMain.handle('update:get-state', () => snapshot)
 
     ipcMain.handle('update:check', async () => {
-      await runCheck()
+      await runCheck(true)
       const current = app.getVersion()
       const remote = snapshot.version ?? lastProbeVersion
       const available = !!remote && semverGt(remote, current)
@@ -428,12 +455,13 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     })
 
     autoUpdater.on('checking-for-update', () => {
-      if (downloadInFlight || !checkInFlight) return
+      if (shuttingDown || downloadInFlight || !checkInFlight) return
       setSnapshot({ ...snapshot, phase: 'checking' })
       sendToRenderer(mainWindow, 'update:checking')
     })
 
     autoUpdater.on('update-available', (info) => {
+      if (shuttingDown) return
       if (!isNewerThanInstalled(info.version)) {
         reconcileStaleDownloadedUpdate(info.version)
         announceNotAvailable()
@@ -443,12 +471,13 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     })
 
     autoUpdater.on('update-not-available', () => {
-      if (downloadInFlight || !checkInFlight) return
+      if (shuttingDown || downloadInFlight || !checkInFlight) return
       reconcileStaleDownloadedUpdate(lastProbeVersion)
       announceNotAvailable()
     })
 
     autoUpdater.on('download-progress', (progress) => {
+      if (shuttingDown) return
       downloadInFlight = true
       lastProgressAt = Date.now()
       const percent = Math.round(progress.percent)
@@ -466,6 +495,7 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     })
 
     autoUpdater.on('update-downloaded', (info) => {
+      if (shuttingDown) return
       if (!isNewerThanInstalled(info.version)) {
         reconcileStaleDownloadedUpdate(info.version)
         announceNotAvailable()
@@ -474,45 +504,50 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
       announceDownloaded(info.version)
     })
 
-    autoUpdater.on('error', async (err) => {
-      const message = err.message || 'Не удалось проверить обновления'
-      console.warn('[updater] error:', message)
+    autoUpdater.on('error', (err) => {
+      void (async () => {
+        if (shuttingDown) return
+        const message = err.message || 'Не удалось проверить обновления'
+        console.warn('[updater] error:', message)
 
-      const current = app.getVersion()
-      const remote = snapshot.version ?? lastProbeVersion ?? await fetchRemoteVersion()
+        const current = app.getVersion()
+        const remote = snapshot.version ?? lastProbeVersion ?? await fetchRemoteVersion()
 
-      if (snapshot.phase === 'downloading') {
-        if (remote && (await tryAnnounceCachedDownload(remote))) return
-        if (remote && semverGt(remote, current) && !isBenignUpdaterError(message)) {
-          announceDownloadError(remote, message)
-          return
+        if (snapshot.phase === 'downloading') {
+          if (remote && (await tryAnnounceCachedDownload(remote))) return
+          if (remote && semverGt(remote, current) && !isBenignUpdaterError(message)) {
+            announceDownloadError(remote, message)
+            return
+          }
+          if (remote && semverGt(remote, current)) {
+            downloadInFlight = false
+            downloadForVersion = null
+            announceAvailable(remote, true)
+            return
+          }
         }
+
         if (remote && semverGt(remote, current)) {
-          downloadInFlight = false
-          downloadForVersion = null
-          announceAvailable(remote, true)
+          if (await tryAnnounceCachedDownload(remote)) return
+          const pending = !(await releaseArtifactsReady(remote))
+          if (!pending && snapshot.phase !== 'downloading') {
+            void ensureDownload(remote)
+            return
+          }
+          announceAvailable(remote, pending)
           return
         }
-      }
 
-      if (remote && semverGt(remote, current)) {
-        if (await tryAnnounceCachedDownload(remote)) return
-        const pending = !(await releaseArtifactsReady(remote))
-        if (!pending && snapshot.phase !== 'downloading') {
-          void ensureDownload(remote)
+        if (isBenignUpdaterError(message)) {
+          reconcileStaleDownloadedUpdate(remote)
+          announceNotAvailable()
           return
         }
-        announceAvailable(remote, pending)
-        return
-      }
 
-      if (isBenignUpdaterError(message)) {
-        reconcileStaleDownloadedUpdate(remote)
-        announceNotAvailable()
-        return
-      }
-
-      announceDownloadError(remote ?? undefined, message)
+        announceDownloadError(remote ?? undefined, message)
+      })().catch((handlerErr) => {
+        console.warn('[updater] error handler failed:', handlerErr)
+      })
     })
   }
 
@@ -533,13 +568,14 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
 
   mainWindow.webContents.once('did-finish-load', () => {
     pushSnapshot()
-    void runCheck()
+    void runCheck(false)
   })
 
-  setInterval(() => { void runCheck() }, PERIODIC_CHECK_MS)
+  periodicCheckTimer = setInterval(() => { void runCheck(false) }, PERIODIC_CHECK_MS)
 }
 
 function sendToRenderer(win: BrowserWindow, channel: string, data?: unknown): void {
+  if (shuttingDown) return
   try {
     if (!win.isDestroyed()) win.webContents.send(channel, data)
   } catch { /* window might be closing */ }
