@@ -29,7 +29,7 @@ import { EMPTY_COMPOSER_DRAFT, resolveComposerDraftKey } from '../lib/composer-d
 import { VisionAttachmentBanner } from './VisionAttachmentBanner'
 import { isImageAttachment, providerSupportsVision } from '../lib/vision-support'
 import { resolveSkillOverride } from '../lib/skill-override'
-import { buildPipelineSend } from '../lib/pipeline-brief'
+import { buildPipelineSend, resolveProofRunId } from '../lib/pipeline-brief'
 import type { PipelineRun, PipelineStep } from '../types/api'
 import type { ProviderId } from '../hooks/useProvider'
 import {
@@ -889,7 +889,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     useProject.getState().startPipeline(run)
     dispatchPipelineSend('plan', run.brief, run.planId)
   }
-  function onPipelinePrimary(step: PipelineStep) {
+  async function onPipelinePrimary(step: PipelineStep) {
     const store = useProject.getState()
     const pipeline = store.activePipeline
     if (!pipeline) return
@@ -900,6 +900,21 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
       void store.advancePipeline({ step: 'verify' })  // Verify-панель — D6
     } else if (step === 'verify') {
       void store.advancePipeline({ step: 'proof' })   // Proof-шаг — D7
+    } else if (step === 'proof') {
+      // Собрать Proof Pack: runId привязанный/последний прогон → proof.generate →
+      // preview HTML inline + pipeline completed.
+      const runs = pipeline.agentRunId ? [] : await window.api.agentRuns.list(pipeline.projectPath, { limit: 5 })
+      const runId = resolveProofRunId(pipeline.agentRunId, pipeline.chatId, runs)
+      if (runId) {
+        try {
+          const res = await window.api.proof.generate(runId)
+          if (res.ok && res.htmlPath) {
+            store.recordArtifact({ kind: 'html', filename: 'proof.html', path: res.htmlPath, sizeBytes: 0 })
+            store.setPreviewArtifact(res.htmlPath)
+          }
+        } catch { /* proof best-effort */ }
+      }
+      void store.advancePipeline({ step: 'completed' })
     }
   }
 

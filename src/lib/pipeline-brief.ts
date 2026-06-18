@@ -60,6 +60,21 @@ export function buildExecutePrompt(brief: PipelineBrief, planId: number): string
   ].join('\n')
 }
 
+/**
+ * runId для Proof Pack: приоритет — привязанный к прогону pipeline; иначе
+ * последний прогон того же чата; иначе самый свежий прогон проекта; иначе null.
+ * runs — список agent_runs проекта новейшими первыми (agentRuns.list).
+ */
+export function resolveProofRunId(
+  agentRunId: string | null,
+  chatId: number | null,
+  runs: ReadonlyArray<{ runId: string; chatId: number | null }>,
+): string | null {
+  if (agentRunId) return agentRunId
+  const sameChat = runs.find(r => r.chatId === chatId)
+  return sameChat?.runId ?? runs[0]?.runId ?? null
+}
+
 /** Режим агента для авто-send шага pipeline. */
 export type PipelineSendMode = 'plan' | 'accept-edits'
 

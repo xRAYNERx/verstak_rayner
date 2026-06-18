@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { EMPTY_BRIEF, isBriefReady, buildPlanPrompt, buildExecutePrompt, pipelineStepIndex, buildPipelineSend, verifyState } from '../../src/lib/pipeline-brief'
+import { EMPTY_BRIEF, isBriefReady, buildPlanPrompt, buildExecutePrompt, pipelineStepIndex, buildPipelineSend, verifyState, resolveProofRunId } from '../../src/lib/pipeline-brief'
 
 describe('pipeline-brief', () => {
   it('EMPTY_BRIEF не готов', () => {
@@ -68,5 +68,13 @@ describe('pipeline-brief', () => {
     expect(verifyState('partial')).toEqual({ tone: 'warn', canProof: false })
     expect(verifyState('not_run')).toEqual({ tone: 'warn', canProof: false })
     expect(verifyState(null)).toEqual({ tone: 'warn', canProof: false })
+  })
+
+  it('resolveProofRunId: привязанный → он; иначе прогон чата; иначе свежайший; иначе null', () => {
+    const runs = [{ runId: 'r-new', chatId: 9 }, { runId: 'r-chat', chatId: 5 }]
+    expect(resolveProofRunId('r-pinned', 5, runs)).toBe('r-pinned')
+    expect(resolveProofRunId(null, 5, runs)).toBe('r-chat')
+    expect(resolveProofRunId(null, 99, runs)).toBe('r-new')
+    expect(resolveProofRunId(null, 1, [])).toBeNull()
   })
 })
