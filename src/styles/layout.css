@@ -10395,3 +10395,15 @@ textarea.gg-input {
   max-width: 340px;
 }
 .gg-pipeline-banner-spacer { flex: 1; }
+
+/* ── Pipeline Verify-статус в баннере (D6) ─────────────────────────── */
+.gg-pipeline-verify {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.gg-pipeline-verify.is-pass { color: var(--success); }
+.gg-pipeline-verify.is-warn { color: var(--warning, #c98a00); }
+.gg-pipeline-verify.is-fail { color: var(--error); }

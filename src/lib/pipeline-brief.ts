@@ -1,4 +1,15 @@
-import type { PipelineBrief, PipelineStep } from '../types/api'
+import type { PipelineBrief, PipelineStep, VerificationOverall } from '../types/api'
+
+/** Тон Verify-шага + можно ли переходить к Proof. passed → зелёный путь;
+ *  partial/not_run → жёлтый (дожать); failed → красный (фикс/откат). */
+export function verifyState(overall: VerificationOverall | null | undefined): {
+  tone: 'pass' | 'warn' | 'fail'
+  canProof: boolean
+} {
+  if (overall === 'passed') return { tone: 'pass', canProof: true }
+  if (overall === 'failed') return { tone: 'fail', canProof: false }
+  return { tone: 'warn', canProof: false } // partial / not_run / null
+}
 
 /** Шаги «N/5» для баннера: brief(1) собирается в визарде, дальше plan→proof. */
 const STEP_ORDER: Record<PipelineStep, number> = {

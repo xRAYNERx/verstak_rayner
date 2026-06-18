@@ -472,6 +472,11 @@ export const en = {
     toVerify: '→ Verify',
     toProof: '→ Proof Pack',
     cancelRun: 'Cancel',
+    verifyPass: 'Checks passed',
+    verifyWarn: 'Checks not confirmed',
+    verifyFail: 'Checks failed',
+    reattest: 'Re-run verify',
+    proceedAnyway: 'Proceed',
   },
 }
 

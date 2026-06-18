@@ -454,5 +454,10 @@ export const ru: Translations = {
     toVerify: '→ Проверка',
     toProof: '→ Proof Pack',
     cancelRun: 'Отменить',
+    verifyPass: 'Проверки прошли',
+    verifyWarn: 'Проверки не подтверждены',
+    verifyFail: 'Проверки красные',
+    reattest: 'Дожать проверку',
+    proceedAnyway: 'Продолжить',
   },
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { EMPTY_BRIEF, isBriefReady, buildPlanPrompt, buildExecutePrompt, pipelineStepIndex, buildPipelineSend } from '../../src/lib/pipeline-brief'
+import { EMPTY_BRIEF, isBriefReady, buildPlanPrompt, buildExecutePrompt, pipelineStepIndex, buildPipelineSend, verifyState } from '../../src/lib/pipeline-brief'
 
 describe('pipeline-brief', () => {
   it('EMPTY_BRIEF не готов', () => {
@@ -60,5 +60,13 @@ describe('pipeline-brief', () => {
   it('buildPipelineSend для verify/proof → null (нет авто-send)', () => {
     expect(buildPipelineSend('verify', brief, 1)).toBeNull()
     expect(buildPipelineSend('proof', brief, 1)).toBeNull()
+  })
+
+  it('verifyState: passed→pass+canProof, failed→fail, partial/not_run/null→warn', () => {
+    expect(verifyState('passed')).toEqual({ tone: 'pass', canProof: true })
+    expect(verifyState('failed')).toEqual({ tone: 'fail', canProof: false })
+    expect(verifyState('partial')).toEqual({ tone: 'warn', canProof: false })
+    expect(verifyState('not_run')).toEqual({ tone: 'warn', canProof: false })
+    expect(verifyState(null)).toEqual({ tone: 'warn', canProof: false })
   })
 })
