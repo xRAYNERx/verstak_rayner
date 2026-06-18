@@ -321,11 +321,12 @@ function ProjectGroupBlock({
 interface ProjectRailProps {
   onOpenProjectSettings: (project: ProjectMeta) => void
   onOpenAppSettings: () => void
+  onOpenHelp: () => void
   sidebarOpen: boolean
   onToggleSidebar: () => void
 }
 
-export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarOpen, onToggleSidebar }: ProjectRailProps) {
+export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, onOpenHelp, sidebarOpen, onToggleSidebar }: ProjectRailProps) {
   const t = useT()
   const { path, projectList, sessions, setProject, refreshProjectList } = useProject()
   const [bootstrapped, setBootstrapped] = useState(false)
@@ -623,16 +624,28 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, sidebarO
 
       <div className="gg-rail-footer">
         <UpdateNotification railExpanded={contentExpanded} />
-        <button
-          type="button"
-          className="gg-rail-app-settings"
-          onClick={onOpenAppSettings}
-          title={t.settings.title}
-          aria-label={t.settings.title}
-        >
-          <SettingsGearIcon size={18} />
-          <span className="gg-rail-app-settings-label" aria-hidden={!contentExpanded}>{t.settings.title}</span>
-        </button>
+        <div className="gg-rail-footer-actions">
+          <button
+            type="button"
+            className="gg-rail-app-settings"
+            onClick={onOpenAppSettings}
+            title={t.settings.title}
+            aria-label={t.settings.title}
+          >
+            <SettingsGearIcon size={18} />
+            <span className="gg-rail-app-settings-label" aria-hidden={!contentExpanded}>{t.settings.title}</span>
+          </button>
+          <button
+            type="button"
+            className="gg-rail-help-btn"
+            onClick={onOpenHelp}
+            disabled={!path}
+            title={path ? t.help.title : t.help.noProject}
+            aria-label={t.help.title}
+          >
+            <span className="gg-rail-help-icon" aria-hidden>?</span>
+          </button>
+        </div>
       </div>
     </div>
     {showCreateClient && (

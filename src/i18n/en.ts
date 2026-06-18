@@ -224,6 +224,15 @@ export const en = {
   },
 
   // Settings
+  help: {
+    title: 'Verstak help',
+    button: 'Help',
+    banner: 'Help mode — questions about Verstak UI and features only',
+    emptyTitle: 'Verstak help',
+    emptyHint: 'Ask how the sidebar, agent modes, message queue, skills, or model settings work.',
+    exampleQuestions: 'Example questions',
+    noProject: 'Open a project first — help is per project but does not modify files.',
+  },
   settings: {
     title: 'Settings',
     appearance: 'Appearance',

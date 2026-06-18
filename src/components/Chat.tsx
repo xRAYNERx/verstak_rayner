@@ -130,11 +130,17 @@ Out of scope: общие best practices, рефакторинги ради кр�
 
 export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSideChat }: ChatProps) {
   const t = useT()
-  const { messages, addMessage, insertMessageBeforeLast, updateLastAssistant, isStreaming, setStreaming, activity, preflights, subagentRuns, sessionUsage, path: activePath, chatSessions, activeChatId } = useProject()
+  const { messages, addMessage, insertMessageBeforeLast, updateLastAssistant, isStreaming, setStreaming, activity, preflights, subagentRuns, sessionUsage, path: activePath, chatSessions, activeChatId, helpChatId } = useProject()
+  const isHelpChat = helpChatId != null && activeChatId === helpChatId
   const { mode: agentMode, setMode: setAgentMode } = useAgentMode()
   const projectName = activePath ? activePath.replace(/^.*[\\/]/, '') : null
-  const activeChatTitle = chatSessions.find(s => s.id === activeChatId)?.title ?? null
+  const activeChatTitle = isHelpChat
+    ? t.help.emptyTitle
+    : (chatSessions.find(s => s.id === activeChatId)?.title ?? null)
   const provider = useProvider()
+  useEffect(() => {
+    if (isHelpChat) setAgentMode('plan')
+  }, [isHelpChat, setAgentMode])
   const [input, setInput] = useState('')
   /** Live token-count preview for whatever is in the composer right now. */
   const [previewTokens, setPreviewTokens] = useState<{ tokens: number; exact: boolean } | null>(null)
@@ -1138,7 +1144,24 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         <div className="gg-chat-stream-inner">
         {/* Crash-resume: баннер «сессия прервана» (если есть зависшие прогоны). */}
         <ResumeBanner />
-        {!hasMessages && (
+        {isHelpChat && (
+          <div className="gg-help-chat-banner" role="note">
+            <span className="gg-help-chat-banner-icon" aria-hidden>❓</span>
+            <span>{t.help.banner}</span>
+          </div>
+        )}
+        {!hasMessages && isHelpChat && (
+          <div className="gg-chat-empty gg-chat-empty-help">
+            <div className="gg-chat-empty-title">{t.help.emptyTitle}</div>
+            <div className="gg-chat-empty-hint">{t.help.emptyHint}</div>
+            <div className="gg-chat-empty-quick">
+              {['Как устроен сайдбар?', 'Чем чеклист отличается от прогонов?', 'Как поставить задачу в очередь?'].map(q => (
+                <button key={q} type="button" className="gg-quick-action" onClick={() => setInput(q)}>{q}</button>
+              ))}
+            </div>
+          </div>
+        )}
+        {!hasMessages && !isHelpChat && (
           <div className="gg-chat-empty">
             <img src={iconUrl} alt="Verstak" className="gg-chat-empty-mark-img" />
             <div className="gg-chat-empty-title">Готов к работе</div>

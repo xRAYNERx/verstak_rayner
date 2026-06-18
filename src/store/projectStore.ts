@@ -4,6 +4,7 @@ import { sortProjectsByName } from '../lib/project-sort'
 import { isModelValidForProvider } from '../hooks/useProvider'
 import { parseReviewFindings, type ReviewFinding } from '../lib/review-findings'
 import { isGenericChatTitle, titleFromFirstMessage } from '../lib/chat-session-title'
+import { useSkills } from './skillStore'
 import {
   freshSnapshot,
   TOUCH_PRIORITY,
@@ -118,6 +119,8 @@ interface ProjectState {
   chatSessions: ChatSession[]
   /** Currently active chat session id within the project. */
   activeChatId: number | null
+  /** Чат справки (kind=help) — скрыт из сайдбара, открывается кнопкой «?». */
+  helpChatId: number | null
   /** Per-project session snapshots for backgrounded projects. */
   sessions: Record<string, SessionSnapshot>
   /** Per-chat snapshots within active project — preserve state when switching
@@ -219,6 +222,8 @@ interface ProjectState {
   autoTitleChatSession: (chatId: number, firstUserText: string) => Promise<void>
   /** Create a new chat session in the active project and switch to it. */
   newChatSession: (title?: string) => Promise<ChatSession | null>
+  /** Открыть чат справки по интерфейсу Verstak (скилл verstak-guide). */
+  openHelpChat: () => Promise<void>
   /** Подгрузить review sub-chats для указанного main-чата из БД. */
   refreshReviewsFor: (parentChatId: number) => Promise<void>
   /** Начать новое ревью текущего main-чата. Возвращает reviewChatId. */
@@ -287,6 +292,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   projectList: [],
   chatSessions: [],
   activeChatId: null,
+  helpChatId: null,
   sessions: {},
   chatSnapshots: {},
   sendOwners: {},
@@ -567,6 +573,10 @@ export const useProject = create<ProjectState>((set, get) => ({
     const myToken = ++switchChatSessionToken
     const s = get()
     if (!s.path) return
+    const helpId = s.helpChatId
+    if (helpId != null && s.activeChatId === helpId && id !== helpId) {
+      useSkills.getState().setActiveSkill(null)
+    }
     const nextSnapshots = { ...s.chatSnapshots }
     if (s.activeChatId != null && s.activeChatId !== id) {
       nextSnapshots[s.activeChatId] = {
@@ -768,6 +778,14 @@ export const useProject = create<ProjectState>((set, get) => ({
       artifacts: []
     })
     return created
+  },
+  openHelpChat: async () => {
+    const s = get()
+    if (!s.path) return
+    const help = await window.api.chatSessions.getOrCreateHelp(s.path)
+    set({ helpChatId: help.id, activeView: 'chat' })
+    useSkills.getState().setActiveSkill('verstak-guide')
+    await get().switchChatSession(help.id)
   },
   refreshReviewsFor: async (parentChatId) => {
     try {

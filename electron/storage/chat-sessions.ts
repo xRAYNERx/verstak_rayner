@@ -9,7 +9,7 @@ import type { Database } from 'better-sqlite3'
  *               Тоже спрятаны от Sidebar, привязаны к main-чату через
  *               parentChatId. Метаданные суба — в sub-sessions.ts.
  */
-export type ChatKind = 'main' | 'review' | 'subagent'
+export type ChatKind = 'main' | 'review' | 'subagent' | 'help'
 
 export interface ChatSession {
   id: number
@@ -26,6 +26,8 @@ export interface ChatSession {
 export interface ChatSessions {
   /** Только main-чаты — для рендера в Sidebar. */
   list: (projectPath: string) => ChatSession[]
+  /** Один чат справки на проект — скрыт из Sidebar. */
+  getOrCreateHelp: (projectPath: string) => ChatSession
   /** Все review-чаты, относящиеся к одному родителю. */
   listReviews: (parentChatId: number) => ChatSession[]
   get: (id: number) => ChatSession | null
@@ -62,7 +64,7 @@ const SELECT = `
 `
 
 export function createChatSessions(db: Database): ChatSessions {
-  return {
+  const sessions: ChatSessions = {
     list(projectPath) {
       // Sidebar показывает ТОЛЬКО main-чаты. Review-чаты вытаскиваются
       // отдельно через listReviews() когда нужно показать pills в Timeline.
@@ -74,6 +76,13 @@ export function createChatSessions(db: Database): ChatSessions {
       return db.prepare(
         `${SELECT} WHERE parent_chat_id = ? AND kind = 'review' ORDER BY created_at ASC`
       ).all(parentChatId) as Row[]
+    },
+    getOrCreateHelp(projectPath) {
+      const existing = db.prepare(
+        `${SELECT} WHERE project_path = ? AND kind = 'help' LIMIT 1`
+      ).get(projectPath) as Row | undefined
+      if (existing) return existing
+      return sessions.create(projectPath, { title: 'Справка Verstak', kind: 'help' })
     },
     get(id) {
       const row = db.prepare(`${SELECT} WHERE id = ?`).get(id) as Row | undefined
@@ -122,4 +131,5 @@ export function createChatSessions(db: Database): ChatSessions {
       tx()
     }
   }
+  return sessions
 }

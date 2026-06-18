@@ -16,7 +16,7 @@ export interface DependencyMapDTO {
 export interface Attachment { name: string; mimeType: string; data: string; size: number }
 export interface ChatMessage { role: 'user' | 'assistant' | 'system'; content: string; attachments?: Attachment[]; thinking?: string; createdAt?: number }
 export interface StoredChatMessage { id: number; role: 'user' | 'assistant' | 'system'; content: string; createdAt: number }
-export type ChatKind = 'main' | 'review'
+export type ChatKind = 'main' | 'review' | 'help'
 export interface ChatSession {
   id: number
   projectPath: string
@@ -250,6 +250,7 @@ declare global {
         rename: (id: number, title: string) => Promise<void>
         setModel: (id: number, providerId: string | null, model: string | null) => Promise<void>
         remove: (id: number) => Promise<void>
+        getOrCreateHelp: (projectPath: string) => Promise<ChatSession>
       }
       chats: {
         list: (sessionId: number) => Promise<StoredChatMessage[]>

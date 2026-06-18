@@ -291,6 +291,7 @@ export function App() {
       <ProjectRail
         onOpenProjectSettings={setProjectSettingsTarget}
         onOpenAppSettings={() => setShowSettings(true)}
+        onOpenHelp={() => void useProject.getState().openHelpChat()}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(v => !v)}
       />

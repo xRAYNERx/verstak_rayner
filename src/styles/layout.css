@@ -1610,6 +1610,57 @@ html {
   padding: 4px;
   margin: 0 auto;
 }
+.gg-rail-footer-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+}
+.gg-rail:not(.is-shell-expanded) .gg-rail-footer-actions {
+  flex-direction: column;
+  align-items: center;
+  width: auto;
+}
+.gg-rail-help-btn {
+  flex: 1 1 0;
+  min-width: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 36px;
+  padding: 0;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--accent-muted) 55%, var(--bg-elevated));
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+.gg-rail-help-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--accent-muted);
+  border-color: var(--accent-border);
+}
+.gg-rail-help-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.gg-rail-help-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.gg-rail-help-icon {
+  display: block;
+  line-height: 1;
+}
 .gg-rail-app-settings {
   flex-shrink: 0;
   display: inline-flex;
@@ -1633,9 +1684,11 @@ html {
     transform 150ms ease;
 }
 .gg-rail.is-shell-expanded .gg-rail-app-settings {
-  width: 100%;
+  flex: 4 1 0;
+  min-width: 0;
+  width: auto;
   justify-content: flex-start;
-  gap: 10px;
+  gap: 8px;
   padding: 0 10px;
   transition:
     width var(--shell-dur) var(--shell-ease),
@@ -1647,12 +1700,18 @@ html {
     transform 150ms ease;
 }
 .gg-rail:not(.is-shell-expanded) .gg-rail-app-settings {
+  flex: 0 0 auto;
   width: 40px;
   min-width: 40px;
   max-width: 40px;
   padding: 0;
   gap: 0;
   justify-content: center;
+}
+.gg-rail:not(.is-shell-expanded) .gg-rail-help-btn {
+  flex: 0 0 auto;
+  width: 40px;
+  min-width: 40px;
 }
 .gg-rail-app-settings:hover {
   color: var(--text-primary);
@@ -1673,7 +1732,7 @@ html {
   transition: opacity var(--shell-dur) var(--shell-ease);
 }
 .gg-rail.is-expanded .gg-rail-app-settings-label {
-  max-width: 120px;
+  max-width: 9rem;
   opacity: 1;
   transition:
     opacity var(--shell-dur) var(--shell-ease) 50ms,
@@ -2690,6 +2749,31 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
   max-width: 980px;
   margin: 0 auto;
   padding: 24px 28px 12px;
+}
+.gg-help-chat-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  background: color-mix(in srgb, var(--accent-muted) 65%, var(--bg-elevated));
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+.gg-help-chat-banner-icon {
+  flex-shrink: 0;
+  font-size: 15px;
+  line-height: 1.2;
+}
+.gg-chat-empty-help {
+  align-items: flex-start;
+  text-align: left;
+  max-width: 640px;
+  margin: 0 auto;
+  padding-top: 24px;
 }
 .gg-chat-empty {
   flex: 1; display: flex; flex-direction: column;
