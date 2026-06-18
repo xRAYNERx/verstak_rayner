@@ -266,6 +266,8 @@ export const en = {
     checkUpdates: 'Check for updates',
     clearUpdateCache: 'Clear update cache',
     clearingUpdateCache: 'Clearing cache…',
+    updateCacheCleared: 'Update cache cleared',
+    updateCacheFailed: 'Could not clear the update cache',
     checkingUpdates: 'Checking…',
     upToDate: 'You have the latest version',
     updateAvailable: 'Version {version} is available — download starting',

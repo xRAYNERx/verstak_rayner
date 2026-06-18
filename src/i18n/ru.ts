@@ -261,6 +261,8 @@ export const ru: Translations = {
     checkUpdates: 'Проверить обновления',
     clearUpdateCache: 'Очистить кэш обновлений',
     clearingUpdateCache: 'Очищаю кэш…',
+    updateCacheCleared: 'Кэш обновлений очищен',
+    updateCacheFailed: 'Не удалось очистить кэш обновлений',
     checkingUpdates: 'Проверяю…',
     upToDate: 'Установлена последняя версия',
     updateAvailable: 'Доступна версия {version} — скачивание начинается',

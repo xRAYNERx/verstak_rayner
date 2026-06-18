@@ -246,6 +246,60 @@ export async function releaseArtifactsReady(version: string): Promise<boolean> {
   return (await fetchReleaseArtifactMeta(version)) != null
 }
 
+/** Синхронная логика: что ставить, если в main уже новее, чем на Releases. */
+export function pickInstallableUpdate(params: {
+  installed: string
+  repoMax: string | null
+  latestRelease: string | null
+  hasArtifacts: (version: string) => boolean
+}): { installable: string | null; pendingVersion: string | null } {
+  const { installed, repoMax, latestRelease, hasArtifacts } = params
+
+  if (latestRelease && semverGt(latestRelease, installed) && hasArtifacts(latestRelease)) {
+    return { installable: latestRelease, pendingVersion: null }
+  }
+
+  if (repoMax && semverGt(repoMax, installed) && hasArtifacts(repoMax)) {
+    return { installable: repoMax, pendingVersion: null }
+  }
+
+  if (repoMax && semverGt(repoMax, installed)) {
+    return { installable: null, pendingVersion: repoMax }
+  }
+
+  return { installable: null, pendingVersion: null }
+}
+
+/** Версия для скачивания: latest.yml на Releases, даже если package.json на main впереди. */
+export async function resolveInstallableUpdate(
+  installedVersion: string,
+  repoMaxVersion: string | null,
+): Promise<{ installable: string | null; pendingVersion: string | null }> {
+  const latestRelease = await fetchVersionFromLatestYml()
+  const artifactCache = new Map<string, boolean>()
+
+  const hasArtifacts = async (version: string): Promise<boolean> => {
+    const key = normalizeVersion(version)
+    if (artifactCache.has(key)) return artifactCache.get(key)!
+    const ready = await releaseArtifactsReady(key)
+    artifactCache.set(key, ready)
+    return ready
+  }
+
+  if (latestRelease && semverGt(latestRelease, installedVersion) && await hasArtifacts(latestRelease)) {
+    return { installable: latestRelease, pendingVersion: null }
+  }
+
+  if (repoMaxVersion && semverGt(repoMaxVersion, installedVersion)) {
+    if (await hasArtifacts(repoMaxVersion)) {
+      return { installable: repoMaxVersion, pendingVersion: null }
+    }
+    return { installable: null, pendingVersion: repoMaxVersion }
+  }
+
+  return { installable: null, pendingVersion: null }
+}
+
 export type ReleaseNote = {
   version: string
   name: string

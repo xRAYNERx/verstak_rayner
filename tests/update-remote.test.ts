@@ -7,6 +7,7 @@ import {
   normalizeVersion,
   parseGithubRateLimit,
   parseLatestYmlArtifact,
+  pickInstallableUpdate,
   rateLimitWaitMinutes,
   releaseFeedBase,
   semverGt,
@@ -38,6 +39,38 @@ describe('cleanReleaseBody', () => {
   it('strips install footer after horizontal rule', () => {
     const raw = '## Verstak 1.4.0\n\n- Feature A\n\n---\nУстановка: setup.exe'
     expect(cleanReleaseBody(raw)).toBe('## Verstak 1.4.0\n\n- Feature A')
+  })
+})
+
+describe('pickInstallableUpdate', () => {
+  it('prefers latest release when package.json on main is ahead', () => {
+    const result = pickInstallableUpdate({
+      installed: '1.5.5',
+      repoMax: '1.5.12',
+      latestRelease: '1.5.11',
+      hasArtifacts: (v) => v === '1.5.11',
+    })
+    expect(result).toEqual({ installable: '1.5.11', pendingVersion: null })
+  })
+
+  it('returns pending when repo is newer but no artifacts exist', () => {
+    const result = pickInstallableUpdate({
+      installed: '1.5.5',
+      repoMax: '1.5.12',
+      latestRelease: null,
+      hasArtifacts: () => false,
+    })
+    expect(result).toEqual({ installable: null, pendingVersion: '1.5.12' })
+  })
+
+  it('uses repo max when it has artifacts', () => {
+    const result = pickInstallableUpdate({
+      installed: '1.5.10',
+      repoMax: '1.5.11',
+      latestRelease: '1.5.11',
+      hasArtifacts: (v) => v === '1.5.11',
+    })
+    expect(result).toEqual({ installable: '1.5.11', pendingVersion: null })
   })
 })
 

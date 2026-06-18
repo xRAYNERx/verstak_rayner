@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useT } from '../i18n'
 import { semverGt } from '../lib/semver'
 import { formatUpdaterError, type UpdaterErrorPayload } from '../lib/updater-error'
@@ -35,6 +35,8 @@ export function UpdatesSettings() {
   const [notesLoading, setNotesLoading] = useState(false)
   const [notesTargetVersion, setNotesTargetVersion] = useState('')
   const [clearingCache, setClearingCache] = useState(false)
+  const [cacheToast, setCacheToast] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+  const cacheToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const installedNorm = version.replace(/^v/, '')
 
@@ -206,6 +208,19 @@ export function UpdatesSettings() {
     }
   }, [remoteVersion, status, version])
 
+  const showCacheToast = useCallback((kind: 'ok' | 'err', text: string) => {
+    if (cacheToastTimer.current) clearTimeout(cacheToastTimer.current)
+    setCacheToast({ kind, text })
+    cacheToastTimer.current = setTimeout(() => {
+      setCacheToast(null)
+      cacheToastTimer.current = null
+    }, 4000)
+  }, [])
+
+  useEffect(() => () => {
+    if (cacheToastTimer.current) clearTimeout(cacheToastTimer.current)
+  }, [])
+
   const check = useCallback(async () => {
     setStatus('checking')
     setError('')
@@ -225,13 +240,19 @@ export function UpdatesSettings() {
     try {
       const result = await window.api.updater.clearCache()
       applyCheckResult(result)
+      if (result.error || result.errorCode || result.phase === 'error') {
+        showCacheToast('err', formatUpdaterError(result, errorT))
+      } else {
+        showCacheToast('ok', t.settings.updateCacheCleared)
+      }
     } catch {
+      showCacheToast('err', t.settings.updateCacheFailed)
       setError(errorT.updateError)
       setStatus('error')
     } finally {
       setClearingCache(false)
     }
-  }, [applyCheckResult, errorT])
+  }, [applyCheckResult, errorT, showCacheToast, t.settings.updateCacheCleared, t.settings.updateCacheFailed])
 
   const notesTitle = notesTargetVersion && remoteVersion === notesTargetVersion && status !== 'current'
     ? t.updates.releaseNotesTitleAvailable.replace('{version}', notesTargetVersion)
@@ -272,7 +293,12 @@ export function UpdatesSettings() {
 
       <div className="gg-settings-row">
         <label className="gg-settings-label">{t.settings.checkUpdates}</label>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, position: 'relative' }}>
+          {cacheToast && (
+            <div className={`gg-prov-toast is-${cacheToast.kind}`} role="status">
+              {cacheToast.text}
+            </div>
+          )}
           <div className="gg-updates-notes-actions">
             <button type="button" className="gg-btn gg-btn-ghost" onClick={() => void check()} disabled={busy}>
               {status === 'checking' && !clearingCache ? t.settings.checkingUpdates : t.settings.checkUpdates}

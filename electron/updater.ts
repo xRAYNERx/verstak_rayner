@@ -11,6 +11,7 @@ import {
   type GithubRateLimitInfo,
   releaseArtifactsReady,
   releaseFeedBase,
+  resolveInstallableUpdate,
   semverGt,
 } from './update-remote'
 import {
@@ -368,9 +369,21 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
       return { newer: false, version: remote, pendingRelease: false }
     }
 
-    const hasArtifacts = await releaseArtifactsReady(remote)
-    lastProbePending = !hasArtifacts
-    return { newer: true, version: remote, pendingRelease: lastProbePending }
+    const resolved = await resolveInstallableUpdate(current, remote)
+    if (resolved.installable) {
+      lastProbeVersion = resolved.installable
+      lastProbePending = false
+      return { newer: true, version: resolved.installable, pendingRelease: false }
+    }
+
+    if (resolved.pendingVersion) {
+      lastProbeVersion = resolved.pendingVersion
+      lastProbePending = true
+      return { newer: true, version: resolved.pendingVersion, pendingRelease: true }
+    }
+
+    lastProbePending = false
+    return { newer: false, version: remote, pendingRelease: false }
   }
 
   const resetUpdaterSession = () => {
