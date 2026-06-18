@@ -13,7 +13,7 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
-    commit: '755d8ce',
+    commit: '66b03eb',
     deployed: '18.06.2026',
     treeVersion: '1.5.5',
     title: 'Чаты: починка контекстного меню по ПКМ',
