@@ -70,3 +70,39 @@ export function freshSnapshot(): SessionSnapshot {
     hasUnread: false
   }
 }
+
+/** Набор полей одного чата, путешествующих вместе при уходе в фон / возврате.
+ *  Это SessionSnapshot без hasUnread — тот же набор держит top-level стора для
+ *  активного чата. Единый источник истины формы «состояние одного чата». */
+export type ChatStateBundle = Omit<SessionSnapshot, 'hasUnread'>
+
+/** Снять bundle активного чата в снапшот (уход в фон). hasUnread=false —
+ *  пользователь только что его смотрел. Заменяет 3 рукописные копии литерала
+ *  bundle в setProject / switchChatSession / newChatSession (источник #8/#17:
+ *  «забыли поле в одной из копий»). */
+export function captureBundle(s: ChatStateBundle): SessionSnapshot {
+  return {
+    messages: s.messages,
+    isStreaming: s.isStreaming,
+    pendingWrites: s.pendingWrites,
+    pendingCommand: s.pendingCommand,
+    activity: s.activity,
+    sessionUsage: s.sessionUsage,
+    runningPlanStep: s.runningPlanStep,
+    hasUnread: false
+  }
+}
+
+/** Развернуть снапшот обратно в top-level поля активного чата (восстановление
+ *  из фона). Обратная к captureBundle — отбрасывает hasUnread. */
+export function restoreBundle(snap: SessionSnapshot): ChatStateBundle {
+  return {
+    messages: snap.messages,
+    isStreaming: snap.isStreaming,
+    pendingWrites: snap.pendingWrites,
+    pendingCommand: snap.pendingCommand,
+    activity: snap.activity,
+    sessionUsage: snap.sessionUsage,
+    runningPlanStep: snap.runningPlanStep
+  }
+}

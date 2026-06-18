@@ -5,6 +5,8 @@ import { isModelValidForProvider } from '../hooks/useProvider'
 import { parseReviewFindings, type ReviewFinding } from '../lib/review-findings'
 import {
   freshSnapshot,
+  captureBundle,
+  restoreBundle,
   TOUCH_PRIORITY,
   type PendingWrite,
   type PendingCommand,
@@ -299,19 +301,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     // 1) Snapshot current session before switching (so background streams keep their state)
     let nextSessions = s.sessions
     if (s.path && s.path !== path) {
-      nextSessions = {
-        ...s.sessions,
-        [s.path]: {
-          messages: s.messages,
-          isStreaming: s.isStreaming,
-          pendingWrites: s.pendingWrites,
-          pendingCommand: s.pendingCommand,
-          activity: s.activity,
-          sessionUsage: s.sessionUsage,
-          runningPlanStep: s.runningPlanStep,
-          hasUnread: false
-        }
-      }
+      nextSessions = { ...s.sessions, [s.path]: captureBundle(s) }
     }
     const existing = nextSessions[path]
     let target: SessionSnapshot
@@ -566,16 +556,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     if (!s.path) return
     const nextSnapshots = { ...s.chatSnapshots }
     if (s.activeChatId != null && s.activeChatId !== id) {
-      nextSnapshots[s.activeChatId] = {
-        messages: s.messages,
-        isStreaming: s.isStreaming,
-        pendingWrites: s.pendingWrites,
-        pendingCommand: s.pendingCommand,
-        activity: s.activity,
-        sessionUsage: s.sessionUsage,
-        runningPlanStep: s.runningPlanStep,
-        hasUnread: false
-      }
+      nextSnapshots[s.activeChatId] = captureBundle(s)
     }
     const restored = nextSnapshots[id]
     const session = s.chatSessions.find(c => c.id === id)
@@ -583,14 +564,8 @@ export const useProject = create<ProjectState>((set, get) => ({
     if (restored) {
       delete nextSnapshots[id]
       set({
+        ...restoreBundle(restored),
         activeChatId: id,
-        messages: restored.messages,
-        isStreaming: restored.isStreaming,
-        pendingWrites: restored.pendingWrites,
-        pendingCommand: restored.pendingCommand,
-        activity: restored.activity,
-        sessionUsage: restored.sessionUsage,
-        runningPlanStep: restored.runningPlanStep,
         chatSnapshots: nextSnapshots,
         openedReviewId: null
       })
@@ -742,16 +717,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     // фоновые события (включая финальный done) уходят в пустой freshSnapshot (#8).
     const nextSnapshots = { ...s.chatSnapshots }
     if (s.activeChatId != null && s.activeChatId !== created.id) {
-      nextSnapshots[s.activeChatId] = {
-        messages: s.messages,
-        isStreaming: s.isStreaming,
-        pendingWrites: s.pendingWrites,
-        pendingCommand: s.pendingCommand,
-        activity: s.activity,
-        sessionUsage: s.sessionUsage,
-        runningPlanStep: s.runningPlanStep,
-        hasUnread: false
-      }
+      nextSnapshots[s.activeChatId] = captureBundle(s)
     }
     set({
       chatSessions: list,
