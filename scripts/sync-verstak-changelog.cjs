@@ -13,7 +13,7 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
-    commit: 'pending-native-fix',
+    commit: 'a5ef302',
     deployed: '19.06.2026',
     treeVersion: '1.5.14',
     title: 'Старт после обновления: авто-починка SQLite native-модуля',
