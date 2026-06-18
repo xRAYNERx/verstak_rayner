@@ -85,8 +85,7 @@ export function App() {
   const [projectSettingsTarget, setProjectSettingsTarget] = useState<ProjectMeta | null>(null)
   // Right docked panel: terminal or parallel side-chat.
   const [rightPanel, setRightPanel] = useState<'none' | 'terminal' | 'sidechat'>('none')
-  // Lazily-created dedicated side-chat session id. Created on first open of the
-  // side-chat panel, reused while the panel stays open within a project.
+  // Side-chat session id — created on first sent message, not on panel open.
   const [sideChatId, setSideChatId] = useState<number | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(readSidebarOpen)
   const [lang, setLang] = useState<Lang>('ru')
@@ -177,25 +176,8 @@ export function App() {
     setRightPanel(p => (p === 'sidechat' ? 'none' : p))
   }, [path])
 
-  // Open the side-chat panel — lazily create a dedicated background chat
-  // session the first time (separate from the active left-list chat).
-  async function openSideChat() {
+  function openSideChat() {
     if (!path) return
-    if (sideChatId == null) {
-      try {
-        const currentProvider = await window.api.settings.getKey('provider')
-        const currentModel = currentProvider
-          ? await window.api.settings.getKey(`model_${currentProvider}`)
-          : null
-        const created = await window.api.chatSessions.create(path, {
-          title: t.chat.sideChatTitle,
-          providerId: currentProvider ?? null,
-          model: currentModel ?? null,
-        })
-        setSideChatId(created.id)
-        await useProject.getState().refreshChatSessions()
-      } catch { return }
-    }
     setRightPanel('sidechat')
   }
 
@@ -350,8 +332,12 @@ export function App() {
                 </div>
               </div>
             )}
-            {effectiveRightPanel === 'sidechat' && sideChatId != null && (
-              <SideChat sideChatId={sideChatId} onClose={() => setRightPanel('none')} />
+            {effectiveRightPanel === 'sidechat' && (
+              <SideChat
+                sideChatId={sideChatId}
+                onSessionCreated={setSideChatId}
+                onClose={() => setRightPanel('none')}
+              />
             )}
         </div>
         {activeView === 'tasks' && <TasksView />}
