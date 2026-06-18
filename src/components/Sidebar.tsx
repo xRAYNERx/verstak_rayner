@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from 'react'
+import { useEffect, useState, type MouseEvent, type ReactElement } from 'react'
 import { useProject, type ViewId } from '../store/projectStore'
 import { ModelPicker } from './ModelPicker'
 import { CreateClientModal } from './CreateClientModal'
@@ -11,8 +11,21 @@ function ChatNavSection() {
   const [open, setOpen] = useState(true)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editTitle, setEditTitle] = useState('')
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; id: number; title: string } | null>(null)
 
   const isActiveSection = activeView === 'chat'
+
+  useEffect(() => {
+    if (!contextMenu) return
+    const close = () => setContextMenu(null)
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
+    window.addEventListener('mousedown', close)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('mousedown', close)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [contextMenu])
 
   async function startEdit(id: number, currentTitle: string) {
     setEditingId(id)
@@ -38,8 +51,15 @@ function ChatNavSection() {
       await refreshChatSessions()
     }
   }
-  async function removeSession(id: number) {
-    if (!window.confirm(t.sidebar.deleteChat)) return
+  function openContextMenu(e: MouseEvent, id: number, title: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({ x: e.clientX, y: e.clientY, id, title })
+  }
+
+  async function removeSession(id: number, title: string) {
+    const msg = t.sidebar.deleteChatConfirm.replace('{title}', title)
+    if (!window.confirm(msg)) return
     await window.api.chatSessions.remove(id)
     // Grok audit fix: каскадное удаление review-чатов в БД работало, но в
     // store оставались stale entries и openedReviewId мог указывать на
@@ -86,6 +106,7 @@ function ChatNavSection() {
             <div
               key={s.id}
               className={`gg-chat-nav-item ${s.id === activeChatId && isActiveSection ? 'is-active' : ''}`}
+              onContextMenu={(e) => openContextMenu(e, s.id, s.title)}
             >
               {editingId === s.id ? (
                 <input
@@ -117,11 +138,44 @@ function ChatNavSection() {
               )}
               <button
                 className="gg-chat-nav-x"
-                onClick={() => void removeSession(s.id)}
+                onClick={() => void removeSession(s.id, s.title)}
                 title={t.sidebar.delete}
               >×</button>
             </div>
           ))}
+        </div>
+      )}
+      {contextMenu && (
+        <div
+          className="gg-chat-nav-menu"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          role="menu"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            className="gg-chat-nav-menu-item"
+            role="menuitem"
+            onClick={() => {
+              const { id, title } = contextMenu
+              setContextMenu(null)
+              void startEdit(id, title)
+            }}
+          >
+            {t.sidebar.renameChat}
+          </button>
+          <button
+            type="button"
+            className="gg-chat-nav-menu-item is-danger"
+            role="menuitem"
+            onClick={() => {
+              const { id, title } = contextMenu
+              setContextMenu(null)
+              void removeSession(id, title)
+            }}
+          >
+            {t.sidebar.delete}
+          </button>
         </div>
       )}
     </>

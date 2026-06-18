@@ -1950,6 +1950,32 @@ html {
   font-size: var(--text-sm);
   outline: none;
 }
+.gg-chat-nav-menu {
+  position: fixed;
+  z-index: 120;
+  min-width: 168px;
+  padding: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+.gg-chat-nav-menu-item {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+.gg-chat-nav-menu-item:hover { background: var(--bg-hover); }
+.gg-chat-nav-menu-item.is-danger { color: var(--error); }
+.gg-chat-nav-menu-item.is-danger:hover { background: var(--error-muted); }
 
 .gg-modal-footer-hint {
   flex: 1;

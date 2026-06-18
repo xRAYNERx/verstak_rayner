@@ -120,6 +120,8 @@ export const en = {
     project: 'Project',
     openFolder: 'Open folder',
     deleteChat: 'Delete this chat and all its messages?',
+    renameChat: 'Rename',
+    deleteChatConfirm: 'Delete chat “{title}”? All messages in this thread will be permanently removed.',
     collapse: 'Collapse',
     expand: 'Expand',
     newChat: 'New chat',

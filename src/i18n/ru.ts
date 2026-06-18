@@ -119,6 +119,8 @@ export const ru: Translations = {
     project: 'Проект',
     openFolder: 'Открыть папку',
     deleteChat: 'Удалить этот чат и все его сообщения?',
+    renameChat: 'Переименовать',
+    deleteChatConfirm: 'Удалить чат «{title}»? Вся переписка в этой ветке будет удалена безвозвратно.',
     collapse: 'Свернуть',
     expand: 'Развернуть',
     newChat: 'Новый чат',
