@@ -13,6 +13,16 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: 'f82bb56',
+    deployed: '18.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Чаты в сайдбаре: контекстное меню по ПКМ',
+    changes: [
+      'Правый клик по чату — «Переименовать» или «Удалить».',
+      'Подтверждение удаления: переписка в ветке удаляется безвозвратно (двойной клик для переименования по-прежнему работает).',
+    ],
+  },
+  {
     commit: 'e1beadb',
     deployed: '18.06.2026',
     treeVersion: '1.5.5',
