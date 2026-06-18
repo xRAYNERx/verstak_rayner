@@ -13,6 +13,18 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: '73cfdf7',
+    deployed: '18.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Чат: разблокировка после справки',
+    changes: [
+      'При входе в «?» флаг стрима проекта сбрасывается в корне — стрим живёт в snapshot.',
+      'При выходе из справки чат проекта восстанавливается; send не блокируется зря.',
+      'Повторный клик по «?» — выход из справки обратно в проект.',
+      'События фонового стрима проекта при открытой справке идут в snapshot, не в корень.',
+    ],
+  },
+  {
     commit: 'f45540f',
     deployed: '18.06.2026',
     treeVersion: '1.5.5',
