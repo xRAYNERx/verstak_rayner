@@ -844,6 +844,7 @@ async function runPlainConversation(
     inputTokens: 0, outputTokens: 0, cachedInputTokens: 0
   }
   let exitReason: ExitReason = 'completed'
+  let handedOff = false // #15: при fallback финализирует рекурсивный фрейм
   try {
     while (!signal.aborted) {
       drainSupplements()
@@ -924,7 +925,9 @@ async function runPlainConversation(
           fallbackOpts.triedProviders.add(nextId)
           // #7: модель fallback-провайдера, а не упавшего — для верного cost/журнала.
           const nextModel = fallbackOpts.getProviderModel(nextId) ?? model
-          return runPlainConversation(sender, sendId, nextProvider, projectPath, messages, signal, recordJournal, costGuard, nextId, nextModel, fallbackOpts)
+          // #15: fallback-фрейм владеет финализацией (agentRuns/runId переданы).
+          handedOff = true
+          return runPlainConversation(sender, sendId, nextProvider, projectPath, messages, signal, recordJournal, costGuard, nextId, nextModel, fallbackOpts, agentRuns, runId)
         }
       }
     }
@@ -938,8 +941,8 @@ async function runPlainConversation(
     unregisterConversationSupplements(sendId)
     // Same guarantee as runApiConversation: every exit path writes a journal
     // entry. Skipped when there's no projectPath (background sessions in the
-    // future may not have one).
-    if (projectPath) {
+    // future may not have one). #15: при fallback журнал/finish делает рекурсивный фрейм.
+    if (!handedOff && projectPath) {
       try {
         writeSessionJournal(
           recordJournal,
@@ -957,9 +960,9 @@ async function runPlainConversation(
     // Multi-agent Manager (Фаза 2): завершаем прогон. Best-effort — ошибка
     // storage не должна ломать runner. Plain-путь: tool/files = 0 (CLI крутит
     // их внутри, наружу не видно), стоимость из costGuard. agentRuns/runId не
-    // прокидываются в рекурсивный fallback-вызов → finish пишется ровно раз
-    // (внешний finally). Review-прогоны (owner='review') финишируются здесь же.
-    if (agentRuns && runId) {
+    // (внешний finally, либо рекурсивный fallback-фрейм при handedOff — #15).
+    // Review-прогоны (owner='review') финишируются здесь же.
+    if (!handedOff && agentRuns && runId) {
       try {
         // Timeline: финальный ответ агента — итог CLI-прогона (на CLI-пути нет
         // recordRunEvent, так что это единственное содержательное событие ленты).
@@ -1110,6 +1113,10 @@ async function runApiConversation(
   // returns abnormally (uncaught exception during streaming) the journal
   // still captures it. Per Gemini audit 2.2 + Idea B.
   let exitReason: ExitReason = 'crashed'
+  // #15: при smart-fallback финализацию (journal + agentRuns.finish) делает
+  // рекурсивный fallback-фрейм — внешний finally её пропускает, иначе успешный
+  // fallback писался бы статусом 'crashed' упавшей попытки.
+  let handedOff = false
   // Дерево делегирования (Фаза 4, Идея 3): один счётчик агентов на весь прогон
   // (ai:send). Прокидывается во ВСЕ вложенные субы через ctx.agentCounter →
   // общий потолок MAX_TOTAL_AGENTS_PER_SESSION на всё дерево, а не на ветку.
@@ -1523,12 +1530,12 @@ async function runApiConversation(
           // #7: модель fallback-провайдера, а не упавшего — иначе cost-guard/журнал
           // считаются по тарифу чужой модели (cost cap не срабатывает).
           const nextModel = fallbackOpts.getProviderModel(nextId) ?? model
-          // Ревью P0: agentRuns/runId — undefined НАМЕРЕННО (finish пишется ровно
-          // раз во внешнем finally, см. ниже). НО verifications и toolsAllow
-          // прокидываем РЕАЛЬНЫЕ: capability-фильтр (M4, безопасность — read-only
-          // скилл не должен получить write/run_command в fallback-прогоне) и
-          // индексация attest-артефактов обязаны действовать и при фолбэке.
-          return runApiConversation(sender, sendId, nextProvider, fallbackTools, projectPath, initialMessages, signal, recordWrite, recordPlan, recordJournal, readJournal, saveMemory, searchMemories, searchConversations, connectors, agentMode, turnsBudget, skillRegistry, getSecretForDelegate, costGuard, nextId, nextModel, fallbackOpts, mcpClientRef, appendAuditFn, trackToolPatternFn, parentChatId, subSessions, sessionTodos, undefined, undefined, verifications, toolsAllow)
+          // #15: передаём agentRuns/runId в fallback-фрейм — ОН финализирует run
+          // своим (реальным) статусом; внешний finally пропускает финализацию по
+          // handedOff. verifications/toolsAllow — capability-фильтр (M4) и индексация
+          // attest обязаны действовать и при фолбэке.
+          handedOff = true
+          return runApiConversation(sender, sendId, nextProvider, fallbackTools, projectPath, initialMessages, signal, recordWrite, recordPlan, recordJournal, readJournal, saveMemory, searchMemories, searchConversations, connectors, agentMode, turnsBudget, skillRegistry, getSecretForDelegate, costGuard, nextId, nextModel, fallbackOpts, mcpClientRef, appendAuditFn, trackToolPatternFn, parentChatId, subSessions, sessionTodos, agentRuns, runId, verifications, toolsAllow)
         }
       }
     }
@@ -1540,6 +1547,10 @@ async function runApiConversation(
     sender.send('ai:event', { id: sendId, event: { type: 'done' } })
   } finally {
     unregisterConversationSupplements(sendId)
+    // #15: при handed-off fallback journal/finish делает рекурсивный фрейм (ему
+    // переданы recordJournal + agentRuns/runId) — внешний пропускает, иначе
+    // дублировал бы журнал и финализировал run статусом упавшей попытки.
+    if (!handedOff) {
     // GUARANTEED journal write on every exit path — completion, abort, error,
     // max-turns, loop-detected, crashed (uncaught). Per Gemini audit Idea B:
     // 'любое завершение runApiConversation обязано вызвать writeSessionJournal'.
@@ -1583,6 +1594,7 @@ async function runApiConversation(
         console.warn('[agent-runs] finish (api) failed:', err instanceof Error ? err.message : err)
       }
     }
+    } // /if (!handedOff) — #15
   }
 }
 
