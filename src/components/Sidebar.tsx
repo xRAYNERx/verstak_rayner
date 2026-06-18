@@ -26,8 +26,15 @@ function ChatNavSection() {
   const [editTitle, setEditTitle] = useState('')
   const [contextMenu, setContextMenu] = useState<ChatContextMenuState | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const editInputRef = useRef<HTMLInputElement | null>(null)
+  const editOriginalRef = useRef('')
 
   const isActiveSection = activeView === 'chat'
+
+  useEffect(() => {
+    if (!open && editingId != null) void commitEdit()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- commit on collapse only
+  }, [open])
 
   useEffect(() => {
     if (!contextMenu) return
@@ -49,26 +56,39 @@ function ChatNavSection() {
     }
   }, [contextMenu])
 
-  async function startEdit(id: number, currentTitle: string) {
+  function focusEditInput() {
+    requestAnimationFrame(() => {
+      const el = editInputRef.current
+      if (!el) return
+      el.focus()
+      el.select()
+    })
+  }
+
+  function startEdit(id: number, currentTitle: string) {
+    editOriginalRef.current = currentTitle
     setEditingId(id)
     setEditTitle(currentTitle)
+    focusEditInput()
   }
-  async function commitEdit() {
-    if (editingId == null) return
-    const t = editTitle.trim()
-    const idToEdit = editingId
-    // Очищаем edit-state СРАЗУ чтобы input закрылся даже если IPC упадёт
+
+  function cancelEdit() {
     setEditingId(null)
     setEditTitle('')
-    if (!t) return
-    // Optimistic local update — заголовок меняется мгновенно, без полной
-    // перезагрузки chatSessions. Это убирает re-render волну, которая
-    // ранее иногда обрывала входящий ai:event стрим.
-    patchChatSession(idToEdit, { title: t })
+    editOriginalRef.current = ''
+  }
+
+  async function commitEdit() {
+    if (editingId == null) return
+    const nextTitle = editTitle.trim()
+    const idToEdit = editingId
+    const original = editOriginalRef.current
+    cancelEdit()
+    if (!nextTitle || nextTitle === original) return
+    patchChatSession(idToEdit, { title: nextTitle })
     try {
-      await window.api.chatSessions.rename(idToEdit, t)
+      await window.api.chatSessions.rename(idToEdit, nextTitle)
     } catch (err) {
-      // Если запись в DB упала — откатываем UI и подтягиваем правду
       console.error('[Sidebar] rename failed, reverting:', err)
       await refreshChatSessions()
     }
@@ -127,19 +147,32 @@ function ChatNavSection() {
           {chatSessions.map(s => (
             <div
               key={s.id}
-              className={`gg-chat-nav-item ${s.id === activeChatId && isActiveSection ? 'is-active' : ''}`}
+              className={`gg-chat-nav-item ${s.id === activeChatId && isActiveSection ? 'is-active' : ''} ${editingId === s.id ? 'is-editing' : ''}`}
               onContextMenu={(e) => openContextMenu(e, s.id, s.title)}
             >
               {editingId === s.id ? (
                 <input
-                  autoFocus
+                  ref={editInputRef}
                   className="gg-chat-nav-edit"
                   value={editTitle}
                   onChange={e => setEditTitle(e.target.value)}
-                  onBlur={() => void commitEdit()}
+                  onInput={e => setEditTitle(e.currentTarget.value)}
+                  onMouseDown={e => e.stopPropagation()}
+                  onBlur={e => {
+                    const row = e.currentTarget.closest('.gg-chat-nav-item')
+                    if (row && e.relatedTarget instanceof Node && row.contains(e.relatedTarget)) return
+                    void commitEdit()
+                  }}
                   onKeyDown={e => {
-                    if (e.key === 'Enter') void commitEdit()
-                    if (e.key === 'Escape') { setEditingId(null); setEditTitle('') }
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      void commitEdit()
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      cancelEdit()
+                    }
                   }}
                 />
               ) : (
@@ -159,12 +192,14 @@ function ChatNavSection() {
                   )}
                 </button>
               )}
-              <button
-                className="gg-chat-nav-x"
-                onClick={() => void removeSession(s.id, s.title)}
-                onContextMenu={(e) => openContextMenu(e, s.id, s.title)}
-                title={t.sidebar.delete}
-              >×</button>
+              {editingId !== s.id && (
+                <button
+                  className="gg-chat-nav-x"
+                  onClick={() => void removeSession(s.id, s.title)}
+                  onContextMenu={(e) => openContextMenu(e, s.id, s.title)}
+                  title={t.sidebar.delete}
+                >×</button>
+              )}
             </div>
           ))}
         </div>
@@ -184,7 +219,7 @@ function ChatNavSection() {
             onClick={() => {
               const { id, title } = contextMenu
               setContextMenu(null)
-              void startEdit(id, title)
+              requestAnimationFrame(() => startEdit(id, title))
             }}
           >
             {t.sidebar.renameChat}

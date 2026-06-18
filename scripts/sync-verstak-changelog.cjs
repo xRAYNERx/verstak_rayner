@@ -13,6 +13,16 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: 'TBD',
+    deployed: '18.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Чаты: починка переименования в сайдбаре',
+    changes: [
+      'Можно нормально печатать новое имя (фокус, onInput, без конфликта с глобальными кликами).',
+      'После Enter/Esc/клика снаружи рамка редактирования снимается; состояние не залипает при сворачивании списка.',
+    ],
+  },
+  {
     commit: '66b03eb',
     deployed: '18.06.2026',
     treeVersion: '1.5.5',
