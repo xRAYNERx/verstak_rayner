@@ -166,6 +166,18 @@ export function createOpenAiCompatProvider(opts: OpenAiCompatOptions): ChatProvi
             for (const k of Object.keys(inProgress)) delete inProgress[Number(k)]
           }
         }
+        // Флаш недослитых tool-calls: некоторые OpenAI-совместимые серверы
+        // (Ollama, часть DeepSeek/Qwen-сборок) закрывают стрим с finish_reason
+        // 'stop' вместо 'tool_calls' — без этого накопленные вызовы молча
+        // терялись и агент видел пустой turn. Штатный путь выше очищает
+        // inProgress, так что здесь остаются ТОЛЬКО недослитые (без дубля).
+        for (const k of Object.keys(inProgress)) {
+          const t = inProgress[Number(k)]
+          if (!t.name) continue
+          let args: Record<string, unknown> = {}
+          try { args = t.args ? JSON.parse(t.args) : {} } catch { args = {} }
+          yield { type: 'tool-call', call: { id: t.id, name: t.name, args } }
+        }
         yield { type: 'done' }
       } catch (err) {
         yield { type: 'error', message: err instanceof Error ? err.message : String(err) }
