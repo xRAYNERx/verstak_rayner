@@ -13,6 +13,16 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: '4cbdebc',
+    deployed: '18.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Параллельный чат: сессия в сайдбаре только после первого сообщения',
+    changes: [
+      'Открытие панели параллельного чата больше не создаёт запись в списке чатов слева.',
+      'Чат «Параллельный чат» появляется в боковой панели только после отправки первого сообщения.',
+    ],
+  },
+  {
     commit: 'aaec457',
     deployed: '18.06.2026',
     treeVersion: '1.5.5',
