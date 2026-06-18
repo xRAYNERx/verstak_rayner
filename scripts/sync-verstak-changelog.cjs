@@ -13,6 +13,18 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: 'pending-native-fix',
+    deployed: '19.06.2026',
+    treeVersion: '1.5.14',
+    title: 'Старт после обновления: авто-починка SQLite native-модуля',
+    changes: [
+      'Причина ошибки БД: robocopy /MIR оставлял старый better_sqlite3.node (Node ABI вместо Electron).',
+      'deploy:local — обязательный деплой: удаляет stale app.asar.unpacked + проверка ABI.',
+      'При старте: ensureBetterSqlite3Healthy() восстанавливает .node из resources/native-fix/.',
+      'Резервная копия .node кладётся в сборку в afterPack (patch-exe-icon).',
+    ],
+  },
+  {
     commit: '3c20b0a',
     deployed: '19.06.2026',
     treeVersion: '1.5.14',

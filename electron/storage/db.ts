@@ -1,7 +1,11 @@
-import Database from 'better-sqlite3'
 import type { Database as DB } from 'better-sqlite3'
+import { createRequire } from 'module'
+
+const require = createRequire(import.meta.url)
 
 export function openDb(path: string): DB {
+  // Lazy require: даёт ensureBetterSqlite3Healthy() отработать до загрузки .node
+  const Database = require('better-sqlite3') as typeof import('better-sqlite3').default
   const db = new Database(path)
   db.pragma('journal_mode = WAL')
 

@@ -36,6 +36,7 @@ import {
   installAppIdentity,
   installGlobalQuitHandlers
 } from './app-lifecycle'
+import { ensureBetterSqlite3Healthy, isNativeModuleError } from './native-modules'
 import { openDb } from './storage/db'
 import { createSettings } from './storage/settings'
 import { createChats } from './storage/chats'
@@ -236,6 +237,7 @@ app.whenReady().then(() => {
   })
   installCSP()
   installMediaPermissions()
+  ensureBetterSqlite3Healthy()
   const dir = join(app.getPath('userData'), 'storage')
   mkdirSync(dir, { recursive: true })
   let db
@@ -245,11 +247,15 @@ app.whenReady().then(() => {
     // DB locked, disk full, schema migration failed — show GUI error
     // instead of crashing silently with stderr only.
     const msg = err instanceof Error ? err.message : String(err)
+    const nativeHint = isNativeModuleError(msg)
+      ? `\n\nПохоже на повреждённый native-модуль после обновления. ` +
+        `Закрой Verstak и выполни npm run deploy:local (или переустанови).\n`
+      : ''
     dialog.showErrorBox(
       'Verstak: не удалось открыть базу данных',
       `Путь: ${join(dir, 'verstak.db')}\n\nОшибка: ${msg}\n\n` +
       `Возможные причины: файл заблокирован другим процессом Verstak, ` +
-      `диск переполнен, или повреждённая миграция схемы.\n\n` +
+      `диск переполнен, повреждённая миграция схемы или устаревший better_sqlite3.node.${nativeHint}\n` +
       `Что попробовать:\n` +
       `1. Закрой все другие копии Verstak\n` +
       `2. Проверь свободное место на диске\n` +
