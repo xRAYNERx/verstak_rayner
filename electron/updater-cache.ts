@@ -56,6 +56,17 @@ export function clearPendingIfWrongVersion(targetVersion: string): void {
   } catch { /* ignore */ }
 }
 
+/** Полный сброс %LOCALAPPDATA%\\verstak-updater — чистый поиск при следующем запуске. */
+export function clearAllUpdaterCache(): void {
+  const root = getUpdaterCacheRoot()
+  if (!existsSync(root)) return
+  try {
+    rmSync(root, { recursive: true, force: true })
+  } catch (err) {
+    console.warn('[updater] clear all cache failed:', err)
+  }
+}
+
 /** Удаляет pending-установщик (петля «установить ту же версию»). */
 export function clearPendingUpdateCache(): void {
   const pending = getPendingUpdateDir()

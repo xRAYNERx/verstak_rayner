@@ -12,6 +12,7 @@ import {
   semverGt,
 } from './update-remote'
 import {
+  clearAllUpdaterCache,
   clearBrokenDifferentialCache,
   clearPendingIfWrongVersion,
   clearPendingUpdateCache,
@@ -49,7 +50,21 @@ let lastProgressAt = 0
 let stallTimer: ReturnType<typeof setTimeout> | null = null
 let releaseNotesIpcRegistered = false
 let updaterIpcRegistered = false
+let quitCleanupRegistered = false
+let quittingForInstall = false
 let checkPromise: Promise<void> | null = null
+
+const NETWORK_CHECK_ERROR = 'Не удалось проверить обновления. Проверьте интернет и попробуйте снова.'
+
+/** Сброс кэша при выходе (кроме quitAndInstall). Вызывается из initAutoUpdater. */
+export function registerUpdaterQuitCleanup(): void {
+  if (quitCleanupRegistered) return
+  quitCleanupRegistered = true
+  app.on('before-quit', () => {
+    if (!app.isPackaged || quittingForInstall) return
+    clearAllUpdaterCache()
+  })
+}
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -114,7 +129,10 @@ export function registerReleaseNotesIpc(): void {
 
 export function initAutoUpdater(mainWindow: BrowserWindow): void {
   registerReleaseNotesIpc()
+  registerUpdaterQuitCleanup()
   if (!app.isPackaged) return
+
+  clearAllUpdaterCache()
 
   const pushSnapshot = () => {
     sendToRenderer(mainWindow, 'update:state', snapshot)
@@ -280,7 +298,12 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     const current = app.getVersion()
     const remote = await fetchRemoteVersion()
     lastProbeVersion = remote
-    if (!remote || !semverGt(remote, current)) {
+    if (!remote) {
+      lastProbePending = false
+      announceDownloadError(undefined, NETWORK_CHECK_ERROR)
+      return { newer: false, version: null, pendingRelease: false }
+    }
+    if (!semverGt(remote, current)) {
       lastProbePending = false
       reconcileStaleDownloadedUpdate(remote)
       return { newer: false, version: remote, pendingRelease: false }
@@ -315,10 +338,11 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
 
     const probe = await evaluateProbe()
 
-    if (!probe.newer || !probe.version) {
-      announceNotAvailable()
+    if (!probe.newer) {
+      if (probe.version != null) announceNotAvailable()
       return
     }
+    if (!probe.version) return
 
     if (await tryAnnounceCachedDownload(probe.version)) return
 
@@ -382,6 +406,7 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
         announceNotAvailable()
         return { ok: false as const, reason: 'already-current' as const }
       }
+      quittingForInstall = true
       autoUpdater.quitAndInstall(false, true)
       return { ok: true as const }
     })
@@ -494,7 +519,7 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
   void evaluateProbe()
     .then(async (probe) => {
       if (!probe.newer) {
-        announceNotAvailable()
+        if (probe.version != null) announceNotAvailable()
         return
       }
       if (probe.version) {

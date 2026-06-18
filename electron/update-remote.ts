@@ -74,9 +74,12 @@ async function fetchPackageJsonVersion(): Promise<string | null> {
   }
 }
 
-/** Последняя версия: max(GitHub Release, semver-теги, package.json на main). */
+/** Последняя версия: max(package.json на main, GitHub Release, semver-теги). */
 export async function fetchRemoteVersion(): Promise<string | null> {
   const candidates: string[] = []
+
+  const fromPkg = await fetchPackageJsonVersion()
+  if (fromPkg) candidates.push(fromPkg)
 
   const latestRelease = await fetchJson<{ tag_name?: string; name?: string }>(
     `https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}/releases/latest`,
@@ -90,9 +93,6 @@ export async function fetchRemoteVersion(): Promise<string | null> {
   )
   const fromTags = maxSemver((tags ?? []).map(t => t.name))
   if (fromTags) candidates.push(fromTags)
-
-  const fromPkg = await fetchPackageJsonVersion()
-  if (fromPkg) candidates.push(fromPkg)
 
   return maxSemver(candidates)
 }

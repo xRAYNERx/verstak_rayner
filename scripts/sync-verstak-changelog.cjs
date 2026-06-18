@@ -13,6 +13,17 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: '501bff7',
+    deployed: '18.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Обновления: сброс кэша при выходе, свежий поиск при запуске',
+    changes: [
+      'При закрытии Verstak очищается verstak-updater (кроме «Установить обновление»).',
+      'При старте сессии кэш тоже сбрасывается — не тянется старый 1.5.7 поверх 1.5.11.',
+      'Версия с GitHub: сначала package.json на main; сеть недоступна — ошибка, не «уже актуально».',
+    ],
+  },
+  {
     commit: '2551745',
     deployed: '18.06.2026',
     treeVersion: '1.5.5',

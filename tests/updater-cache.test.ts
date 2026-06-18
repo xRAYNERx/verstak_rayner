@@ -64,6 +64,17 @@ describe('updater-cache', () => {
     expect(repaired).toBeNull()
   })
 
+  it('clearAllUpdaterCache removes entire updater directory', async () => {
+    const { getUpdaterCacheRoot, clearAllUpdaterCache } = await import('../electron/updater-cache')
+    const root = getUpdaterCacheRoot()
+    mkdirSync(join(root, 'pending'), { recursive: true })
+    writeFileSync(join(root, 'installer.exe'), 'x')
+
+    clearAllUpdaterCache()
+
+    expect(existsSync(root)).toBe(false)
+  })
+
   it('clearPendingIfWrongVersion removes stale installer', async () => {
     const { getUpdaterCacheRoot, clearPendingIfWrongVersion } = await import('../electron/updater-cache')
     const pending = join(getUpdaterCacheRoot(), 'pending')
