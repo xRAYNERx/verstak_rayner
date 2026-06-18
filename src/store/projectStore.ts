@@ -17,6 +17,12 @@ import {
   type SessionSnapshot
 } from './session-snapshot'
 import { HELP_PROJECT_PATH } from '../lib/help-scope'
+import {
+  EMPTY_COMPOSER_DRAFT,
+  isEmptyComposerDraft,
+  pruneComposerDraftsForProject,
+  type ComposerDraft,
+} from '../lib/composer-drafts'
 
 /** Preflight-карточка: агент объявил план перед сложной/деструктивной задачей.
  *  Эфемерное — живёт только в активной сессии, чистится как activity. */
@@ -276,6 +282,11 @@ interface ProjectState {
   loadResumableRuns: (path: string) => Promise<void>
   /** Crash-resume: отклонить баннер для прогона (убрать из resumableRuns + main). */
   dismissResumableRun: (runId: string) => void
+  /** Несохранённые черновики композера (текст + вложения) до выхода из приложения. */
+  composerDrafts: Record<string, ComposerDraft>
+  setComposerDraft: (key: string, draft: ComposerDraft) => void
+  getComposerDraft: (key: string) => ComposerDraft
+  clearComposerDraft: (key: string) => void
 }
 
 // Monotonic token used by setProject to cancel its own stale concurrent runs.
@@ -331,6 +342,18 @@ export const useProject = create<ProjectState>((set, get) => ({
   previewArtifactId: null,
   effortLevel: 'standard',
   resumableRuns: [],
+  composerDrafts: {},
+  setComposerDraft: (key, draft) => set(s => {
+    if (isEmptyComposerDraft(draft)) {
+      if (!(key in s.composerDrafts)) return {}
+      const next = { ...s.composerDrafts }
+      delete next[key]
+      return { composerDrafts: next }
+    }
+    return { composerDrafts: { ...s.composerDrafts, [key]: draft } }
+  }),
+  getComposerDraft: (key) => get().composerDrafts[key] ?? EMPTY_COMPOSER_DRAFT,
+  clearComposerDraft: (key) => get().setComposerDraft(key, EMPTY_COMPOSER_DRAFT),
   setProject: async (path) => {
     const myToken = ++setProjectToken
     const s = get()
@@ -478,10 +501,11 @@ export const useProject = create<ProjectState>((set, get) => ({
     if (!result.ok) return result
     const projectList = await window.api.projects.list()
     const state = get()
+    const composerDrafts = pruneComposerDraftsForProject(state.composerDrafts, path)
     if (state.path === path) {
-      set({ path: null, tree: [], messages: [], projectList, activeChatId: null, chatSessions: [] })
+      set({ path: null, tree: [], messages: [], projectList, activeChatId: null, chatSessions: [], composerDrafts })
     } else {
-      set({ projectList })
+      set({ projectList, composerDrafts })
     }
     return result
   },

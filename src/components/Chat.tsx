@@ -23,6 +23,7 @@ import iconUrl from '../assets/icon.png'
 import { useT } from '../i18n'
 import { notifyResponseReady } from '../lib/response-notify'
 import { HELP_AGENT_MODE, HELP_CHAT_SEND_OVERRIDES, HELP_PROJECT_PATH } from '../lib/help-scope'
+import { EMPTY_COMPOSER_DRAFT, resolveComposerDraftKey } from '../lib/composer-drafts'
 import { VisionAttachmentBanner } from './VisionAttachmentBanner'
 import { isImageAttachment, providerSupportsVision } from '../lib/vision-support'
 import type { ProviderId } from '../hooks/useProvider'
@@ -165,6 +166,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     addHelpMessage, insertHelpMessageBeforeLast, updateHelpLastAssistant,
     setHelpStreaming, clearHelpActivity, pushHelpActivity, addHelpUsage,
     appendHelpLastAssistantThinking,
+    setComposerDraft,
+    clearComposerDraft,
   } = useProject()
   const isHelpChat = helpMode
   const messages = helpMode ? help.messages : projectMessages
@@ -183,6 +186,49 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
   /** If the agent loop exhausted its budget on the last send, the user can click "+N turns" to extend. */
   const [exhausted, setExhausted] = useState<{ used: number; suggestedAdd: number; maxBudget: number } | null>(null)
   const [attachments, setAttachments] = useState<Attachment[]>([])
+  const composerDraftKeyRef = useRef<string | null>(null)
+  const composerInputRef = useRef(input)
+  const composerAttachmentsRef = useRef(attachments)
+  composerInputRef.current = input
+  composerAttachmentsRef.current = attachments
+
+  function resetComposerAfterSend() {
+    const key = composerDraftKeyRef.current
+    if (key) clearComposerDraft(key)
+    setInput('')
+    setAttachments([])
+  }
+
+  useEffect(() => {
+    const prevKey = composerDraftKeyRef.current
+    const nextKey = resolveComposerDraftKey({
+      helpMode,
+      projectPath: activePath,
+      activeChatId,
+    })
+
+    if (prevKey && prevKey !== nextKey) {
+      setComposerDraft(prevKey, {
+        text: composerInputRef.current,
+        attachments: composerAttachmentsRef.current,
+      })
+    }
+
+    if (nextKey !== prevKey) {
+      const loaded = nextKey
+        ? useProject.getState().getComposerDraft(nextKey)
+        : EMPTY_COMPOSER_DRAFT
+      setInput(loaded.text)
+      setAttachments(loaded.attachments)
+      composerDraftKeyRef.current = nextKey
+    }
+  }, [helpMode, activePath, activeChatId, setComposerDraft])
+
+  useEffect(() => {
+    const key = composerDraftKeyRef.current
+    if (!key) return
+    setComposerDraft(key, { text: input, attachments })
+  }, [input, attachments, setComposerDraft])
   const [dragOver, setDragOver] = useState(false)
   const [warning, setWarning] = useState<string | null>(null)
   const [queueNotice, setQueueNotice] = useState<string | null>(null)
@@ -1014,8 +1060,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
       setExhausted(null)
       setCrossVerify(null)
       if (!opts?.text) {
-        setInput('')
-        setAttachments([])
+        resetComposerAfterSend()
       }
       const summary = userAttachments.length > 0
         ? `${text}${text ? '\n\n' : ''}📎 ${userAttachments.map(a => a.name).join(', ')}`
@@ -1086,8 +1131,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     setExhausted(null)  // new send wipes any pending continue state
     setCrossVerify(null)  // сбрасываем предыдущий результат cross-verify
     if (!opts?.text) {
-      setInput('')
-      setAttachments([])
+      resetComposerAfterSend()
     }
     const summary = userAttachments.length > 0
       ? `${text}${text ? '\n\n' : ''}📎 ${userAttachments.map(a => a.name).join(', ')}`
