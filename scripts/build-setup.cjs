@@ -11,6 +11,8 @@ const ROOT = path.join(__dirname, '..')
 const NPX = process.platform === 'win32' ? 'npx.cmd' : 'npx'
 const UNPACKED = path.join(ROOT, 'release', 'win-unpacked')
 const STAGING = path.join(ROOT, 'release', 'app-payload-staging')
+const PAYLOAD_ARCHIVE = path.join(ROOT, 'release', 'app-payload.7z')
+const SEVEN_ZA = path.join(ROOT, 'node_modules', '7zip-bin', 'win', 'x64', '7za.exe')
 const APP_STAGING = path.join(ROOT, 'release', 'installer-app-staging')
 const INSTALLER_OUT = path.join(ROOT, 'release', 'installer-build')
 const PORTABLE_NSIS = path.join(
@@ -131,6 +133,20 @@ fs.writeFileSync(
   `${JSON.stringify(manifest, null, 2)}\n`,
 )
 console.log(`[build-setup] payload: ${(manifest.payloadBytes / (1024 * 1024)).toFixed(1)} MB, ${manifest.fileCount} files`)
+
+if (!fs.existsSync(SEVEN_ZA)) {
+  die('Нет 7za.exe (npm install 7zip-bin).')
+}
+console.log('[build-setup] pack app-payload.7z')
+fs.rmSync(PAYLOAD_ARCHIVE, { force: true })
+const pack = spawnSync(SEVEN_ZA, ['a', '-t7z', '-mx=1', PAYLOAD_ARCHIVE, '*'], {
+  cwd: STAGING,
+  stdio: 'inherit',
+  windowsHide: true,
+})
+if (pack.status !== 0) die('Не удалось создать app-payload.7z')
+const archiveMb = (fs.statSync(PAYLOAD_ARCHIVE).size / (1024 * 1024)).toFixed(1)
+console.log(`[build-setup] archive: ${archiveMb} MB → release/app-payload.7z`)
 
 console.log('[build-setup] vite build (installer)')
 run(NPX, ['electron-vite', 'build', '--config', 'electron.vite.installer.config.ts'])
