@@ -3,6 +3,7 @@ import type { FileNode, ChatMessage, ProjectMeta, ChatSession, DevTask, Resumabl
 import { sortProjectsByName } from '../lib/project-sort'
 import { isModelValidForProvider } from '../hooks/useProvider'
 import { parseReviewFindings, type ReviewFinding } from '../lib/review-findings'
+import { isGenericChatTitle, titleFromFirstMessage } from '../lib/chat-session-title'
 import {
   freshSnapshot,
   TOUCH_PRIORITY,
@@ -214,6 +215,8 @@ interface ProjectState {
   /** Optimistically update a chat-session row without refetching the list.
    *  Used by rename — avoids the stream-disrupting re-render cascade. */
   patchChatSession: (id: number, patch: Partial<ChatSession>) => void
+  /** Первое сообщение → осмысленный заголовок вместо «Новый чат» / Parallel chat. */
+  autoTitleChatSession: (chatId: number, firstUserText: string) => Promise<void>
   /** Create a new chat session in the active project and switch to it. */
   newChatSession: (title?: string) => Promise<ChatSession | null>
   /** Подгрузить review sub-chats для указанного main-чата из БД. */
@@ -723,6 +726,20 @@ export const useProject = create<ProjectState>((set, get) => ({
   patchChatSession: (id, patch) => set(s => ({
     chatSessions: s.chatSessions.map(c => c.id === id ? { ...c, ...patch } : c)
   })),
+  autoTitleChatSession: async (chatId, firstUserText) => {
+    const s = get()
+    const session = s.chatSessions.find(c => c.id === chatId)
+    if (!session || !isGenericChatTitle(session.title)) return
+    const title = titleFromFirstMessage(firstUserText)
+    if (!title) return
+    get().patchChatSession(chatId, { title })
+    try {
+      await window.api.chatSessions.rename(chatId, title)
+    } catch (err) {
+      console.warn('[projectStore] autoTitleChatSession rename failed:', err)
+      await get().refreshChatSessions()
+    }
+  },
   newChatSession: async (title) => {
     const s = get()
     if (!s.path) return null

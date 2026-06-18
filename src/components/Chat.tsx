@@ -986,6 +986,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         console.warn('[chat] skill loaders failed:', err)
       }
     }
+    const isFirstUserMessage = !store.messages.some(m => m.role === 'user')
     armAutoScrollForOutgoing()
     addMessage({ role: 'user', content: enrichedText, attachments: userAttachments })
     const activeChatId = ctx.activeChatId
@@ -993,6 +994,9 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
       // В БД сохраняем оригинальный text пользователя (без loader-контекста),
       // чтобы при reload UI не показывал жирный системный блок.
       await window.api.chats.append(activeChatId, path, 'user', summary)
+      if (isFirstUserMessage) {
+        void store.autoTitleChatSession(activeChatId, text || summary)
+      }
       // log the start of a session — title is the first 80 chars of the request
       const journalTitle = text.length > 80 ? text.slice(0, 80) + '…' : (text || 'Сообщение с вложением')
       void window.api.journal.append(path, 'session', journalTitle,

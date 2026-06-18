@@ -163,7 +163,7 @@ export function SideChat({ sideChatId, onSessionCreated, onClose }: SideChatProp
     if (!path) return null
     try {
       const created = await window.api.chatSessions.create(path, {
-        title: t.chat.sideChatTitle,
+        title: 'Параллельный чат',
         providerId: sideProviderId,
         model: sideModel,
       })
@@ -183,7 +183,9 @@ export function SideChat({ sideChatId, onSessionCreated, onClose }: SideChatProp
     if (chatId == null) return
 
     const store = useProject.getState()
-    const history = (store.chatSnapshots[chatId]?.messages ?? draftMessages)
+    const priorMessages = store.chatSnapshots[chatId]?.messages ?? draftMessages
+    const isFirstUserMessage = !priorMessages.some(m => m.role === 'user' && m.content.trim())
+    const history = priorMessages
       .filter(m => m.content)
       .map(m => ({ role: m.role, content: m.content }))
     const userMsg = { role: 'user' as const, content: text }
@@ -191,6 +193,9 @@ export function SideChat({ sideChatId, onSessionCreated, onClose }: SideChatProp
     store.pushUserToChatSnapshot(chatId, text)
     if (path) {
       void window.api.chats.append(chatId, path, 'user', text).catch(() => {})
+    }
+    if (isFirstUserMessage) {
+      void store.autoTitleChatSession(chatId, text)
     }
     const sendId = await window.api.ai.sendWithOverrides(
       [...history, userMsg],
