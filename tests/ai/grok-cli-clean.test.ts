@@ -87,6 +87,18 @@ The response begins with a standard greeting.`
     expect(answer === '' || answer === 'Done. What next?').toBe(true)
   })
 
+  it('Русское reasoning-преамбула + русский ответ: преамбулу в reasoning', () => {
+    const raw = `Пользователь спрашивает про сохранение сессий.
+
+Нужно проверить projectStore и chatSnapshots.
+
+Нет, не каждое сообщение — новая сессия с нуля.`
+    const { answer, reasoning } = cleanGrokOutput(raw)
+    expect(answer).toBe('Нет, не каждое сообщение — новая сессия с нуля.')
+    expect(reasoning).toContain('Пользователь спрашивает')
+    expect(reasoning).toContain('Нужно проверить')
+  })
+
   it('Mixed code + кириллица: код-пути в ответе НЕ выкидываются', () => {
     const raw = `Я Grok 4.3 от xAI, подключён через electron/ai/grok.ts → OpenAI-compat на https://api.x.ai/v1.`
     const { answer } = cleanGrokOutput(raw)

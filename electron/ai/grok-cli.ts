@@ -62,7 +62,7 @@ export function cleanGrokOutput(raw: string): { answer: string; reasoning: strin
   // Типичные английские reasoning-префиксы Grok'а. cyrRatio фейлится когда
   // он цитирует русские слова в кавычках («The user said "Привет"…») — там
   // 5-6 кириллических букв вытягивают ratio выше 0.15. Префиксы надёжнее.
-  const REASONING_PREFIX = /^(The user |The response |The instruction|The format |The system |The directory |Why ["']|Since ["']|Since "|If |First[,.:]|Final answer|Confidence:|Context preservation|I need to|I should|Let me |Note:|Standard Electron|Only two chats|There are previous|Available tools|Looking at)/i
+  const REASONING_PREFIX = /^(The user |The response |The instruction|The format |The system |The directory |Why ["']|Since ["']|Since "|If |First[,.:]|Final answer|Confidence:|Context preservation|I need to|I should|Let me |Note:|Standard Electron|Only two chats|There are previous|Available tools|Looking at|Пользователь |Ответ пользователя|Инструкция|Формат |Система |Директория |Почему |Поскольку |Если |Сначала[,.:]|Итоговый ответ|Уверенность:|Сохранение контекста|Мне нужно|Я должен|Позвольте|Заметка:|Доступные инструменты|Смотрю на|Нужно (проверить|понять|сначала|разобрать))/i
 
   const paragraphs = work.split(/\n{2,}/).map(p => p.trim()).filter(Boolean)
   const answerPars: string[] = []
@@ -71,7 +71,7 @@ export function cleanGrokOutput(raw: string): { answer: string; reasoning: strin
     // Заголовки-маркеры reasoning блоков. После них Grok часто продолжает
     // английский анализ — сбрасываем inAnswer чтобы следующие английские
     // параграфы тоже ушли в reasoning.
-    if (/^(Explanation|Reasoning|Analysis|Thinking|Note|Confidence):?$/i.test(p)) {
+    if (/^(Explanation|Reasoning|Analysis|Thinking|Note|Confidence|Объяснение|Рассуждение|Анализ|Размышление|Заметка|Уверенность):?$/i.test(p)) {
       reasoningParts.push(p)
       inAnswer = false
       continue
