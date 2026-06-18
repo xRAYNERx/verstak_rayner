@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { EMPTY_BRIEF, isBriefReady, buildPlanPrompt, buildExecutePrompt, pipelineStepIndex } from '../../src/lib/pipeline-brief'
+import { EMPTY_BRIEF, isBriefReady, buildPlanPrompt, buildExecutePrompt, pipelineStepIndex, buildPipelineSend } from '../../src/lib/pipeline-brief'
 
 describe('pipeline-brief', () => {
   it('EMPTY_BRIEF не готов', () => {
@@ -41,5 +41,24 @@ describe('pipeline-brief', () => {
     expect(pipelineStepIndex('execute')).toEqual({ index: 3, total: 5 })
     expect(pipelineStepIndex('verify')).toEqual({ index: 4, total: 5 })
     expect(pipelineStepIndex('proof')).toEqual({ index: 5, total: 5 })
+  })
+
+  const brief = { goal: 'fix', constraints: '', dod: 'npm test' }
+
+  it('buildPipelineSend plan → planPrompt + mode plan', () => {
+    const s = buildPipelineSend('plan', brief, null)
+    expect(s?.mode).toBe('plan')
+    expect(s?.text).toContain('НЕ вноси изменений')
+  })
+
+  it('buildPipelineSend execute → executePrompt c planId + mode accept-edits', () => {
+    const s = buildPipelineSend('execute', brief, 17)
+    expect(s?.mode).toBe('accept-edits')
+    expect(s?.text).toContain('plan id=17')
+  })
+
+  it('buildPipelineSend для verify/proof → null (нет авто-send)', () => {
+    expect(buildPipelineSend('verify', brief, 1)).toBeNull()
+    expect(buildPipelineSend('proof', brief, 1)).toBeNull()
   })
 })

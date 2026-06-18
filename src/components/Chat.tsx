@@ -12,6 +12,8 @@ import { TimelineBar } from './TimelineBar'
 import { ReviewPanel } from './ReviewPills'
 import { DevTaskBadge } from './DevTaskBadge'
 import { ResumeBanner } from './ResumeBanner'
+import { PipelineWizard } from './PipelineWizard'
+import { PipelineBanner } from './PipelineBanner'
 import { ComposerToolsMenu } from './ComposerToolsMenu'
 import { EffortPicker } from './EffortPicker'
 import { SlashCommandPopup, type SlashCommand } from './SlashCommandPopup'
@@ -27,6 +29,8 @@ import { EMPTY_COMPOSER_DRAFT, resolveComposerDraftKey } from '../lib/composer-d
 import { VisionAttachmentBanner } from './VisionAttachmentBanner'
 import { isImageAttachment, providerSupportsVision } from '../lib/vision-support'
 import { resolveSkillOverride } from '../lib/skill-override'
+import { buildPipelineSend } from '../lib/pipeline-brief'
+import type { PipelineRun, PipelineStep } from '../types/api'
 import type { ProviderId } from '../hooks/useProvider'
 import {
   formatChatDateDivider,
@@ -255,6 +259,11 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
   const flushQueueRef = useRef<() => void>(() => {})
   // Resume задачи (Фаза 4): взводится при gg-resume-send, эффект ниже шлёт send().
   const resumeAutoSendRef = useRef(false)
+  // Pipeline (спек D5): авто-send шага. Держит желаемый режим — авто-send
+  // срабатывает только когда agentMode реально применился (без race).
+  const pipelineSendModeRef = useRef<'plan' | 'accept-edits' | null>(null)
+  const [pipelineWizardOpen, setPipelineWizardOpen] = useState(false)
+  const activePipeline = useProject(s => s.activePipeline)
   const [undoCount, setUndoCount] = useState(0)
   // Cross-verify: результат авто-ревью другим провайдером после изменения файлов.
   // null = ещё не было; object = последний результат (сбрасывается при новом send).
@@ -575,6 +584,11 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
             `Создан план: ${event.title}`,
             `${event.stepCount} шагов`)
         }
+        // Pipeline (спек D5): план создан во время Plan-шага → привязываем planId
+        // к активному прогону (шаг не двигаем — это сделает «План OK» в баннере).
+        if (store.activePipeline?.step === 'plan') {
+          void store.advancePipeline({ planId: event.planId })
+        }
       }
       else if (event.type === 'preflight') {
         store.pushPreflight({
@@ -848,6 +862,47 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     return () => window.removeEventListener('gg-resume-send', onResume)
   }, [])
 
+  // Pipeline auto-send (спек D5): PipelineBanner/визард диспатчат
+  // CustomEvent('gg-pipeline-send', { text, mode }). Ставим режим + текст и
+  // взводим ref; авто-send ниже ждёт, пока agentMode реально станет нужным.
+  useEffect(() => {
+    function onPipelineSend(e: Event) {
+      const ev = e as CustomEvent<{ text: string; mode: 'plan' | 'accept-edits' }>
+      const d = ev.detail
+      if (d && typeof d.text === 'string' && d.text.trim()) {
+        setAgentMode(d.mode)
+        setInput(d.text)
+        pipelineSendModeRef.current = d.mode
+      }
+    }
+    window.addEventListener('gg-pipeline-send', onPipelineSend)
+    return () => window.removeEventListener('gg-pipeline-send', onPipelineSend)
+  }, [setAgentMode])
+
+  // Pipeline-оркестрация (спек D5): запуск из визарда → активируем прогон + шлём
+  // Plan-промпт; «План OK» в баннере → двигаем шаг + шлём Execute-промпт.
+  function dispatchPipelineSend(step: PipelineStep, brief: PipelineRun['brief'], planId: number | null) {
+    const params = buildPipelineSend(step, brief, planId)
+    if (params) window.dispatchEvent(new CustomEvent('gg-pipeline-send', { detail: params }))
+  }
+  function onPipelineStarted(run: PipelineRun) {
+    useProject.getState().startPipeline(run)
+    dispatchPipelineSend('plan', run.brief, run.planId)
+  }
+  function onPipelinePrimary(step: PipelineStep) {
+    const store = useProject.getState()
+    const pipeline = store.activePipeline
+    if (!pipeline) return
+    if (step === 'plan') {
+      void store.advancePipeline({ step: 'execute' })
+      dispatchPipelineSend('execute', pipeline.brief, pipeline.planId)
+    } else if (step === 'execute') {
+      void store.advancePipeline({ step: 'verify' })  // Verify-панель — D6
+    } else if (step === 'verify') {
+      void store.advancePipeline({ step: 'proof' })   // Proof-шаг — D7
+    }
+  }
+
   // Автоотправка после resume: когда input обновился из gg-resume-send и взведён
   // флаг — шлём ровно как при ручной отправке (через send()). Флаг гасим сразу,
   // чтобы обычный ввод пользователя не уезжал в авто-send.
@@ -855,9 +910,16 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     if (resumeAutoSendRef.current && input.trim() && !isStreaming) {
       resumeAutoSendRef.current = false
       void send()
+    } else if (
+      pipelineSendModeRef.current && input.trim() && !isStreaming
+      && agentMode === pipelineSendModeRef.current
+    ) {
+      // Pipeline-send: ждём пока agentMode применился к нужному режиму, потом шлём.
+      pipelineSendModeRef.current = null
+      void send()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input, isStreaming])
+  }, [input, isStreaming, agentMode])
 
   // Cleanup warning / queue notice timers on unmount
   useEffect(() => () => {
@@ -1674,6 +1736,14 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
 
       <TimelineBar />
       <ReviewPanel />
+      <PipelineBanner onPrimary={onPipelinePrimary} />
+      {pipelineWizardOpen && (
+        <PipelineWizard
+          chatId={activeChatId}
+          onClose={() => setPipelineWizardOpen(false)}
+          onStarted={onPipelineStarted}
+        />
+      )}
 
       <div className="gg-composer">
         {attachments.length > 0 && (
@@ -1926,6 +1996,16 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
               <DevTaskBadge />
             </div>
             <div className="gg-composer-meta-cluster gg-composer-meta-cluster--end">
+              {!isHelpChat && !activePipeline && (
+                <button
+                  type="button"
+                  className="gg-btn gg-btn-ghost gg-btn-xs gg-pipeline-entry"
+                  onClick={() => setPipelineWizardOpen(true)}
+                  title={t.pipeline.title}
+                >
+                  ▶ Pipeline
+                </button>
+              )}
               {!isHelpChat && <ComposerToolsMenu onInject={injectTemplate} />}
               <ModePicker
                 mode={isHelpChat ? HELP_AGENT_MODE : agentMode}

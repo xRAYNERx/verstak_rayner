@@ -48,3 +48,22 @@ export function buildExecutePrompt(brief: PipelineBrief, planId: number): string
     'По завершении ОБЯЗАТЕЛЬНО вызови attest_verification с task_summary и checks из DoD.',
   ].join('\n')
 }
+
+/** Режим агента для авто-send шага pipeline. */
+export type PipelineSendMode = 'plan' | 'accept-edits'
+
+/**
+ * Параметры авто-send для шага pipeline: текст промпта + режим агента.
+ *  - plan → read-only (mode 'plan'), buildPlanPrompt;
+ *  - execute → правки (mode 'accept-edits'), buildExecutePrompt с planId;
+ *  - остальные шаги (verify/proof/…) авто-send не делают → null.
+ */
+export function buildPipelineSend(
+  step: PipelineStep,
+  brief: PipelineBrief,
+  planId: number | null,
+): { text: string; mode: PipelineSendMode } | null {
+  if (step === 'plan') return { text: buildPlanPrompt(brief), mode: 'plan' }
+  if (step === 'execute') return { text: buildExecutePrompt(brief, planId ?? 0), mode: 'accept-edits' }
+  return null
+}
