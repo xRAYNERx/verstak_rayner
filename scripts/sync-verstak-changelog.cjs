@@ -13,6 +13,28 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: 'pending-codeblocks',
+    deployed: '19.06.2026',
+    treeVersion: '1.5.14',
+    title: 'Чат: текст под заголовками в блоках кода',
+    changes: [
+      'Многострочные ```блоки``` без языка снова рендерятся как code block, не как inline.',
+      'Промпты и plain text в блоках — без hljs-подсветки (не пропадают на светлой теме).',
+      'Блоки кода — тёмный фон, читаемый текст в Nord и Light.',
+    ],
+  },
+  {
+    commit: 'pending-timer',
+    deployed: '19.06.2026',
+    treeVersion: '1.5.14',
+    title: 'Чат: время выполнения ответа',
+    changes: [
+      'Пока агент отвечает — в шапке сообщения «выполняется N с» (обновляется каждую секунду).',
+      'После завершения — «за N с» рядом с временем; работает в проекте, ветках и справке.',
+      'При остановке Esc и ошибке длительность тоже фиксируется.',
+    ],
+  },
+  {
     version: '1.5.14',
     build: '18.06.2026',
     deployed: '18.06.2026',

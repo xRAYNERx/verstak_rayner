@@ -49,12 +49,12 @@
   color: var(--text-code);
 }
 
-/* Code blocks (we render these with the CodeBlock component) */
+/* Code blocks — always dark inset (hljs github-dark is tuned for this) */
 .gg-code-block {
   margin: 10px 0;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  background: var(--bg-input);
+  background: #0d1117;
   overflow: hidden;
 }
 .gg-code-header {
@@ -85,8 +85,21 @@
   overflow-x: auto;
   font-size: 12.5px;
   line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #c9d1d9;
 }
-.gg-code-block code { background: transparent; border: none; padding: 0; color: inherit; }
+.gg-code-block code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: #c9d1d9;
+  font-family: var(--font-mono);
+}
+.gg-code-block .hljs {
+  background: transparent;
+  color: #c9d1d9;
+}
 
 /* Tables */
 .gg-md table {
