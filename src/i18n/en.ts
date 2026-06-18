@@ -274,6 +274,8 @@ export const en = {
     updateReady: 'v{version} is ready to install',
     installUpdate: 'Install',
     updateError: 'Could not check for updates',
+    updateRateLimitMinutes: 'GitHub API rate limit reached. Wait {minutes} min. and try again.',
+    updateRateLimitHour: 'GitHub API rate limit reached. Wait about an hour ({minutes} min.) and try again.',
     updateNoRelease: 'No installer on GitHub yet — waiting for a published release',
     updatesHint: 'Version from GitHub (frolofpavel/verstak): main package.json and latest.yml. Download starts automatically; install when you click Install. If stuck — Clear update cache.',
     releaseNotes: 'Release notes',

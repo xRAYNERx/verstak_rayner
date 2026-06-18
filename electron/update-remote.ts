@@ -56,15 +56,69 @@ async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Respon
   }
 }
 
-async function fetchJson<T>(url: string): Promise<T | null> {
+export type GithubRateLimitInfo = {
+  resetAt: number
+  retryAfterSec: number
+}
+
+export type RemoteVersionProbeResult = {
+  version: string | null
+  rateLimit: GithubRateLimitInfo | null
+}
+
+export function rateLimitWaitMinutes(info: GithubRateLimitInfo): number {
+  return Math.max(1, Math.ceil(info.retryAfterSec / 60))
+}
+
+export function mergeRateLimit(
+  a: GithubRateLimitInfo | null,
+  b: GithubRateLimitInfo | null,
+): GithubRateLimitInfo | null {
+  if (!a) return b
+  if (!b) return a
+  return a.resetAt >= b.resetAt ? a : b
+}
+
+/** 403/429 GitHub API + заголовки X-RateLimit-Reset / Retry-After. */
+export async function parseGithubRateLimit(res: Response): Promise<GithubRateLimitInfo | null> {
+  if (res.status !== 403 && res.status !== 429) return null
+
+  const remaining = res.headers.get('x-ratelimit-remaining')
+  const reset = res.headers.get('x-ratelimit-reset')
+  const retryAfter = res.headers.get('retry-after')
+
+  let isRateLimit = res.status === 429 || remaining === '0'
+  if (!isRateLimit) {
+    try {
+      const body = await res.clone().text()
+      isRateLimit = /rate limit/i.test(body)
+    } catch { /* ignore */ }
+  }
+  if (!isRateLimit) return null
+
+  const resetSec = reset ? Number(reset) : 0
+  const resetAt = resetSec > 0 ? resetSec * 1000 : Date.now() + 3600_000
+  const retryAfterSec = retryAfter
+    ? Math.max(60, Number(retryAfter) || 3600)
+    : Math.max(60, Math.ceil((resetAt - Date.now()) / 1000))
+
+  return { resetAt, retryAfterSec }
+}
+
+type FetchJsonResult<T> = { data: T | null; rateLimit: GithubRateLimitInfo | null }
+
+async function fetchJson<T>(url: string): Promise<FetchJsonResult<T>> {
   const res = await fetchWithTimeout(url, {
     headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Verstak-Updater' },
   })
-  if (!res?.ok) return null
+  if (!res) return { data: null, rateLimit: null }
+  if (!res.ok) {
+    return { data: null, rateLimit: await parseGithubRateLimit(res) }
+  }
   try {
-    return await res.json() as T
+    return { data: await res.json() as T, rateLimit: null }
   } catch {
-    return null
+    return { data: null, rateLimit: null }
   }
 }
 
@@ -98,8 +152,9 @@ async function fetchVersionFromLatestYml(): Promise<string | null> {
   }
 }
 
-async function fetchRemoteVersionOnce(): Promise<string | null> {
+async function fetchRemoteVersionOnce(): Promise<RemoteVersionProbeResult> {
   const candidates: string[] = []
+  let rateLimit: GithubRateLimitInfo | null = null
 
   const fromPkg = await fetchPackageJsonVersion()
   if (fromPkg) candidates.push(fromPkg)
@@ -110,29 +165,34 @@ async function fetchRemoteVersionOnce(): Promise<string | null> {
   const latestRelease = await fetchJson<{ tag_name?: string; name?: string }>(
     `https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}/releases/latest`,
   )
-  if (latestRelease?.tag_name || latestRelease?.name) {
-    candidates.push(normalizeVersion(latestRelease.tag_name || latestRelease.name || ''))
+  rateLimit = mergeRateLimit(rateLimit, latestRelease.rateLimit)
+  if (latestRelease.data?.tag_name || latestRelease.data?.name) {
+    candidates.push(normalizeVersion(latestRelease.data.tag_name || latestRelease.data.name || ''))
   }
 
   const tags = await fetchJson<Array<{ name: string }>>(
     `https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}/tags?per_page=30`,
   )
-  const fromTags = maxSemver((tags ?? []).map(t => t.name))
+  rateLimit = mergeRateLimit(rateLimit, tags.rateLimit)
+  const fromTags = maxSemver((tags.data ?? []).map(t => t.name))
   if (fromTags) candidates.push(fromTags)
 
-  return maxSemver(candidates)
+  const version = maxSemver(candidates)
+  return { version, rateLimit: version ? null : rateLimit }
 }
 
-/** Последняя версия: max(package.json на main, GitHub Release, semver-теги). */
-export async function fetchRemoteVersion(): Promise<string | null> {
+/** Последняя версия: max(package.json на main, latest.yml, GitHub API). */
+export async function fetchRemoteVersion(): Promise<RemoteVersionProbeResult> {
+  let rateLimit: GithubRateLimitInfo | null = null
   for (let attempt = 0; attempt < 3; attempt++) {
-    const version = await fetchRemoteVersionOnce()
-    if (version) return version
+    const probe = await fetchRemoteVersionOnce()
+    if (probe.version) return { version: probe.version, rateLimit: null }
+    rateLimit = mergeRateLimit(rateLimit, probe.rateLimit)
     if (attempt < 2) {
       await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)))
     }
   }
-  return null
+  return { version: null, rateLimit }
 }
 
 /** electron-updater часто падает, если на GitHub ещё нет Release с latest.yml — это не сбой для пользователя. */

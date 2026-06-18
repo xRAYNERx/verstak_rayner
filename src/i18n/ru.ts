@@ -269,6 +269,8 @@ export const ru: Translations = {
     updateReady: 'Готова версия {version}',
     installUpdate: 'Установить',
     updateError: 'Не удалось проверить обновления',
+    updateRateLimitMinutes: 'Лимит запросов к GitHub API. Подождите {minutes} мин. и попробуйте снова.',
+    updateRateLimitHour: 'Лимит запросов к GitHub API. Подождите около часа ({minutes} мин.) и попробуйте снова.',
     updateNoRelease: 'На GitHub пока нет установщика — ждём публикации релиза',
     updatesHint: 'Версия берётся с GitHub (frolofpavel/verstak): package.json на main и latest.yml. Скачивание начинается само; установка — по кнопке «Установить». Если что-то залипло — «Очистить кэш».',
     releaseNotes: 'Список изменений',

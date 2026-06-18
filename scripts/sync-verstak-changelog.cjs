@@ -13,6 +13,17 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: 'e698090',
+    deployed: '18.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Обновления: ошибка лимита GitHub API с таймером ожидания',
+    changes: [
+      'Детект 403/429 rate limit (тело ответа + X-RateLimit-Reset).',
+      'Отдельное сообщение: подождите N минут / около часа.',
+      'Версия по-прежнему берётся без API (package.json + latest.yml) — лимит не блокирует probe.',
+    ],
+  },
+  {
     commit: 'e71a185',
     deployed: '18.06.2026',
     treeVersion: '1.5.5',

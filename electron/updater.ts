@@ -6,7 +6,9 @@ import {
   fetchReleaseNoteMerged,
   fetchReleaseNotesSince,
   fetchRemoteVersion,
+  rateLimitWaitMinutes,
   isBenignUpdaterError,
+  type GithubRateLimitInfo,
   releaseArtifactsReady,
   releaseFeedBase,
   semverGt,
@@ -31,11 +33,15 @@ const UPDATER_RPC_TIMEOUT_MS = 25_000
 
 export type UpdatePhase = 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
 
+export type UpdateErrorCode = 'network' | 'github-rate-limit'
+
 export type UpdateSnapshot = {
   phase: UpdatePhase
   version?: string
   percent?: number
   error?: string
+  errorCode?: UpdateErrorCode
+  rateLimitMinutes?: number
   pendingRelease?: boolean
 }
 
@@ -191,12 +197,37 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     sendToRenderer(mainWindow, 'update:downloaded', { version })
   }
 
-  const announceDownloadError = (version: string | undefined, message: string) => {
+  const announceDownloadError = (
+    version: string | undefined,
+    message: string,
+    opts?: { errorCode?: UpdateErrorCode; rateLimitMinutes?: number },
+  ) => {
     clearStallTimer()
     downloadInFlight = false
     downloadForVersion = null
-    setSnapshot({ phase: 'error', version: version ?? lastProbeVersion ?? undefined, error: message })
-    sendToRenderer(mainWindow, 'update:error', { error: message })
+    setSnapshot({
+      phase: 'error',
+      version: version ?? lastProbeVersion ?? undefined,
+      error: message,
+      errorCode: opts?.errorCode,
+      rateLimitMinutes: opts?.rateLimitMinutes,
+    })
+    sendToRenderer(mainWindow, 'update:error', {
+      error: message,
+      errorCode: opts?.errorCode,
+      rateLimitMinutes: opts?.rateLimitMinutes,
+    })
+  }
+
+  const announceRateLimitError = (info: GithubRateLimitInfo) => {
+    announceDownloadError(undefined, '', {
+      errorCode: 'github-rate-limit',
+      rateLimitMinutes: rateLimitWaitMinutes(info),
+    })
+  }
+
+  const announceNetworkError = () => {
+    announceDownloadError(undefined, NETWORK_CHECK_ERROR, { errorCode: 'network' })
   }
 
   const armStallTimer = (version: string) => {
@@ -312,14 +343,21 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     opts?: { reportNetworkError?: boolean },
   ): Promise<{ newer: boolean; version: string | null; pendingRelease: boolean }> => {
     const current = app.getVersion()
-    const remote = await fetchRemoteVersion()
+    const probeResult = await fetchRemoteVersion()
+    const remote = probeResult.version
     lastProbeVersion = remote
-    console.info('[updater] probe: installed=%s remote=%s', current, remote ?? 'null')
+    console.info(
+      '[updater] probe: installed=%s remote=%s rateLimit=%s',
+      current,
+      remote ?? 'null',
+      probeResult.rateLimit ? rateLimitWaitMinutes(probeResult.rateLimit) + 'min' : 'no',
+    )
 
     if (!remote) {
       lastProbePending = false
       if (opts?.reportNetworkError) {
-        announceDownloadError(undefined, NETWORK_CHECK_ERROR)
+        if (probeResult.rateLimit) announceRateLimitError(probeResult.rateLimit)
+        else announceNetworkError()
       }
       return { newer: false, version: null, pendingRelease: false }
     }
@@ -362,7 +400,7 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     if (!probe.newer) {
       if (probe.version != null) announceNotAvailable()
       else if (manual && snapshot.phase !== 'error') {
-        announceDownloadError(undefined, NETWORK_CHECK_ERROR)
+        announceNetworkError()
       } else if (!manual) {
         setSnapshot({ phase: 'idle' })
       }
@@ -394,11 +432,11 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
         if (lastProbeVersion && isNewerThanInstalled(lastProbeVersion)) {
           await downloadVersion(lastProbeVersion)
         } else if (manual && !lastProbeVersion) {
-          announceDownloadError(undefined, NETWORK_CHECK_ERROR)
+          announceNetworkError()
         } else if (lastProbeVersion) {
           announceNotAvailable()
         } else if (manual) {
-          announceDownloadError(undefined, NETWORK_CHECK_ERROR)
+          announceNetworkError()
         } else {
           setSnapshot({ phase: 'idle' })
         }
@@ -420,6 +458,8 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
       installedVersion: current,
       phase: snapshot.phase,
       error: snapshot.error,
+      errorCode: snapshot.errorCode,
+      rateLimitMinutes: snapshot.rateLimitMinutes,
       pendingRelease: snapshot.pendingRelease,
     }
   }

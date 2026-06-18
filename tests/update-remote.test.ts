@@ -3,8 +3,11 @@ import {
   cleanReleaseBody,
   isBenignUpdaterError,
   maxSemver,
+  mergeRateLimit,
   normalizeVersion,
+  parseGithubRateLimit,
   parseLatestYmlArtifact,
+  rateLimitWaitMinutes,
   releaseFeedBase,
   semverGt,
 } from '../electron/update-remote'
@@ -54,6 +57,31 @@ sha512: abc==
       sha512: 'abc==',
       size: 253272554,
     })
+  })
+})
+
+describe('parseGithubRateLimit', () => {
+  it('detects 403 rate limit from body and reset header', async () => {
+    const reset = Math.floor(Date.now() / 1000) + 3600
+    const res = new Response(
+      JSON.stringify({ message: 'API rate limit exceeded for 1.2.3.4' }),
+      { status: 403, headers: { 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': String(reset) } },
+    )
+    const info = await parseGithubRateLimit(res)
+    expect(info).not.toBeNull()
+    expect(info!.resetAt).toBe(reset * 1000)
+    expect(rateLimitWaitMinutes(info!)).toBeGreaterThan(0)
+  })
+
+  it('returns null for unrelated 403', async () => {
+    const res = new Response('Forbidden', { status: 403 })
+    expect(await parseGithubRateLimit(res)).toBeNull()
+  })
+
+  it('mergeRateLimit keeps later reset', () => {
+    const a = { resetAt: 1000, retryAfterSec: 60 }
+    const b = { resetAt: 5000, retryAfterSec: 120 }
+    expect(mergeRateLimit(a, b)?.resetAt).toBe(5000)
   })
 })
 

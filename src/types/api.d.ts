@@ -423,15 +423,15 @@ declare global {
           htmlUrl: string
           publishedAt?: string
         }>>
-        check(): Promise<{ available: boolean; version?: string; installedVersion?: string; error?: string; phase?: string; pendingRelease?: boolean }>
-        clearCache(): Promise<{ ok: boolean; available: boolean; version?: string; installedVersion?: string; error?: string; phase?: string; pendingRelease?: boolean }>
-        getState(): Promise<{ phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean; installedVersion?: string; remoteVersion?: string }>
-        onState(cb: (data: { phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }) => void): () => void
+        check(): Promise<{ available: boolean; version?: string; installedVersion?: string; error?: string; errorCode?: string; rateLimitMinutes?: number; phase?: string; pendingRelease?: boolean }>
+        clearCache(): Promise<{ ok: boolean; available: boolean; version?: string; installedVersion?: string; error?: string; errorCode?: string; rateLimitMinutes?: number; phase?: string; pendingRelease?: boolean }>
+        getState(): Promise<{ phase: string; version?: string; percent?: number; error?: string; errorCode?: string; rateLimitMinutes?: number; pendingRelease?: boolean; installedVersion?: string; remoteVersion?: string }>
+        onState(cb: (data: { phase: string; version?: string; percent?: number; error?: string; errorCode?: string; rateLimitMinutes?: number; pendingRelease?: boolean }) => void): () => void
         onAvailable(cb: (data: { version: string; pendingRelease?: boolean }) => void): () => void
         onDownloaded(cb: (data: { version: string }) => void): () => void
         onProgress(cb: (data: { percent: number }) => void): () => void
         onNotAvailable(cb: () => void): () => void
-        onError(cb: (data: { error: string }) => void): () => void
+        onError(cb: (data: { error: string; errorCode?: string; rateLimitMinutes?: number }) => void): () => void
       }
       audit: {
         query(projectPath: string, opts?: { limit?: number; action?: string; since?: number }): Promise<AuditEntry[]>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useT } from '../i18n'
 import { semverGt } from '../lib/semver'
+import { formatUpdaterError } from '../lib/updater-error'
 
 type Phase = 'idle' | 'downloading' | 'ready' | 'error'
 
@@ -25,7 +26,22 @@ export function UpdateNotification({ railExpanded }: Props) {
 
     const isNewer = (v?: string) => !!v && !!currentVersion && semverGt(v, currentVersion)
 
-    const apply = (state: { phase: string; version?: string; percent?: number; pendingRelease?: boolean; error?: string }) => {
+    const errorT = {
+      updateError: t.settings.updateError,
+      updateNoRelease: t.settings.updateNoRelease,
+      updateRateLimitMinutes: t.settings.updateRateLimitMinutes,
+      updateRateLimitHour: t.settings.updateRateLimitHour,
+    }
+
+    const apply = (state: {
+      phase: string
+      version?: string
+      percent?: number
+      pendingRelease?: boolean
+      error?: string
+      errorCode?: string
+      rateLimitMinutes?: number
+    }) => {
       if (state.phase === 'downloaded' && state.version && isNewer(state.version)) {
         setVersion(state.version)
         setPhase('ready')
@@ -38,7 +54,7 @@ export function UpdateNotification({ railExpanded }: Props) {
         setError('')
       } else if (state.phase === 'error') {
         if (state.version) setVersion(state.version)
-        setError(state.error || t.settings.updateError)
+        setError(formatUpdaterError(state, errorT))
         setPhase('error')
       } else if (state.phase === 'not-available' || state.phase === 'checking' || state.phase === 'idle') {
         setPhase('idle')
@@ -68,8 +84,8 @@ export function UpdateNotification({ railExpanded }: Props) {
       setPhase('idle')
       setError('')
     })
-    const offError = window.api.updater.onError(({ error: e }) => {
-      setError(e || t.settings.updateError)
+    const offError = window.api.updater.onError((payload) => {
+      setError(formatUpdaterError(payload, errorT))
       setPhase('error')
     })
 
@@ -80,7 +96,7 @@ export function UpdateNotification({ railExpanded }: Props) {
       offNotAvailable()
       offError()
     }
-  }, [currentVersion, t.settings.updateError])
+  }, [currentVersion, t.settings.updateError, t.settings.updateNoRelease, t.settings.updateRateLimitHour, t.settings.updateRateLimitMinutes])
 
   if (phase === 'idle') return null
 

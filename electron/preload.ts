@@ -329,12 +329,30 @@ contextBridge.exposeInMainWorld('api', {
       version?: string
       percent?: number
       error?: string
+      errorCode?: string
+      rateLimitMinutes?: number
       pendingRelease?: boolean
       installedVersion?: string
       remoteVersion?: string
     }>,
-    onState: (cb: (data: { phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }) => void) => {
-      const handler = (_e: unknown, data: { phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }) => cb(data)
+    onState: (cb: (data: {
+      phase: string
+      version?: string
+      percent?: number
+      error?: string
+      errorCode?: string
+      rateLimitMinutes?: number
+      pendingRelease?: boolean
+    }) => void) => {
+      const handler = (_e: unknown, data: {
+        phase: string
+        version?: string
+        percent?: number
+        error?: string
+        errorCode?: string
+        rateLimitMinutes?: number
+        pendingRelease?: boolean
+      }) => cb(data)
       ipcRenderer.on('update:state', handler)
       return () => { ipcRenderer.off('update:state', handler) }
     },
@@ -358,8 +376,8 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.on('update:not-available', handler)
       return () => { ipcRenderer.off('update:not-available', handler) }
     },
-    onError: (cb: (data: { error: string }) => void) => {
-      const handler = (_e: unknown, data: { error: string }) => cb(data)
+    onError: (cb: (data: { error: string; errorCode?: string; rateLimitMinutes?: number }) => void) => {
+      const handler = (_e: unknown, data: { error: string; errorCode?: string; rateLimitMinutes?: number }) => cb(data)
       ipcRenderer.on('update:error', handler)
       return () => { ipcRenderer.off('update:error', handler) }
     },

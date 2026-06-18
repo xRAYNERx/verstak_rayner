@@ -1,37 +1,28 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useT } from '../i18n'
 import { semverGt } from '../lib/semver'
+import { formatUpdaterError, type UpdaterErrorPayload } from '../lib/updater-error'
 import { PastReleasesModal } from './PastReleasesModal'
 import { ReleaseNotesModal, type ReleaseNote } from './ReleaseNotesModal'
 
 type Status = 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'ready' | 'error' | 'pending'
 
-type CheckResult = {
+type CheckResult = UpdaterErrorPayload & {
   available: boolean
   version?: string
   installedVersion?: string
   phase?: string
-  error?: string
   pendingRelease?: boolean
-}
-
-function friendlyUpdateError(raw: string, fallback: string, noRelease: string): string {
-  if (!raw) return fallback
-  const m = raw.toLowerCase()
-  if (
-    m.includes('404')
-    || m.includes('not found')
-    || m.includes('latest.yml')
-    || m.includes('no published')
-    || m.includes('cannot find')
-  ) {
-    return noRelease
-  }
-  return raw.length > 160 ? fallback : raw
 }
 
 export function UpdatesSettings() {
   const t = useT()
+  const errorT = {
+    updateError: t.settings.updateError,
+    updateNoRelease: t.settings.updateNoRelease,
+    updateRateLimitMinutes: t.settings.updateRateLimitMinutes,
+    updateRateLimitHour: t.settings.updateRateLimitHour,
+  }
   const [version, setVersion] = useState('…')
   const [versionLoaded, setVersionLoaded] = useState(false)
   const [status, setStatus] = useState<Status>('idle')
@@ -59,8 +50,8 @@ export function UpdatesSettings() {
   }, [])
 
   const applyCheckResult = useCallback((result: CheckResult) => {
-    if (result.error || result.phase === 'error') {
-      setError(friendlyUpdateError(result.error || '', t.settings.updateError, t.settings.updateNoRelease))
+    if (result.error || result.errorCode || result.phase === 'error') {
+      setError(formatUpdaterError(result, errorT))
       setStatus('error')
       return
     }
@@ -88,7 +79,7 @@ export function UpdatesSettings() {
     }
     setStatus('current')
     setError('')
-  }, [applyAvailable, isNewerThanInstalled, t.settings.updateError, t.settings.updateNoRelease])
+  }, [applyAvailable, errorT, isNewerThanInstalled])
 
   useEffect(() => {
     const applyPhase = (
@@ -97,6 +88,8 @@ export function UpdatesSettings() {
       p?: number,
       err?: string,
       pendingRelease?: boolean,
+      errorCode?: string,
+      rateLimitMinutes?: number,
     ) => {
       if (phase === 'available') {
         if (!pendingRelease && !isNewerThanInstalled(v)) {
@@ -127,7 +120,7 @@ export function UpdatesSettings() {
       } else if (phase === 'checking') {
         setStatus('checking')
       } else if (phase === 'error') {
-        setError(friendlyUpdateError(err || '', t.settings.updateError, t.settings.updateNoRelease))
+        setError(formatUpdaterError({ error: err, errorCode, rateLimitMinutes }, errorT))
         setStatus('error')
       } else if (phase === 'idle') {
         setStatus('idle')
@@ -141,10 +134,26 @@ export function UpdatesSettings() {
       })
       .catch(() => setVersionLoaded(true))
     void window.api.updater.getState()
-      .then(s => applyPhase(s.phase, s.remoteVersion ?? s.version, s.percent, s.error, s.pendingRelease))
+      .then(s => applyPhase(
+        s.phase,
+        s.remoteVersion ?? s.version,
+        s.percent,
+        s.error,
+        s.pendingRelease,
+        s.errorCode,
+        s.rateLimitMinutes,
+      ))
       .catch(() => {})
 
-    const offState = window.api.updater.onState(s => applyPhase(s.phase, s.version, s.percent, s.error, s.pendingRelease))
+    const offState = window.api.updater.onState(s => applyPhase(
+      s.phase,
+      s.version,
+      s.percent,
+      s.error,
+      s.pendingRelease,
+      s.errorCode,
+      s.rateLimitMinutes,
+    ))
     const offAvailable = window.api.updater.onAvailable(({ version: v, pendingRelease }) => {
       if (!pendingRelease && !isNewerThanInstalled(v)) {
         setStatus('current')
@@ -168,8 +177,8 @@ export function UpdatesSettings() {
       if (remoteVersion && isNewerThanInstalled(remoteVersion)) return
       setStatus('current')
     })
-    const offError = window.api.updater.onError(({ error: e }) => {
-      setError(friendlyUpdateError(e, t.settings.updateError, t.settings.updateNoRelease))
+    const offError = window.api.updater.onError((payload) => {
+      setError(formatUpdaterError(payload, errorT))
       setStatus('error')
     })
     return () => {
@@ -180,7 +189,7 @@ export function UpdatesSettings() {
       offNotAvailable()
       offError()
     }
-  }, [applyAvailable, isNewerThanInstalled, remoteVersion, t.settings.updateError, t.settings.updateNoRelease])
+  }, [applyAvailable, errorT, isNewerThanInstalled, remoteVersion])
 
   const viewReleaseNotes = useCallback(async () => {
     setNotesLoading(true)
@@ -204,10 +213,10 @@ export function UpdatesSettings() {
       const result = await window.api.updater.check()
       applyCheckResult(result)
     } catch {
-      setError(t.settings.updateError)
+      setError(errorT.updateError)
       setStatus('error')
     }
-  }, [applyCheckResult, t.settings.updateError])
+  }, [applyCheckResult, errorT])
 
   const clearCache = useCallback(async () => {
     setClearingCache(true)
@@ -217,12 +226,12 @@ export function UpdatesSettings() {
       const result = await window.api.updater.clearCache()
       applyCheckResult(result)
     } catch {
-      setError(t.settings.updateError)
+      setError(errorT.updateError)
       setStatus('error')
     } finally {
       setClearingCache(false)
     }
-  }, [applyCheckResult, t.settings.updateError])
+  }, [applyCheckResult, errorT])
 
   const notesTitle = notesTargetVersion && remoteVersion === notesTargetVersion && status !== 'current'
     ? t.updates.releaseNotesTitleAvailable.replace('{version}', notesTargetVersion)
