@@ -13,6 +13,16 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: 'aaec457',
+    deployed: '18.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Обновления: toast при очистке кэша, скачивание последнего релиза',
+    changes: [
+      'Кнопка «Очистить кэш» показывает всплывашку: «Кэш очищен» или текст ошибки.',
+      'Если package.json на main впереди Releases (1.5.12 vs 1.5.11) — качаем последний готовый релиз, не «ждём установщик».',
+    ],
+  },
+  {
     commit: 'e698090',
     deployed: '18.06.2026',
     treeVersion: '1.5.5',
