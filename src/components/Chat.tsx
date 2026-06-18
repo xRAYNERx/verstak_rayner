@@ -143,6 +143,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [dragOver, setDragOver] = useState(false)
   const [warning, setWarning] = useState<string | null>(null)
+  const [queueNotice, setQueueNotice] = useState<string | null>(null)
   const [visionBannerDismissed, setVisionBannerDismissed] = useState(false)
   const streamRef = useRef<HTMLDivElement>(null)
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(readAutoScrollPref)
@@ -156,6 +157,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
   const fileInputRef = useRef<HTMLInputElement>(null)
   const screenshotCounter = useRef(0)
   const warningTimer = useRef<number | null>(null)
+  const queueNoticeTimer = useRef<number | null>(null)
   const currentSendIdRef = useRef<number | null>(null)
   const queuedMessagesRef = useRef<QueuedComposerMessage[]>([])
   const [queuedMessages, setQueuedMessages] = useState<QueuedComposerMessage[]>([])
@@ -175,6 +177,12 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     setWarning(msg)
     if (warningTimer.current) window.clearTimeout(warningTimer.current)
     warningTimer.current = window.setTimeout(() => setWarning(null), 2500)
+  }
+
+  function flashQueueNotice(msg: string) {
+    setQueueNotice(msg)
+    if (queueNoticeTimer.current) window.clearTimeout(queueNoticeTimer.current)
+    queueNoticeTimer.current = window.setTimeout(() => setQueueNotice(null), 2500)
   }
 
   const hasImageAttachments = attachments.some(a => isImageAttachment(a.mimeType))
@@ -742,8 +750,11 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [input, isStreaming])
 
-  // Cleanup warning timer on unmount
-  useEffect(() => () => { if (warningTimer.current) window.clearTimeout(warningTimer.current) }, [])
+  // Cleanup warning / queue notice timers on unmount
+  useEffect(() => () => {
+    if (warningTimer.current) window.clearTimeout(warningTimer.current)
+    if (queueNoticeTimer.current) window.clearTimeout(queueNoticeTimer.current)
+  }, [])
 
   // Live token preview: debounce text changes (400ms) and ask the main process
   // to count tokens for the current draft. Gemini API gives an exact count;
@@ -884,7 +895,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     setQueuedMessagesState([...queuedMessagesRef.current, item])
     setInput('')
     setPendingBarExpanded(true)
-    flashWarning(t.chat.streamingQueueAdded)
+    flashQueueNotice(t.chat.streamingQueueAdded)
     armAutoScrollForOutgoing()
   }
 
@@ -907,9 +918,9 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
       const res = await window.api.ai.appendContext(sendId, text)
       if (res.ok) {
         status = 'accepted'
-        flashWarning(t.chat.streamingAppendAccepted)
+        flashQueueNotice(t.chat.streamingAppendAccepted)
       } else if (provider.id.endsWith('-cli')) {
-        flashWarning(t.chat.streamingAppendCliNote)
+        flashQueueNotice(t.chat.streamingAppendCliNote)
       }
     }
 
@@ -1440,6 +1451,17 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
               <polyline points="6 9 12 15 18 9" />
             </svg>
           </button>
+        )}
+        {queueNotice && (
+          <div className="gg-chat-queue-notice" role="status" aria-live="polite">
+            <span className="gg-chat-queue-notice-text">{queueNotice}</span>
+            <span className="gg-chat-queue-notice-arrow" aria-hidden>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </span>
+          </div>
         )}
         {isStreaming && (queuedMessages.length > 0 || pendingSupplements.length > 0) && (
           <ComposerPendingBar

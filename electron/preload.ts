@@ -171,6 +171,8 @@ contextBridge.exposeInMainWorld('api', {
     list: (projectPath: string, limit?: number) => ipcRenderer.invoke('journal:list', projectPath, limit),
     append: (projectPath: string, kind: string, title: string, detail?: string | null) =>
       ipcRenderer.invoke('journal:append', projectPath, kind, title, detail),
+    updateManual: (id: number, title: string, detail?: string | null) =>
+      ipcRenderer.invoke('journal:updateManual', id, title, detail),
     remove: (id: number) => ipcRenderer.invoke('journal:remove', id),
     clear: (projectPath: string) => ipcRenderer.invoke('journal:clear', projectPath)
   },

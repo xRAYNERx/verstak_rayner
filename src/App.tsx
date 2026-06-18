@@ -7,6 +7,7 @@ import type { ProjectMeta } from './types/api'
 import { Sidebar } from './components/Sidebar'
 import { Chat } from './components/Chat'
 import { TasksView } from './components/TasksView'
+import { FilesView } from './components/FilesView'
 import { JournalView } from './components/JournalView'
 import { PlanView } from './components/PlanView'
 import { FeedbackView } from './components/FeedbackView'
@@ -349,6 +350,7 @@ export function App() {
         {activeView === 'tasks-manager' && <AgentRunsPanel />}
         {activeView === 'task' && <DevTaskPanel />}
         {activeView === 'project-map' && <ProjectMapPanel />}
+        {activeView === 'files' && <FilesView />}
         {activeView === 'memory-gov' && (
           <Suspense fallback={<ViewFallback />}><MemoryGovernance /></Suspense>
         )}

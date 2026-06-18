@@ -268,6 +268,7 @@ declare global {
       journal: {
         list: (projectPath: string, limit?: number) => Promise<JournalEntry[]>
         append: (projectPath: string, kind: JournalKind, title: string, detail?: string | null) => Promise<JournalEntry>
+        updateManual: (id: number, title: string, detail?: string | null) => Promise<JournalEntry | null>
         remove: (id: number) => Promise<void>
         clear: (projectPath: string) => Promise<number>
       }

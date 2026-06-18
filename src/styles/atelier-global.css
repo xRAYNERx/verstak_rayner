@@ -526,11 +526,15 @@ html.gg-atelier .gg-attach-row .gg-attach-chip {
 }
 
 html.gg-atelier .gg-composer-warning,
-html.gg-atelier .gg-budget-bar {
+html.gg-atelier .gg-budget-bar,
+html.gg-atelier .gg-chat-queue-notice {
   background: var(--vol-glass);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   backdrop-filter: blur(10px);
+}
+html.gg-atelier .gg-chat-queue-notice {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border-default));
 }
 
 /* ─── Scrollbar (тоньше, в тон стекла) ─── */

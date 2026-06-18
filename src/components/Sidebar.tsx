@@ -4,7 +4,7 @@ import { useProject, type ViewId } from '../store/projectStore'
 import { ModelPicker } from './ModelPicker'
 import { CreateClientModal } from './CreateClientModal'
 import { useT } from '../i18n'
-import type { FileNode } from '../types/api'
+
 
 type ChatContextMenuState = { x: number; y: number; id: number; title: string }
 
@@ -264,65 +264,11 @@ function ChatIconNode() {
   )
 }
 
-function FilesSection({ tree }: { tree: FileNode[] }) {
-  const t = useT()
-  const [open, setOpen] = useState(false)
-  return (
-    <>
-      <button
-        type="button"
-        className="gg-sidebar-section-collapsible"
-        onClick={() => setOpen(v => !v)}
-      >
-        <span className="gg-sidebar-section-caret">{open ? '▾' : '▸'}</span>
-        <span className="gg-sidebar-section-title">{t.sidebar.files}</span>
-        <span className="gg-sidebar-section-count">{tree.length}</span>
-      </button>
-      {open && (
-        <div className="gg-tree">
-          {tree.map(node => <TreeNode key={node.path} node={node} depth={0} />)}
-        </div>
-      )}
-    </>
-  )
-}
-
-/**
- * Map a TouchKind to a one-glyph marker. Keeps the tree visually quiet —
- * full descriptions live in the title tooltip.
- */
-function touchMarker(kind: 'read' | 'write' | 'list'): { icon: string; title: string } {
-  if (kind === 'write') return { icon: '●', title: 'AI правил этот файл в текущей сессии' }
-  if (kind === 'read') return { icon: '○', title: 'AI читал этот файл в текущей сессии' }
-  return { icon: '·', title: 'AI листал этот каталог в текущей сессии' }
-}
-
-function TreeNode({ node, depth }: { node: FileNode; depth: number }) {
-  const [open, setOpen] = useState(depth < 1)
-  const isDir = node.isDirectory
-  // Touched-by-AI marker. The store keys by the project-relative path the
-  // tools emit — match against node.path. If it doesn't match (different
-  // separator on Windows), fall through silently.
-  const touched = useProject(s => s.touchedFiles[node.path])
-  const marker = touched ? touchMarker(touched) : null
-  return (
-    <>
-      <div
-        className={`gg-tree-node ${isDir ? 'is-dir' : 'is-file'} ${touched ? `is-touched is-${touched}` : ''}`}
-        style={{ paddingLeft: 8 + depth * 12 }}
-        onClick={() => isDir && setOpen(o => !o)}
-        title={marker?.title}
-      >
-        <span className="gg-tree-icon">{isDir ? (open ? '▾' : '▸') : '·'}</span>
-        <span className="gg-tree-name">{node.name}</span>
-        {marker && <span className="gg-tree-touch" aria-hidden>{marker.icon}</span>}
-      </div>
-      {isDir && open && node.children?.map(child => (
-        <TreeNode key={child.path} node={child} depth={depth + 1} />
-      ))}
-    </>
-  )
-}
+const FilesIcon = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+  </svg>
+)
 
 interface NavItem {
   id: ViewId
@@ -402,12 +348,6 @@ const InspectorIcon = (
     <line x1="21" y1="21" x2="16.65" y2="16.65" />
   </svg>
 )
-const VideoIcon = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="4" width="20" height="16" rx="2" />
-    <polygon points="10 9 16 12 10 15 10 9" />
-  </svg>
-)
 const MemoryIcon = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 2a4 4 0 0 0-4 4 3 3 0 0 0-2 5.5A3 3 0 0 0 8 17a3.5 3.5 0 0 0 4 1 3.5 3.5 0 0 0 4-1 3 3 0 0 0 2-5.5A3 3 0 0 0 16 6a4 4 0 0 0-4-4z" />
@@ -439,16 +379,6 @@ const ProjectMapIcon = (
     <line x1="16" y1="6" x2="16" y2="21" />
   </svg>
 )
-// Dev Task Flow (Фаза 2) — иконка вкладки «Задача» (ветка + чекмарк).
-const DevTaskIcon = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="6" y1="3" x2="6" y2="15" />
-    <circle cx="18" cy="6" r="3" />
-    <circle cx="6" cy="18" r="3" />
-    <path d="M18 9a9 9 0 0 1-9 9" />
-  </svg>
-)
-
 // Chat is rendered separately above the rest of the nav (expandable section
 // with its own list of chat sessions + create button).
 // NAV is built inside the component to use translations.
@@ -458,40 +388,36 @@ interface SidebarProps {
   'aria-hidden'?: boolean
 }
 
-const MORE_VIEW_IDS = new Set<ViewId>([
-  'inspector', 'project-map', 'tasks-manager', 'task', 'agents', 'memory-gov', 'workflow', 'video', 'feedback',
-])
-
 export function Sidebar({ onOpenSettings, 'aria-hidden': ariaHidden }: SidebarProps) {
-  const { path, tree, setProject, activeView, setActiveView, refreshProjectList } = useProject()
+  const { path, setProject, activeView, setActiveView, refreshProjectList } = useProject()
   const t = useT()
   const [showCreateClient, setShowCreateClient] = useState(false)
-  const [moreOpen, setMoreOpen] = useState(() => MORE_VIEW_IDS.has(activeView))
 
-  const PRIMARY_NAV: NavItem[] = [
-    { id: 'tasks',    label: t.sidebar.tasks,    icon: TasksIcon },
-    { id: 'journal',  label: t.sidebar.journal,  icon: JournalIcon },
+  const WORK_NAV: NavItem[] = [
     { id: 'plan',     label: t.sidebar.plan,     icon: PlanIcon },
+    { id: 'tasks',    label: t.sidebar.tasks,    icon: TasksIcon },
     { id: 'skills',   label: t.sidebar.skills,   icon: SkillsIcon },
-    { id: 'browser',  label: t.sidebar.browser,  icon: BrowserIcon },
-    { id: 'design',   label: t.sidebar.design,   icon: DesignIcon },
+    { id: 'workflow', label: t.sidebar.workflow, icon: WorkflowIcon },
   ]
 
-  const MORE_NAV: NavItem[] = [
+  const CONTROL_NAV: NavItem[] = [
+    { id: 'journal',  label: t.sidebar.journal,  icon: JournalIcon },
     { id: 'tasks-manager', label: t.sidebar.tasksManager, icon: TasksManagerIcon },
     { id: 'inspector', label: t.sidebar.inspector, icon: InspectorIcon },
-    { id: 'agents',   label: t.sidebar.agents,  icon: AgentsIcon },
-    { id: 'task',     label: t.sidebar.task,    icon: DevTaskIcon },
-    { id: 'project-map', label: t.sidebar.projectMap, icon: ProjectMapIcon },
-    { id: 'memory-gov', label: t.sidebar.memory, icon: MemoryIcon },
-    { id: 'workflow', label: t.sidebar.workflow, icon: WorkflowIcon },
-    { id: 'video',    label: t.sidebar.video,    icon: VideoIcon, badge: t.sidebar.soon },
-    { id: 'feedback', label: t.sidebar.feedback, icon: FeedbackIcon },
+    { id: 'agents',   label: t.sidebar.agents,   icon: AgentsIcon },
   ]
 
-  useEffect(() => {
-    if (MORE_VIEW_IDS.has(activeView)) setMoreOpen(true)
-  }, [activeView])
+  const PROJECT_NAV: NavItem[] = [
+    { id: 'project-map', label: t.sidebar.projectMap, icon: ProjectMapIcon },
+    { id: 'memory-gov', label: t.sidebar.memory, icon: MemoryIcon },
+    { id: 'files', label: t.sidebar.files, icon: FilesIcon },
+  ]
+
+  const TOOLS_NAV: NavItem[] = [
+    { id: 'browser',  label: t.sidebar.browser,  icon: BrowserIcon },
+    { id: 'design',   label: t.sidebar.design,   icon: DesignIcon },
+    { id: 'feedback', label: t.sidebar.feedback, icon: FeedbackIcon },
+  ]
 
   async function handleClientOpened(clientPath: string) {
     await setProject(clientPath)
@@ -519,9 +445,12 @@ export function Sidebar({ onOpenSettings, 'aria-hidden': ariaHidden }: SidebarPr
 
         {path && (
           <>
+            <div className="gg-sidebar-section">
+              <div className="gg-sidebar-section-title">{t.sidebar.workSection}</div>
+            </div>
             <ChatNavSection />
             <div className="gg-nav">
-              {PRIMARY_NAV.map(item => (
+              {WORK_NAV.map(item => (
                 <button
                   key={item.id}
                   className={`gg-nav-item ${activeView === item.id ? 'is-active' : ''}`}
@@ -531,36 +460,55 @@ export function Sidebar({ onOpenSettings, 'aria-hidden': ariaHidden }: SidebarPr
                   <span className="gg-nav-label">{item.label}</span>
                 </button>
               ))}
-              <button
-                type="button"
-                className={`gg-nav-item gg-nav-more-toggle ${moreOpen ? 'is-open' : ''}`}
-                onClick={() => setMoreOpen(v => !v)}
-                aria-expanded={moreOpen}
-              >
-                <span className="gg-nav-icon">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                    <circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                    <circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                  </svg>
-                </span>
-                <span className="gg-nav-label">{t.sidebar.more}</span>
-                <span className="gg-nav-caret">{moreOpen ? '▾' : '▸'}</span>
-              </button>
-              {moreOpen && MORE_NAV.map(item => (
+            </div>
+
+            <div className="gg-sidebar-section">
+              <div className="gg-sidebar-section-title">{t.sidebar.controlSection}</div>
+            </div>
+            <div className="gg-nav">
+              {CONTROL_NAV.map(item => (
                 <button
                   key={item.id}
-                  className={`gg-nav-item is-nested ${activeView === item.id ? 'is-active' : ''} ${item.badge ? 'is-disabled' : ''}`}
-                  onClick={() => { if (!item.badge) setActiveView(item.id) }}
+                  className={`gg-nav-item ${activeView === item.id ? 'is-active' : ''}`}
+                  onClick={() => setActiveView(item.id)}
                 >
                   <span className="gg-nav-icon">{item.icon}</span>
                   <span className="gg-nav-label">{item.label}</span>
-                  {item.badge && <span className="gg-nav-badge">{item.badge}</span>}
                 </button>
               ))}
             </div>
 
-            <FilesSection tree={tree} />
+            <div className="gg-sidebar-section">
+              <div className="gg-sidebar-section-title">{t.sidebar.projectSection}</div>
+            </div>
+            <div className="gg-nav">
+              {PROJECT_NAV.map(item => (
+                <button
+                  key={item.id}
+                  className={`gg-nav-item ${activeView === item.id ? 'is-active' : ''}`}
+                  onClick={() => setActiveView(item.id)}
+                >
+                  <span className="gg-nav-icon">{item.icon}</span>
+                  <span className="gg-nav-label">{item.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="gg-sidebar-section">
+              <div className="gg-sidebar-section-title">{t.sidebar.toolsSection}</div>
+            </div>
+            <div className="gg-nav">
+              {TOOLS_NAV.map(item => (
+                <button
+                  key={item.id}
+                  className={`gg-nav-item ${activeView === item.id ? 'is-active' : ''}`}
+                  onClick={() => setActiveView(item.id)}
+                >
+                  <span className="gg-nav-icon">{item.icon}</span>
+                  <span className="gg-nav-label">{item.label}</span>
+                </button>
+              ))}
+            </div>
           </>
         )}
       </div>
