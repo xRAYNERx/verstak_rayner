@@ -104,6 +104,15 @@ function unregisterConversationSupplements(sendId: number): void {
   conversationSupplements.delete(sendId)
 }
 
+/** Инъекция догруженного контекста (supplement) в активный прогон по sendId.
+ *  false — если для sendId нет активного слушателя. Используется ai:append-context. */
+export function pushConversationSupplement(sendId: number, text: string): boolean {
+  const push = conversationSupplements.get(sendId)
+  if (!push) return false
+  push(text)
+  return true
+}
+
 // Track which chats have already received memory injection in this process
 // lifetime. Replaces the old isFirstTurn check so memory is injected on the
 // first ai:send for a chat in this app session — not only on truly-first-ever
@@ -654,9 +663,7 @@ export function registerAiIpc(deps: AiDeps): void {
   ipcMain.handle('ai:append-context', (_e, sendId: number, text: string) => {
     const trimmed = String(text ?? '').trim()
     if (!trimmed || sendId <= 0) return { ok: false as const, fallback: 'invalid' as const }
-    const push = conversationSupplements.get(sendId)
-    if (!push) return { ok: false as const, fallback: 'unavailable' as const }
-    push(trimmed)
+    if (!pushConversationSupplement(sendId, trimmed)) return { ok: false as const, fallback: 'unavailable' as const }
     return { ok: true as const }
   })
 
@@ -1017,7 +1024,7 @@ export function selectAllowedToolDefs<T extends { name: string }>(
   return mcp.length > 0 ? [...base, ...mcp] : [...base]
 }
 
-async function runApiConversation(
+export async function runApiConversation(
   sender: TaggedSender,
   sendId: number,
   provider: ChatProvider,

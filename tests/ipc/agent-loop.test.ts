@@ -1,0 +1,143 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mkdtempSync, rmSync } from 'fs'
+import { join } from 'path'
+import { tmpdir } from 'os'
+import type { ChatProvider, ChatEvent, ChatMessage } from '../../electron/ai/types'
+
+/**
+ * Тест-харнес для главного agent-loop (runApiConversation). Долгое время это была
+ * непокрытая зона (CLAUDE.md §5 #3) — fallback/supplements/finalize правились
+ * вслепую (#7/#12/#14/#15). Харнес гоняет реальный loop с мок-провайдером.
+ *
+ * ipcMain мокаем — ai.ts тянет его на загрузке модуля.
+ */
+vi.mock('electron', () => ({ ipcMain: { handle: () => {} }, app: { getPath: () => tmpdir() } }))
+
+const { runApiConversation, pushConversationSupplement } = await import('../../electron/ipc/ai')
+const { createFileTools } = await import('../../electron/ai/tools')
+const { createCostGuard } = await import('../../electron/ai/cost-guard')
+
+/** Мок-провайдер: per-turn скрипт событий. throwErr → падает на send (для fallback). */
+function provider(id: string, script: (turn: number) => ChatEvent[], throwErr?: Error): ChatProvider {
+  let turn = 0
+  return {
+    id, name: id, models: [id],
+    async *send(): AsyncGenerator<ChatEvent> {
+      turn++
+      if (throwErr) throw throwErr
+      for (const e of script(turn)) yield e
+    },
+  }
+}
+
+type Overrides = {
+  provider: ChatProvider
+  providerId?: string
+  model?: string
+  costGuard?: ReturnType<typeof createCostGuard>
+  agentRuns?: unknown
+  runId?: string
+  fallbackOpts?: unknown
+  messages?: ChatMessage[]
+}
+
+function makeSender() { return { send: vi.fn(), exec: vi.fn(async () => undefined) } }
+
+// Позиционная сборка 33 аргументов runApiConversation.
+function args(dir: string, o: Overrides): unknown[] {
+  const signal = new AbortController().signal
+  return [
+    makeSender(), 1, o.provider, createFileTools(dir, signal), dir,
+    o.messages ?? [{ role: 'user', content: 'hi' }], signal,
+    vi.fn(), vi.fn(() => ({ id: 1 })), vi.fn(), vi.fn(() => []),
+    vi.fn(() => ({ id: 'm' })), vi.fn(() => []), vi.fn(() => []),
+    { list: () => [], query: async () => ({}) }, 'bypass', 5,
+    undefined, () => null, o.costGuard, o.providerId, o.model, o.fallbackOpts,
+    undefined, undefined, undefined, null, undefined, undefined,
+    o.agentRuns, o.runId, undefined, null,
+  ]
+}
+
+function mockRuns() {
+  return { finish: vi.fn(), appendEvent: vi.fn() }
+}
+
+describe('agent-loop (runApiConversation) — харнес', () => {
+  let dir: string
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'gg-loop-')) })
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }) })
+
+  it('happy path: plain-ответ → completed, finish("done")', async () => {
+    const runs = mockRuns()
+    const p = provider('p1', () => [{ type: 'text', text: 'привет' }, { type: 'done' }])
+    await runApiConversation(...(args(dir, { provider: p, providerId: 'gemini-api', model: 'gemini-3-flash', costGuard: createCostGuard(100), agentRuns: runs, runId: 'r1' }) as Parameters<typeof runApiConversation>))
+    expect(runs.finish).toHaveBeenCalledTimes(1)
+    expect(runs.finish).toHaveBeenCalledWith('r1', 'done', expect.anything())
+  })
+
+  // #15 + #7: упавший провайдер → fallback успешен. run финализируется как 'done'
+  // (не 'failed'/'crashed'), ровно один раз, а cost считается по модели fallback'а.
+  it('успешный fallback → finish("done") один раз + cost по модели fallback', async () => {
+    const runs = mockRuns()
+    const cg = createCostGuard(100)
+    const recordSpy = vi.spyOn(cg, 'recordAndCheck')
+    const failing = provider('gemini-api', () => [], new Error('503 Service Unavailable'))
+    const fallback = provider('claude', () => [
+      { type: 'usage', usage: { inputTokens: 1000, outputTokens: 1000, cachedInputTokens: 0 } },
+      { type: 'text', text: 'ответ от fallback' },
+      { type: 'done' },
+    ])
+    const fallbackOpts = {
+      getNextProvider: (_id: string) => fallback,
+      getProviderModel: (_id: string) => 'claude-opus-4-5',
+      configuredProviders: new Set(['gemini-api', 'claude']),
+      triedProviders: new Set(['gemini-api']),
+    }
+    await runApiConversation(...(args(dir, {
+      provider: failing, providerId: 'gemini-api', model: 'gemini-3-flash',
+      costGuard: cg, agentRuns: runs, runId: 'r1', fallbackOpts,
+    }) as Parameters<typeof runApiConversation>))
+
+    expect(runs.finish).toHaveBeenCalledTimes(1)
+    expect(runs.finish).toHaveBeenCalledWith('r1', 'done', expect.anything()) // #15
+    // #7: стоимость записана по модели fallback (claude-opus-4-5), не упавшего gemini-3-flash.
+    expect(recordSpy).toHaveBeenCalledWith('claude', 'claude-opus-4-5', 1000, 1000, 0)
+  }, 15000)
+
+  // #12: принятые propose_edits попадают в filesTouched → finish.filesCount > 0.
+  it('propose_edits (accepted) → filesTouched учтён в finish', async () => {
+    const runs = mockRuns()
+    const p = provider('p1', (turn) => turn === 1
+      ? [{ type: 'tool-call', call: { id: 'c1', name: 'propose_edits', args: { edits: [{ path: 'a.txt', content: 'hello' }] } } }, { type: 'done' }]
+      : [{ type: 'text', text: 'готово' }, { type: 'done' }])
+    await runApiConversation(...(args(dir, { provider: p, providerId: 'gemini-api', model: 'gemini-3-flash', costGuard: createCostGuard(100), agentRuns: runs, runId: 'r1' }) as Parameters<typeof runApiConversation>))
+    expect(runs.finish).toHaveBeenCalledWith('r1', 'done', expect.objectContaining({ filesCount: 1 }))
+  }, 15000)
+
+  // #14: supplement, догруженный во время plain-ответа, перезапускает turn и
+  // попадает в контекст следующего хода (раньше continue гасил стрим, не turn).
+  it('supplement после plain-ответа перезапускает turn и доходит до провайдера', async () => {
+    const runs = mockRuns()
+    const received: string[] = []
+    let turn = 0
+    const p: ChatProvider = {
+      id: 'p1', name: 'p1', models: ['p1'],
+      async *send(messages): AsyncGenerator<ChatEvent> {
+        received.push(JSON.stringify(messages))
+        turn++
+        if (turn === 1) {
+          pushConversationSupplement(1, 'СРОЧНАЯ-ДОБАВКА') // инъекция во время хода 1
+          yield { type: 'text', text: 'первый ответ' }
+          yield { type: 'done' }
+          return
+        }
+        yield { type: 'text', text: 'учёл добавку' }
+        yield { type: 'done' }
+      },
+    }
+    await runApiConversation(...(args(dir, { provider: p, providerId: 'gemini-api', model: 'gemini-3-flash', costGuard: createCostGuard(100), agentRuns: runs, runId: 'r1' }) as Parameters<typeof runApiConversation>))
+
+    expect(turn).toBeGreaterThanOrEqual(2)                       // turn перезапустился
+    expect(received[1]).toContain('СРОЧНАЯ-ДОБАВКА')             // добавка дошла до хода 2
+  }, 15000)
+})
