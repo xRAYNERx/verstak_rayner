@@ -1,4 +1,14 @@
-import type { PipelineBrief } from '../types/api'
+import type { PipelineBrief, PipelineStep } from '../types/api'
+
+/** Шаги «N/5» для баннера: brief(1) собирается в визарде, дальше plan→proof. */
+const STEP_ORDER: Record<PipelineStep, number> = {
+  brief: 1, plan: 2, execute: 3, verify: 4, proof: 5, completed: 5, cancelled: 5,
+}
+
+/** {index 1-based, total} шага для баннера «Pipeline · N/5». */
+export function pipelineStepIndex(step: PipelineStep): { index: number; total: number } {
+  return { index: STEP_ORDER[step] ?? 1, total: 5 }
+}
 
 /** Пустой бриф для инициализации формы визарда. */
 export const EMPTY_BRIEF: PipelineBrief = { goal: '', constraints: '', dod: '' }

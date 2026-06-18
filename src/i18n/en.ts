@@ -463,6 +463,15 @@ export const en = {
     dodPlaceholder: 'npm run type, a specific test, HTTP 200…',
     start: 'Generate plan',
     starting: 'Starting…',
+    banner: 'Pipeline',
+    stepPlan: 'Plan',
+    stepExecute: 'Execute',
+    stepVerify: 'Verify',
+    stepProof: 'Proof',
+    planOk: 'Plan OK → Execute',
+    toVerify: '→ Verify',
+    toProof: '→ Proof Pack',
+    cancelRun: 'Cancel',
   },
 }
 

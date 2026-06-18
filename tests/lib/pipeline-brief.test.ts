@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { EMPTY_BRIEF, isBriefReady, buildPlanPrompt, buildExecutePrompt } from '../../src/lib/pipeline-brief'
+import { EMPTY_BRIEF, isBriefReady, buildPlanPrompt, buildExecutePrompt, pipelineStepIndex } from '../../src/lib/pipeline-brief'
 
 describe('pipeline-brief', () => {
   it('EMPTY_BRIEF не готов', () => {
@@ -34,5 +34,12 @@ describe('pipeline-brief', () => {
     expect(p).toContain('plan id=42')
     expect(p).toContain('DoD: npm test')
     expect(p).toContain('attest_verification')
+  })
+
+  it('pipelineStepIndex: plan=2/5 … proof=5/5', () => {
+    expect(pipelineStepIndex('plan')).toEqual({ index: 2, total: 5 })
+    expect(pipelineStepIndex('execute')).toEqual({ index: 3, total: 5 })
+    expect(pipelineStepIndex('verify')).toEqual({ index: 4, total: 5 })
+    expect(pipelineStepIndex('proof')).toEqual({ index: 5, total: 5 })
   })
 })

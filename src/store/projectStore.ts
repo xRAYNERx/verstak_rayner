@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { FileNode, ChatMessage, ProjectMeta, ChatSession, DevTask, ResumableRun } from '../types/api'
+import type { FileNode, ChatMessage, ProjectMeta, ChatSession, DevTask, ResumableRun, PipelineRun, PipelineStep } from '../types/api'
 import { sortProjectsByName } from '../lib/project-sort'
 import { isModelValidForProvider } from '../hooks/useProvider'
 import { parseReviewFindings, type ReviewFinding } from '../lib/review-findings'
@@ -121,6 +121,9 @@ interface ProjectState {
   activeDevTaskId: number | null
   /** Снимок активной dev_task — обновляется refreshDevTask. null если задачи нет. */
   devTask: DevTask | null
+  /** Pipeline Brief→Proof: активный прогон проекта (баннер по шагам). null если нет.
+   *  Заполняется startPipeline / loadActivePipeline, продвигается advancePipeline. */
+  activePipeline: PipelineRun | null
   activeView: ViewId
   sessionUsage: SessionUsage
   runningPlanStep: RunningPlanStep | null
@@ -200,6 +203,14 @@ interface ProjectState {
   refreshDevTask: () => Promise<void>
   /** Сбросить активную задачу (снимок + id). Вкладку не переключает. */
   closeDevTask: () => void
+  /** Pipeline: сделать прогон активным (после pipeline.start из визарда). */
+  startPipeline: (run: PipelineRun) => void
+  /** Pipeline: подгрузить активный прогон проекта из БД (resume-баннер). */
+  loadActivePipeline: (projectPath: string) => Promise<void>
+  /** Pipeline: продвинуть шаг / привязать planId / runId — пишет в БД + стейт. */
+  advancePipeline: (patch: { step?: PipelineStep; planId?: number | null; agentRunId?: string | null; chatId?: number | null }) => Promise<void>
+  /** Pipeline: отменить активный прогон (step='cancelled') + очистить стейт. */
+  cancelPipeline: () => Promise<void>
   addUsage: (delta: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number }) => void
   resetUsage: () => void
   setRunningPlanStep: (s: RunningPlanStep | null) => void
@@ -327,6 +338,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   checkpointId: null,
   activeDevTaskId: null,
   devTask: null,
+  activePipeline: null,
   activeView: 'chat',
   sessionUsage: { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 },
   runningPlanStep: null,
@@ -565,6 +577,31 @@ export const useProject = create<ProjectState>((set, get) => ({
     } catch { /* IPC недоступен в dev — оставляем текущий снимок */ }
   },
   closeDevTask: () => set({ activeDevTaskId: null, devTask: null }),
+  startPipeline: (run) => set({ activePipeline: run }),
+  loadActivePipeline: async (projectPath) => {
+    try {
+      const run = await window.api.pipeline.getActive(projectPath)
+      // Гонка смены проекта: применяем только если проект всё ещё активен.
+      if (get().path !== projectPath) return
+      set({ activePipeline: run })
+    } catch { /* pipeline-баннер не критичен */ }
+  },
+  advancePipeline: async (patch) => {
+    const cur = get().activePipeline
+    if (!cur) return
+    try {
+      const updated = await window.api.pipeline.advance(cur.id, patch)
+      // Применяем только если тот же прогон ещё активен (не переключились).
+      if (get().activePipeline?.id !== cur.id) return
+      set({ activePipeline: updated })
+    } catch { /* best-effort */ }
+  },
+  cancelPipeline: async () => {
+    const cur = get().activePipeline
+    if (!cur) return
+    set({ activePipeline: null })
+    try { await window.api.pipeline.cancel(cur.id) } catch { /* best-effort */ }
+  },
   addUsage: (delta) => set(s => ({
     sessionUsage: {
       inputTokens: s.sessionUsage.inputTokens + (delta.inputTokens ?? 0),

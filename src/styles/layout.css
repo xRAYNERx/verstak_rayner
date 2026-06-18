@@ -10368,3 +10368,30 @@ textarea.gg-input {
   margin-bottom: 14px;
 }
 .gg-pipeline-textarea { resize: vertical; min-height: 38px; font: inherit; }
+
+/* ── Pipeline баннер (sticky, шаги Plan→Proof) ─────────────────────── */
+.gg-pipeline-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  background: var(--surface-raised, rgba(127,127,127,0.08));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.gg-pipeline-banner-tag {
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent, currentColor);
+  font-size: 11px;
+}
+.gg-pipeline-banner-step { color: var(--text-muted); white-space: nowrap; }
+.gg-pipeline-banner-goal {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 340px;
+}
+.gg-pipeline-banner-spacer { flex: 1; }
