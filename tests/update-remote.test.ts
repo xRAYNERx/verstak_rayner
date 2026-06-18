@@ -57,6 +57,18 @@ sha512: abc==
   })
 })
 
+describe('fetchVersionFromLatestYml parsing', () => {
+  it('parses version line from latest.yml body', () => {
+    const yml = `version: 1.5.11
+files:
+  - url: Verstak-Setup-1.5.11-x64.exe
+path: Verstak-Setup-1.5.11-x64.exe
+`
+    const m = yml.match(/^version:\s*(\S+)/m)
+    expect(m?.[1]).toBe('1.5.11')
+  })
+})
+
 describe('isBenignUpdaterError', () => {
   it('treats missing latest.yml as benign', () => {
     expect(isBenignUpdaterError('Cannot find latest.yml in the latest release')).toBe(true)

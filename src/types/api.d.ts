@@ -423,8 +423,9 @@ declare global {
           htmlUrl: string
           publishedAt?: string
         }>>
-        check(): Promise<{ available: boolean; version?: string; error?: string; phase?: string; pendingRelease?: boolean }>
-        getState(): Promise<{ phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }>
+        check(): Promise<{ available: boolean; version?: string; installedVersion?: string; error?: string; phase?: string; pendingRelease?: boolean }>
+        clearCache(): Promise<{ ok: boolean; available: boolean; version?: string; installedVersion?: string; error?: string; phase?: string; pendingRelease?: boolean }>
+        getState(): Promise<{ phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean; installedVersion?: string; remoteVersion?: string }>
         onState(cb: (data: { phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }) => void): () => void
         onAvailable(cb: (data: { version: string; pendingRelease?: boolean }) => void): () => void
         onDownloaded(cb: (data: { version: string }) => void): () => void

@@ -13,6 +13,17 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: 'e71a185',
+    deployed: '18.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Обновления v2: probe — источник истины, кнопка «Очистить кэш»',
+    changes: [
+      'Переписан updater: версия с package.json + latest.yml; electron-updater не сбрасывает probe.',
+      'Игнор update-not-available когда probe видит версию новее установленной.',
+      'Кнопка «Очистить кэш обновлений» в настройках — сброс + повторная проверка.',
+    ],
+  },
+  {
     commit: '0a42dd3',
     deployed: '18.06.2026',
     treeVersion: '1.5.5',

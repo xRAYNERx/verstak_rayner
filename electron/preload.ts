@@ -315,12 +315,23 @@ contextBridge.exposeInMainWorld('api', {
     getReleaseNotes: (opts?: { sinceVersion?: string; upToVersion?: string; version?: string; all?: boolean }) =>
       ipcRenderer.invoke('update:get-release-notes', opts ?? {}),
     check: () => ipcRenderer.invoke('update:check'),
+    clearCache: () => ipcRenderer.invoke('update:clear-cache') as Promise<{
+      ok: boolean
+      available: boolean
+      version?: string
+      installedVersion?: string
+      phase?: string
+      error?: string
+      pendingRelease?: boolean
+    }>,
     getState: () => ipcRenderer.invoke('update:get-state') as Promise<{
       phase: string
       version?: string
       percent?: number
       error?: string
       pendingRelease?: boolean
+      installedVersion?: string
+      remoteVersion?: string
     }>,
     onState: (cb: (data: { phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }) => void) => {
       const handler = (_e: unknown, data: { phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }) => cb(data)

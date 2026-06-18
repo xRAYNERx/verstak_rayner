@@ -6,6 +6,15 @@ import { ReleaseNotesModal, type ReleaseNote } from './ReleaseNotesModal'
 
 type Status = 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'ready' | 'error' | 'pending'
 
+type CheckResult = {
+  available: boolean
+  version?: string
+  installedVersion?: string
+  phase?: string
+  error?: string
+  pendingRelease?: boolean
+}
+
 function friendlyUpdateError(raw: string, fallback: string, noRelease: string): string {
   if (!raw) return fallback
   const m = raw.toLowerCase()
@@ -34,13 +43,54 @@ export function UpdatesSettings() {
   const [releaseNotes, setReleaseNotes] = useState<ReleaseNote[]>([])
   const [notesLoading, setNotesLoading] = useState(false)
   const [notesTargetVersion, setNotesTargetVersion] = useState('')
+  const [clearingCache, setClearingCache] = useState(false)
+
+  const installedNorm = version.replace(/^v/, '')
+
+  const isNewerThanInstalled = useCallback((v?: string) => {
+    if (!v || !versionLoaded) return false
+    return semverGt(v, installedNorm)
+  }, [installedNorm, versionLoaded])
+
+  const applyAvailable = useCallback((v: string, pendingRelease?: boolean) => {
+    setRemoteVersion(v)
+    setStatus(pendingRelease ? 'pending' : 'available')
+    setError('')
+  }, [])
+
+  const applyCheckResult = useCallback((result: CheckResult) => {
+    if (result.error || result.phase === 'error') {
+      setError(friendlyUpdateError(result.error || '', t.settings.updateError, t.settings.updateNoRelease))
+      setStatus('error')
+      return
+    }
+    if (result.phase === 'downloaded') {
+      if (result.version) setRemoteVersion(result.version)
+      setStatus('ready')
+      return
+    }
+    if (result.phase === 'downloading') {
+      if (result.version) setRemoteVersion(result.version)
+      setStatus('downloading')
+      return
+    }
+    if (result.available && result.version) {
+      applyAvailable(result.version, result.pendingRelease)
+      return
+    }
+    if (result.version && isNewerThanInstalled(result.version)) {
+      applyAvailable(result.version, result.pendingRelease)
+      return
+    }
+    if (result.phase === 'idle') {
+      setStatus('idle')
+      return
+    }
+    setStatus('current')
+    setError('')
+  }, [applyAvailable, isNewerThanInstalled, t.settings.updateError, t.settings.updateNoRelease])
 
   useEffect(() => {
-    const isNewerThanInstalled = (v?: string) => {
-      if (!v || !versionLoaded) return false
-      return semverGt(v, version.replace(/^v/, ''))
-    }
-
     const applyPhase = (
       phase: string,
       v?: string,
@@ -53,9 +103,7 @@ export function UpdatesSettings() {
           setStatus('current')
           return
         }
-        if (v) setRemoteVersion(v)
-        setStatus(pendingRelease ? 'pending' : 'available')
-        setError('')
+        if (v) applyAvailable(v, pendingRelease)
       } else if (phase === 'downloading') {
         if (v) setRemoteVersion(v)
         setStatus('downloading')
@@ -70,6 +118,10 @@ export function UpdatesSettings() {
         setStatus('ready')
         setError('')
       } else if (phase === 'not-available') {
+        if (v && isNewerThanInstalled(v)) {
+          applyAvailable(v, pendingRelease)
+          return
+        }
         setStatus('current')
         setError('')
       } else if (phase === 'checking') {
@@ -77,6 +129,8 @@ export function UpdatesSettings() {
       } else if (phase === 'error') {
         setError(friendlyUpdateError(err || '', t.settings.updateError, t.settings.updateNoRelease))
         setStatus('error')
+      } else if (phase === 'idle') {
+        setStatus('idle')
       }
     }
 
@@ -87,7 +141,7 @@ export function UpdatesSettings() {
       })
       .catch(() => setVersionLoaded(true))
     void window.api.updater.getState()
-      .then(s => applyPhase(s.phase, s.version, s.percent, s.error, s.pendingRelease))
+      .then(s => applyPhase(s.phase, s.remoteVersion ?? s.version, s.percent, s.error, s.pendingRelease))
       .catch(() => {})
 
     const offState = window.api.updater.onState(s => applyPhase(s.phase, s.version, s.percent, s.error, s.pendingRelease))
@@ -96,8 +150,7 @@ export function UpdatesSettings() {
         setStatus('current')
         return
       }
-      setRemoteVersion(v)
-      setStatus(pendingRelease ? 'pending' : 'available')
+      applyAvailable(v, pendingRelease)
     })
     const offProgress = window.api.updater.onProgress(({ percent: p }) => {
       setPercent(p)
@@ -112,6 +165,7 @@ export function UpdatesSettings() {
       setStatus('ready')
     })
     const offNotAvailable = window.api.updater.onNotAvailable(() => {
+      if (remoteVersion && isNewerThanInstalled(remoteVersion)) return
       setStatus('current')
     })
     const offError = window.api.updater.onError(({ error: e }) => {
@@ -126,7 +180,7 @@ export function UpdatesSettings() {
       offNotAvailable()
       offError()
     }
-  }, [version, versionLoaded, t.settings.updateError, t.settings.updateNoRelease])
+  }, [applyAvailable, isNewerThanInstalled, remoteVersion, t.settings.updateError, t.settings.updateNoRelease])
 
   const viewReleaseNotes = useCallback(async () => {
     setNotesLoading(true)
@@ -143,45 +197,6 @@ export function UpdatesSettings() {
     }
   }, [remoteVersion, status, version])
 
-  const applyCheckResult = useCallback((result: {
-    available: boolean
-    version?: string
-    phase?: string
-    error?: string
-    pendingRelease?: boolean
-  }) => {
-    if (result.error || result.phase === 'error') {
-      setError(friendlyUpdateError(result.error || '', t.settings.updateError, t.settings.updateNoRelease))
-      setStatus('error')
-      return
-    }
-    if (result.phase === 'downloaded') {
-      if (result.version) setRemoteVersion(result.version)
-      setStatus('ready')
-      return
-    }
-    if (result.phase === 'downloading') {
-      if (result.version) setRemoteVersion(result.version)
-      setStatus('downloading')
-      return
-    }
-    if (result.phase === 'checking') {
-      if (!result.available) {
-        setStatus('current')
-        return
-      }
-      if (result.version) setRemoteVersion(result.version)
-      setStatus(result.pendingRelease ? 'pending' : 'available')
-      return
-    }
-    if (!result.available) {
-      setStatus('current')
-      return
-    }
-    if (result.version) setRemoteVersion(result.version)
-    setStatus(result.pendingRelease ? 'pending' : 'available')
-  }, [t.settings.updateError, t.settings.updateNoRelease])
-
   const check = useCallback(async () => {
     setStatus('checking')
     setError('')
@@ -194,9 +209,26 @@ export function UpdatesSettings() {
     }
   }, [applyCheckResult, t.settings.updateError])
 
+  const clearCache = useCallback(async () => {
+    setClearingCache(true)
+    setStatus('checking')
+    setError('')
+    try {
+      const result = await window.api.updater.clearCache()
+      applyCheckResult(result)
+    } catch {
+      setError(t.settings.updateError)
+      setStatus('error')
+    } finally {
+      setClearingCache(false)
+    }
+  }, [applyCheckResult, t.settings.updateError])
+
   const notesTitle = notesTargetVersion && remoteVersion === notesTargetVersion && status !== 'current'
     ? t.updates.releaseNotesTitleAvailable.replace('{version}', notesTargetVersion)
     : t.updates.releaseNotesTitleCurrent.replace('{version}', notesTargetVersion || version.replace(/^v/, ''))
+
+  const busy = status === 'checking' || clearingCache
 
   return (
     <div className="gg-settings-extra">
@@ -232,9 +264,14 @@ export function UpdatesSettings() {
       <div className="gg-settings-row">
         <label className="gg-settings-label">{t.settings.checkUpdates}</label>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
-          <button type="button" className="gg-btn gg-btn-ghost" onClick={() => void check()} disabled={status === 'checking'}>
-            {status === 'checking' ? t.settings.checkingUpdates : t.settings.checkUpdates}
-          </button>
+          <div className="gg-updates-notes-actions">
+            <button type="button" className="gg-btn gg-btn-ghost" onClick={() => void check()} disabled={busy}>
+              {status === 'checking' && !clearingCache ? t.settings.checkingUpdates : t.settings.checkUpdates}
+            </button>
+            <button type="button" className="gg-btn gg-btn-ghost" onClick={() => void clearCache()} disabled={busy}>
+              {clearingCache ? t.settings.clearingUpdateCache : t.settings.clearUpdateCache}
+            </button>
+          </div>
           {status === 'current' && <span className="gg-settings-hint">{t.settings.upToDate}</span>}
           {status === 'pending' && remoteVersion && (
             <span className="gg-settings-hint">{t.settings.updatePendingRelease.replace('{version}', remoteVersion)}</span>

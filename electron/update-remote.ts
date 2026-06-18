@@ -82,11 +82,30 @@ async function fetchPackageJsonVersion(): Promise<string | null> {
   }
 }
 
+/** Без GitHub API — редирект releases/latest/download/latest.yml. */
+async function fetchVersionFromLatestYml(): Promise<string | null> {
+  const res = await fetchWithTimeout(
+    `https://github.com/${UPDATE_OWNER}/${UPDATE_REPO}/releases/latest/download/latest.yml`,
+    { headers: { 'User-Agent': 'Verstak-Updater' } },
+  )
+  if (!res?.ok) return null
+  try {
+    const yml = await res.text()
+    const versionMatch = yml.match(/^version:\s*(\S+)/m)
+    return versionMatch ? normalizeVersion(versionMatch[1]) : null
+  } catch {
+    return null
+  }
+}
+
 async function fetchRemoteVersionOnce(): Promise<string | null> {
   const candidates: string[] = []
 
   const fromPkg = await fetchPackageJsonVersion()
   if (fromPkg) candidates.push(fromPkg)
+
+  const fromYml = await fetchVersionFromLatestYml()
+  if (fromYml) candidates.push(fromYml)
 
   const latestRelease = await fetchJson<{ tag_name?: string; name?: string }>(
     `https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}/releases/latest`,
