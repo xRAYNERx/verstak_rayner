@@ -2,6 +2,7 @@ export const UPDATE_OWNER = 'frolofpavel'
 export const UPDATE_REPO = 'verstak'
 
 const SEMVER_RE = /^v?(\d+\.\d+\.\d+)/
+const FETCH_TIMEOUT_MS = 15_000
 
 export function normalizeVersion(raw: string): string {
   const m = raw.trim().match(SEMVER_RE)
@@ -35,12 +36,24 @@ export function releaseFeedBase(version: string): string {
   return `https://github.com/${UPDATE_OWNER}/${UPDATE_REPO}/releases/download/v${normalizeVersion(version)}`
 }
 
-async function fetchJson<T>(url: string): Promise<T | null> {
+async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response | null> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   try {
-    const res = await fetch(url, {
-      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Verstak-Updater' },
-    })
-    if (!res.ok) return null
+    return await fetch(url, { ...init, signal: controller.signal })
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function fetchJson<T>(url: string): Promise<T | null> {
+  const res = await fetchWithTimeout(url, {
+    headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Verstak-Updater' },
+  })
+  if (!res?.ok) return null
+  try {
     return await res.json() as T
   } catch {
     return null
@@ -48,17 +61,17 @@ async function fetchJson<T>(url: string): Promise<T | null> {
 }
 
 async function fetchPackageJsonVersion(): Promise<string | null> {
+  const res = await fetchWithTimeout(
+    `https://raw.githubusercontent.com/${UPDATE_OWNER}/${UPDATE_REPO}/main/package.json`,
+    { headers: { 'User-Agent': 'Verstak-Updater' } },
+  )
+  if (!res?.ok) return null
   try {
-    const res = await fetch(
-      `https://raw.githubusercontent.com/${UPDATE_OWNER}/${UPDATE_REPO}/main/package.json`,
-      { headers: { 'User-Agent': 'Verstak-Updater' } },
-    )
-    if (res.ok) {
-      const pkg = await res.json() as { version?: string }
-      if (pkg.version) return normalizeVersion(pkg.version)
-    }
-  } catch { /* ignore */ }
-  return null
+    const pkg = await res.json() as { version?: string }
+    return pkg.version ? normalizeVersion(pkg.version) : null
+  } catch {
+    return null
+  }
 }
 
 /** Последняя версия: max(GitHub Release, semver-теги, package.json на main). */
@@ -119,11 +132,11 @@ export function parseLatestYmlArtifact(yml: string, version: string): ReleaseArt
 }
 
 export async function fetchReleaseArtifactMeta(version: string): Promise<ReleaseArtifactMeta | null> {
+  const res = await fetchWithTimeout(`${releaseFeedBase(version)}/latest.yml`, {
+    headers: { 'User-Agent': 'Verstak-Updater' },
+  })
+  if (!res?.ok) return null
   try {
-    const res = await fetch(`${releaseFeedBase(version)}/latest.yml`, {
-      headers: { 'User-Agent': 'Verstak-Updater' },
-    })
-    if (!res.ok) return null
     const yml = await res.text()
     return parseLatestYmlArtifact(yml, version)
   } catch {

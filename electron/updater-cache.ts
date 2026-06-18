@@ -11,6 +11,7 @@ import {
 } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
+import { normalizeVersion } from './update-remote'
 
 export type PendingUpdateMeta = {
   fileName: string
@@ -35,6 +36,24 @@ export async function hashFileSha512Base64(filePath: string): Promise<string> {
     stream.on('error', reject)
     stream.on('end', () => resolve(hash.digest('base64')))
   })
+}
+
+function pendingInstallerVersion(fileName: string): string | null {
+  const match = fileName.match(/Verstak-Setup-(\d+\.\d+\.\d+)-/)
+  return match ? normalizeVersion(match[1]) : null
+}
+
+/** Сбрасывает pending, если на диске установщик другой версии (например 1.5.7 при цели 1.5.11). */
+export function clearPendingIfWrongVersion(targetVersion: string): void {
+  const infoPath = join(getPendingUpdateDir(), 'update-info.json')
+  if (!existsSync(infoPath)) return
+  try {
+    const meta = JSON.parse(readFileSync(infoPath, 'utf8')) as PendingUpdateMeta
+    const cachedVersion = meta.fileName ? pendingInstallerVersion(meta.fileName) : null
+    if (cachedVersion && cachedVersion !== normalizeVersion(targetVersion)) {
+      clearPendingUpdateCache()
+    }
+  } catch { /* ignore */ }
 }
 
 /** Удаляет pending-установщик (петля «установить ту же версию»). */
@@ -90,7 +109,8 @@ export async function reconcileCachedDownload(
     try {
       const meta = JSON.parse(readFileSync(infoPath, 'utf8')) as PendingUpdateMeta
       const cached = join(pending, meta.fileName)
-      if (existsSync(cached)) {
+      const versionMatches = !fileName || meta.fileName === fileName
+      if (existsSync(cached) && versionMatches) {
         const size = statSync(cached).size
         if (expectedSize > 0 && size !== expectedSize) {
           /* broken pending — fall through */

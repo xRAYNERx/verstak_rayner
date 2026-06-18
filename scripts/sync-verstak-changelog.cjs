@@ -13,6 +13,17 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: '2551745',
+    deployed: '18.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Обновления: «Проверяю…» не зависает (кэш 1.5.7 + поздние события updater)',
+    changes: [
+      'Устаревший pending-кэш другой версии (1.5.7) сбрасывается перед скачиванием 1.5.11.',
+      'События checking-for-update / update-not-available игнорируются вне активной проверки.',
+      'Таймауты fetch GitHub; finalizeIfStillChecking и ensureDownload дожидаются завершения.',
+    ],
+  },
+  {
     commit: '129edb9',
     deployed: '17.06.2026',
     treeVersion: '1.5.5',

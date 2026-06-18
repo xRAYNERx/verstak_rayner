@@ -48,6 +48,37 @@ describe('updater-cache', () => {
     expect(existsSync(join(root, 'pending', 'update-info.json'))).toBe(true)
   })
 
+  it('reconcileCachedDownload ignores pending for a different version', async () => {
+    const { getUpdaterCacheRoot, reconcileCachedDownload } = await import('../electron/updater-cache')
+    const root = getUpdaterCacheRoot()
+    const pending = join(root, 'pending')
+    mkdirSync(pending, { recursive: true })
+    const payload = 'pending-old-version'
+    const sha512 = createHash('sha512').update(payload).digest('base64')
+    const fileName = 'Verstak-Setup-1.5.7-x64.exe'
+    writeFileSync(join(pending, fileName), payload)
+    writeFileSync(join(pending, 'update-info.json'), JSON.stringify({ fileName, sha512 }))
+
+    const repaired = await reconcileCachedDownload('Verstak-Setup-1.5.11-x64.exe', sha512, payload.length)
+
+    expect(repaired).toBeNull()
+  })
+
+  it('clearPendingIfWrongVersion removes stale installer', async () => {
+    const { getUpdaterCacheRoot, clearPendingIfWrongVersion } = await import('../electron/updater-cache')
+    const pending = join(getUpdaterCacheRoot(), 'pending')
+    mkdirSync(pending, { recursive: true })
+    writeFileSync(join(pending, 'Verstak-Setup-1.5.7-x64.exe'), 'old')
+    writeFileSync(
+      join(pending, 'update-info.json'),
+      JSON.stringify({ fileName: 'Verstak-Setup-1.5.7-x64.exe', sha512: 'abc==' }),
+    )
+
+    clearPendingIfWrongVersion('1.5.11')
+
+    expect(existsSync(pending)).toBe(false)
+  })
+
   it('reconcileCachedDownload trusts valid pending without re-hash', async () => {
     const { getUpdaterCacheRoot, reconcileCachedDownload } = await import('../electron/updater-cache')
     const root = getUpdaterCacheRoot()

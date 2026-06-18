@@ -165,6 +165,15 @@ export function UpdatesSettings() {
       setStatus('downloading')
       return
     }
+    if (result.phase === 'checking') {
+      if (!result.available) {
+        setStatus('current')
+        return
+      }
+      if (result.version) setRemoteVersion(result.version)
+      setStatus(result.pendingRelease ? 'pending' : 'available')
+      return
+    }
     if (!result.available) {
       setStatus('current')
       return

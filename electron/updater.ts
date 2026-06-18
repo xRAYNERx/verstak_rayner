@@ -13,6 +13,7 @@ import {
 } from './update-remote'
 import {
   clearBrokenDifferentialCache,
+  clearPendingIfWrongVersion,
   clearPendingUpdateCache,
   reconcileCachedDownload,
 } from './updater-cache'
@@ -39,6 +40,7 @@ export type UpdateSnapshot = {
 
 let snapshot: UpdateSnapshot = { phase: 'idle' }
 let lastProbeVersion: string | null = null
+let lastProbePending = false
 let checkInFlight = false
 let downloadInFlight = false
 let downloadForVersion: string | null = null
@@ -195,6 +197,7 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
 
   const tryAnnounceCachedDownload = async (version: string): Promise<boolean> => {
     try {
+      clearPendingIfWrongVersion(version)
       let meta = await fetchReleaseArtifactMeta(version)
       if (!meta) {
         const fileName = `Verstak-Setup-${version}-x64.exe`
@@ -221,6 +224,8 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
       announceNotAvailable()
       return
     }
+
+    clearPendingIfWrongVersion(version)
 
     if (downloadInFlight && downloadForVersion === version) return
     if (snapshot.phase === 'downloaded' && snapshot.version === version) return
@@ -276,21 +281,29 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     const remote = await fetchRemoteVersion()
     lastProbeVersion = remote
     if (!remote || !semverGt(remote, current)) {
+      lastProbePending = false
       reconcileStaleDownloadedUpdate(remote)
       return { newer: false, version: remote, pendingRelease: false }
     }
     const hasArtifacts = await releaseArtifactsReady(remote)
-    return { newer: true, version: remote, pendingRelease: !hasArtifacts }
+    lastProbePending = !hasArtifacts
+    return { newer: true, version: remote, pendingRelease: lastProbePending }
   }
 
-  const finalizeIfStillChecking = () => {
+  const finalizeIfStillChecking = async () => {
     if (snapshot.phase !== 'checking') return
     const remote = snapshot.version ?? lastProbeVersion
-    if (remote && isNewerThanInstalled(remote)) {
-      announceAvailable(remote, snapshot.pendingRelease ?? true)
+    if (!remote || !isNewerThanInstalled(remote)) {
+      announceNotAvailable()
       return
     }
-    announceNotAvailable()
+    const pending = snapshot.pendingRelease ?? lastProbePending
+    if (pending) {
+      announceAvailable(remote, true)
+      return
+    }
+    if (await tryAnnounceCachedDownload(remote)) return
+    await ensureDownload(remote)
   }
 
   const runCheckBody = async () => {
@@ -330,7 +343,7 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
       console.warn('[updater] checkForUpdates failed:', err)
       await ensureDownload(probe.version)
     } finally {
-      finalizeIfStillChecking()
+      await finalizeIfStillChecking()
     }
   }
 
@@ -341,14 +354,12 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     }
     checkInFlight = true
     checkPromise = withTimeout(runCheckBody(), CHECK_TIMEOUT_MS, 'update check')
-      .catch((err) => {
+      .catch(async (err) => {
         console.warn('[updater] runCheck failed:', err)
         if (snapshot.phase === 'checking') {
           const remote = lastProbeVersion
           if (remote && isNewerThanInstalled(remote)) {
-            void tryAnnounceCachedDownload(remote).then((ok) => {
-              if (!ok) announceAvailable(remote, true)
-            })
+            await finalizeIfStillChecking()
           } else {
             announceNotAvailable()
           }
@@ -392,7 +403,7 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     })
 
     autoUpdater.on('checking-for-update', () => {
-      if (downloadInFlight) return
+      if (downloadInFlight || !checkInFlight) return
       setSnapshot({ ...snapshot, phase: 'checking' })
       sendToRenderer(mainWindow, 'update:checking')
     })
@@ -407,7 +418,7 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     })
 
     autoUpdater.on('update-not-available', () => {
-      if (downloadInFlight) return
+      if (downloadInFlight || !checkInFlight) return
       reconcileStaleDownloadedUpdate(lastProbeVersion)
       announceNotAvailable()
     })
