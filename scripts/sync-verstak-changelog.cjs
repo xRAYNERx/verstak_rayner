@@ -13,6 +13,17 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: 'b698298',
+    deployed: '18.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Справка Verstak: чат ? и скилл verstak-guide',
+    changes: [
+      'В rail: «Настройки» целиком (~80% ширины) + кнопка «?» (~20%) — отдельный чат справки по интерфейсу.',
+      'Скилл verstak-guide: карта UI, режимы, очередь, модели; чат скрыт из сайдбара, режим План по умолчанию.',
+      'Баннер и быстрые вопросы в пустом чате справки.',
+    ],
+  },
+  {
     commit: '9ef4d4a',
     deployed: '18.06.2026',
     treeVersion: '1.5.5',
