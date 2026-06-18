@@ -128,6 +128,16 @@ describe('smart-router per-subtask — выбор модели по сложно
     expect(recommendModel('gemini-api', complexity)).toBe('gemini-3.5-flash')
   })
 
+  // toolHistory в ai.ts передаётся как [] — сложность должна учитывать реальную
+  // активность из toolCalls в истории сообщений (короткий промпт, но >5 вызовов).
+  it('много tool-вызовов в истории → complex даже при коротком промпте', () => {
+    const messages = [
+      { role: 'user' as const, content: 'go on' },
+      { role: 'assistant' as const, content: '', toolCalls: Array.from({ length: 6 }, (_v, i) => ({ id: 't' + i, name: 'read_file', args: {} })) },
+    ]
+    expect(estimateComplexity(messages, [])).toBe('complex')
+  })
+
   it('другой провайдер (claude): простая → haiku, сложная → opus', () => {
     expect(recommendModel('claude', 'simple')).toBe('claude-haiku-4-5')
     expect(recommendModel('claude', 'complex')).toBe('claude-opus-4-5')

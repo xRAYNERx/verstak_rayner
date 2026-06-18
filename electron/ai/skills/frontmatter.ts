@@ -21,6 +21,9 @@ export interface ParsedDoc {
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/
 
 export function parseSkillDoc(raw: string): ParsedDoc {
+  // Пустой/отсутствующий raw (битый серверный скилл, ошибка чтения файла) иначе
+  // ронял .match с TypeError — гасим у источника.
+  if (!raw) return { frontmatter: {}, body: '' }
   const m = raw.match(FRONTMATTER_RE)
   if (!m) {
     return { frontmatter: {}, body: raw.trim() }

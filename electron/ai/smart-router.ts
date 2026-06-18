@@ -21,10 +21,16 @@ export function estimateComplexity(messages: ChatMessage[], toolHistory: string[
 
   const text = lastUser.content.toLowerCase()
   const len = text.length
+  // Реальная активность агента: в ai.ts toolHistory передаётся как [], поэтому
+  // считаем число tool-вызовов прямо из истории сообщений (иначе сложность
+  // оценивалась только по длине последнего промпта).
+  const totalToolCalls = messages.reduce((acc, m) => acc + (m.toolCalls?.length ?? 0), 0)
 
-  // Простые: короткие вопросы без сигналов сложной работы
+  // Простые: короткие вопросы без сигналов сложной работы И без накопленной
+  // активности (короткое «продолжи» при 6 уже сделанных tool-вызовах — не простая).
   if (
     len < 100 &&
+    totalToolCalls <= 5 &&
     !text.includes('refactor') &&
     !text.includes('fix') &&
     !text.includes('implement') &&
@@ -39,7 +45,7 @@ export function estimateComplexity(messages: ChatMessage[], toolHistory: string[
   ]
   const complexCount = complexSignals.filter(s => text.includes(s)).length
 
-  if (complexCount >= 2 || len > 500 || toolHistory.length > 5) return 'complex'
+  if (complexCount >= 2 || len > 500 || toolHistory.length > 5 || totalToolCalls > 5) return 'complex'
 
   return 'moderate'
 }

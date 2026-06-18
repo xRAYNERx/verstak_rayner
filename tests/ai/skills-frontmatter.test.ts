@@ -118,4 +118,10 @@ body`
     const doc = parseSkillDoc(raw)
     expect(doc.frontmatter.description).toBe('Скилл: продажи и реактивация, через @BotFather')
   })
+
+  // Битый серверный скилл без raw / ошибка чтения файла раньше роняла .match.
+  it('не падает на пустом/undefined raw', () => {
+    expect(parseSkillDoc('')).toEqual({ frontmatter: {}, body: '' })
+    expect(parseSkillDoc(undefined as unknown as string)).toEqual({ frontmatter: {}, body: '' })
+  })
 })
