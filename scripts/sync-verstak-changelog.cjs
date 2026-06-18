@@ -13,6 +13,16 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    commit: 'e1beadb',
+    deployed: '18.06.2026',
+    treeVersion: '1.5.5',
+    title: 'Чаты: осмысленные русские названия из первого сообщения',
+    changes: [
+      'Вместо «New chat» / «Параллельный чат» в сайдбаре — краткий заголовок по сути первого запроса.',
+      'Работает в основном и параллельном чате; старые имена вручную не трогаем.',
+    ],
+  },
+  {
     commit: '4cbdebc',
     deployed: '18.06.2026',
     treeVersion: '1.5.5',
