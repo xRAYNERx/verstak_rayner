@@ -296,6 +296,11 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         if (event.type === 'done' || event.type === 'error') store.forgetSendOwner(id)
         return
       }
+      // Owner забыт (stop() или send уже завершён) → это трейлинг/устаревшее
+      // событие. НЕ роутим его в активный чат: иначе done после stop() гасил бы
+      // новый стрим активного чата (#17). registerSendOwner ставится синхронно
+      // до событий, так что у живого активного send'а owner всегда есть.
+      if (!owner) return
       if (event.type === 'text') updateLastAssistant(event.text)
       else if (event.type === 'thought') store.appendLastAssistantThinking(event.text)
       else if (event.type === 'pending-write') {
