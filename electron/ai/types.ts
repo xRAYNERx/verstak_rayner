@@ -47,6 +47,9 @@ export interface ToolResult {
   result: unknown
   /** If the tool failed, the error message. When set, `result` is the error context. */
   error?: string
+  /** Файлы, реально записанные тулзой (propose_edits — принятые правки). agent-loop
+   *  добавляет их в filesTouched для attest-сверки claimed-vs-actual (#12). */
+  filesWritten?: string[]
 }
 
 export interface ToolDefinition {

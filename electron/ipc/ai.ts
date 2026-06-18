@@ -1373,6 +1373,11 @@ async function runApiConversation(
       const call = toolCalls[i]
       const result = toolResults[i]
       if (!result) continue
+      // #12: propose_edits (и любой тул с filesWritten) — принятые файлы в
+      // filesTouched, иначе attest-сверка claimed-vs-actual их не видела.
+      if (result.filesWritten?.length) {
+        for (const p of result.filesWritten) { filesTouched.add(p); acceptedWritesThisTurn++ }
+      }
       if ((call.name === 'write_file' || call.name === 'apply_patch') && !result.error) {
         const p = String(call.args.path ?? '')
         if (p) {

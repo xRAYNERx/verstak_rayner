@@ -447,10 +447,15 @@ const proposeEditsHandler: ToolHandler = {
     }
     const ok = subResults.filter(r => !r.error).length
     const total = subResults.length
+    // #12: принятые файлы — структурно (filesWritten), чтобы agent-loop добавил
+    // их в filesTouched для attest-сверки claimed-vs-actual. Текст "Applied ok/total"
+    // не давал per-file accept (частичный accept структурно не виден).
+    const filesWritten = edits.filter((_e, i) => !subResults[i].error).map(e => e.path)
     return {
       id: call.id,
       name: call.name,
       result: `Applied ${ok}/${total} edits. ${subResults.map(r => r.error ? `✗ ${r.error}` : `✓ ${r.result}`).join('; ')}`,
+      ...(filesWritten.length ? { filesWritten } : {}),
       ...(ok === 0 ? { error: 'All edits rejected or failed' } : {})
     }
   }
