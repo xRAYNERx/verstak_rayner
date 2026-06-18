@@ -24,6 +24,13 @@ export function pipelineStepIndex(step: PipelineStep): { index: number; total: n
 /** Пустой бриф для инициализации формы визарда. */
 export const EMPTY_BRIEF: PipelineBrief = { goal: '', constraints: '', dod: '' }
 
+/** Демо-бриф для «Попробовать Pipeline» из онбординга (First Win, D10). */
+export const SAMPLE_BRIEF: PipelineBrief = {
+  goal: 'Исправить ошибки типов в проекте (tsc)',
+  constraints: 'Не трогать конфиги сборки и зависимости',
+  dod: 'npm run type проходит без ошибок',
+}
+
 /**
  * Бриф готов к «Сформировать план», когда заданы цель и Definition of Done.
  * Границы (constraints) опциональны — не каждая задача их требует.

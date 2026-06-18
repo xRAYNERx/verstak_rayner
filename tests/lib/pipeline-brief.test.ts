@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { EMPTY_BRIEF, isBriefReady, buildPlanPrompt, buildExecutePrompt, pipelineStepIndex, buildPipelineSend, verifyState, resolveProofRunId } from '../../src/lib/pipeline-brief'
+import { EMPTY_BRIEF, SAMPLE_BRIEF, isBriefReady, buildPlanPrompt, buildExecutePrompt, pipelineStepIndex, buildPipelineSend, verifyState, resolveProofRunId } from '../../src/lib/pipeline-brief'
 
 describe('pipeline-brief', () => {
   it('EMPTY_BRIEF не готов', () => {
     expect(isBriefReady(EMPTY_BRIEF)).toBe(false)
+  })
+
+  it('SAMPLE_BRIEF (демо из онбординга) — готов к отправке', () => {
+    expect(isBriefReady(SAMPLE_BRIEF)).toBe(true)
   })
 
   it('готов когда есть цель И DoD (границы опциональны)', () => {

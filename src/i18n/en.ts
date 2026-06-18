@@ -478,6 +478,7 @@ export const en = {
     reattest: 'Re-run verify',
     proceedAnyway: 'Proceed',
     cliGate: 'Pipeline needs an API provider: full control + Proof. CLI providers run edits in an external process — pick Claude (API) / Gemini API / OpenAI, etc.',
+    tryIt: 'Try Pipeline',
   },
 }
 

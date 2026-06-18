@@ -127,7 +127,7 @@ export function OnboardingWizard({ onComplete }: Props) {
     }
   }
 
-  async function complete() {
+  async function complete(tryPipeline = false) {
     setBusy(true)
     setError(null)
     try {
@@ -152,6 +152,8 @@ export function OnboardingWizard({ onComplete }: Props) {
       }
 
       await window.api.settings.setKey('onboarding_completed', '1')
+      // First Win (D10): открыть Pipeline с демо-брифом после онбординга.
+      if (tryPipeline) await window.api.settings.setKey('pipeline_sample_pending', '1')
       onComplete()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -341,9 +343,14 @@ export function OnboardingWizard({ onComplete }: Props) {
             </button>
           )}
           {step === 3 && (
-            <button type="button" className="gg-btn gg-btn-primary" onClick={() => void complete()} disabled={busy}>
-              {busy ? t.onboarding.saving : t.onboarding.start}
-            </button>
+            <>
+              <button type="button" className="gg-btn gg-btn-ghost" onClick={() => void complete(true)} disabled={busy}>
+                ▶ {t.pipeline.tryIt}
+              </button>
+              <button type="button" className="gg-btn gg-btn-primary" onClick={() => void complete()} disabled={busy}>
+                {busy ? t.onboarding.saving : t.onboarding.start}
+              </button>
+            </>
           )}
         </div>
       </div>

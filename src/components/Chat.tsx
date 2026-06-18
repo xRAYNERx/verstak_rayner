@@ -29,9 +29,9 @@ import { EMPTY_COMPOSER_DRAFT, resolveComposerDraftKey } from '../lib/composer-d
 import { VisionAttachmentBanner } from './VisionAttachmentBanner'
 import { isImageAttachment, providerSupportsVision } from '../lib/vision-support'
 import { resolveSkillOverride } from '../lib/skill-override'
-import { buildPipelineSend, resolveProofRunId } from '../lib/pipeline-brief'
+import { buildPipelineSend, resolveProofRunId, SAMPLE_BRIEF } from '../lib/pipeline-brief'
 import { isCliProvider } from '../lib/model-catalog'
-import type { PipelineRun, PipelineStep } from '../types/api'
+import type { PipelineRun, PipelineStep, PipelineBrief } from '../types/api'
 import type { ProviderId } from '../hooks/useProvider'
 import {
   formatChatDateDivider,
@@ -264,6 +264,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
   // срабатывает только когда agentMode реально применился (без race).
   const pipelineSendModeRef = useRef<'plan' | 'accept-edits' | null>(null)
   const [pipelineWizardOpen, setPipelineWizardOpen] = useState(false)
+  const [pipelineInitialBrief, setPipelineInitialBrief] = useState<PipelineBrief | undefined>(undefined)
   const activePipeline = useProject(s => s.activePipeline)
   const [undoCount, setUndoCount] = useState(0)
   // Cross-verify: результат авто-ревью другим провайдером после изменения файлов.
@@ -879,6 +880,19 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     window.addEventListener('gg-pipeline-send', onPipelineSend)
     return () => window.removeEventListener('gg-pipeline-send', onPipelineSend)
   }, [setAgentMode])
+
+  // First Win (спек D10): онбординг ставит флаг «попробовать Pipeline» —
+  // на маунте открываем визард с демо-брифом (race-free через settings, не
+  // зависим от того, смонтирован ли Chat в момент закрытия онбординга).
+  useEffect(() => {
+    void window.api.settings.getKey('pipeline_sample_pending').then(v => {
+      if (v === '1') {
+        void window.api.settings.setKey('pipeline_sample_pending', '')
+        setPipelineInitialBrief(SAMPLE_BRIEF)
+        setPipelineWizardOpen(true)
+      }
+    })
+  }, [])
 
   // Pipeline-оркестрация (спек D5): запуск из визарда → активируем прогон + шлём
   // Plan-промпт; «План OK» в баннере → двигаем шаг + шлём Execute-промпт.
@@ -1756,7 +1770,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
       {pipelineWizardOpen && (
         <PipelineWizard
           chatId={activeChatId}
-          onClose={() => setPipelineWizardOpen(false)}
+          initialBrief={pipelineInitialBrief}
+          onClose={() => { setPipelineWizardOpen(false); setPipelineInitialBrief(undefined) }}
           onStarted={onPipelineStarted}
         />
       )}

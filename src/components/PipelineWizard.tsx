@@ -7,6 +7,8 @@ import type { PipelineBrief, PipelineRun } from '../types/api'
 interface PipelineWizardProps {
   /** Чат, к которому привязать прогон (опц.). */
   chatId?: number | null
+  /** Предзаполнить бриф (напр. демо из онбординга, D10). */
+  initialBrief?: PipelineBrief
   onClose: () => void
   /** Вызывается после успешного pipeline:start — прогон создан, step='plan'. */
   onStarted: (run: PipelineRun) => void
@@ -17,9 +19,9 @@ interface PipelineWizardProps {
  * Done. «Сформировать план» активна только когда заданы цель и DoD (isBriefReady).
  * v1 — только Dev-режим (Agency — позже через WorkflowsPanel).
  */
-export function PipelineWizard({ chatId, onClose, onStarted }: PipelineWizardProps) {
+export function PipelineWizard({ chatId, initialBrief, onClose, onStarted }: PipelineWizardProps) {
   const t = useT()
-  const [brief, setBrief] = useState<PipelineBrief>(EMPTY_BRIEF)
+  const [brief, setBrief] = useState<PipelineBrief>(initialBrief ?? EMPTY_BRIEF)
   const [busy, setBusy] = useState(false)
   const ready = isBriefReady(brief)
 
