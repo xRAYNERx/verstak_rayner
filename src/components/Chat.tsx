@@ -24,6 +24,7 @@ import { useT } from '../i18n'
 import { notifyResponseReady } from '../lib/response-notify'
 import { VisionAttachmentBanner } from './VisionAttachmentBanner'
 import { isImageAttachment, providerSupportsVision } from '../lib/vision-support'
+import { resolveSkillOverride } from '../lib/skill-override'
 import type { ProviderId } from '../hooks/useProvider'
 import {
   formatChatDateDivider,
@@ -1013,15 +1014,9 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     if (activeSkill) {
       // Узнаём текущий provider пользователя — чтобы решить override или нет
       const currentProvider = await window.api.settings.getKey('provider')
-      const skillProvider = activeSkill.default_provider
-      // «Семейство» провайдера — для совместимости (claude vs claude-cli — одно)
-      const family = (p: string | null | undefined): string =>
-        (p ?? '').replace(/-cli$|-api$/, '').replace(/^gemini.*$/, 'gemini')
-            .replace(/^(claude|grok|openai|codex).*$/, '$1')
-      const overrideProvider = skillProvider && family(skillProvider) !== family(currentProvider)
-        ? skillProvider
-        : undefined
-      const overrideModel = overrideProvider ? (activeSkill.default_model ?? null) : null
+      // Provider/model override скилла. Провайдер — только при разном семействе
+      // (сохраняем выбор API/CLI). Модель — и при том же семействе (B5).
+      const { providerId: overrideProvider, model: overrideModel } = resolveSkillOverride(activeSkill, currentProvider)
       // Anti-stall guard: некоторые скиллы — оркестраторы/штабы (los-hq, bos-hq,
       // навигаторы) с протоколом «жди пакет задачи / маршрутизируй / ✋ СТОП».
       // Базовый system-layer теперь НАСЛАИВАЕТСЯ под скилл (ipc/ai.ts передаёт
@@ -1032,7 +1027,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
       sendId = await window.api.ai.sendWithOverrides(allMessages, path, {
         systemPrompt: activeSkill.systemPrompt + antiStallNudge,
         ...(overrideProvider ? { providerId: overrideProvider } : {}),
-        ...(overrideModel !== null ? { model: overrideModel } : {}),
+        ...(overrideModel ? { model: overrideModel } : {}),
         // Аудит M4: tools_allow скилла → agent-loop ограничивает инструменты модели.
         ...(activeSkill.tools_allow?.length ? { toolsAllow: activeSkill.tools_allow } : {}),
         effortLevel: useProject.getState().effortLevel
