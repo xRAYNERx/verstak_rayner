@@ -452,6 +452,18 @@ export const en = {
     error: 'Error',
     ok: 'OK',
   },
+  pipeline: {
+    title: 'Task with proof',
+    subtitle: 'Brief → Plan → Execute → Verify → Proof',
+    goalLabel: 'Goal',
+    goalPlaceholder: 'One sentence: what to do',
+    constraintsLabel: 'Constraints',
+    constraintsPlaceholder: 'What NOT to touch, zones, NDA (optional)',
+    dodLabel: 'Definition of Done',
+    dodPlaceholder: 'npm run type, a specific test, HTTP 200…',
+    start: 'Generate plan',
+    starting: 'Starting…',
+  },
 }
 
 export type Translations = typeof en

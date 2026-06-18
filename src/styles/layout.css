@@ -10358,3 +10358,13 @@ textarea.gg-input {
 }
 .gg-run-verify-row.is-passed .gg-run-verify-status { color: var(--success); }
 .gg-run-verify-row.is-failed .gg-run-verify-status { color: var(--error); }
+
+/* ── Pipeline Brief→Proof (визард брифа) ───────────────────────────── */
+.gg-pipeline-wizard { width: 520px; max-width: 92vw; }
+.gg-pipeline-subtitle {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+.gg-pipeline-textarea { resize: vertical; min-height: 38px; font: inherit; }

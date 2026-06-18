@@ -434,4 +434,16 @@ export const ru: Translations = {
     error: 'Ошибка',
     ok: 'OK',
   },
+  pipeline: {
+    title: 'Задача с доказательством',
+    subtitle: 'Brief → Plan → Execute → Verify → Proof',
+    goalLabel: 'Цель',
+    goalPlaceholder: 'Одно предложение: что нужно сделать',
+    constraintsLabel: 'Границы',
+    constraintsPlaceholder: 'Что НЕ трогать, зоны, NDA (опционально)',
+    dodLabel: 'Как проверим (Definition of Done)',
+    dodPlaceholder: 'npm run type, конкретный тест, HTTP 200…',
+    start: 'Сформировать план',
+    starting: 'Создаю…',
+  },
 }
