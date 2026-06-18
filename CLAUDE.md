@@ -161,7 +161,7 @@ npm run dist:win     # NSIS + portable .exe
    - `PerChatState` (map chatId → ChatStateBundle вместо top-level полей + chatSnapshots копирования)
    - План в комментариях того же файла.
 
-2. **CLI parity 7.5/10.** runPlainConversation проще runApiConversation: нет attachments, нет verify hints. См. `cli-prompt.ts` для разбора уже сделанного (Phase 2 cli-аудит).
+2. **CLI parity ~9/10.** Паритет промпта закрыт в `cli-prompt.ts`: attachments помечаются текстовым хинтом (`describeAttachments` — binary в stream-json не передать, это inherent-лимит CLI), verify-hint инжектится по факту прошлых write'ов (авто-детект `historyHadWrites` + явный флаг `appendVerifyHint`), skill_layer/context_pack/история — как в API-пути. Покрыто `tests/ai/cli-prompt.test.ts`. Остаточное — inherent: CLI one-shot (нет multi-turn сессии), бинарные вложения только описываются.
 
 3. **Тестовое покрытие критичных путей слабое.** Сильно покрыто: compact-history (6), with-retry (14), pricing (12), apply-patch. Слабо: ipc handlers, agent loop, review flow, multi-chat routing.
 

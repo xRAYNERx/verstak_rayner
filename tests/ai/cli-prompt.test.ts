@@ -105,6 +105,39 @@ describe('buildCliPrompt', () => {
     })
     expect(out).not.toContain('<skill_layer>')
   })
+
+  // Verify-hint паритет с API-путём (§5 #2). CLI one-shot не имеет цикла, поэтому
+  // напоминание «запусти проверку» инжектится в промпт по факту прошлых write'ов.
+  it('verify_hint появляется когда в истории был apply_patch (авто-детект)', async () => {
+    const msgs: ChatMessage[] = [
+      { role: 'user', content: 'поправь файл' },
+      { role: 'assistant', content: 'готово', toolCalls: [{ id: 'c1', name: 'apply_patch', args: {} }] },
+      { role: 'user', content: 'что дальше' }
+    ]
+    const out = await buildCliPrompt({ providerId: 'grok-cli', projectPath: dir, messages: msgs })
+    expect(out).toContain('verify_hint')
+    expect(out).toMatch(/запусти проверку/)
+  })
+
+  it('без write\'ов в истории verify_hint не инжектится', async () => {
+    const msgs: ChatMessage[] = [
+      { role: 'user', content: 'просто вопрос' },
+      { role: 'assistant', content: 'просто ответ' },
+      { role: 'user', content: 'ещё вопрос' }
+    ]
+    const out = await buildCliPrompt({ providerId: 'grok-cli', projectPath: dir, messages: msgs })
+    expect(out).not.toContain('verify_hint')
+  })
+
+  it('явный appendVerifyHint:true форсит хинт даже без write\'ов в истории', async () => {
+    const out = await buildCliPrompt({
+      providerId: 'grok-cli',
+      projectPath: dir,
+      messages: [{ role: 'user', content: 'q' }],
+      appendVerifyHint: true
+    })
+    expect(out).toContain('verify_hint')
+  })
 })
 
 describe('fitCliPayloadToArgvCap', () => {
