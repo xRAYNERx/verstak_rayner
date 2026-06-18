@@ -334,9 +334,12 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         if (event.type === 'done' || event.type === 'error') store.forgetSendOwner(id)
         return
       }
-      // Route background-chat events (same project, different chat) to the
-      // chat snapshot so the user's stream survives chat-switching.
-      if (owner?.kind === 'chat' && owner.chatId !== store.activeChatId) {
+      // Фоновый чат: другая ветка ИЛИ на экране справки (проектный стрим в snapshot).
+      if (
+        owner?.kind === 'chat'
+        && !owner.isHelp
+        && (store.helpMode || owner.chatId !== store.activeChatId)
+      ) {
         store.applyEventToChat(owner.chatId, event as unknown as { type: string; [k: string]: unknown })
         if (event.type === 'done') {
           notifyAgentFinished(owner, store.path)

@@ -287,6 +287,16 @@ let switchChatSessionToken = 0
 
 export const LAST_PROJECT_PATH_KEY = 'last_project_path'
 
+function hasInflightChatSend(
+  sendOwners: ProjectState['sendOwners'],
+  chatId: number,
+  isHelp: boolean
+): boolean {
+  return Object.values(sendOwners).some(
+    o => o.kind === 'chat' && !!o.isHelp === isHelp && o.chatId === chatId
+  )
+}
+
 
 
 export const useProject = create<ProjectState>((set, get) => ({
@@ -324,7 +334,13 @@ export const useProject = create<ProjectState>((set, get) => ({
   setProject: async (path) => {
     const myToken = ++setProjectToken
     const s = get()
-    if (s.helpMode) get().leaveHelpMode()
+    const wasHelp = s.helpMode
+    if (wasHelp) get().leaveHelpMode()
+    // Вернулись из справки в тот же проект — leaveHelpMode уже восстановил чат.
+    if (wasHelp && s.path === path) {
+      set({ activeView: 'chat' })
+      return
+    }
     // 1) Snapshot current session before switching (so background streams keep their state)
     let nextSessions = s.sessions
     if (s.path && s.path !== path) {
@@ -801,7 +817,26 @@ export const useProject = create<ProjectState>((set, get) => ({
     const s = get()
     if (!s.helpMode) return
     useSkills.getState().setActiveSkill(null)
-    set({ helpMode: false })
+    const chatId = s.activeChatId
+    const snap = chatId != null ? s.chatSnapshots[chatId] : undefined
+    if (snap && chatId != null) {
+      const nextSnapshots = { ...s.chatSnapshots }
+      delete nextSnapshots[chatId]
+      const inflight = hasInflightChatSend(s.sendOwners, chatId, false)
+      set({
+        helpMode: false,
+        messages: snap.messages,
+        isStreaming: inflight && snap.isStreaming,
+        pendingWrites: snap.pendingWrites,
+        pendingCommand: snap.pendingCommand,
+        activity: snap.activity,
+        sessionUsage: snap.sessionUsage,
+        runningPlanStep: snap.runningPlanStep,
+        chatSnapshots: nextSnapshots,
+      })
+      return
+    }
+    set({ helpMode: false, isStreaming: false })
   },
   markHelpRead: () => set(s => ({
     help: { ...s.help, hasUnread: false }
@@ -905,8 +940,12 @@ export const useProject = create<ProjectState>((set, get) => ({
   }),
   openHelpChat: async () => {
     const s = get()
+    if (s.helpMode) {
+      get().leaveHelpMode()
+      return
+    }
     const helpSession = await window.api.chatSessions.getOrCreateHelp()
-    if (s.path && s.activeChatId != null && !s.helpMode) {
+    if (s.path && s.activeChatId != null) {
       const nextSnapshots = { ...s.chatSnapshots }
       nextSnapshots[s.activeChatId] = {
         messages: s.messages,
@@ -918,7 +957,14 @@ export const useProject = create<ProjectState>((set, get) => ({
         runningPlanStep: s.runningPlanStep,
         hasUnread: false
       }
-      set({ chatSnapshots: nextSnapshots })
+      // Стрим проекта уходит в chatSnapshots; в корне сбрасываем — иначе после
+      // выхода из справки send блокируется, пока фоновый прогон не завершится.
+      set({
+        chatSnapshots: nextSnapshots,
+        isStreaming: false,
+        pendingWrites: [],
+        pendingCommand: null,
+      })
     }
     let helpState = s.help
     if (helpState.messages.length === 0) {
