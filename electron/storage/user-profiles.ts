@@ -104,6 +104,10 @@ export function createUserProfiles(db: Database): UserProfiles {
       }
     },
     setActive(id) {
+      // Несуществующий id иначе обнулял ВСЕ профили (деактивация + 0 строк на
+      // активацию) → ни одного активного. No-op, если профиля нет (B7).
+      const exists = db.prepare('SELECT 1 FROM user_profiles WHERE id = ?').get(id)
+      if (!exists) return
       const tx = db.transaction(() => {
         db.prepare('UPDATE user_profiles SET is_active = 0 WHERE is_active = 1').run()
         db.prepare('UPDATE user_profiles SET is_active = 1 WHERE id = ?').run(id)
