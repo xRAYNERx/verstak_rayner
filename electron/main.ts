@@ -379,6 +379,7 @@ app.whenReady().then(() => {
     getSecret,
     getProviderId,
     getProviderModel,
+    getKnownRoots: knownRoots,
     recordWrite: (projectPath, filePath, before, after) => {
       undoStack.push(projectPath, filePath, before, after)
     },

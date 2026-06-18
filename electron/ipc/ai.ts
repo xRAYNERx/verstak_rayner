@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import { randomUUID } from 'crypto'
 import { createFileTools, TOOL_DEFS } from '../ai/tools'
+import { isWithinKnownRoots } from '../ai/path-policy'
 import { createProvider, PROVIDERS, type ProviderId } from '../ai/registry'
 import type { McpClient } from '../mcp/client'
 import { prepareSystemContext } from '../ai/compose-system'
@@ -30,6 +31,8 @@ interface AiDeps {
   getSecret: (key: string) => string | null
   getProviderId: () => ProviderId
   getProviderModel: (id: ProviderId) => string | null
+  /** Корни зарегистрированных проектов — для валидации projectPath из рендерера. */
+  getKnownRoots: () => string[]
   /** Persist a write so the user can ↶ revert it later. */
   recordWrite: (projectPath: string, filePath: string, before: string, after: string) => void
   /** Fetch the N most recent accepted writes for the Context Pack. */
@@ -251,6 +254,12 @@ export function registerAiIpc(deps: AiDeps): void {
   }
 
   ipcMain.handle('ai:send', async (e, messages: ChatMessage[], projectPath: string | null, budget?: number, overrides?: AiSendOverrides, chatId?: string) => {
+    // Безопасность: projectPath приходит из рендерера. Без проверки агент мог бы
+    // получить файловый + shell доступ к произвольной системной папке (C:\Windows,
+    // C:\Users\Pavel). Гейтим так же, как files/terminal IPC (isWithinKnownRoots).
+    if (projectPath && !isWithinKnownRoots(projectPath, deps.getKnownRoots())) {
+      throw new Error('Доступ запрещён: путь проекта не зарегистрирован')
+    }
     const providerId = overrides?.providerId ?? deps.getProviderId()
     const descriptor = PROVIDERS[providerId]
     const sendId = ++currentSendId
