@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type DragEvent, type ClipboardEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { useProject, type PreflightCard } from '../store/projectStore'
+import { useProject, type PreflightCard, type SendOwner } from '../store/projectStore'
 import { useProvider } from '../hooks/useProvider'
 import { estimateCost, costSeverity, costBreakdown } from '../lib/pricing'
 import { Markdown } from './Markdown'
@@ -22,6 +22,8 @@ import type { Attachment, Suggestion } from '../types/api'
 import iconUrl from '../assets/icon.png'
 import { useT } from '../i18n'
 import { notifyResponseReady } from '../lib/response-notify'
+import { HELP_AGENT_MODE, HELP_CHAT_SEND_OVERRIDES, HELP_PROJECT_PATH } from '../lib/help-scope'
+import { EMPTY_COMPOSER_DRAFT, resolveComposerDraftKey } from '../lib/composer-drafts'
 import { VisionAttachmentBanner } from './VisionAttachmentBanner'
 import { isImageAttachment, providerSupportsVision } from '../lib/vision-support'
 import { resolveSkillOverride } from '../lib/skill-override'
@@ -41,6 +43,11 @@ import {
   type PendingSupplementStatus,
   type QueuedComposerMessage,
 } from '../lib/composer-streaming'
+import {
+  blobToAttachment,
+  CHAT_FILE_ACCEPT,
+  isLegacyDoc,
+} from '../lib/chat-attachments'
 
 function normalizeProjectPath(p: string): string {
   return p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
@@ -51,6 +58,30 @@ function projectNameForPath(projectPath: string | null | undefined): string | un
   const norm = normalizeProjectPath(projectPath)
   const meta = useProject.getState().projectList.find(p => normalizeProjectPath(p.path) === norm)
   return meta?.name ?? projectPath.split(/[/\\]/).pop() ?? undefined
+}
+
+function registerChatSendOwner(sendId: number, chatId: number, isHelp: boolean): void {
+  useProject.getState().registerSendOwner(sendId, {
+    kind: 'chat',
+    chatId,
+    ...(isHelp ? { isHelp: true } : {})
+  })
+}
+
+function notifyAgentFinished(
+  owner: SendOwner | null,
+  projectPath: string | null | undefined,
+  isError?: boolean
+): void {
+  if (owner?.kind === 'chat' && owner.isHelp) {
+    void notifyResponseReady({ isHelp: true, isError })
+    return
+  }
+  void notifyResponseReady({
+    projectName: projectNameForPath(projectPath),
+    projectPath: projectPath ?? undefined,
+    isError
+  })
 }
 
 const MAX_BYTES_PER_FILE = 5 * 1024 * 1024  // 5 MB
@@ -65,8 +96,6 @@ function readAutoScrollPref(): boolean {
   } catch { /* private mode */ }
   return true
 }
-
-const ACCEPTED_MIME_PREFIXES = ['image/', 'text/', 'application/pdf', 'application/json']
 
 type RightPanel = 'none' | 'terminal' | 'sidechat'
 
@@ -107,27 +136,6 @@ function TokenPreviewMeter({ tokens, exact, title }: { tokens: number; exact: bo
   )
 }
 
-function isAcceptable(mime: string): boolean {
-  return ACCEPTED_MIME_PREFIXES.some(p => mime.startsWith(p))
-}
-
-async function blobToAttachment(blob: Blob, fallbackName: string): Promise<Attachment | null> {
-  if (blob.size > MAX_BYTES_PER_FILE) return null
-  const mimeType = blob.type || 'application/octet-stream'
-  if (!isAcceptable(mimeType)) return null
-  const buffer = await blob.arrayBuffer()
-  const bytes = new Uint8Array(buffer)
-  let binary = ''
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-  const data = btoa(binary)
-  return {
-    name: (blob as File).name || fallbackName,
-    mimeType,
-    data,
-    size: blob.size
-  }
-}
-
 /**
  * Goal-cycle prompt: композит из read_journal + project_map + create_plan.
  * Это конкретный "AI-Lab/Ideas cycle" внутри продукта — AI сам читает свою
@@ -149,10 +157,29 @@ Out of scope: общие best practices, рефакторинги ради кр�
 
 export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSideChat }: ChatProps) {
   const t = useT()
-  const { messages, addMessage, insertMessageBeforeLast, updateLastAssistant, isStreaming, setStreaming, activity, preflights, subagentRuns, sessionUsage, path: activePath, chatSessions, activeChatId } = useProject()
+  const {
+    helpMode, help, helpChatId,
+    messages: projectMessages, addMessage, insertMessageBeforeLast, updateLastAssistant,
+    isStreaming: projectIsStreaming, setStreaming,
+    activity: projectActivity, preflights, subagentRuns,
+    sessionUsage: projectSessionUsage,
+    path: activePath, chatSessions, activeChatId,
+    addHelpMessage, insertHelpMessageBeforeLast, updateHelpLastAssistant,
+    setHelpStreaming, clearHelpActivity, pushHelpActivity, addHelpUsage,
+    appendHelpLastAssistantThinking,
+    setComposerDraft,
+    clearComposerDraft,
+  } = useProject()
+  const isHelpChat = helpMode
+  const messages = helpMode ? help.messages : projectMessages
+  const isStreaming = helpMode ? help.isStreaming : projectIsStreaming
+  const activity = helpMode ? help.activity : projectActivity
+  const sessionUsage = helpMode ? help.sessionUsage : projectSessionUsage
   const { mode: agentMode, setMode: setAgentMode } = useAgentMode()
   const projectName = activePath ? activePath.replace(/^.*[\\/]/, '') : null
-  const activeChatTitle = chatSessions.find(s => s.id === activeChatId)?.title ?? null
+  const activeChatTitle = isHelpChat
+    ? t.help.emptyTitle
+    : (chatSessions.find(s => s.id === activeChatId)?.title ?? null)
   const provider = useProvider()
   const [input, setInput] = useState('')
   /** Live token-count preview for whatever is in the composer right now. */
@@ -160,8 +187,52 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
   /** If the agent loop exhausted its budget on the last send, the user can click "+N turns" to extend. */
   const [exhausted, setExhausted] = useState<{ used: number; suggestedAdd: number; maxBudget: number } | null>(null)
   const [attachments, setAttachments] = useState<Attachment[]>([])
+  const composerDraftKeyRef = useRef<string | null>(null)
+  const composerInputRef = useRef(input)
+  const composerAttachmentsRef = useRef(attachments)
+  composerInputRef.current = input
+  composerAttachmentsRef.current = attachments
+
+  function resetComposerAfterSend() {
+    const key = composerDraftKeyRef.current
+    if (key) clearComposerDraft(key)
+    setInput('')
+    setAttachments([])
+  }
+
+  useEffect(() => {
+    const prevKey = composerDraftKeyRef.current
+    const nextKey = resolveComposerDraftKey({
+      helpMode,
+      projectPath: activePath,
+      activeChatId,
+    })
+
+    if (prevKey && prevKey !== nextKey) {
+      setComposerDraft(prevKey, {
+        text: composerInputRef.current,
+        attachments: composerAttachmentsRef.current,
+      })
+    }
+
+    if (nextKey !== prevKey) {
+      const loaded = nextKey
+        ? useProject.getState().getComposerDraft(nextKey)
+        : EMPTY_COMPOSER_DRAFT
+      setInput(loaded.text)
+      setAttachments(loaded.attachments)
+      composerDraftKeyRef.current = nextKey
+    }
+  }, [helpMode, activePath, activeChatId, setComposerDraft])
+
+  useEffect(() => {
+    const key = composerDraftKeyRef.current
+    if (!key) return
+    setComposerDraft(key, { text: input, attachments })
+  }, [input, attachments, setComposerDraft])
   const [dragOver, setDragOver] = useState(false)
   const [warning, setWarning] = useState<string | null>(null)
+  const [queueNotice, setQueueNotice] = useState<string | null>(null)
   const [visionBannerDismissed, setVisionBannerDismissed] = useState(false)
   const streamRef = useRef<HTMLDivElement>(null)
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(readAutoScrollPref)
@@ -175,6 +246,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
   const fileInputRef = useRef<HTMLInputElement>(null)
   const screenshotCounter = useRef(0)
   const warningTimer = useRef<number | null>(null)
+  const queueNoticeTimer = useRef<number | null>(null)
   const currentSendIdRef = useRef<number | null>(null)
   const queuedMessagesRef = useRef<QueuedComposerMessage[]>([])
   const [queuedMessages, setQueuedMessages] = useState<QueuedComposerMessage[]>([])
@@ -194,6 +266,12 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     setWarning(msg)
     if (warningTimer.current) window.clearTimeout(warningTimer.current)
     warningTimer.current = window.setTimeout(() => setWarning(null), 2500)
+  }
+
+  function flashQueueNotice(msg: string) {
+    setQueueNotice(msg)
+    if (queueNoticeTimer.current) window.clearTimeout(queueNoticeTimer.current)
+    queueNoticeTimer.current = window.setTimeout(() => setQueueNotice(null), 2500)
   }
 
   const hasImageAttachments = attachments.some(a => isImageAttachment(a.mimeType))
@@ -228,11 +306,15 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         flashWarning(`Можно прикрепить максимум ${MAX_ATTACHMENTS} файлов`)
         break
       }
+      if (isLegacyDoc(nameHint)) {
+        flashWarning(`${nameHint}: старый .doc не поддерживается — сохраните как .docx`)
+        continue
+      }
       if (blob.size > MAX_BYTES_PER_FILE) {
         flashWarning(`${nameHint}: больше ${formatSize(MAX_BYTES_PER_FILE)}, пропущен`)
         continue
       }
-      const att = await blobToAttachment(blob, nameHint)
+      const att = await blobToAttachment(blob, nameHint, MAX_BYTES_PER_FILE)
       if (!att) {
         flashWarning(`${nameHint}: формат не поддерживается, пропущен`)
         continue
@@ -252,6 +334,18 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
       //  - 'chat' → если не активный, в chatSnapshots; если активный, в
       //             основное состояние ниже по логике
       const owner = store.lookupSendOwner(id)
+      if (owner?.kind === 'chat' && owner.isHelp) {
+        store.applyEventToHelp(event as { type: string; [k: string]: unknown })
+        if (event.type === 'done' || event.type === 'error') {
+          notifyAgentFinished(owner, null, event.type === 'error')
+          store.forgetSendOwner(id)
+          if (store.helpMode) {
+            setHelpStreaming(false)
+            flushQueueRef.current()
+          }
+        }
+        return
+      }
       if (owner?.kind === 'review') {
         const reviewChatId = owner.reviewChatId
         if (event.type === 'text' && typeof (event as { text?: string }).text === 'string') {
@@ -277,21 +371,24 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         // мапа растёт при каждом переключении проекта во время активного
         // стрима в фоне.
         if (event.type === 'done') {
-          void notifyResponseReady({ projectName: projectNameForPath(projectPath), projectPath })
+          notifyAgentFinished(owner, projectPath)
         } else if (event.type === 'error') {
-          void notifyResponseReady({ projectName: projectNameForPath(projectPath), projectPath, isError: true })
+          notifyAgentFinished(owner, projectPath, true)
         }
         if (event.type === 'done' || event.type === 'error') store.forgetSendOwner(id)
         return
       }
-      // Route background-chat events (same project, different chat) to the
-      // chat snapshot so the user's stream survives chat-switching.
-      if (owner?.kind === 'chat' && owner.chatId !== store.activeChatId) {
+      // Фоновый чат: другая ветка ИЛИ на экране справки (проектный стрим в snapshot).
+      if (
+        owner?.kind === 'chat'
+        && !owner.isHelp
+        && (store.helpMode || owner.chatId !== store.activeChatId)
+      ) {
         store.applyEventToChat(owner.chatId, event as unknown as { type: string; [k: string]: unknown })
         if (event.type === 'done') {
-          void notifyResponseReady({ projectName: projectNameForPath(store.path), projectPath: store.path ?? undefined })
+          notifyAgentFinished(owner, store.path)
         } else if (event.type === 'error') {
-          void notifyResponseReady({ projectName: projectNameForPath(store.path), projectPath: store.path ?? undefined, isError: true })
+          notifyAgentFinished(owner, store.path, true)
         }
         if (event.type === 'done' || event.type === 'error') store.forgetSendOwner(id)
         return
@@ -530,7 +627,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         setPendingSupplements([])
         setPendingBarExpanded(false)
         store.forgetSendOwner(id)
-        void notifyResponseReady({ projectName: projectNameForPath(store.path), projectPath: store.path ?? undefined })
+        notifyAgentFinished(owner, store.path)
         flushQueueRef.current()
       }
       else if (event.type === 'error') {
@@ -554,7 +651,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         setPendingSupplements([])
         setPendingBarExpanded(false)
         store.forgetSendOwner(id)
-        void notifyResponseReady({ projectName: projectNameForPath(store.path), projectPath: store.path ?? undefined, isError: true })
+        notifyAgentFinished(owner, store.path, true)
         flushQueueRef.current()
       }
     })
@@ -762,8 +859,11 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [input, isStreaming])
 
-  // Cleanup warning timer on unmount
-  useEffect(() => () => { if (warningTimer.current) window.clearTimeout(warningTimer.current) }, [])
+  // Cleanup warning / queue notice timers on unmount
+  useEffect(() => () => {
+    if (warningTimer.current) window.clearTimeout(warningTimer.current)
+    if (queueNoticeTimer.current) window.clearTimeout(queueNoticeTimer.current)
+  }, [])
 
   // Live token preview: debounce text changes (400ms) and ask the main process
   // to count tokens for the current draft. Gemini API gives an exact count;
@@ -856,14 +956,19 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     const newBudget = Math.min(exhausted.maxBudget, exhausted.used + exhausted.suggestedAdd)
     setExhausted(null)
     armAutoScrollForOutgoing()
+    if (store.helpMode) {
+      addHelpMessage({ role: 'assistant', content: '' })
+      setHelpStreaming(true)
+      const msgs = [...store.help.messages].slice(0, -1)
+      const sendId = await window.api.ai.sendWithBudget(msgs, null, newBudget, store.helpChatId != null ? String(store.helpChatId) : undefined)
+      if (store.helpChatId != null) registerChatSendOwner(sendId, store.helpChatId, true)
+      return
+    }
     addMessage({ role: 'assistant', content: '' })
     setStreaming(true)
-    // Send everything except the empty placeholder we just pushed
     const msgs = [...useProject.getState().messages].slice(0, -1)
     const sendId = await window.api.ai.sendWithBudget(msgs, store.path, newBudget)
-    if (activeChatId != null) {
-      useProject.getState().registerSendOwner(sendId, { kind: 'chat', chatId: activeChatId })
-    }
+    if (activeChatId != null) registerChatSendOwner(sendId, activeChatId, false)
   }
 
   async function ensureProjectForChat(): Promise<{ path: string; activeChatId: number } | null> {
@@ -891,7 +996,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
 
   async function flushMessageQueue() {
     if (queuedMessagesRef.current.length === 0) return
-    if (useProject.getState().isStreaming) return
+    const st = useProject.getState()
+    if (st.helpMode ? st.help.isStreaming : st.isStreaming) return
     const [next, ...rest] = queuedMessagesRef.current
     setQueuedMessagesState(rest)
     await send({ text: next.text, fromQueue: true })
@@ -904,7 +1010,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     setQueuedMessagesState([...queuedMessagesRef.current, item])
     setInput('')
     setPendingBarExpanded(true)
-    flashWarning(t.chat.streamingQueueAdded)
+    flashQueueNotice(t.chat.streamingQueueAdded)
     armAutoScrollForOutgoing()
   }
 
@@ -927,9 +1033,9 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
       const res = await window.api.ai.appendContext(sendId, text)
       if (res.ok) {
         status = 'accepted'
-        flashWarning(t.chat.streamingAppendAccepted)
+        flashQueueNotice(t.chat.streamingAppendAccepted)
       } else if (provider.id.endsWith('-cli')) {
-        flashWarning(t.chat.streamingAppendCliNote)
+        flashQueueNotice(t.chat.streamingAppendCliNote)
       }
     }
 
@@ -951,6 +1057,69 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     if (!text && attachments.length === 0) return
     if (!opts?.fromQueue && isStreaming) return
     const store = useProject.getState()
+
+    if (store.helpMode) {
+      const helpChatId = store.helpChatId
+      if (helpChatId == null) return
+      const userAttachments = attachments
+      store.clearHelpActivity()
+      setExhausted(null)
+      setCrossVerify(null)
+      if (!opts?.text) {
+        resetComposerAfterSend()
+      }
+      const summary = userAttachments.length > 0
+        ? `${text}${text ? '\n\n' : ''}📎 ${userAttachments.map(a => a.name).join(', ')}`
+        : text
+      let enrichedText = text
+      const activeSkillForLoad = useSkillsStore.getState().activeSkillId
+        ? useSkillsStore.getState().skills.find(s => s.id === useSkillsStore.getState().activeSkillId)
+        : null
+      if (activeSkillForLoad?.context_loaders?.length) {
+        try {
+          const loaded = await window.api.skills.runLoaders(activeSkillForLoad.id, {
+            trigger: !store.help.messages.some(m => m.role === 'user') ? 'chat_open' : 'slash_arg',
+            projectPath: null,
+            arg: text.split(/\s+/)[0]
+          })
+          if (loaded.context) enrichedText = `${loaded.context}\n\n---\n\n${text}`
+        } catch (err) {
+          console.warn('[help] skill loaders failed:', err)
+        }
+      }
+      armAutoScrollForOutgoing()
+      addHelpMessage({ role: 'user', content: enrichedText, attachments: userAttachments })
+      await window.api.chats.append(helpChatId, HELP_PROJECT_PATH, 'user', summary)
+      addHelpMessage({ role: 'assistant', content: '' })
+      setHelpStreaming(true)
+      const allMessages = [...useProject.getState().help.messages].slice(0, -1)
+      const activeSkill = useSkillsStore.getState().activeSkillId
+        ? useSkillsStore.getState().skills.find(s => s.id === useSkillsStore.getState().activeSkillId)
+        : null
+      let sendId: number
+      const antiStallNudge = '\n\n---\nВАЖНО (Verstak): если пользователь дал ясный прямой запрос — выполни его прямо в этом чате и выдай результат. Не зацикливайся, прося оформить «пакет задачи», «одну фразу цели» или ждать отдельного «ок», если намерение уже понятно.'
+      const helpOverrides: Parameters<typeof window.api.ai.sendWithOverrides>[2] = {
+        ...HELP_CHAT_SEND_OVERRIDES,
+      }
+      if (activeSkill) {
+        const currentProvider = await window.api.settings.getKey('provider')
+        const { providerId: overrideProvider, model: overrideModel } = resolveSkillOverride(activeSkill, currentProvider)
+        Object.assign(helpOverrides, {
+          systemPrompt: activeSkill.systemPrompt + antiStallNudge,
+          ...(overrideProvider ? { providerId: overrideProvider } : {}),
+          ...(overrideModel ? { model: overrideModel } : {}),
+          ...(activeSkill.tools_allow?.length ? { toolsAllow: activeSkill.tools_allow } : {}),
+          effortLevel: store.effortLevel,
+        })
+      } else if (store.effortLevel !== 'standard') {
+        helpOverrides.effortLevel = store.effortLevel
+      }
+      sendId = await window.api.ai.sendWithOverrides(allMessages, null, helpOverrides, String(helpChatId))
+      currentSendIdRef.current = sendId
+      registerChatSendOwner(sendId, helpChatId, true)
+      return
+    }
+
     const ctx = await ensureProjectForChat()
     if (!ctx) {
       flashWarning('Сначала открой папку проекта слева — без неё переписка не сохраняется.')
@@ -962,8 +1131,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     setExhausted(null)  // new send wipes any pending continue state
     setCrossVerify(null)  // сбрасываем предыдущий результат cross-verify
     if (!opts?.text) {
-      setInput('')
-      setAttachments([])
+      resetComposerAfterSend()
     }
     const summary = userAttachments.length > 0
       ? `${text}${text ? '\n\n' : ''}📎 ${userAttachments.map(a => a.name).join(', ')}`
@@ -992,6 +1160,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         console.warn('[chat] skill loaders failed:', err)
       }
     }
+    const isFirstUserMessage = !store.messages.some(m => m.role === 'user')
     armAutoScrollForOutgoing()
     addMessage({ role: 'user', content: enrichedText, attachments: userAttachments })
     const activeChatId = ctx.activeChatId
@@ -999,6 +1168,9 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
       // В БД сохраняем оригинальный text пользователя (без loader-контекста),
       // чтобы при reload UI не показывал жирный системный блок.
       await window.api.chats.append(activeChatId, path, 'user', summary)
+      if (isFirstUserMessage) {
+        void store.autoTitleChatSession(activeChatId, text || summary)
+      }
       // log the start of a session — title is the first 80 chars of the request
       const journalTitle = text.length > 80 ? text.slice(0, 80) + '…' : (text || 'Сообщение с вложением')
       void window.api.journal.append(path, 'session', journalTitle,
@@ -1019,8 +1191,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     if (activeSkill) {
       // Узнаём текущий provider пользователя — чтобы решить override или нет
       const currentProvider = await window.api.settings.getKey('provider')
-      // Provider/model override скилла. Провайдер — только при разном семействе
-      // (сохраняем выбор API/CLI). Модель — и при том же семействе (B5).
+      // Provider/model override скилла (B5). Провайдер — только при разном
+      // семействе (сохраняем выбор API/CLI). Модель — и при том же семействе.
       const { providerId: overrideProvider, model: overrideModel } = resolveSkillOverride(activeSkill, currentProvider)
       // Anti-stall guard: некоторые скиллы — оркестраторы/штабы (los-hq, bos-hq,
       // навигаторы) с протоколом «жди пакет задачи / маршрутизируй / ✋ СТОП».
@@ -1050,7 +1222,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     // another chat mid-stream, the event handler will route events into
     // chatSnapshots[activeChatId] rather than corrupting the new active chat.
     if (activeChatId != null) {
-      useProject.getState().registerSendOwner(sendId, { kind: 'chat', chatId: activeChatId })
+      registerChatSendOwner(sendId, activeChatId, false)
     }
   }
 
@@ -1058,7 +1230,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
     const id = currentSendIdRef.current
     if (id == null) return
     await window.api.ai.stop(id)
-    setStreaming(false)
+    if (useProject.getState().helpMode) setHelpStreaming(false)
+    else setStreaming(false)
     setPendingSupplements([])
     setPendingBarExpanded(false)
     // sendOwners cleanup: stop() = главное место где renderer знает, что
@@ -1105,7 +1278,12 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         </div>
       )}
 
-      {projectName && (
+      {isHelpChat ? (
+        <div className="gg-chat-project-bar gg-chat-project-bar-help" role="note">
+          <span className="gg-chat-project-icon" aria-hidden>❓</span>
+          <span className="gg-chat-project-name">{t.help.emptyTitle}</span>
+        </div>
+      ) : projectName ? (
         <div className="gg-chat-project-bar" title={activePath ?? ''}>
           <span className="gg-chat-project-icon">📁</span>
           <span className="gg-chat-project-name">{projectName}</span>
@@ -1132,14 +1310,31 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
             </div>
           )}
         </div>
-      )}
+      ) : null}
 
       <div className="gg-chat-stream-area">
         <div className="gg-chat-stream" ref={streamRef}>
         <div className="gg-chat-stream-inner">
         {/* Crash-resume: баннер «сессия прервана» (если есть зависшие прогоны). */}
         <ResumeBanner />
-        {!hasMessages && (
+        {isHelpChat && (
+          <div className="gg-help-chat-banner" role="note">
+            <span className="gg-help-chat-banner-icon" aria-hidden>❓</span>
+            <span>{t.help.banner}</span>
+          </div>
+        )}
+        {!hasMessages && isHelpChat && (
+          <div className="gg-chat-empty gg-chat-empty-help">
+            <div className="gg-chat-empty-title">{t.help.emptyTitle}</div>
+            <div className="gg-chat-empty-hint">{t.help.emptyHint}</div>
+            <div className="gg-chat-empty-quick">
+              {['Как устроен сайдбар?', 'Чем чеклист отличается от прогонов?', 'Как поставить задачу в очередь?'].map(q => (
+                <button key={q} type="button" className="gg-quick-action" onClick={() => setInput(q)}>{q}</button>
+              ))}
+            </div>
+          </div>
+        )}
+        {!hasMessages && !isHelpChat && (
           <div className="gg-chat-empty">
             <img src={iconUrl} alt="Verstak" className="gg-chat-empty-mark-img" />
             <div className="gg-chat-empty-title">Готов к работе</div>
@@ -1453,6 +1648,19 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
             </svg>
           </button>
         )}
+        {queueNotice && (
+          <div className="gg-chat-queue-notice-anchor">
+            <div className="gg-chat-queue-notice" role="status" aria-live="polite">
+              <span className="gg-chat-queue-notice-text">{queueNotice}</span>
+              <span className="gg-chat-queue-notice-arrow" aria-hidden>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
+              </span>
+            </div>
+          </div>
+        )}
         {isStreaming && (queuedMessages.length > 0 || pendingSupplements.length > 0) && (
           <ComposerPendingBar
             queueItems={queuedMessages}
@@ -1507,7 +1715,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
             onClear={() => setInput('')}
             onInject={text => setInput(text)}
             projectPath={activePath}
-            systemCommands={[
+            helpScope={isHelpChat}
+            systemCommands={isHelpChat ? [] : [
               {
                 kind: 'system',
                 trigger: 'new',
@@ -1634,7 +1843,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
             type="file"
             multiple
             style={{ display: 'none' }}
-            accept="image/*,application/pdf,text/*,.json,.md,.csv"
+            accept={CHAT_FILE_ACCEPT}
             onChange={onFilesPicked}
           />
         </div>
@@ -1717,8 +1926,12 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
               <DevTaskBadge />
             </div>
             <div className="gg-composer-meta-cluster gg-composer-meta-cluster--end">
-              <ComposerToolsMenu onInject={injectTemplate} />
-              <ModePicker mode={agentMode} onChange={setAgentMode} />
+              {!isHelpChat && <ComposerToolsMenu onInject={injectTemplate} />}
+              <ModePicker
+                mode={isHelpChat ? HELP_AGENT_MODE : agentMode}
+                onChange={setAgentMode}
+                locked={isHelpChat}
+              />
               <ModelPicker onOpenSettings={onOpenSettings} />
               {/* Бейдж возможностей провайдера (аудит P1 #12): у CLI-провайдеров
                   правки делает внешний агент в субпроцессе — контрольные гарантии

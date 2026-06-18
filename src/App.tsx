@@ -7,6 +7,7 @@ import type { ProjectMeta } from './types/api'
 import { Sidebar } from './components/Sidebar'
 import { Chat } from './components/Chat'
 import { TasksView } from './components/TasksView'
+import { FilesView } from './components/FilesView'
 import { JournalView } from './components/JournalView'
 import { PlanView } from './components/PlanView'
 import { FeedbackView } from './components/FeedbackView'
@@ -85,8 +86,7 @@ export function App() {
   const [projectSettingsTarget, setProjectSettingsTarget] = useState<ProjectMeta | null>(null)
   // Right docked panel: terminal or parallel side-chat.
   const [rightPanel, setRightPanel] = useState<'none' | 'terminal' | 'sidechat'>('none')
-  // Lazily-created dedicated side-chat session id. Created on first open of the
-  // side-chat panel, reused while the panel stays open within a project.
+  // Side-chat session id — created on first sent message, not on panel open.
   const [sideChatId, setSideChatId] = useState<number | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(readSidebarOpen)
   const [lang, setLang] = useState<Lang>('ru')
@@ -160,12 +160,18 @@ export function App() {
   useEffect(() => {
     if (!authDone) return
     const norm = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
-    const off = window.api.notify.onOpenProject((projectPath) => {
+    const offProject = window.api.notify.onOpenProject((projectPath) => {
       if (!projectPath) return
       if (path && norm(path) === norm(projectPath)) return
       void setProject(projectPath)
     })
-    return off
+    const offHelp = window.api.notify.onOpenHelp(() => {
+      void useProject.getState().openHelpChat()
+    })
+    return () => {
+      offProject()
+      offHelp()
+    }
   }, [authDone, path, setProject])
   // Panels require an open project (the terminal/file tree are project-scoped).
   const effectiveRightPanel = path ? rightPanel : 'none'
@@ -177,25 +183,8 @@ export function App() {
     setRightPanel(p => (p === 'sidechat' ? 'none' : p))
   }, [path])
 
-  // Open the side-chat panel — lazily create a dedicated background chat
-  // session the first time (separate from the active left-list chat).
-  async function openSideChat() {
+  function openSideChat() {
     if (!path) return
-    if (sideChatId == null) {
-      try {
-        const currentProvider = await window.api.settings.getKey('provider')
-        const currentModel = currentProvider
-          ? await window.api.settings.getKey(`model_${currentProvider}`)
-          : null
-        const created = await window.api.chatSessions.create(path, {
-          title: t.chat.sideChatTitle,
-          providerId: currentProvider ?? null,
-          model: currentModel ?? null,
-        })
-        setSideChatId(created.id)
-        await useProject.getState().refreshChatSessions()
-      } catch { return }
-    }
     setRightPanel('sidechat')
   }
 
@@ -209,6 +198,8 @@ export function App() {
       } else if (e.key === 'Tab' && e.shiftKey && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
         // Shift+Tab — cycle через agent mode (как в Claude Code). Игнорируем
         // когда фокус в input/textarea (там Shift+Tab — обычная навигация).
+        // В справке режим зафиксирован на «План» — не переключаем глобально.
+        if (useProject.getState().helpMode) return
         e.preventDefault()
         const modes: Array<'ask' | 'accept-edits' | 'plan' | 'auto' | 'bypass'> = ['ask', 'accept-edits', 'plan', 'auto', 'bypass']
         void (async () => {
@@ -308,6 +299,7 @@ export function App() {
       <ProjectRail
         onOpenProjectSettings={setProjectSettingsTarget}
         onOpenAppSettings={() => setShowSettings(true)}
+        onOpenHelp={() => void useProject.getState().openHelpChat()}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(v => !v)}
       />
@@ -350,8 +342,12 @@ export function App() {
                 </div>
               </div>
             )}
-            {effectiveRightPanel === 'sidechat' && sideChatId != null && (
-              <SideChat sideChatId={sideChatId} onClose={() => setRightPanel('none')} />
+            {effectiveRightPanel === 'sidechat' && (
+              <SideChat
+                sideChatId={sideChatId}
+                onSessionCreated={setSideChatId}
+                onClose={() => setRightPanel('none')}
+              />
             )}
         </div>
         {activeView === 'tasks' && <TasksView />}
@@ -363,6 +359,7 @@ export function App() {
         {activeView === 'tasks-manager' && <AgentRunsPanel />}
         {activeView === 'task' && <DevTaskPanel />}
         {activeView === 'project-map' && <ProjectMapPanel />}
+        {activeView === 'files' && <FilesView />}
         {activeView === 'memory-gov' && (
           <Suspense fallback={<ViewFallback />}><MemoryGovernance /></Suspense>
         )}

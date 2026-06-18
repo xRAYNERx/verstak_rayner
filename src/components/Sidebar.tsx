@@ -1,9 +1,22 @@
-import { useEffect, useState, type ReactElement } from 'react'
+import { useEffect, useRef, useState, type MouseEvent, type ReactElement, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useProject, type ViewId } from '../store/projectStore'
 import { ModelPicker } from './ModelPicker'
 import { CreateClientModal } from './CreateClientModal'
 import { useT } from '../i18n'
-import type { FileNode } from '../types/api'
+
+
+type ChatContextMenuState = { x: number; y: number; id: number; title: string }
+
+const CHAT_MENU_W = 168
+const CHAT_MENU_H = 76
+
+function clampChatMenuPos(x: number, y: number): { left: number; top: number } {
+  const pad = 8
+  const maxX = Math.max(pad, window.innerWidth - CHAT_MENU_W - pad)
+  const maxY = Math.max(pad, window.innerHeight - CHAT_MENU_H - pad)
+  return { left: Math.min(Math.max(pad, x), maxX), top: Math.min(Math.max(pad, y), maxY) }
+}
 
 function ChatNavSection() {
   const t = useT()
@@ -11,35 +24,84 @@ function ChatNavSection() {
   const [open, setOpen] = useState(true)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editTitle, setEditTitle] = useState('')
+  const [contextMenu, setContextMenu] = useState<ChatContextMenuState | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
+  const editInputRef = useRef<HTMLInputElement | null>(null)
+  const editOriginalRef = useRef('')
 
   const isActiveSection = activeView === 'chat'
 
-  async function startEdit(id: number, currentTitle: string) {
+  useEffect(() => {
+    if (!open && editingId != null) void commitEdit()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- commit on collapse only
+  }, [open])
+
+  useEffect(() => {
+    if (!contextMenu) return
+    const close = () => setContextMenu(null)
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
+    const onPointerDown = (e: PointerEvent) => {
+      if (menuRef.current?.contains(e.target as Node)) return
+      close()
+    }
+    // Откладываем listener — иначе тот же ПКМ, что открыл меню, сразу его закрывает.
+    const timer = window.setTimeout(() => {
+      window.addEventListener('pointerdown', onPointerDown, true)
+    }, 0)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('pointerdown', onPointerDown, true)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [contextMenu])
+
+  function focusEditInput() {
+    requestAnimationFrame(() => {
+      const el = editInputRef.current
+      if (!el) return
+      el.focus()
+      el.select()
+    })
+  }
+
+  function startEdit(id: number, currentTitle: string) {
+    editOriginalRef.current = currentTitle
     setEditingId(id)
     setEditTitle(currentTitle)
+    focusEditInput()
   }
-  async function commitEdit() {
-    if (editingId == null) return
-    const t = editTitle.trim()
-    const idToEdit = editingId
-    // Очищаем edit-state СРАЗУ чтобы input закрылся даже если IPC упадёт
+
+  function cancelEdit() {
     setEditingId(null)
     setEditTitle('')
-    if (!t) return
-    // Optimistic local update — заголовок меняется мгновенно, без полной
-    // перезагрузки chatSessions. Это убирает re-render волну, которая
-    // ранее иногда обрывала входящий ai:event стрим.
-    patchChatSession(idToEdit, { title: t })
+    editOriginalRef.current = ''
+  }
+
+  async function commitEdit() {
+    if (editingId == null) return
+    const nextTitle = editTitle.trim()
+    const idToEdit = editingId
+    const original = editOriginalRef.current
+    cancelEdit()
+    if (!nextTitle || nextTitle === original) return
+    patchChatSession(idToEdit, { title: nextTitle })
     try {
-      await window.api.chatSessions.rename(idToEdit, t)
+      await window.api.chatSessions.rename(idToEdit, nextTitle)
     } catch (err) {
-      // Если запись в DB упала — откатываем UI и подтягиваем правду
       console.error('[Sidebar] rename failed, reverting:', err)
       await refreshChatSessions()
     }
   }
-  async function removeSession(id: number) {
-    if (!window.confirm(t.sidebar.deleteChat)) return
+  function openContextMenu(e: MouseEvent, id: number, title: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({ x: e.clientX, y: e.clientY, id, title })
+  }
+
+  async function removeSession(id: number, title: string) {
+    const msg = t.sidebar.deleteChatConfirm.replace('{title}', title)
+    if (!window.confirm(msg)) return
     await window.api.chatSessions.remove(id)
     // Grok audit fix: каскадное удаление review-чатов в БД работало, но в
     // store оставались stale entries и openedReviewId мог указывать на
@@ -85,18 +147,32 @@ function ChatNavSection() {
           {chatSessions.map(s => (
             <div
               key={s.id}
-              className={`gg-chat-nav-item ${s.id === activeChatId && isActiveSection ? 'is-active' : ''}`}
+              className={`gg-chat-nav-item ${s.id === activeChatId && isActiveSection ? 'is-active' : ''} ${editingId === s.id ? 'is-editing' : ''}`}
+              onContextMenu={(e) => openContextMenu(e, s.id, s.title)}
             >
               {editingId === s.id ? (
                 <input
-                  autoFocus
+                  ref={editInputRef}
                   className="gg-chat-nav-edit"
                   value={editTitle}
                   onChange={e => setEditTitle(e.target.value)}
-                  onBlur={() => void commitEdit()}
+                  onInput={e => setEditTitle(e.currentTarget.value)}
+                  onMouseDown={e => e.stopPropagation()}
+                  onBlur={e => {
+                    const row = e.currentTarget.closest('.gg-chat-nav-item')
+                    if (row && e.relatedTarget instanceof Node && row.contains(e.relatedTarget)) return
+                    void commitEdit()
+                  }}
                   onKeyDown={e => {
-                    if (e.key === 'Enter') void commitEdit()
-                    if (e.key === 'Escape') { setEditingId(null); setEditTitle('') }
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      void commitEdit()
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      cancelEdit()
+                    }
                   }}
                 />
               ) : (
@@ -104,6 +180,7 @@ function ChatNavSection() {
                   className="gg-chat-nav-pick"
                   onClick={() => { void switchChatSession(s.id); setActiveView('chat') }}
                   onDoubleClick={() => void startEdit(s.id, s.title)}
+                  onContextMenu={(e) => openContextMenu(e, s.id, s.title)}
                   title={s.title}
                 >
                   <span className={`gg-chat-nav-dot ${chatSnapshots[s.id]?.isStreaming ? 'is-streaming' : chatSnapshots[s.id]?.hasUnread ? 'is-unread' : ''}`} />
@@ -115,14 +192,52 @@ function ChatNavSection() {
                   )}
                 </button>
               )}
-              <button
-                className="gg-chat-nav-x"
-                onClick={() => void removeSession(s.id)}
-                title={t.sidebar.delete}
-              >×</button>
+              {editingId !== s.id && (
+                <button
+                  className="gg-chat-nav-x"
+                  onClick={() => void removeSession(s.id, s.title)}
+                  onContextMenu={(e) => openContextMenu(e, s.id, s.title)}
+                  title={t.sidebar.delete}
+                >×</button>
+              )}
             </div>
           ))}
         </div>
+      )}
+      {contextMenu && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          className="gg-chat-nav-menu"
+          style={clampChatMenuPos(contextMenu.x, contextMenu.y)}
+          role="menu"
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <button
+            type="button"
+            className="gg-chat-nav-menu-item"
+            role="menuitem"
+            onClick={() => {
+              const { id, title } = contextMenu
+              setContextMenu(null)
+              requestAnimationFrame(() => startEdit(id, title))
+            }}
+          >
+            {t.sidebar.renameChat}
+          </button>
+          <button
+            type="button"
+            className="gg-chat-nav-menu-item is-danger"
+            role="menuitem"
+            onClick={() => {
+              const { id, title } = contextMenu
+              setContextMenu(null)
+              void removeSession(id, title)
+            }}
+          >
+            {t.sidebar.delete}
+          </button>
+        </div>,
+        document.body,
       )}
     </>
   )
@@ -160,65 +275,11 @@ function ChatIconNode() {
   )
 }
 
-function FilesSection({ tree }: { tree: FileNode[] }) {
-  const t = useT()
-  const [open, setOpen] = useState(false)
-  return (
-    <>
-      <button
-        type="button"
-        className="gg-sidebar-section-collapsible"
-        onClick={() => setOpen(v => !v)}
-      >
-        <span className="gg-sidebar-section-caret">{open ? '▾' : '▸'}</span>
-        <span className="gg-sidebar-section-title">{t.sidebar.files}</span>
-        <span className="gg-sidebar-section-count">{tree.length}</span>
-      </button>
-      {open && (
-        <div className="gg-tree">
-          {tree.map(node => <TreeNode key={node.path} node={node} depth={0} />)}
-        </div>
-      )}
-    </>
-  )
-}
-
-/**
- * Map a TouchKind to a one-glyph marker. Keeps the tree visually quiet —
- * full descriptions live in the title tooltip.
- */
-function touchMarker(kind: 'read' | 'write' | 'list'): { icon: string; title: string } {
-  if (kind === 'write') return { icon: '●', title: 'AI правил этот файл в текущей сессии' }
-  if (kind === 'read') return { icon: '○', title: 'AI читал этот файл в текущей сессии' }
-  return { icon: '·', title: 'AI листал этот каталог в текущей сессии' }
-}
-
-function TreeNode({ node, depth }: { node: FileNode; depth: number }) {
-  const [open, setOpen] = useState(depth < 1)
-  const isDir = node.isDirectory
-  // Touched-by-AI marker. The store keys by the project-relative path the
-  // tools emit — match against node.path. If it doesn't match (different
-  // separator on Windows), fall through silently.
-  const touched = useProject(s => s.touchedFiles[node.path])
-  const marker = touched ? touchMarker(touched) : null
-  return (
-    <>
-      <div
-        className={`gg-tree-node ${isDir ? 'is-dir' : 'is-file'} ${touched ? `is-touched is-${touched}` : ''}`}
-        style={{ paddingLeft: 8 + depth * 12 }}
-        onClick={() => isDir && setOpen(o => !o)}
-        title={marker?.title}
-      >
-        <span className="gg-tree-icon">{isDir ? (open ? '▾' : '▸') : '·'}</span>
-        <span className="gg-tree-name">{node.name}</span>
-        {marker && <span className="gg-tree-touch" aria-hidden>{marker.icon}</span>}
-      </div>
-      {isDir && open && node.children?.map(child => (
-        <TreeNode key={child.path} node={child} depth={depth + 1} />
-      ))}
-    </>
-  )
-}
+const FilesIcon = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+  </svg>
+)
 
 interface NavItem {
   id: ViewId
@@ -226,6 +287,98 @@ interface NavItem {
   icon: ReactElement
   badge?: string
 }
+
+const SIDEBAR_SECTIONS_KEY = 'gg.sidebar.sections'
+
+function readSectionOpen(sectionId: string, defaultOpen = true): boolean {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_SECTIONS_KEY)
+    if (!raw) return defaultOpen
+    const data = JSON.parse(raw) as Record<string, boolean>
+    return data[sectionId] ?? defaultOpen
+  } catch {
+    return defaultOpen
+  }
+}
+
+function writeSectionOpen(sectionId: string, open: boolean) {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_SECTIONS_KEY)
+    const data = raw ? JSON.parse(raw) as Record<string, boolean> : {}
+    data[sectionId] = open
+    localStorage.setItem(SIDEBAR_SECTIONS_KEY, JSON.stringify(data))
+  } catch { /* ignore */ }
+}
+
+function SidebarNavSection({
+  sectionId,
+  title,
+  activeView,
+  viewIds,
+  children,
+}: {
+  sectionId: string
+  title: string
+  activeView: ViewId
+  viewIds: ReadonlySet<ViewId>
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(() => readSectionOpen(sectionId))
+
+  useEffect(() => {
+    if (viewIds.has(activeView)) setOpen(true)
+  }, [activeView, viewIds])
+
+  function toggle() {
+    setOpen(v => {
+      const next = !v
+      writeSectionOpen(sectionId, next)
+      return next
+    })
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className="gg-sidebar-section-collapsible"
+        onClick={toggle}
+        aria-expanded={open}
+      >
+        <span className="gg-sidebar-section-caret">{open ? '▾' : '▸'}</span>
+        <span className="gg-sidebar-section-title">{title}</span>
+      </button>
+      {open && children}
+    </>
+  )
+}
+
+function NavButtons({ items, activeView, onSelect }: {
+  items: NavItem[]
+  activeView: ViewId
+  onSelect: (id: ViewId) => void
+}) {
+  return (
+    <div className="gg-nav">
+      {items.map(item => (
+        <button
+          key={item.id}
+          type="button"
+          className={`gg-nav-item ${activeView === item.id ? 'is-active' : ''}`}
+          onClick={() => onSelect(item.id)}
+        >
+          <span className="gg-nav-icon">{item.icon}</span>
+          <span className="gg-nav-label">{item.label}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+const WORK_VIEW_IDS = new Set<ViewId>(['chat', 'plan', 'tasks', 'skills', 'workflow'])
+const CONTROL_VIEW_IDS = new Set<ViewId>(['journal', 'tasks-manager', 'inspector', 'agents'])
+const PROJECT_VIEW_IDS = new Set<ViewId>(['project-map', 'memory-gov', 'files'])
+const TOOLS_VIEW_IDS = new Set<ViewId>(['browser', 'design', 'feedback'])
 
 const ChatIcon = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -298,12 +451,6 @@ const InspectorIcon = (
     <line x1="21" y1="21" x2="16.65" y2="16.65" />
   </svg>
 )
-const VideoIcon = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="4" width="20" height="16" rx="2" />
-    <polygon points="10 9 16 12 10 15 10 9" />
-  </svg>
-)
 const MemoryIcon = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 2a4 4 0 0 0-4 4 3 3 0 0 0-2 5.5A3 3 0 0 0 8 17a3.5 3.5 0 0 0 4 1 3.5 3.5 0 0 0 4-1 3 3 0 0 0 2-5.5A3 3 0 0 0 16 6a4 4 0 0 0-4-4z" />
@@ -335,16 +482,6 @@ const ProjectMapIcon = (
     <line x1="16" y1="6" x2="16" y2="21" />
   </svg>
 )
-// Dev Task Flow (Фаза 2) — иконка вкладки «Задача» (ветка + чекмарк).
-const DevTaskIcon = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="6" y1="3" x2="6" y2="15" />
-    <circle cx="18" cy="6" r="3" />
-    <circle cx="6" cy="18" r="3" />
-    <path d="M18 9a9 9 0 0 1-9 9" />
-  </svg>
-)
-
 // Chat is rendered separately above the rest of the nav (expandable section
 // with its own list of chat sessions + create button).
 // NAV is built inside the component to use translations.
@@ -354,40 +491,36 @@ interface SidebarProps {
   'aria-hidden'?: boolean
 }
 
-const MORE_VIEW_IDS = new Set<ViewId>([
-  'inspector', 'project-map', 'tasks-manager', 'task', 'agents', 'memory-gov', 'workflow', 'video', 'feedback',
-])
-
 export function Sidebar({ onOpenSettings, 'aria-hidden': ariaHidden }: SidebarProps) {
-  const { path, tree, setProject, activeView, setActiveView, refreshProjectList } = useProject()
+  const { path, setProject, activeView, setActiveView, refreshProjectList } = useProject()
   const t = useT()
   const [showCreateClient, setShowCreateClient] = useState(false)
-  const [moreOpen, setMoreOpen] = useState(() => MORE_VIEW_IDS.has(activeView))
 
-  const PRIMARY_NAV: NavItem[] = [
-    { id: 'tasks',    label: t.sidebar.tasks,    icon: TasksIcon },
-    { id: 'journal',  label: t.sidebar.journal,  icon: JournalIcon },
+  const WORK_NAV: NavItem[] = [
     { id: 'plan',     label: t.sidebar.plan,     icon: PlanIcon },
+    { id: 'tasks',    label: t.sidebar.tasks,    icon: TasksIcon },
     { id: 'skills',   label: t.sidebar.skills,   icon: SkillsIcon },
-    { id: 'browser',  label: t.sidebar.browser,  icon: BrowserIcon },
-    { id: 'design',   label: t.sidebar.design,   icon: DesignIcon },
+    { id: 'workflow', label: t.sidebar.workflow, icon: WorkflowIcon },
   ]
 
-  const MORE_NAV: NavItem[] = [
+  const CONTROL_NAV: NavItem[] = [
+    { id: 'journal',  label: t.sidebar.journal,  icon: JournalIcon },
     { id: 'tasks-manager', label: t.sidebar.tasksManager, icon: TasksManagerIcon },
     { id: 'inspector', label: t.sidebar.inspector, icon: InspectorIcon },
-    { id: 'agents',   label: t.sidebar.agents,  icon: AgentsIcon },
-    { id: 'task',     label: t.sidebar.task,    icon: DevTaskIcon },
-    { id: 'project-map', label: t.sidebar.projectMap, icon: ProjectMapIcon },
-    { id: 'memory-gov', label: t.sidebar.memory, icon: MemoryIcon },
-    { id: 'workflow', label: t.sidebar.workflow, icon: WorkflowIcon },
-    { id: 'video',    label: t.sidebar.video,    icon: VideoIcon, badge: t.sidebar.soon },
-    { id: 'feedback', label: t.sidebar.feedback, icon: FeedbackIcon },
+    { id: 'agents',   label: t.sidebar.agents,   icon: AgentsIcon },
   ]
 
-  useEffect(() => {
-    if (MORE_VIEW_IDS.has(activeView)) setMoreOpen(true)
-  }, [activeView])
+  const PROJECT_NAV: NavItem[] = [
+    { id: 'project-map', label: t.sidebar.projectMap, icon: ProjectMapIcon },
+    { id: 'memory-gov', label: t.sidebar.memory, icon: MemoryIcon },
+    { id: 'files', label: t.sidebar.files, icon: FilesIcon },
+  ]
+
+  const TOOLS_NAV: NavItem[] = [
+    { id: 'browser',  label: t.sidebar.browser,  icon: BrowserIcon },
+    { id: 'design',   label: t.sidebar.design,   icon: DesignIcon },
+    { id: 'feedback', label: t.sidebar.feedback, icon: FeedbackIcon },
+  ]
 
   async function handleClientOpened(clientPath: string) {
     await setProject(clientPath)
@@ -415,48 +548,42 @@ export function Sidebar({ onOpenSettings, 'aria-hidden': ariaHidden }: SidebarPr
 
         {path && (
           <>
-            <ChatNavSection />
-            <div className="gg-nav">
-              {PRIMARY_NAV.map(item => (
-                <button
-                  key={item.id}
-                  className={`gg-nav-item ${activeView === item.id ? 'is-active' : ''}`}
-                  onClick={() => setActiveView(item.id)}
-                >
-                  <span className="gg-nav-icon">{item.icon}</span>
-                  <span className="gg-nav-label">{item.label}</span>
-                </button>
-              ))}
-              <button
-                type="button"
-                className={`gg-nav-item gg-nav-more-toggle ${moreOpen ? 'is-open' : ''}`}
-                onClick={() => setMoreOpen(v => !v)}
-                aria-expanded={moreOpen}
-              >
-                <span className="gg-nav-icon">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                    <circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                    <circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                  </svg>
-                </span>
-                <span className="gg-nav-label">{t.sidebar.more}</span>
-                <span className="gg-nav-caret">{moreOpen ? '▾' : '▸'}</span>
-              </button>
-              {moreOpen && MORE_NAV.map(item => (
-                <button
-                  key={item.id}
-                  className={`gg-nav-item is-nested ${activeView === item.id ? 'is-active' : ''} ${item.badge ? 'is-disabled' : ''}`}
-                  onClick={() => { if (!item.badge) setActiveView(item.id) }}
-                >
-                  <span className="gg-nav-icon">{item.icon}</span>
-                  <span className="gg-nav-label">{item.label}</span>
-                  {item.badge && <span className="gg-nav-badge">{item.badge}</span>}
-                </button>
-              ))}
-            </div>
+            <SidebarNavSection
+              sectionId="work"
+              title={t.sidebar.workSection}
+              activeView={activeView}
+              viewIds={WORK_VIEW_IDS}
+            >
+              <ChatNavSection />
+              <NavButtons items={WORK_NAV} activeView={activeView} onSelect={setActiveView} />
+            </SidebarNavSection>
 
-            <FilesSection tree={tree} />
+            <SidebarNavSection
+              sectionId="control"
+              title={t.sidebar.controlSection}
+              activeView={activeView}
+              viewIds={CONTROL_VIEW_IDS}
+            >
+              <NavButtons items={CONTROL_NAV} activeView={activeView} onSelect={setActiveView} />
+            </SidebarNavSection>
+
+            <SidebarNavSection
+              sectionId="project"
+              title={t.sidebar.projectSection}
+              activeView={activeView}
+              viewIds={PROJECT_VIEW_IDS}
+            >
+              <NavButtons items={PROJECT_NAV} activeView={activeView} onSelect={setActiveView} />
+            </SidebarNavSection>
+
+            <SidebarNavSection
+              sectionId="tools"
+              title={t.sidebar.toolsSection}
+              activeView={activeView}
+              viewIds={TOOLS_VIEW_IDS}
+            >
+              <NavButtons items={TOOLS_NAV} activeView={activeView} onSelect={setActiveView} />
+            </SidebarNavSection>
           </>
         )}
       </div>

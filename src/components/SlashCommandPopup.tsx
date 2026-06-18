@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSkills } from '../store/skillStore'
+import { HELP_SKILL_ID } from '../lib/help-scope'
 import type { UserCommand } from '../types/api'
 
 /**
@@ -35,9 +36,11 @@ interface Props {
   systemCommands?: SlashCommand[]
   /** Путь к текущему проекту (для загрузки project-scope команд). */
   projectPath?: string | null
+  /** Справка: только verstak-guide, без системных и пользовательских команд. */
+  helpScope?: boolean
 }
 
-export function SlashCommandPopup({ text, onClear, onInject, systemCommands = [], projectPath = null }: Props) {
+export function SlashCommandPopup({ text, onClear, onInject, systemCommands = [], projectPath = null, helpScope = false }: Props) {
   const skills = useSkills(s => s.skills)
   const setActiveSkill = useSkills(s => s.setActiveSkill)
   const [selectedIdx, setSelectedIdx] = useState(0)
@@ -49,18 +52,18 @@ export function SlashCommandPopup({ text, onClear, onInject, systemCommands = []
 
   // Загружаем команды когда popup открывается
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || helpScope) return
     window.api.commands.list(projectPath).then(cmds => {
       setUserCommands(cmds)
     }).catch(err => {
       console.error('[SlashCommandPopup] commands:list failed:', err)
     })
-  }, [isOpen, projectPath])
+  }, [isOpen, projectPath, helpScope])
 
   // Собрать все команды: skill slashes + user-commands + system
   const allCommands: SlashCommand[] = useMemo(() => {
     const skillCommands: SlashCommand[] = skills
-      .filter(s => s.slash)
+      .filter(s => s.slash && (!helpScope || s.id === HELP_SKILL_ID))
       .map(s => ({
         kind: 'skill' as const,
         skillId: s.id,
@@ -69,6 +72,7 @@ export function SlashCommandPopup({ text, onClear, onInject, systemCommands = []
         description: s.description,
         icon: s.icon
       }))
+    if (helpScope) return skillCommands
     const cmdCommands: SlashCommand[] = userCommands.map(cmd => ({
       kind: 'user-command' as const,
       command: cmd,
@@ -78,7 +82,7 @@ export function SlashCommandPopup({ text, onClear, onInject, systemCommands = []
       icon: cmd.scope === 'project' ? '📁' : '📝'
     }))
     return [...skillCommands, ...cmdCommands, ...systemCommands]
-  }, [skills, userCommands, systemCommands])
+  }, [skills, userCommands, systemCommands, helpScope])
 
   // Фильтр по введённому query
   const filtered = useMemo(() => {

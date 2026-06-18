@@ -16,7 +16,7 @@ export interface DependencyMapDTO {
 export interface Attachment { name: string; mimeType: string; data: string; size: number }
 export interface ChatMessage { role: 'user' | 'assistant' | 'system'; content: string; attachments?: Attachment[]; thinking?: string; createdAt?: number }
 export interface StoredChatMessage { id: number; role: 'user' | 'assistant' | 'system'; content: string; createdAt: number }
-export type ChatKind = 'main' | 'review'
+export type ChatKind = 'main' | 'review' | 'help'
 export interface ChatSession {
   id: number
   projectPath: string
@@ -168,10 +168,12 @@ declare global {
           body: string
           projectName?: string
           projectPath?: string
+          isHelp?: boolean
           isError?: boolean
         }) => Promise<boolean>
         playSound: (opts?: { isError?: boolean }) => Promise<boolean>
         onOpenProject: (cb: (projectPath: string) => void) => () => void
+        onOpenHelp: (cb: (projectPath?: string) => void) => () => void
       }
       voice: {
         status: () => Promise<{ ready: boolean; loading: boolean; label: string }>
@@ -224,7 +226,7 @@ declare global {
         sendWithOverrides: (
           messages: ChatMessage[],
           projectPath: string | null,
-          overrides: { providerId?: string; model?: string | null; noTools?: boolean; systemPrompt?: string; useReviewerPrompt?: boolean; effortLevel?: 'quick' | 'standard' | 'deep'; toolsAllow?: string[] },
+          overrides: { providerId?: string; model?: string | null; noTools?: boolean; systemPrompt?: string; useReviewerPrompt?: boolean; effortLevel?: 'quick' | 'standard' | 'deep'; toolsAllow?: string[]; agentMode?: 'ask' | 'accept-edits' | 'plan' | 'auto' | 'bypass' },
           chatId?: string
         ) => Promise<number>
         resolveWrite: (callId: string, accept: boolean, sendId?: number) => Promise<void>
@@ -250,6 +252,7 @@ declare global {
         rename: (id: number, title: string) => Promise<void>
         setModel: (id: number, providerId: string | null, model: string | null) => Promise<void>
         remove: (id: number) => Promise<void>
+        getOrCreateHelp: () => Promise<ChatSession>
       }
       chats: {
         list: (sessionId: number) => Promise<StoredChatMessage[]>
@@ -268,6 +271,7 @@ declare global {
       journal: {
         list: (projectPath: string, limit?: number) => Promise<JournalEntry[]>
         append: (projectPath: string, kind: JournalKind, title: string, detail?: string | null) => Promise<JournalEntry>
+        updateManual: (id: number, title: string, detail?: string | null) => Promise<JournalEntry | null>
         remove: (id: number) => Promise<void>
         clear: (projectPath: string) => Promise<number>
       }
@@ -429,14 +433,15 @@ declare global {
           htmlUrl: string
           publishedAt?: string
         }>>
-        check(): Promise<{ available: boolean; version?: string; error?: string; phase?: string; pendingRelease?: boolean; rateLimited?: boolean }>
-        getState(): Promise<{ phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }>
-        onState(cb: (data: { phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }) => void): () => void
+        check(): Promise<{ available: boolean; version?: string; installedVersion?: string; error?: string; errorCode?: string; rateLimitMinutes?: number; phase?: string; pendingRelease?: boolean }>
+        clearCache(): Promise<{ ok: boolean; available: boolean; version?: string; installedVersion?: string; error?: string; errorCode?: string; rateLimitMinutes?: number; phase?: string; pendingRelease?: boolean }>
+        getState(): Promise<{ phase: string; version?: string; percent?: number; error?: string; errorCode?: string; rateLimitMinutes?: number; pendingRelease?: boolean; installedVersion?: string; remoteVersion?: string }>
+        onState(cb: (data: { phase: string; version?: string; percent?: number; error?: string; errorCode?: string; rateLimitMinutes?: number; pendingRelease?: boolean }) => void): () => void
         onAvailable(cb: (data: { version: string; pendingRelease?: boolean }) => void): () => void
         onDownloaded(cb: (data: { version: string }) => void): () => void
         onProgress(cb: (data: { percent: number }) => void): () => void
         onNotAvailable(cb: () => void): () => void
-        onError(cb: (data: { error: string }) => void): () => void
+        onError(cb: (data: { error: string; errorCode?: string; rateLimitMinutes?: number }) => void): () => void
       }
       audit: {
         query(projectPath: string, opts?: { limit?: number; action?: string; since?: number }): Promise<AuditEntry[]>

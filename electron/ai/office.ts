@@ -9,6 +9,7 @@
  * exceljs — для xlsx (read/modify/write). mammoth — для docx→текст (уже в deps).
  */
 
+import { Buffer } from 'node:buffer'
 import { isForbiddenPath, scanText } from './secret-scanner'
 import { safeRealJoin } from './path-policy'
 
@@ -88,6 +89,21 @@ export async function readSpreadsheet(projectPath: string, relPath: string): Pro
   // Редактируем вывод через secret-scanner — в ячейках клиентских таблиц могут
   // лежать токены/ключи, которые иначе утекут в контекст модели.
   const scan = scanText(out.join('\n'))
+  return scan.hits.length > 0
+    ? `[secret-scanner: redacted ${scan.hits.join(', ')}]\n${scan.redacted}`
+    : scan.redacted
+}
+
+/** Извлечь текст из буфера .docx (вложения чата, не на диске). */
+export async function extractDocxTextFromBuffer(buf: Buffer): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const mammoth = require('mammoth') as {
+    extractRawText: (opts: { buffer: Buffer }) => Promise<{ value: string }>
+  }
+  const res = await mammoth.extractRawText({ buffer: buf })
+  const raw = res.value ?? ''
+  const text = raw.length > MAX_DOC_CHARS ? raw.slice(0, MAX_DOC_CHARS) + '\n…(документ обрезан)' : raw
+  const scan = scanText(text)
   return scan.hits.length > 0
     ? `[secret-scanner: redacted ${scan.hits.join(', ')}]\n${scan.redacted}`
     : scan.redacted

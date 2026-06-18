@@ -11,6 +11,7 @@ import {
 } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
+import { normalizeVersion } from './update-remote'
 
 export type PendingUpdateMeta = {
   fileName: string
@@ -38,6 +39,35 @@ export async function hashFileSha512Base64(filePath: string): Promise<string> {
     stream.on('error', reject)
     stream.on('end', () => resolve(hash.digest('base64')))
   })
+}
+
+function pendingInstallerVersion(fileName: string): string | null {
+  const match = fileName.match(/Verstak-Setup-(\d+\.\d+\.\d+)-/)
+  return match ? normalizeVersion(match[1]) : null
+}
+
+/** Сбрасывает pending, если на диске установщик другой версии (например 1.5.7 при цели 1.5.11). */
+export function clearPendingIfWrongVersion(targetVersion: string): void {
+  const infoPath = join(getPendingUpdateDir(), 'update-info.json')
+  if (!existsSync(infoPath)) return
+  try {
+    const meta = JSON.parse(readFileSync(infoPath, 'utf8')) as PendingUpdateMeta
+    const cachedVersion = meta.fileName ? pendingInstallerVersion(meta.fileName) : null
+    if (cachedVersion && cachedVersion !== normalizeVersion(targetVersion)) {
+      clearPendingUpdateCache()
+    }
+  } catch { /* ignore */ }
+}
+
+/** Полный сброс %LOCALAPPDATA%\\verstak-updater — чистый поиск при следующем запуске. */
+export function clearAllUpdaterCache(): void {
+  try {
+    const root = getUpdaterCacheRoot()
+    if (!existsSync(root)) return
+    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+  } catch (err) {
+    console.warn('[updater] clear all cache failed:', err)
+  }
 }
 
 /** Удаляет pending-установщик (петля «установить ту же версию»). */
@@ -93,9 +123,18 @@ export async function reconcileCachedDownload(
     try {
       const meta = JSON.parse(readFileSync(infoPath, 'utf8')) as PendingUpdateMeta
       const cached = join(pending, meta.fileName)
-      if (existsSync(cached)) {
-        const hash = await hashFileSha512Base64(cached)
-        if (hash === sha512) return cached
+      const versionMatches = !fileName || meta.fileName === fileName
+      if (existsSync(cached) && versionMatches) {
+        const size = statSync(cached).size
+        if (expectedSize > 0 && size !== expectedSize) {
+          /* broken pending — fall through */
+        } else if (!sha512 || meta.sha512 === sha512) {
+          // Уже валидный pending-кэш electron-updater — не перечитываем 250+ МБ на sha512.
+          return cached
+        } else {
+          const hash = await hashFileSha512Base64(cached)
+          if (hash === sha512) return cached
+        }
       }
     } catch { /* fall through */ }
   }
@@ -110,15 +149,18 @@ export async function reconcileCachedDownload(
   for (const source of candidates) {
     if (!existsSync(source)) continue
     if (expectedSize > 0 && statSync(source).size !== expectedSize) continue
-    const hash = await hashFileSha512Base64(source)
-    if (hash !== sha512) continue
+    if (sha512) {
+      const hash = await hashFileSha512Base64(source)
+      if (hash !== sha512) continue
+    }
 
     const target = join(pending, fileName)
     mkdirSync(pending, { recursive: true })
     if (source !== target) {
       copyFileSync(source, target)
     }
-    writePendingMeta(fileName, sha512)
+    const resolvedSha = sha512 || await hashFileSha512Base64(target)
+    writePendingMeta(fileName, resolvedSha)
     clearBrokenDifferentialCache()
     return target
   }

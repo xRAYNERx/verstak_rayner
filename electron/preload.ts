@@ -50,6 +50,7 @@ contextBridge.exposeInMainWorld('api', {
       body: string
       projectName?: string
       projectPath?: string
+      isHelp?: boolean
       isError?: boolean
     }) => ipcRenderer.invoke('notify:show', opts) as Promise<boolean>,
     playSound: (opts?: { isError?: boolean }) =>
@@ -58,6 +59,11 @@ contextBridge.exposeInMainWorld('api', {
       const handler = (_e: unknown, projectPath: string) => cb(projectPath)
       ipcRenderer.on('notify:open-project', handler)
       return () => { ipcRenderer.removeListener('notify:open-project', handler) }
+    },
+    onOpenHelp: (cb: (projectPath?: string) => void) => {
+      const handler = (_e: unknown, projectPath?: string) => cb(projectPath)
+      ipcRenderer.on('notify:open-help', handler)
+      return () => { ipcRenderer.removeListener('notify:open-help', handler) }
     }
   },
   voice: {
@@ -116,7 +122,7 @@ contextBridge.exposeInMainWorld('api', {
     sendWithOverrides: (
       messages: unknown[],
       projectPath: string | null,
-      overrides: { providerId?: string; model?: string | null; noTools?: boolean; systemPrompt?: string; useReviewerPrompt?: boolean; effortLevel?: 'quick' | 'standard' | 'deep'; toolsAllow?: string[] },
+      overrides: { providerId?: string; model?: string | null; noTools?: boolean; systemPrompt?: string; useReviewerPrompt?: boolean; effortLevel?: 'quick' | 'standard' | 'deep'; toolsAllow?: string[]; agentMode?: 'ask' | 'accept-edits' | 'plan' | 'auto' | 'bypass' },
       chatId?: string
     ) => ipcRenderer.invoke('ai:send', messages, projectPath, undefined, overrides, chatId),
     resolveWrite: (callId: string, accept: boolean, sendId?: number) =>
@@ -143,9 +149,10 @@ contextBridge.exposeInMainWorld('api', {
       title?: string
       providerId?: string | null
       model?: string | null
-      kind?: 'main' | 'review'
+      kind?: 'main' | 'review' | 'help'
       parentChatId?: number | null
     }) => ipcRenderer.invoke('chat-sessions:create', projectPath, opts),
+    getOrCreateHelp: () => ipcRenderer.invoke('chat-sessions:get-or-create-help'),
     rename: (id: number, title: string) => ipcRenderer.invoke('chat-sessions:rename', id, title),
     setModel: (id: number, providerId: string | null, model: string | null) =>
       ipcRenderer.invoke('chat-sessions:set-model', id, providerId, model),
@@ -171,6 +178,8 @@ contextBridge.exposeInMainWorld('api', {
     list: (projectPath: string, limit?: number) => ipcRenderer.invoke('journal:list', projectPath, limit),
     append: (projectPath: string, kind: string, title: string, detail?: string | null) =>
       ipcRenderer.invoke('journal:append', projectPath, kind, title, detail),
+    updateManual: (id: number, title: string, detail?: string | null) =>
+      ipcRenderer.invoke('journal:updateManual', id, title, detail),
     remove: (id: number) => ipcRenderer.invoke('journal:remove', id),
     clear: (projectPath: string) => ipcRenderer.invoke('journal:clear', projectPath)
   },
@@ -320,15 +329,44 @@ contextBridge.exposeInMainWorld('api', {
     getReleaseNotes: (opts?: { sinceVersion?: string; upToVersion?: string; version?: string; all?: boolean }) =>
       ipcRenderer.invoke('update:get-release-notes', opts ?? {}),
     check: () => ipcRenderer.invoke('update:check'),
+    clearCache: () => ipcRenderer.invoke('update:clear-cache') as Promise<{
+      ok: boolean
+      available: boolean
+      version?: string
+      installedVersion?: string
+      phase?: string
+      error?: string
+      pendingRelease?: boolean
+    }>,
     getState: () => ipcRenderer.invoke('update:get-state') as Promise<{
       phase: string
       version?: string
       percent?: number
       error?: string
+      errorCode?: string
+      rateLimitMinutes?: number
       pendingRelease?: boolean
+      installedVersion?: string
+      remoteVersion?: string
     }>,
-    onState: (cb: (data: { phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }) => void) => {
-      const handler = (_e: unknown, data: { phase: string; version?: string; percent?: number; error?: string; pendingRelease?: boolean }) => cb(data)
+    onState: (cb: (data: {
+      phase: string
+      version?: string
+      percent?: number
+      error?: string
+      errorCode?: string
+      rateLimitMinutes?: number
+      pendingRelease?: boolean
+    }) => void) => {
+      const handler = (_e: unknown, data: {
+        phase: string
+        version?: string
+        percent?: number
+        error?: string
+        errorCode?: string
+        rateLimitMinutes?: number
+        pendingRelease?: boolean
+      }) => cb(data)
       ipcRenderer.on('update:state', handler)
       return () => { ipcRenderer.off('update:state', handler) }
     },
@@ -352,8 +390,8 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.on('update:not-available', handler)
       return () => { ipcRenderer.off('update:not-available', handler) }
     },
-    onError: (cb: (data: { error: string }) => void) => {
-      const handler = (_e: unknown, data: { error: string }) => cb(data)
+    onError: (cb: (data: { error: string; errorCode?: string; rateLimitMinutes?: number }) => void) => {
+      const handler = (_e: unknown, data: { error: string; errorCode?: string; rateLimitMinutes?: number }) => cb(data)
       ipcRenderer.on('update:error', handler)
       return () => { ipcRenderer.off('update:error', handler) }
     },

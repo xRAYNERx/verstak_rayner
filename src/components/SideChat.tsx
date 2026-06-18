@@ -6,8 +6,9 @@ import { Markdown } from './Markdown'
 import { useT } from '../i18n'
 
 interface SideChatProps {
-  /** Dedicated side-chat session id (created lazily by App). */
-  sideChatId: number
+  /** Set after the first user message creates a chat session in the sidebar. */
+  sideChatId: number | null
+  onSessionCreated: (id: number) => void
   onClose: () => void
 }
 
@@ -25,14 +26,15 @@ function SideChatPanelIcon() {
  * Работает параллельно основному чату в том же окне: свой стрим
  * сообщений + свой composer.
  */
-export function SideChat({ sideChatId, onClose }: SideChatProps) {
+export function SideChat({ sideChatId, onSessionCreated, onClose }: SideChatProps) {
   const t = useT()
   const provider = useProvider()
   const patchChatSession = useProject(s => s.patchChatSession)
   const refreshChatSessions = useProject(s => s.refreshChatSessions)
-  const snapshot = useProject(s => s.chatSnapshots[sideChatId])
+  const snapshot = useProject(s => sideChatId != null ? s.chatSnapshots[sideChatId] : undefined)
   const path = useProject(s => s.path)
-  const messages = snapshot?.messages ?? []
+  const [draftMessages, setDraftMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([])
+  const messages = sideChatId != null ? (snapshot?.messages ?? []) : draftMessages
   const isStreaming = snapshot?.isStreaming ?? false
   const hasUserMessages = messages.some(m => m.role === 'user' && m.content.trim().length > 0)
 
@@ -51,6 +53,11 @@ export function SideChat({ sideChatId, onClose }: SideChatProps) {
   useEffect(() => {
     let cancelled = false
     void (async () => {
+      if (sideChatId == null) {
+        setSideProviderId(provider.id)
+        setSideModel(provider.model ?? null)
+        return
+      }
       await refreshChatSessions()
       if (cancelled) return
       const session = useProject.getState().chatSessions.find(c => c.id === sideChatId)
@@ -105,6 +112,7 @@ export function SideChat({ sideChatId, onClose }: SideChatProps) {
   const sideModelLabel = sideModel ?? sideProvider?.defaultModel ?? 'auto'
 
   async function persistSideModel(nextProviderId: string | null, nextModel: string | null) {
+    if (sideChatId == null) return
     try {
       await window.api.chatSessions.setModel(sideChatId, nextProviderId, nextModel)
       patchChatSession(sideChatId, { providerId: nextProviderId, model: nextModel })
@@ -124,6 +132,7 @@ export function SideChat({ sideChatId, onClose }: SideChatProps) {
   }
 
   useEffect(() => {
+    if (sideChatId == null) return
     let cancelled = false
     const store = useProject.getState()
     const snap = store.chatSnapshots[sideChatId]
@@ -149,36 +158,62 @@ export function SideChat({ sideChatId, onClose }: SideChatProps) {
   }
   useEffect(autoGrow, [input])
 
+  async function ensureSideChatSession(): Promise<number | null> {
+    if (sideChatId != null) return sideChatId
+    if (!path) return null
+    try {
+      const created = await window.api.chatSessions.create(path, {
+        title: 'Параллельный чат',
+        providerId: sideProviderId,
+        model: sideModel,
+      })
+      onSessionCreated(created.id)
+      await refreshChatSessions()
+      return created.id
+    } catch {
+      return null
+    }
+  }
+
   async function send() {
     const text = input.trim()
     if (!text || isStreaming) return
     setInput('')
+    const chatId = await ensureSideChatSession()
+    if (chatId == null) return
+
     const store = useProject.getState()
-    const history = (store.chatSnapshots[sideChatId]?.messages ?? [])
+    const priorMessages = store.chatSnapshots[chatId]?.messages ?? draftMessages
+    const isFirstUserMessage = !priorMessages.some(m => m.role === 'user' && m.content.trim())
+    const history = priorMessages
       .filter(m => m.content)
       .map(m => ({ role: m.role, content: m.content }))
     const userMsg = { role: 'user' as const, content: text }
-    store.pushUserToChatSnapshot(sideChatId, text)
+    setDraftMessages([])
+    store.pushUserToChatSnapshot(chatId, text)
     if (path) {
-      void window.api.chats.append(sideChatId, path, 'user', text).catch(() => {})
+      void window.api.chats.append(chatId, path, 'user', text).catch(() => {})
+    }
+    if (isFirstUserMessage) {
+      void store.autoTitleChatSession(chatId, text)
     }
     const sendId = await window.api.ai.sendWithOverrides(
       [...history, userMsg],
       path,
       { providerId: sideProviderId ?? undefined, model: sideModel },
-      String(sideChatId)
+      String(chatId)
     )
     sendIdRef.current = sendId
     if (sendId > 0) {
-      store.registerSendOwner(sendId, { kind: 'chat', chatId: sideChatId })
+      store.registerSendOwner(sendId, { kind: 'chat', chatId })
     } else {
-      store.applyEventToChat(sideChatId, { type: 'error', message: 'Провайдер недоступен' })
+      store.applyEventToChat(chatId, { type: 'error', message: 'Провайдер недоступен' })
     }
   }
 
   async function stop() {
     const id = sendIdRef.current
-    if (id == null) return
+    if (id == null || sideChatId == null) return
     await window.api.ai.stop(id).catch(() => {})
     useProject.getState().applyEventToChat(sideChatId, { type: 'done' })
     useProject.getState().forgetSendOwner(id)

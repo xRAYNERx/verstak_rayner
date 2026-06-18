@@ -2,6 +2,7 @@ export const UPDATE_OWNER = 'frolofpavel'
 export const UPDATE_REPO = 'verstak'
 
 const SEMVER_RE = /^v?(\d+\.\d+\.\d+)/
+const FETCH_TIMEOUT_MS = 15_000
 
 export function normalizeVersion(raw: string): string {
   const m = raw.trim().match(SEMVER_RE)
@@ -35,78 +36,163 @@ export function releaseFeedBase(version: string): string {
   return `https://github.com/${UPDATE_OWNER}/${UPDATE_REPO}/releases/download/v${normalizeVersion(version)}`
 }
 
-// GitHub API без авторизации = 60 запросов/час на IP. Частые проверки (старт +
-// каждые 4ч + error-handler + release-notes) исчерпывали лимит → 403 → апдейтер
-// «не видел» обновления. Детектим rate-limit и backoff'имся; версию берём из
-// raw package.json (CDN, не ест лимит API), API — только как fallback.
-let rateLimitedUntil = 0
-let versionCache: { version: string | null; at: number } | null = null
-const VERSION_CACHE_MS = 20 * 60 * 1000
-
-/** True, если GitHub API сейчас в rate-limit (для понятного сообщения в UI). */
-export function isGithubRateLimited(): boolean {
-  return Date.now() < rateLimitedUntil
+async function electronFetch(url: string, init?: RequestInit): Promise<Response> {
+  if (process.versions.electron) {
+    const { net } = await import('electron')
+    return net.fetch(url, init)
+  }
+  return fetch(url, init)
 }
 
-async function fetchJson<T>(url: string): Promise<T | null> {
-  if (isGithubRateLimited()) return null
+async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response | null> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   try {
-    const res = await fetch(url, {
-      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Verstak-Updater' },
-    })
-    // 403 + X-RateLimit-Remaining: 0 → лимит исчерпан, не дёргаем API до reset.
-    if ((res.status === 403 || res.status === 429) && res.headers.get('x-ratelimit-remaining') === '0') {
-      const reset = Number(res.headers.get('x-ratelimit-reset')) * 1000
-      rateLimitedUntil = Number.isFinite(reset) && reset > Date.now() ? reset : Date.now() + 30 * 60 * 1000
-      return null
-    }
-    if (!res.ok) return null
-    return await res.json() as T
+    return await electronFetch(url, { ...init, signal: controller.signal })
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+export type GithubRateLimitInfo = {
+  resetAt: number
+  retryAfterSec: number
+}
+
+export type RemoteVersionProbeResult = {
+  version: string | null
+  rateLimit: GithubRateLimitInfo | null
+}
+
+export function rateLimitWaitMinutes(info: GithubRateLimitInfo): number {
+  return Math.max(1, Math.ceil(info.retryAfterSec / 60))
+}
+
+export function mergeRateLimit(
+  a: GithubRateLimitInfo | null,
+  b: GithubRateLimitInfo | null,
+): GithubRateLimitInfo | null {
+  if (!a) return b
+  if (!b) return a
+  return a.resetAt >= b.resetAt ? a : b
+}
+
+/** 403/429 GitHub API + заголовки X-RateLimit-Reset / Retry-After. */
+export async function parseGithubRateLimit(res: Response): Promise<GithubRateLimitInfo | null> {
+  if (res.status !== 403 && res.status !== 429) return null
+
+  const remaining = res.headers.get('x-ratelimit-remaining')
+  const reset = res.headers.get('x-ratelimit-reset')
+  const retryAfter = res.headers.get('retry-after')
+
+  let isRateLimit = res.status === 429 || remaining === '0'
+  if (!isRateLimit) {
+    try {
+      const body = await res.clone().text()
+      isRateLimit = /rate limit/i.test(body)
+    } catch { /* ignore */ }
+  }
+  if (!isRateLimit) return null
+
+  const resetSec = reset ? Number(reset) : 0
+  const resetAt = resetSec > 0 ? resetSec * 1000 : Date.now() + 3600_000
+  const retryAfterSec = retryAfter
+    ? Math.max(60, Number(retryAfter) || 3600)
+    : Math.max(60, Math.ceil((resetAt - Date.now()) / 1000))
+
+  return { resetAt, retryAfterSec }
+}
+
+type FetchJsonResult<T> = { data: T | null; rateLimit: GithubRateLimitInfo | null }
+
+async function fetchJson<T>(url: string): Promise<FetchJsonResult<T>> {
+  const res = await fetchWithTimeout(url, {
+    headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Verstak-Updater' },
+  })
+  if (!res) return { data: null, rateLimit: null }
+  if (!res.ok) {
+    return { data: null, rateLimit: await parseGithubRateLimit(res) }
+  }
+  try {
+    return { data: await res.json() as T, rateLimit: null }
+  } catch {
+    return { data: null, rateLimit: null }
+  }
+}
+
+async function fetchPackageJsonVersion(): Promise<string | null> {
+  const res = await fetchWithTimeout(
+    `https://raw.githubusercontent.com/${UPDATE_OWNER}/${UPDATE_REPO}/main/package.json`,
+    { headers: { 'User-Agent': 'Verstak-Updater' } },
+  )
+  if (!res?.ok) return null
+  try {
+    const pkg = await res.json() as { version?: string }
+    return pkg.version ? normalizeVersion(pkg.version) : null
   } catch {
     return null
   }
 }
 
-async function fetchPackageJsonVersion(): Promise<string | null> {
+/** Без GitHub API — редирект releases/latest/download/latest.yml. */
+async function fetchVersionFromLatestYml(): Promise<string | null> {
+  const res = await fetchWithTimeout(
+    `https://github.com/${UPDATE_OWNER}/${UPDATE_REPO}/releases/latest/download/latest.yml`,
+    { headers: { 'User-Agent': 'Verstak-Updater' } },
+  )
+  if (!res?.ok) return null
   try {
-    const res = await fetch(
-      `https://raw.githubusercontent.com/${UPDATE_OWNER}/${UPDATE_REPO}/main/package.json`,
-      { headers: { 'User-Agent': 'Verstak-Updater' } },
-    )
-    if (res.ok) {
-      const pkg = await res.json() as { version?: string }
-      if (pkg.version) return normalizeVersion(pkg.version)
-    }
-  } catch { /* ignore */ }
-  return null
+    const yml = await res.text()
+    const versionMatch = yml.match(/^version:\s*(\S+)/m)
+    return versionMatch ? normalizeVersion(versionMatch[1]) : null
+  } catch {
+    return null
+  }
 }
 
-/**
- * Последняя версия. Источник №1 — raw package.json на main (CDN, НЕ ест лимит
- * GitHub API): package.json бампится вместе с релизом, поэтому отражает последнюю
- * версию. API (releases/latest) дёргаем только если raw не дал результат и мы не
- * в rate-limit. Результат кэшируется на 20 мин — частые проверки не палят лимит.
- */
-export async function fetchRemoteVersion(): Promise<string | null> {
-  if (versionCache && Date.now() - versionCache.at < VERSION_CACHE_MS) return versionCache.version
-
+async function fetchRemoteVersionOnce(): Promise<RemoteVersionProbeResult> {
   const candidates: string[] = []
+  let rateLimit: GithubRateLimitInfo | null = null
+
   const fromPkg = await fetchPackageJsonVersion()
   if (fromPkg) candidates.push(fromPkg)
 
-  // API — только как fallback, когда raw недоступен и лимит не исчерпан.
-  if (!fromPkg && !isGithubRateLimited()) {
-    const latestRelease = await fetchJson<{ tag_name?: string; name?: string }>(
-      `https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}/releases/latest`,
-    )
-    if (latestRelease?.tag_name || latestRelease?.name) {
-      candidates.push(normalizeVersion(latestRelease.tag_name || latestRelease.name || ''))
-    }
+  const fromYml = await fetchVersionFromLatestYml()
+  if (fromYml) candidates.push(fromYml)
+
+  const latestRelease = await fetchJson<{ tag_name?: string; name?: string }>(
+    `https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}/releases/latest`,
+  )
+  rateLimit = mergeRateLimit(rateLimit, latestRelease.rateLimit)
+  if (latestRelease.data?.tag_name || latestRelease.data?.name) {
+    candidates.push(normalizeVersion(latestRelease.data.tag_name || latestRelease.data.name || ''))
   }
 
+  const tags = await fetchJson<Array<{ name: string }>>(
+    `https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}/tags?per_page=30`,
+  )
+  rateLimit = mergeRateLimit(rateLimit, tags.rateLimit)
+  const fromTags = maxSemver((tags.data ?? []).map(t => t.name))
+  if (fromTags) candidates.push(fromTags)
+
   const version = maxSemver(candidates)
-  versionCache = { version, at: Date.now() }
-  return version
+  return { version, rateLimit: version ? null : rateLimit }
+}
+
+/** Последняя версия: max(package.json на main, latest.yml, GitHub API). */
+export async function fetchRemoteVersion(): Promise<RemoteVersionProbeResult> {
+  let rateLimit: GithubRateLimitInfo | null = null
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const probe = await fetchRemoteVersionOnce()
+    if (probe.version) return { version: probe.version, rateLimit: null }
+    rateLimit = mergeRateLimit(rateLimit, probe.rateLimit)
+    if (attempt < 2) {
+      await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)))
+    }
+  }
+  return { version: null, rateLimit }
 }
 
 /** electron-updater часто падает, если на GitHub ещё нет Release с latest.yml — это не сбой для пользователя. */
@@ -144,11 +230,11 @@ export function parseLatestYmlArtifact(yml: string, version: string): ReleaseArt
 }
 
 export async function fetchReleaseArtifactMeta(version: string): Promise<ReleaseArtifactMeta | null> {
+  const res = await fetchWithTimeout(`${releaseFeedBase(version)}/latest.yml`, {
+    headers: { 'User-Agent': 'Verstak-Updater' },
+  })
+  if (!res?.ok) return null
   try {
-    const res = await fetch(`${releaseFeedBase(version)}/latest.yml`, {
-      headers: { 'User-Agent': 'Verstak-Updater' },
-    })
-    if (!res.ok) return null
     const yml = await res.text()
     return parseLatestYmlArtifact(yml, version)
   } catch {
@@ -158,6 +244,60 @@ export async function fetchReleaseArtifactMeta(version: string): Promise<Release
 
 export async function releaseArtifactsReady(version: string): Promise<boolean> {
   return (await fetchReleaseArtifactMeta(version)) != null
+}
+
+/** Синхронная логика: что ставить, если в main уже новее, чем на Releases. */
+export function pickInstallableUpdate(params: {
+  installed: string
+  repoMax: string | null
+  latestRelease: string | null
+  hasArtifacts: (version: string) => boolean
+}): { installable: string | null; pendingVersion: string | null } {
+  const { installed, repoMax, latestRelease, hasArtifacts } = params
+
+  if (latestRelease && semverGt(latestRelease, installed) && hasArtifacts(latestRelease)) {
+    return { installable: latestRelease, pendingVersion: null }
+  }
+
+  if (repoMax && semverGt(repoMax, installed) && hasArtifacts(repoMax)) {
+    return { installable: repoMax, pendingVersion: null }
+  }
+
+  if (repoMax && semverGt(repoMax, installed)) {
+    return { installable: null, pendingVersion: repoMax }
+  }
+
+  return { installable: null, pendingVersion: null }
+}
+
+/** Версия для скачивания: latest.yml на Releases, даже если package.json на main впереди. */
+export async function resolveInstallableUpdate(
+  installedVersion: string,
+  repoMaxVersion: string | null,
+): Promise<{ installable: string | null; pendingVersion: string | null }> {
+  const latestRelease = await fetchVersionFromLatestYml()
+  const artifactCache = new Map<string, boolean>()
+
+  const hasArtifacts = async (version: string): Promise<boolean> => {
+    const key = normalizeVersion(version)
+    if (artifactCache.has(key)) return artifactCache.get(key)!
+    const ready = await releaseArtifactsReady(key)
+    artifactCache.set(key, ready)
+    return ready
+  }
+
+  if (latestRelease && semverGt(latestRelease, installedVersion) && await hasArtifacts(latestRelease)) {
+    return { installable: latestRelease, pendingVersion: null }
+  }
+
+  if (repoMaxVersion && semverGt(repoMaxVersion, installedVersion)) {
+    if (await hasArtifacts(repoMaxVersion)) {
+      return { installable: repoMaxVersion, pendingVersion: null }
+    }
+    return { installable: null, pendingVersion: repoMaxVersion }
+  }
+
+  return { installable: null, pendingVersion: null }
 }
 
 export type ReleaseNote = {
@@ -197,14 +337,14 @@ function mapRelease(data: GithubRelease): ReleaseNote | null {
 
 export async function fetchReleaseNote(version: string): Promise<ReleaseNote | null> {
   const tag = `v${normalizeVersion(version)}`
-  const data = await fetchJson<GithubRelease>(
+  const { data } = await fetchJson<GithubRelease>(
     `https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}/releases/tags/${tag}`,
   )
   return data ? mapRelease(data) : null
 }
 
 export async function fetchAllReleaseNotes(): Promise<ReleaseNote[]> {
-  const list = await fetchJson<GithubRelease[]>(
+  const { data: list } = await fetchJson<GithubRelease[]>(
     `https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}/releases?per_page=50`,
   )
   if (!list) return []

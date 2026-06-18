@@ -25,6 +25,9 @@ export function JournalView() {
   const [draftDetail, setDraftDetail] = useState('')
   const [filter, setFilter] = useState<KindFilter>('all')
   const [search, setSearch] = useState('')
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDetail, setEditDetail] = useState('')
 
   async function refresh() {
     if (!path) return
@@ -41,7 +44,6 @@ export function JournalView() {
     return true
   })
 
-  // Counts per kind for the filter chips
   const counts: Record<KindFilter, number> = { all: entries.length, manual: 0, session: 0, tool: 0, note: 0 }
   for (const e of entries) counts[e.kind]++
 
@@ -65,8 +67,32 @@ export function JournalView() {
   }
 
   async function remove(id: number) {
+    if (editingId === id) cancelEdit()
     await window.api.journal.remove(id)
     await refresh()
+  }
+
+  function startEdit(entry: JournalEntry) {
+    setEditingId(entry.id)
+    setEditTitle(entry.title)
+    setEditDetail(entry.detail ?? '')
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setEditTitle('')
+    setEditDetail('')
+  }
+
+  async function saveEdit() {
+    if (editingId == null) return
+    const title = editTitle.trim()
+    if (!title) return
+    const updated = await window.api.journal.updateManual(editingId, title, editDetail.trim() || null)
+    if (updated) {
+      cancelEdit()
+      await refresh()
+    }
   }
 
   return (
@@ -92,7 +118,7 @@ export function JournalView() {
         </div>
         <input
           className="gg-input gg-journal-search"
-          placeholder="Поиск по тексту…"
+          placeholder="Поиск…"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -128,16 +154,63 @@ export function JournalView() {
 
         <div className="gg-journal-list">
           {visible.map(e => (
-            <div key={e.id} className="gg-journal-entry">
+            <div key={e.id} className={`gg-journal-entry${editingId === e.id ? ' is-editing' : ''}`}>
               <div className="gg-journal-meta">
                 <span className="gg-journal-kind" style={{ color: KIND_COLOR[e.kind], borderColor: KIND_COLOR[e.kind] }}>
                   {KIND_LABEL[e.kind]}
                 </span>
                 <span className="gg-journal-time">{formatTime(e.createdAt)}</span>
-                <button className="gg-journal-remove" onClick={() => void remove(e.id)} title="Удалить">×</button>
+                {e.kind === 'manual' && editingId !== e.id && (
+                  <button
+                    className="gg-journal-edit"
+                    onClick={() => startEdit(e)}
+                    title="Редактировать"
+                    type="button"
+                  >
+                    ✎
+                  </button>
+                )}
+                <button className="gg-journal-remove" onClick={() => void remove(e.id)} title="Удалить" type="button">×</button>
               </div>
-              <div className="gg-journal-title">{e.title}</div>
-              {e.detail && <div className="gg-journal-detail-text">{e.detail}</div>}
+              {editingId === e.id ? (
+                <div className="gg-journal-edit-form">
+                  <input
+                    className="gg-input"
+                    value={editTitle}
+                    onChange={ev => setEditTitle(ev.target.value)}
+                    onKeyDown={ev => {
+                      if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); void saveEdit() }
+                      if (ev.key === 'Escape') cancelEdit()
+                    }}
+                    autoFocus
+                  />
+                  <textarea
+                    className="gg-input gg-journal-detail"
+                    value={editDetail}
+                    rows={2}
+                    onChange={ev => setEditDetail(ev.target.value)}
+                    onKeyDown={ev => { if (ev.key === 'Escape') cancelEdit() }}
+                  />
+                  <div className="gg-journal-edit-actions">
+                    <button
+                      className="gg-btn gg-btn-primary"
+                      type="button"
+                      onClick={() => void saveEdit()}
+                      disabled={!editTitle.trim()}
+                    >
+                      Сохранить
+                    </button>
+                    <button className="gg-btn gg-btn-ghost" type="button" onClick={cancelEdit}>
+                      Отмена
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="gg-journal-title">{e.title}</div>
+                  {e.detail && <div className="gg-journal-detail-text">{e.detail}</div>}
+                </>
+              )}
             </div>
           ))}
         </div>

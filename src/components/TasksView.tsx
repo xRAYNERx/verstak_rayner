@@ -15,7 +15,7 @@ export function TasksView() {
 
   useEffect(() => { void refresh() }, [path])
 
-  if (!path) return <EmptyState text="Открой проект чтобы видеть задачи" />
+  if (!path) return <EmptyState text="Открой проект чтобы видеть чек-лист" />
 
   async function add() {
     const text = input.trim()
@@ -46,7 +46,7 @@ export function TasksView() {
   return (
     <div className="gg-panel">
       <div className="gg-panel-header">
-        <h2 className="gg-panel-title">Задачи</h2>
+        <h2 className="gg-panel-title">Чеклист</h2>
         <div className="gg-panel-meta">
           {open.length} открытых · {done.length} закрытых
         </div>
@@ -67,7 +67,7 @@ export function TasksView() {
         </div>
 
         {tasks.length === 0 && (
-          <div className="gg-panel-empty">Задач ещё нет. Добавь первую — что нужно сделать в проекте.</div>
+          <div className="gg-panel-empty">Пунктов ещё нет. Добавь первый — что нужно сделать в проекте.</div>
         )}
 
         {open.length > 0 && (

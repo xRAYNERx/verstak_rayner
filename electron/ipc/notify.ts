@@ -64,6 +64,7 @@ export function registerNotifyIpc(getMainWindow: () => BrowserWindow | null, set
     body: string
     projectName?: string
     projectPath?: string
+    isHelp?: boolean
     isError?: boolean
   }) => {
     const title = (opts.title ?? 'Verstak').slice(0, 120)
@@ -76,6 +77,7 @@ export function registerNotifyIpc(getMainWindow: () => BrowserWindow | null, set
       body,
       projectName,
       projectPath,
+      isHelp: !!opts.isHelp,
       isError: !!opts.isError,
       theme: readTheme(settings)
     })

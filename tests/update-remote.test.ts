@@ -3,8 +3,12 @@ import {
   cleanReleaseBody,
   isBenignUpdaterError,
   maxSemver,
+  mergeRateLimit,
   normalizeVersion,
+  parseGithubRateLimit,
   parseLatestYmlArtifact,
+  pickInstallableUpdate,
+  rateLimitWaitMinutes,
   releaseFeedBase,
   semverGt,
 } from '../electron/update-remote'
@@ -38,6 +42,38 @@ describe('cleanReleaseBody', () => {
   })
 })
 
+describe('pickInstallableUpdate', () => {
+  it('prefers latest release when package.json on main is ahead', () => {
+    const result = pickInstallableUpdate({
+      installed: '1.5.5',
+      repoMax: '1.5.12',
+      latestRelease: '1.5.11',
+      hasArtifacts: (v) => v === '1.5.11',
+    })
+    expect(result).toEqual({ installable: '1.5.11', pendingVersion: null })
+  })
+
+  it('returns pending when repo is newer but no artifacts exist', () => {
+    const result = pickInstallableUpdate({
+      installed: '1.5.5',
+      repoMax: '1.5.12',
+      latestRelease: null,
+      hasArtifacts: () => false,
+    })
+    expect(result).toEqual({ installable: null, pendingVersion: '1.5.12' })
+  })
+
+  it('uses repo max when it has artifacts', () => {
+    const result = pickInstallableUpdate({
+      installed: '1.5.10',
+      repoMax: '1.5.11',
+      latestRelease: '1.5.11',
+      hasArtifacts: (v) => v === '1.5.11',
+    })
+    expect(result).toEqual({ installable: '1.5.11', pendingVersion: null })
+  })
+})
+
 describe('parseLatestYmlArtifact', () => {
   it('parses path, sha512 and size', () => {
     const yml = `version: 1.5.7
@@ -54,6 +90,43 @@ sha512: abc==
       sha512: 'abc==',
       size: 253272554,
     })
+  })
+})
+
+describe('parseGithubRateLimit', () => {
+  it('detects 403 rate limit from body and reset header', async () => {
+    const reset = Math.floor(Date.now() / 1000) + 3600
+    const res = new Response(
+      JSON.stringify({ message: 'API rate limit exceeded for 1.2.3.4' }),
+      { status: 403, headers: { 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': String(reset) } },
+    )
+    const info = await parseGithubRateLimit(res)
+    expect(info).not.toBeNull()
+    expect(info!.resetAt).toBe(reset * 1000)
+    expect(rateLimitWaitMinutes(info!)).toBeGreaterThan(0)
+  })
+
+  it('returns null for unrelated 403', async () => {
+    const res = new Response('Forbidden', { status: 403 })
+    expect(await parseGithubRateLimit(res)).toBeNull()
+  })
+
+  it('mergeRateLimit keeps later reset', () => {
+    const a = { resetAt: 1000, retryAfterSec: 60 }
+    const b = { resetAt: 5000, retryAfterSec: 120 }
+    expect(mergeRateLimit(a, b)?.resetAt).toBe(5000)
+  })
+})
+
+describe('fetchVersionFromLatestYml parsing', () => {
+  it('parses version line from latest.yml body', () => {
+    const yml = `version: 1.5.11
+files:
+  - url: Verstak-Setup-1.5.11-x64.exe
+path: Verstak-Setup-1.5.11-x64.exe
+`
+    const m = yml.match(/^version:\s*(\S+)/m)
+    expect(m?.[1]).toBe('1.5.11')
   })
 })
 
