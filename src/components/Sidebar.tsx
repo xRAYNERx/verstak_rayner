@@ -1,9 +1,22 @@
-import { useEffect, useState, type MouseEvent, type ReactElement } from 'react'
+import { useEffect, useRef, useState, type MouseEvent, type ReactElement } from 'react'
+import { createPortal } from 'react-dom'
 import { useProject, type ViewId } from '../store/projectStore'
 import { ModelPicker } from './ModelPicker'
 import { CreateClientModal } from './CreateClientModal'
 import { useT } from '../i18n'
 import type { FileNode } from '../types/api'
+
+type ChatContextMenuState = { x: number; y: number; id: number; title: string }
+
+const CHAT_MENU_W = 168
+const CHAT_MENU_H = 76
+
+function clampChatMenuPos(x: number, y: number): { left: number; top: number } {
+  const pad = 8
+  const maxX = Math.max(pad, window.innerWidth - CHAT_MENU_W - pad)
+  const maxY = Math.max(pad, window.innerHeight - CHAT_MENU_H - pad)
+  return { left: Math.min(Math.max(pad, x), maxX), top: Math.min(Math.max(pad, y), maxY) }
+}
 
 function ChatNavSection() {
   const t = useT()
@@ -11,7 +24,8 @@ function ChatNavSection() {
   const [open, setOpen] = useState(true)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editTitle, setEditTitle] = useState('')
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; id: number; title: string } | null>(null)
+  const [contextMenu, setContextMenu] = useState<ChatContextMenuState | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
 
   const isActiveSection = activeView === 'chat'
 
@@ -19,10 +33,18 @@ function ChatNavSection() {
     if (!contextMenu) return
     const close = () => setContextMenu(null)
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
-    window.addEventListener('mousedown', close)
+    const onPointerDown = (e: PointerEvent) => {
+      if (menuRef.current?.contains(e.target as Node)) return
+      close()
+    }
+    // Откладываем listener — иначе тот же ПКМ, что открыл меню, сразу его закрывает.
+    const timer = window.setTimeout(() => {
+      window.addEventListener('pointerdown', onPointerDown, true)
+    }, 0)
     window.addEventListener('keydown', onKey)
     return () => {
-      window.removeEventListener('mousedown', close)
+      window.clearTimeout(timer)
+      window.removeEventListener('pointerdown', onPointerDown, true)
       window.removeEventListener('keydown', onKey)
     }
   }, [contextMenu])
@@ -125,6 +147,7 @@ function ChatNavSection() {
                   className="gg-chat-nav-pick"
                   onClick={() => { void switchChatSession(s.id); setActiveView('chat') }}
                   onDoubleClick={() => void startEdit(s.id, s.title)}
+                  onContextMenu={(e) => openContextMenu(e, s.id, s.title)}
                   title={s.title}
                 >
                   <span className={`gg-chat-nav-dot ${chatSnapshots[s.id]?.isStreaming ? 'is-streaming' : chatSnapshots[s.id]?.hasUnread ? 'is-unread' : ''}`} />
@@ -139,18 +162,20 @@ function ChatNavSection() {
               <button
                 className="gg-chat-nav-x"
                 onClick={() => void removeSession(s.id, s.title)}
+                onContextMenu={(e) => openContextMenu(e, s.id, s.title)}
                 title={t.sidebar.delete}
               >×</button>
             </div>
           ))}
         </div>
       )}
-      {contextMenu && (
+      {contextMenu && typeof document !== 'undefined' && createPortal(
         <div
+          ref={menuRef}
           className="gg-chat-nav-menu"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+          style={clampChatMenuPos(contextMenu.x, contextMenu.y)}
           role="menu"
-          onMouseDown={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.preventDefault()}
         >
           <button
             type="button"
@@ -176,7 +201,8 @@ function ChatNavSection() {
           >
             {t.sidebar.delete}
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   )

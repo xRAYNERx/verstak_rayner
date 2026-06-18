@@ -1952,7 +1952,7 @@ html {
 }
 .gg-chat-nav-menu {
   position: fixed;
-  z-index: 120;
+  z-index: 1205;
   min-width: 168px;
   padding: 4px;
   background: var(--bg-elevated);
