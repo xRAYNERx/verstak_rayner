@@ -78,7 +78,7 @@ export interface ToolContext {
   signal: AbortSignal
   projectPath: string
   tools: FileTools
-  recordWrite: (projectPath: string, filePath: string, before: string, after: string) => void
+  recordWrite: (projectPath: string, filePath: string, before: string | null, after: string) => void
   recordPlan: (projectPath: string, title: string, steps: Array<{ title: string; detail?: string | null }>) => { id: number }
   recordJournal: (projectPath: string, kind: 'tool' | 'session' | 'note', title: string, detail?: string | null) => void
   /** Read recent journal entries — used by the `read_journal` AI tool for self-reflection. */
@@ -348,9 +348,14 @@ async function diffConfirmWrite(call: ToolCall, ctx: ToolContext, path: string, 
   if (!accepted) {
     return { id: call.id, name: call.name, result: `User rejected write to ${path}`, error: 'User rejected' }
   }
+  // Существовал ли файл ДО записи: для undo важно отличать «файла не было»
+  // (revert → unlink) от «был, но пустой» (revert → восстановить пустым). Иначе
+  // before='' для существующего пустого файла трактовался как «не было» и revert
+  // удалял его (B4). null = не существовал, '' = существовал пустым.
+  const existedBefore = existsSync(join(ctx.projectPath, path))
   try {
     await ctx.tools.execute('write_file', { path, content: after })
-    try { ctx.recordWrite(ctx.projectPath, path, before, after) } catch { /* undo not critical */ }
+    try { ctx.recordWrite(ctx.projectPath, path, existedBefore ? before : null, after) } catch { /* undo not critical */ }
     // Incremental project map update — mark file dirty instead of full rebuild
     markFileDirty(ctx.projectPath, join(ctx.projectPath, path))
     // Timeline задачи (Фаза 4): принятая запись файла. ref/label = путь (панель

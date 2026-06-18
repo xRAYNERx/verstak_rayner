@@ -36,13 +36,23 @@ describe('revertToCheckpoint (safety-критичный откат)', () => {
     expect(readFileSync(join(dir, 'a.txt'), 'utf8')).toBe('original')
   })
 
-  it('удаляет новый файл (beforeContent=пусто → unlink)', async () => {
-    // Новый файл в реальном API пушится с before='' → revert трактует как unlink.
+  it('удаляет новый файл (beforeContent=null → unlink)', async () => {
+    // Новый файл в реальном API пушится с before=null → revert удаляет.
     writeFileSync(join(dir, 'new.txt'), 'content')
-    stack.push(dir, 'new.txt', '', 'content')
+    stack.push(dir, 'new.txt', null, 'content')
     const res = await revertToCheckpoint(stack, dir, 0)
     expect(res.ok).toBe(true)
     expect(existsSync(join(dir, 'new.txt'))).toBe(false)
+  })
+
+  // B4: существовавший ПУСТОЙ файл (before='') раньше удалялся (конфликт с «не было»).
+  it('восстанавливает существовавший пустой файл (before="") вместо удаления', async () => {
+    writeFileSync(join(dir, 'empty.txt'), 'now has content')
+    stack.push(dir, 'empty.txt', '', 'now has content')
+    const res = await revertToCheckpoint(stack, dir, 0)
+    expect(res.ok).toBe(true)
+    expect(existsSync(join(dir, 'empty.txt'))).toBe(true)            // НЕ удалён
+    expect(readFileSync(join(dir, 'empty.txt'), 'utf8')).toBe('')    // восстановлен пустым
   })
 
   it('чекпоинт-гард: правки до checkpointId не откатываются', async () => {

@@ -39,7 +39,9 @@ export async function revertToCheckpoint(
     try {
       const abs = await safeRealJoin(projectPath, popped.filePath)
       const before = popped.beforeContent
-      if (before === null || before === '') {
+      // null = файла не было до записи → удаляем. Пустой существовавший файл
+      // (before='') идёт в else и восстанавливается, а не удаляется (B4).
+      if (before === null) {
         try {
           await stat(abs)
           await unlink(abs)
@@ -113,8 +115,9 @@ export function registerUndoIpc(stack: UndoStack): void {
       // ai-tools and files.ts — no third path-policy drift.
       const abs = await safeRealJoin(projectPath, entry.filePath)
       const before = entry.beforeContent
-      if (before === null || before === '') {
-        // The file did not exist before — attempting to remove it now.
+      // null = файла не было до записи → удаляем. Пустой существовавший файл
+      // (before='') восстанавливается в else, а не удаляется (B4).
+      if (before === null) {
         try {
           await stat(abs)
           await unlink(abs)

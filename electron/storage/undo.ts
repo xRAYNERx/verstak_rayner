@@ -9,7 +9,7 @@ export interface UndoEntry {
 }
 
 export interface UndoStack {
-  push: (projectPath: string, filePath: string, before: string, after: string) => UndoEntry
+  push: (projectPath: string, filePath: string, before: string | null, after: string) => UndoEntry
   list: (projectPath: string) => UndoEntry[]
   pop: (id: number) => UndoEntry | null
   clear: (projectPath: string) => number

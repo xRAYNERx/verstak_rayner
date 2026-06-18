@@ -34,7 +34,7 @@ interface AiDeps {
   /** Корни зарегистрированных проектов — для валидации projectPath из рендерера. */
   getKnownRoots: () => string[]
   /** Persist a write so the user can ↶ revert it later. */
-  recordWrite: (projectPath: string, filePath: string, before: string, after: string) => void
+  recordWrite: (projectPath: string, filePath: string, before: string | null, after: string) => void
   /** Fetch the N most recent accepted writes for the Context Pack. */
   recentWrites: (projectPath: string, limit: number) => Array<{ filePath: string; createdAt: number }>
   /** Persist a plan emitted by the AI. */
@@ -1022,7 +1022,7 @@ async function runApiConversation(
   projectPath: string,
   initialMessages: ChatMessage[],
   signal: AbortSignal,
-  recordWrite: (projectPath: string, filePath: string, before: string, after: string) => void,
+  recordWrite: (projectPath: string, filePath: string, before: string | null, after: string) => void,
   recordPlan: (projectPath: string, title: string, steps: Array<{ title: string; detail?: string | null }>) => { id: number },
   recordJournal: (projectPath: string, kind: 'tool' | 'session' | 'note', title: string, detail?: string | null) => void,
   readJournal: (projectPath: string, limit: number) => Array<{ kind: string; title: string; detail: string | null; createdAt: number }>,
