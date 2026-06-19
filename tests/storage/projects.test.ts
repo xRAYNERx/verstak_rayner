@@ -24,6 +24,41 @@ describe('projects', () => {
     expect(projects.list()).toEqual([])
   })
 
+  it('миграция 23: projects имеет kind + remote_json', () => {
+    db = openDb(join(dir, 't.db'))
+    const cols = (db.prepare('PRAGMA table_info(projects)').all() as Array<{ name: string }>).map(c => c.name)
+    expect(cols).toContain('kind')
+    expect(cols).toContain('remote_json')
+  })
+
+  it('upsert → local-проект (kind=local, remote=null)', () => {
+    db = openDb(join(dir, 't.db'))
+    const p = createProjects(db).upsert('C:\\proj')
+    expect(p.kind).toBe('local')
+    expect(p.remote).toBeNull()
+  })
+
+  it('createRemote ssh-live → kind=ssh + remote разобран обратно', () => {
+    db = openDb(join(dir, 't.db'))
+    const projects = createProjects(db)
+    const remote = { kind: 'ssh' as const, user: 'root', host: 'agi-iri.ru', remotePath: '/var/www/agi-iri.ru', name: 'agi-iri.ru' }
+    const created = projects.createRemote('ssh://root@agi-iri.ru/var/www/agi-iri.ru', 'ssh', remote)
+    expect(created.kind).toBe('ssh')
+    expect(created.name).toBe('agi-iri.ru')
+    expect(created.remote).toEqual(remote)
+    // переживает round-trip через list()
+    const fromList = projects.list().find(p => p.kind === 'ssh')
+    expect(fromList?.remote).toEqual(remote)
+  })
+
+  it('createRemote git → kind=git + cloneUrl', () => {
+    db = openDb(join(dir, 't.db'))
+    const remote = { kind: 'git' as const, cloneUrl: 'https://github.com/owner/repo', name: 'repo' }
+    const p = createProjects(db).createRemote('/home/.verstak/projects/repo', 'git', remote)
+    expect(p.kind).toBe('git')
+    expect(p.remote).toEqual(remote)
+  })
+
   it('upsert creates then touch updates lastOpenedAt', () => {
     db = openDb(join(dir, 't.db'))
     const projects = createProjects(db)

@@ -44,6 +44,13 @@ export interface WorkflowRunState { workflowId: string; status: 'pending' | 'run
 /** Результат workflows:start — готовый промпт + созданный план + состояние прогона. */
 export interface WorkflowStartResult { prompt: string; planId: number; runState: WorkflowRunState }
 export interface FeedbackEntry { id: number; projectPath: string | null; providerId: string | null; rating: number | null; message: string; createdAt: number }
+/** Источник проекта: local — папка; git — клон репо; ssh — файлы на сервере (live). */
+export type ProjectKind = 'local' | 'git' | 'ssh'
+/** Удалённый источник (зеркало electron/projects/remote-source.ts). */
+export type RemoteSource =
+  | { kind: 'git'; cloneUrl: string; name: string }
+  | { kind: 'ssh'; user: string | null; host: string; remotePath: string; name: string }
+
 export interface ProjectMeta {
   path: string
   name: string
@@ -51,6 +58,8 @@ export interface ProjectMeta {
   iconPath: string | null
   lastOpenedAt: number
   hidden: boolean
+  kind: ProjectKind
+  remote: RemoteSource | null
 }
 
 export interface ProjectGroup {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseRemoteSource, isRemoteSource } from '../../electron/projects/remote-source'
+import { parseRemoteSource, isRemoteSource, remoteProjectPath, type RemoteSource } from '../../electron/projects/remote-source'
 
 describe('parseRemoteSource', () => {
   it('https GitHub → git clone', () => {
@@ -51,5 +51,14 @@ describe('parseRemoteSource', () => {
     expect(isRemoteSource(parseRemoteSource(''))).toBe(false)
     expect(isRemoteSource(parseRemoteSource('просто текст'))).toBe(false)
     expect(isRemoteSource(parseRemoteSource('https://github.com/'))).toBe(false)
+  })
+
+  it('remoteProjectPath: git → папка клона, ssh → ssh:// id', () => {
+    const git: RemoteSource = { kind: 'git', cloneUrl: 'x', name: 'verstak' }
+    expect(remoteProjectPath(git, '/home/.verstak/projects')).toBe('/home/.verstak/projects/verstak')
+    const ssh: RemoteSource = { kind: 'ssh', user: 'root', host: 'agi-iri.ru', remotePath: '/var/www/agi-iri.ru', name: 'agi-iri.ru' }
+    expect(remoteProjectPath(ssh, '/x')).toBe('ssh://root@agi-iri.ru/var/www/agi-iri.ru')
+    const sshNoUser: RemoteSource = { kind: 'ssh', user: null, host: 'srv', remotePath: '~/site', name: 'site' }
+    expect(remoteProjectPath(sshNoUser, '/x')).toBe('ssh://srv/~/site')
   })
 })

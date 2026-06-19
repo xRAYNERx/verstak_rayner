@@ -65,3 +65,21 @@ export function parseRemoteSource(input: string): RemoteSource | RemoteSourceErr
 export function isRemoteSource(r: RemoteSource | RemoteSourceError): r is RemoteSource {
   return !('error' in r)
 }
+
+/**
+ * Стабильный project_path (он же id) для источника:
+ *  - git → локальная папка клона `<cloneBaseDir>/<name>` (там работаем);
+ *  - ssh → синтетический id `ssh://[user@]host/remotePath` (локального пути нет,
+ *    файлы живут на сервере; tool-слой по этому id роутится на ssh-backend).
+ * cloneBaseDir передаётся снаружи (обычно ~/.verstak/projects) — для тестируемости.
+ */
+export function remoteProjectPath(source: RemoteSource, cloneBaseDir: string): string {
+  if (source.kind === 'git') {
+    const base = cloneBaseDir.replace(/[\\/]+$/, '')
+    const sep = base.includes('\\') ? '\\' : '/'
+    return `${base}${sep}${source.name}`
+  }
+  const userPart = source.user ? `${source.user}@` : ''
+  const path = source.remotePath.startsWith('/') ? source.remotePath : `/${source.remotePath}`
+  return `ssh://${userPart}${source.host}${path}`
+}

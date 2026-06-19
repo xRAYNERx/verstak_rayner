@@ -571,6 +571,19 @@ const MIGRATIONS: Array<{ version: number; description: string; run: (db: DB) =>
         CREATE INDEX IF NOT EXISTS idx_pipeline_runs_project ON pipeline_runs(project_path);
       `)
     }
+  },
+  {
+    version: 23,
+    description: 'projects.kind + remote_json — удалённые проекты (git-клон / ssh-live)',
+    run: (db: DB) => {
+      const cols = (db.prepare('PRAGMA table_info(projects)').all() as Array<{ name: string }>).map(c => c.name)
+      if (!cols.includes('kind')) {
+        db.exec("ALTER TABLE projects ADD COLUMN kind TEXT NOT NULL DEFAULT 'local'")
+      }
+      if (!cols.includes('remote_json')) {
+        db.exec('ALTER TABLE projects ADD COLUMN remote_json TEXT')
+      }
+    }
   }
 ]
 
