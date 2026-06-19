@@ -694,8 +694,8 @@ html {
   border: 2px solid color-mix(in srgb, var(--border-default) 80%, transparent);
   font-family: var(--font-mono);
   font-size: 16px;
-  font-weight: 700;
-  color: rgba(0, 0, 0, 0.82);
+  font-weight: 600;
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;

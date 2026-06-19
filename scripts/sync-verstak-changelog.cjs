@@ -13,6 +13,66 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 // Rayner-запись: commit + deployed (+ treeVersion опционально). Старые — поле version.
 const ENTRIES = [
   {
+    deployed: '19.06.2026',
+    treeVersion: '1.5.15',
+    title: 'Обновления: whats-new, release notes, тихая установка без сбоев',
+    changes: [
+      'Окно «Что нового» после апдейта снова показывает список изменений (встроенный changelog + 1.5.16).',
+      'Вкладка «Обновления» — «Посмотреть описание» для текущей и доступной версии без GitHub API.',
+      'Кнопка «Установить»: Verstak закрывается, payload копируется тихо, приложение перезапускается.',
+      'Фикс ошибки ~9%: удаление stale app.asar.unpacked перед копированием файлов.',
+      'generate-official-changelog: учёт treeVersion; 7za.exe в ресурсах приложения.',
+    ],
+  },
+  {
+    version: '1.5.16',
+    build: '19.06.2026',
+    deployed: '19.06.2026',
+    title: 'Verstak 1.5.16 — Pipeline Brief→Proof',
+    changes: [
+      'Флагманский сценарий: задача с доказательством. Кнопка «Pipeline» в композере — бриф → план → выполнение → проверка → Proof Pack (HTML: diff + проверки + стоимость).',
+      'Баннер «Pipeline · N/5» — видно, на каком шаге.',
+      'Шаг Проверки читает реальный статус верификации, даёт дожать.',
+      'Только для API-провайдеров (полный контроль + Proof); на CLI кнопка подсказывает переключиться.',
+      'Новым пользователям — «Попробовать Pipeline» в онбординге с готовым примером.',
+      'Под капотом: миграция 22 (pipeline_runs), 33 теста на фичу.',
+    ],
+  },
+  {
+    deployed: '19.06.2026',
+    treeVersion: '1.5.15',
+    title: 'Тихое обновление в фоне (без мастера установщика)',
+    changes: [
+      'После скачивания — автоустановка: watchdog ждёт выход Verstak, тихо запускает Setup, перезапуск.',
+      'Setup: --silent --install-dir=… --restart (без окна мастера).',
+      'Фазы installing в UI; кнопка «Установить» — ускорить, если авто ещё не стартовало.',
+      'update-install.ts, updater.ts, installer/main.ts, silent-args.ts.'
+    ]
+  },
+  {
+    deployed: '19.06.2026',
+    treeVersion: '1.5.15',
+    title: 'Аватарки проектов — единый цвет (unified)',
+    changes: [
+      'Буквенные аватары одного цвета: bg-elevated/bg-overlay + border-default, text-secondary.',
+      'Переключатель AVATAR_LETTER_STYLE в project-avatar.ts: original | variant1 | unified.',
+      'original — яркие цвета; variant1 — приглушённый hue per-path; unified — текущий.',
+      'project-avatar.ts, тесты.'
+    ]
+  },
+  {
+    deployed: '19.06.2026',
+    treeVersion: '1.5.15',
+    title: 'Аватарки проектов — приглушённая палитра',
+    changes: [
+      'Буквенные аватары: фон color-mix 20% оттенка + bg-overlay, не яркая заливка.',
+      'Буква — text-secondary, рамка с лёгким hue; вес 600 вместо 700.',
+      'Палитра новых проектов — Nord (5e81ac, 88c0d0, a3be8c…), без кислотных цветов.',
+      'Старые проекты в БД тоже приглушаются при отрисовке — миграция не нужна.',
+      'project-avatar.ts, ProjectAvatar.tsx, projects.ts, layout.css.'
+    ]
+  },
+  {
     commit: '93a393d',
     deployed: '19.06.2026',
     treeVersion: '1.5.15',

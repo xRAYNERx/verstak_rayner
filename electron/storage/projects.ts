@@ -1,5 +1,6 @@
 import type { Database } from 'better-sqlite3'
 import { basename } from 'path'
+import { pickProjectColor } from '../../src/lib/project-avatar'
 import { sortProjectsByName } from '../../src/lib/project-sort'
 
 export interface ProjectMeta {
@@ -37,18 +38,6 @@ function mapRow(row: ProjectMeta & { icon_path?: string | null; hidden?: number 
   }
 }
 
-const PALETTE = ['#5b8dff', '#4ec9b0', '#c668ff', '#f0a500', '#f47174', '#7aa3ff', '#b04fc3', '#4ec986']
-
-/**
- * Stable per-path color: hash the project path so the same project always gets
- * the same accent across launches (and across machines if the path matches).
- */
-function pickColor(path: string): string {
-  let hash = 0
-  for (let i = 0; i < path.length; i++) hash = (hash * 31 + path.charCodeAt(i)) | 0
-  return PALETTE[Math.abs(hash) % PALETTE.length]
-}
-
 export function createProjects(db: Database): Projects {
   return {
     list() {
@@ -67,7 +56,7 @@ export function createProjects(db: Database): Projects {
         return mapRow(existing)
       }
       const name = basename(path) || path
-      const color = pickColor(path)
+      const color = pickProjectColor(path)
       // hidden задаём явно (а не полагаемся на DEFAULT 0 миграции) — ревью:
       // явное значение надёжнее при изменении дефолтов в будущем.
       db.prepare('INSERT INTO projects (path, name, color, icon_path, last_opened_at, hidden) VALUES (?, ?, ?, NULL, ?, 0)').run(path, name, color, now)

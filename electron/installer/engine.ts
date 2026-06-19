@@ -1,5 +1,12 @@
 import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from 'fs/promises'
 import { dirname, join, relative } from 'path'
+
+const STALE_UNPACKED = join('resources', 'app.asar.unpacked')
+
+async function removeStaleUnpacked(installDir: string): Promise<void> {
+  const unpacked = join(installDir, STALE_UNPACKED)
+  await rm(unpacked, { recursive: true, force: true }).catch(() => {})
+}
 import { homedir } from 'os'
 import type { InstallDefaults, InstallProgress, InstallResult } from './types'
 import { createShortcut, psQuote, runPowerShell, setUninstallRegistry } from './shell'
@@ -188,6 +195,7 @@ export async function runInstall(
 
     emit(onProgress, { phase: 'preparing' }, 0, 0, 0, 0, '')
 
+    await removeStaleUnpacked(normalized)
     await copyPayload(payloadRoot, normalized, onProgress)
 
     emit(onProgress, { phase: 'shortcuts' }, 0, 0, 0, 0, '')

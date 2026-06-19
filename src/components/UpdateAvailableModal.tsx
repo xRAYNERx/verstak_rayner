@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useT } from '../i18n'
 import { semverGt } from '../lib/semver'
 
-type ModalPhase = 'available' | 'pending' | 'downloading' | 'ready'
+type ModalPhase = 'available' | 'pending' | 'downloading' | 'ready' | 'installing'
 
 const RELEASES_URL = 'https://github.com/frolofpavel/verstak/releases'
 
@@ -38,6 +38,11 @@ export function UpdateAvailableModal() {
       percent?: number
       pendingRelease?: boolean
     }) => {
+      if (state.phase === 'installing' && state.version) {
+        showUpdate('installing', state.version)
+        setPercent(100)
+        return
+      }
       if (state.phase === 'downloaded' && state.version) {
         if (!isNewerThanInstalled(state.version)) return
         showUpdate('ready', state.version)
@@ -84,7 +89,9 @@ export function UpdateAvailableModal() {
   if (!visible || dismissed) return null
 
   const body =
-    phase === 'ready'
+    phase === 'installing'
+      ? t.updates.installingBar.replace('{version}', version)
+      : phase === 'ready'
       ? t.updates.availableReady.replace('{version}', version)
       : phase === 'downloading'
         ? t.updates.downloadingBar.replace('{version}', version).replace('{percent}', String(percent))
@@ -118,9 +125,14 @@ export function UpdateAvailableModal() {
           <button type="button" className="gg-btn gg-btn-ghost" onClick={() => setDismissed(true)}>
             {t.updates.later}
           </button>
-          {phase === 'ready' && (
-            <button type="button" className="gg-btn gg-btn-primary" onClick={() => void window.api.updater.install()}>
-              {t.updates.install}
+          {(phase === 'ready' || phase === 'installing') && (
+            <button
+              type="button"
+              className="gg-btn gg-btn-primary"
+              onClick={() => void window.api.updater.install()}
+              disabled={phase === 'installing'}
+            >
+              {phase === 'installing' ? '…' : t.updates.install}
             </button>
           )}
           {phase === 'pending' && (

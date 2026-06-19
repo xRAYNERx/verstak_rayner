@@ -3,7 +3,7 @@ import { useT } from '../i18n'
 import { semverGt } from '../lib/semver'
 import { formatUpdaterError } from '../lib/updater-error'
 
-type Phase = 'idle' | 'downloading' | 'ready' | 'error'
+type Phase = 'idle' | 'downloading' | 'ready' | 'installing' | 'error'
 
 interface Props {
   /** Развёрнут ли левый rail — влияет на подпись и ширину. */
@@ -42,7 +42,12 @@ export function UpdateNotification({ railExpanded }: Props) {
       errorCode?: string
       rateLimitMinutes?: number
     }) => {
-      if (state.phase === 'downloaded' && state.version && isNewer(state.version)) {
+      if (state.phase === 'installing' && state.version && isNewer(state.version)) {
+        setVersion(state.version)
+        setPhase('installing')
+        setPercent(100)
+        setError('')
+      } else if (state.phase === 'downloaded' && state.version && isNewer(state.version)) {
         setVersion(state.version)
         setPhase('ready')
         setPercent(100)
@@ -101,14 +106,20 @@ export function UpdateNotification({ railExpanded }: Props) {
   if (phase === 'idle') return null
 
   const title =
-    phase === 'ready'
-      ? t.updates.readyBar.replace('{version}', version)
-      : phase === 'error'
-        ? error
-        : t.updates.downloadingBar.replace('{version}', version).replace('{percent}', String(percent))
+    phase === 'installing'
+      ? t.updates.installingBar.replace('{version}', version)
+      : phase === 'ready'
+        ? t.updates.readyBar.replace('{version}', version)
+        : phase === 'error'
+          ? error
+          : t.updates.downloadingBar.replace('{version}', version).replace('{percent}', String(percent))
 
   const label =
-    phase === 'ready'
+    phase === 'installing'
+      ? (railExpanded
+        ? t.updates.installingBar.replace('{version}', version)
+        : '…')
+      : phase === 'ready'
       ? (railExpanded
         ? t.updates.readyBar.replace('{version}', version)
         : t.updates.railReadyShort)
@@ -136,6 +147,9 @@ export function UpdateNotification({ railExpanded }: Props) {
           >
             {railExpanded ? t.updates.install : '↵'}
           </button>
+        )}
+        {phase === 'installing' && (
+          <span className="gg-update-rail-install is-pending" aria-hidden>…</span>
         )}
       </div>
       {phase === 'downloading' && (

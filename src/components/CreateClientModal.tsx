@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useT } from '../i18n'
+import { pickProjectColor } from '../lib/project-avatar'
 import { ProjectAvatar } from './ProjectAvatar'
 import type { ProjectGroup, ProjectMeta } from '../types/api'
 
@@ -50,11 +51,14 @@ export function CreateClientModal({ onClose, onOpened, onGroupsChanged }: Create
     setFolderSlug(slugFromName(name))
   }, [name, slugTouched])
 
-  const previewProject = useMemo<Pick<ProjectMeta, 'name' | 'color' | 'iconPath'>>(() => ({
-    name: name.trim() || t.rail.createPreviewFallback,
-    color: '#5b8dff',
-    iconPath
-  }), [name, iconPath, t.rail.createPreviewFallback])
+  const previewProject = useMemo<Pick<ProjectMeta, 'name' | 'color' | 'iconPath'>>(() => {
+    const previewPath = folderSlug.trim() || name.trim() || 'preview'
+    return {
+      name: name.trim() || t.rail.createPreviewFallback,
+      color: pickProjectColor(previewPath),
+      iconPath
+    }
+  }, [name, folderSlug, iconPath, t.rail.createPreviewFallback])
 
   async function handleOpenExisting() {
     setBusy(true)

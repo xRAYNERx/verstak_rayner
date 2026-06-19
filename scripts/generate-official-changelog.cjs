@@ -40,33 +40,76 @@ function parseRuDate(s) {
   return `${yyyy}-${mm}-${dd}T12:00:00Z`
 }
 
-function entryToNote(entry) {
-  const version = entry.version || entry.treeVersion
-  if (!version) return null
-  const lines = [`### ${entry.title}`]
-  for (const change of entry.changes || []) {
-    lines.push(`- ${change}`)
-  }
-  const publishedAt = parseRuDate(entry.build || entry.deployed)
-  return {
-    version,
-    name: `Verstak ${version}`,
-    publishedAt,
-    body: lines.join('\n'),
-    htmlUrl: `https://github.com/frolofpavel/verstak/releases/tag/v${version}`,
-  }
+function normalizeVersion(raw) {
+  const m = String(raw || '').trim().match(/^v?(\d+\.\d+\.\d+)/)
+  return m ? m[1] : String(raw || '').trim().replace(/^v/, '')
 }
 
-const entries = loadEntries()
-const seen = new Set()
-const notes = []
-for (const entry of entries) {
-  if (!entry.version) continue
-  if (seen.has(entry.version)) continue
-  seen.add(entry.version)
-  const note = entryToNote(entry)
-  if (note) notes.push(note)
+function semverGt(a, b) {
+  const pa = normalizeVersion(a).split('.').map((n) => Number(n) || 0)
+  const pb = normalizeVersion(b).split('.').map((n) => Number(n) || 0)
+  const len = Math.max(pa.length, pb.length)
+  for (let i = 0; i < len; i++) {
+    const da = pa[i] ?? 0
+    const db = pb[i] ?? 0
+    if (da > db) return true
+    if (da < db) return false
+  }
+  return false
 }
+
+function entryVersion(entry) {
+  return entry.version || entry.treeVersion || null
+}
+
+function buildNoteBody(entries) {
+  const lines = []
+  for (const entry of entries) {
+    lines.push(`### ${entry.title}`)
+    for (const change of entry.changes || []) {
+      lines.push(`- ${change}`)
+    }
+  }
+  return lines.join('\n')
+}
+
+function buildNotesFromEntries(entries) {
+  const byVersion = new Map()
+  for (const entry of entries) {
+    const version = entryVersion(entry)
+    if (!version) continue
+    const key = normalizeVersion(version)
+    if (!byVersion.has(key)) byVersion.set(key, [])
+    byVersion.get(key).push(entry)
+  }
+
+  const notes = []
+  for (const [version, group] of byVersion) {
+    const publishedAt = parseRuDate(
+      group.find((e) => e.build || e.deployed)?.build
+        || group.find((e) => e.build || e.deployed)?.deployed,
+    )
+    notes.push({
+      version,
+      name: `Verstak ${version}`,
+      publishedAt,
+      body: buildNoteBody(group),
+      htmlUrl: `https://github.com/frolofpavel/verstak/releases/tag/v${version}`,
+    })
+  }
+
+  notes.sort((a, b) => {
+    if (semverGt(a.version, b.version)) return -1
+    if (semverGt(b.version, a.version)) return 1
+    return 0
+  })
+  return notes
+}
+
+module.exports = { buildNotesFromEntries, entryVersion, normalizeVersion, semverGt }
+
+const entries = loadEntries()
+const notes = buildNotesFromEntries(entries)
 
 const header = `import type { ReleaseNote } from './update-remote'
 import { normalizeVersion, semverGt } from './update-remote'
