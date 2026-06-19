@@ -24,7 +24,8 @@
 - **Pipeline Brief→Proof** (флагман, спек D1→D10): storage(миграция 22)+IPC+store+UI, 33 теста → **1.5.16**.
 - **Merge Ильи:** дизайн (таймер ответа, markdown) + фикс установщика «9% install error / не скачивалась» → **1.5.17**.
 - **Релизы:** 1.5.13 → 1.5.17, все проверены на скачиваемость.
-- **Diagnostic Loop v2** (бэклог #1): авто-tsc после правок .ts/.tsx → ошибки в контекст агента (коммит 60edc11, в main, не зарелизено).
+- **Diagnostic Loop v2** (бэклог): авто-tsc после правок .ts/.tsx → ошибки в контекст агента (коммит 60edc11, в main, не зарелизено).
+- **RU Workflow Pack** (бэклог): добавлен Ozon+WB снимок — итого 5 RU-сценариев (цель ≥3 перевыполнена; доки 1.5.3 устарели). Коммит 349283e.
 
 ---
 
@@ -35,8 +36,8 @@
 | Приоритет | Задача | Эффект | Размер |
 |-----------|--------|--------|--------|
 | ✅ | ~~Diagnostic Loop v2~~ — СДЕЛАНО (60edc11) | — | — |
-| 🔥 1 | **RU Workflow Pack** — добить до ≥3 сценариев (есть 1: маркетинг-аудит). Нужны: Лиды Б24, Сверка 1С↔Sheets, Ozon/WB snapshot | монетизация Pro/Deploy | M |
-| 3 | **Agent Registry UI** (как Qwen `/agents`): роли explore/implement/review/ru-ops, параллельный запуск из композера | multi-agent без хаоса | M |
+| ✅ | ~~RU Workflow Pack~~ — СДЕЛАНО (5 сценариев, 349283e) | — | — |
+| 🔥 1 | **Agent Registry UI** (как Qwen `/agents`): роли explore/implement/review/ru-ops, параллельный запуск из композера | multi-agent без хаоса | M |
 | 4 | **Pipeline v1.1** — Agency-режим (через WorkflowsPanel) | hero для агентств | M |
 | 5 | **Proof Pack → PDF + «отправить в Telegram»** | B2B / agency sales | M |
 | 6 | **Remote Pulse** — TG-бот: статус run, approve write, stop, доставка Proof Pack | always-on контроль с телефона | L |
