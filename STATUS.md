@@ -26,6 +26,8 @@
 - **Релизы:** 1.5.13 → 1.5.17, все проверены на скачиваемость.
 - **Diagnostic Loop v2** (бэклог): авто-tsc после правок .ts/.tsx → ошибки в контекст агента (коммит 60edc11, в main, не зарелизено).
 - **RU Workflow Pack** (бэклог): добавлен Ozon+WB снимок — итого 5 RU-сценариев (цель ≥3 перевыполнена; доки 1.5.3 устарели). Коммит 349283e.
+- **Сортировка FilesView** (хвост): папки→файлы (sortFileTree). Коммит ce40ab7.
+- **Skill Capture** (бэклог): кнопка «⭐ В скилл» в AgentRunsPanel → скаффолд в ~/.verstak/skills/. Коммит 636d276 (UI-клик — 1 живая проверка).
 
 ---
 
@@ -37,11 +39,11 @@
 |-----------|--------|--------|--------|
 | ✅ | ~~Diagnostic Loop v2~~ — СДЕЛАНО (60edc11) | — | — |
 | ✅ | ~~RU Workflow Pack~~ — СДЕЛАНО (5 сценариев, 349283e) | — | — |
-| 🔥 1 | **Agent Registry UI** (как Qwen `/agents`): роли explore/implement/review/ru-ops, параллельный запуск из композера | multi-agent без хаоса | M |
-| 4 | **Pipeline v1.1** — Agency-режим (через WorkflowsPanel) | hero для агентств | M |
-| 5 | **Proof Pack → PDF + «отправить в Telegram»** | B2B / agency sales | M |
-| 6 | **Remote Pulse** — TG-бот: статус run, approve write, stop, доставка Proof Pack | always-on контроль с телефона | L |
-| 7 | **Skill Capture** — «сохранить успешный прогон как skill» (с human approve) | learning loop | M |
+| ✅ | ~~Skill Capture~~ — СДЕЛАНО (636d276) | — | — |
+| 🔴 нужна живая проверка | **Agent Registry UI** — инфра УЖЕ есть (AgentsPanel/MultiAgentPicker/role-tools); нужна UX-полировка + клик | multi-agent без хаоса | M |
+| 🔴 нужна живая проверка | **Pipeline v1.1** — Agency-режим (через WorkflowsPanel + баннер) | hero для агентств | M |
+| 🟠 Electron-coupled | **Proof Pack → PDF + Telegram** — printToPDF (нужен Electron) + отправка | B2B / agency sales | M |
+| 🟠 большая инфра | **Remote Pulse** — TG-бот: статус run, approve write, доставка Proof Pack | контроль с телефона | L |
 | — | Heatmap файлов в FilesView · DoD Commit Guard · mandatory DoD setting · deep-interview (Gajae) | разное | S–L |
 
 ---
