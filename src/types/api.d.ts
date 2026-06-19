@@ -134,6 +134,10 @@ declare global {
     api: {
       projects: {
         pick: () => Promise<string | null>
+        /** Добавить удалённый проект: https/git@…/repo (клон) или user@host:/path (ssh-live). */
+        addRemote: (input: string) => Promise<
+          { ok: true; path: string; meta: ProjectMeta } | { ok: false; error: string }
+        >
         create: (input: { name: string; folderSlug: string; iconSourcePath?: string | null }) => Promise<
           { ok: true; path: string; meta: ProjectMeta } | { ok: false; error: string }
         >

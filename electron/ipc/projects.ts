@@ -1,6 +1,9 @@
 import { app, dialog, ipcMain, BrowserWindow, shell } from 'electron'
-import { mkdirSync } from 'fs'
+import { mkdirSync, existsSync } from 'fs'
 import { join } from 'path'
+import { homedir } from 'os'
+import { spawn } from 'child_process'
+import { parseRemoteSource, isRemoteSource, remoteProjectPath } from '../projects/remote-source'
 import { setActiveProjectPath } from '../state/project-state'
 import { ensureUserLayer } from '../ai/user-layer'
 import { warmProjectMaps } from '../ai/project-map'
@@ -35,6 +38,18 @@ async function pickImageFile(win: BrowserWindow): Promise<string | null> {
   return result.filePaths[0]
 }
 
+/** Клонировать репозиторий через системный git. Полный клон (проект для
+ *  работы + push, не shallow). Возвращает ok | error со stderr-хвостом. */
+function gitClone(url: string, dest: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  return new Promise(resolve => {
+    const proc = spawn('git', ['clone', url, dest], { windowsHide: true })
+    let stderr = ''
+    proc.stderr.on('data', c => { if (stderr.length < 8192) stderr += c.toString('utf8') })
+    proc.on('error', err => resolve({ ok: false, error: err.message }))
+    proc.on('close', code => resolve(code === 0 ? { ok: true } : { ok: false, error: stderr.trim().slice(-400) || `exit ${code}` }))
+  })
+}
+
 export function registerProjectIpc(projects: Projects, projectGroups: ProjectGroups, db: Database): void {
   ipcMain.handle('projects:pick', async () => {
     const win = BrowserWindow.getFocusedWindow()
@@ -52,6 +67,34 @@ export function registerProjectIpc(projects: Projects, projectGroups: ProjectGro
     // ai:send и открытию панели Карта кэш был уже тёплым (non-blocking).
     void warmProjectMaps(picked).catch(() => { /* non-critical, фон */ })
     return picked
+  })
+
+  // Добавить удалённый проект: git-репо (клонируем локально) или ssh-сервер
+  // (регистрируем, файлы остаются на сервере — правки через ssh-backend, фаза B).
+  ipcMain.handle('projects:add-remote', async (_e, input: string): Promise<
+    { ok: true; path: string; meta: ProjectMeta } | { ok: false; error: string }
+  > => {
+    const source = parseRemoteSource(input)
+    if (!isRemoteSource(source)) return { ok: false, error: source.error }
+    const cloneBase = join(homedir(), '.verstak', 'projects')
+    const path = remoteProjectPath(source, cloneBase)
+
+    if (source.kind === 'git') {
+      if (existsSync(path)) return { ok: false, error: `Папка уже существует: ${path}. Удали её или открой как локальный проект.` }
+      mkdirSync(cloneBase, { recursive: true })
+      const cloned = await gitClone(source.cloneUrl, path)
+      if (!cloned.ok) return { ok: false, error: `git clone не удался: ${cloned.error}` }
+      const meta = projects.createRemote(path, 'git', source)
+      setActiveProjectPath(path)
+      void ensureUserLayer(path).catch(() => {})
+      void warmProjectMaps(path).catch(() => {})
+      return { ok: true, path, meta }
+    }
+
+    // ssh: файлы на сервере — регистрируем проект, локального клона нет.
+    const meta = projects.createRemote(path, 'ssh', source)
+    setActiveProjectPath(path)
+    return { ok: true, path, meta }
   })
 
   ipcMain.handle('projects:set-current', (_e, path: string | null) => {

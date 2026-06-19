@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 contextBridge.exposeInMainWorld('api', {
   projects: {
     pick: () => ipcRenderer.invoke('projects:pick'),
+    addRemote: (input: string) => ipcRenderer.invoke('projects:add-remote', input),
     create: (input: { name: string; folderSlug: string; iconSourcePath?: string | null }) =>
       ipcRenderer.invoke('projects:create', input),
     clientsRoot: () => ipcRenderer.invoke('projects:clients-root') as Promise<string>,
