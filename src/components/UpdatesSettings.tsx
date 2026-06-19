@@ -5,7 +5,7 @@ import { formatUpdaterError, type UpdaterErrorPayload } from '../lib/updater-err
 import { PastReleasesModal } from './PastReleasesModal'
 import { ReleaseNotesModal, type ReleaseNote } from './ReleaseNotesModal'
 
-type Status = 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'ready' | 'error' | 'pending'
+type Status = 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'ready' | 'installing' | 'error' | 'pending'
 
 type CheckResult = UpdaterErrorPayload & {
   available: boolean
@@ -57,6 +57,11 @@ export function UpdatesSettings() {
       setStatus('error')
       return
     }
+    if (result.phase === 'installing') {
+      if (result.version) setRemoteVersion(result.version)
+      setStatus('installing')
+      return
+    }
     if (result.phase === 'downloaded') {
       if (result.version) setRemoteVersion(result.version)
       setStatus('ready')
@@ -103,6 +108,10 @@ export function UpdatesSettings() {
         if (v) setRemoteVersion(v)
         setStatus('downloading')
         if (p != null) setPercent(p)
+        setError('')
+      } else if (phase === 'installing') {
+        if (v) setRemoteVersion(v)
+        setStatus('installing')
         setError('')
       } else if (phase === 'downloaded') {
         if (!isNewerThanInstalled(v)) {
@@ -196,17 +205,21 @@ export function UpdatesSettings() {
   const viewReleaseNotes = useCallback(async () => {
     setNotesLoading(true)
     try {
-      const targetVersion = remoteVersion && status !== 'current' && status !== 'idle'
+      const installed = version.replace(/^v/, '')
+      const targetVersion = remoteVersion && isNewerThanInstalled(remoteVersion)
         ? remoteVersion
-        : version.replace(/^v/, '')
-      const notes = await window.api.updater.getReleaseNotes({ version: targetVersion })
+        : installed
+      let notes = await window.api.updater.getReleaseNotes({ version: targetVersion })
+      if (notes.length === 0 && targetVersion !== installed) {
+        notes = await window.api.updater.getReleaseNotes({ version: installed })
+      }
       setReleaseNotes(notes)
-      setNotesTargetVersion(targetVersion)
+      setNotesTargetVersion(notes.length > 0 ? targetVersion : installed)
       setNotesOpen(true)
     } finally {
       setNotesLoading(false)
     }
-  }, [remoteVersion, status, version])
+  }, [isNewerThanInstalled, remoteVersion, version])
 
   const showCacheToast = useCallback((kind: 'ok' | 'err', text: string) => {
     if (cacheToastTimer.current) clearTimeout(cacheToastTimer.current)
@@ -325,6 +338,9 @@ export function UpdatesSettings() {
                 {t.settings.installUpdate}
               </button>
             </div>
+          )}
+          {status === 'installing' && remoteVersion && (
+            <span className="gg-settings-hint">{t.settings.updateInstalling.replace('{version}', remoteVersion)}</span>
           )}
           {status === 'error' && <span className="gg-settings-hint" style={{ color: 'var(--error)' }}>{error || t.settings.updateError}</span>}
         </div>

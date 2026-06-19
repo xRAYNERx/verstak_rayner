@@ -31,10 +31,15 @@ export function WhatsNewModal() {
 
         if (!semverGt(current, last)) return
 
-        const fetched = await window.api.updater.getReleaseNotes({
+        let fetched = await window.api.updater.getReleaseNotes({
           sinceVersion: last,
           upToVersion: current,
         })
+
+        if (fetched.length === 0) {
+          const currentNote = await window.api.updater.getReleaseNotes({ version: current })
+          if (currentNote.length > 0) fetched = currentNote
+        }
 
         if (fetched.length === 0) {
           await window.api.settings.setKey(LAST_WHATS_NEW_KEY, current)

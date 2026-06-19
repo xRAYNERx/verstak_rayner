@@ -28,6 +28,7 @@ function distinctiveBundle(tag: string): SessionSnapshot {
   return {
     messages: [{ role: 'assistant', content: `msg-${tag}` }] as ChatMessage[],
     isStreaming: true,
+    streamStartedAt: 1000,
     pendingWrites: [{ callId: `w-${tag}`, path: 'a.ts', before: '', after: 'x' }],
     pendingCommand: { callId: `c-${tag}`, command: `cmd-${tag}` },
     activity: [{ id: `act-${tag}`, kind: 'read', label: 'r', status: 'ok', timestamp: 1 }],

@@ -1,5 +1,6 @@
 import { join } from 'path'
 import { existsSync } from 'fs'
+import { resolvePayloadFromArchive, verifyPayloadRoot } from './payload-extract'
 
 const APP_FOLDER = 'Verstak'
 const EXE_NAME = 'Verstak.exe'
@@ -12,13 +13,27 @@ export function defaultInstallDir(): string {
 
 export function resolvePayloadRoot(): string {
   const dev = process.env.VERSTAK_INSTALLER_PAYLOAD
-  if (dev && existsSync(dev)) return dev
+  if (dev && existsSync(dev)) {
+    verifyPayloadRoot(dev)
+    return dev
+  }
+
+  const archive = join(process.resourcesPath, 'app-payload.7z')
+  if (existsSync(archive)) {
+    return resolvePayloadFromArchive(archive)
+  }
 
   const packaged = join(process.resourcesPath, 'app-payload')
-  if (existsSync(packaged)) return packaged
+  if (existsSync(packaged)) {
+    verifyPayloadRoot(packaged)
+    return packaged
+  }
 
   const sibling = join(process.cwd(), 'release', 'win-unpacked')
-  if (existsSync(sibling)) return sibling
+  if (existsSync(sibling)) {
+    verifyPayloadRoot(sibling)
+    return sibling
+  }
 
   throw new Error('Не найден архив приложения (app-payload). Пересоберите установщик.')
 }

@@ -3,6 +3,7 @@ import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { getInstallDefaults, launchInstalledApp, runInstall } from './engine'
+import { parseSilentInstallArgs } from './silent-args'
 import { dismissPortableSplash } from './shell'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -110,6 +111,22 @@ if (!gotLock) {
   })
 
   app.whenReady().then(() => {
+    const silentArgs = parseSilentInstallArgs(process.argv.slice(1))
+    if (silentArgs.silent && silentArgs.installDir) {
+      dismissPortableSplash()
+      void (async () => {
+        const result = await runInstall(silentArgs.installDir!, readAppVersion(), () => {})
+        if (!result.ok) {
+          console.error('[installer] silent update failed:', result.error)
+          app.exit(1)
+          return
+        }
+        if (silentArgs.restart) launchInstalledApp(result.installDir!)
+        app.exit(0)
+      })()
+      return
+    }
+
     dismissPortableSplash()
     createWindow()
 

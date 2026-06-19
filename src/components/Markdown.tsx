@@ -18,6 +18,7 @@ import rust from 'highlight.js/lib/languages/rust'
 import diffLang from 'highlight.js/lib/languages/diff'
 import shell from 'highlight.js/lib/languages/shell'
 import 'highlight.js/styles/github-dark.css'
+import { isMarkdownCodeBlock, markdownCodeLanguage } from '../lib/markdown-code'
 
 hljs.registerLanguage('javascript', javascript)
 hljs.registerLanguage('js', javascript)
@@ -48,25 +49,21 @@ interface CodeBlockProps {
   code: string
 }
 
-function CodeBlock({ language, code }: CodeBlockProps) {
-  const [copied, setCopied] = useState(false)
-
-  let highlighted = code
-  let usedLang = language
+function highlightForBlock(language: string, code: string): { html: string | null; label: string } {
   if (language && hljs.getLanguage(language)) {
     try {
-      const out = hljs.highlight(code, { language, ignoreIllegals: true })
-      highlighted = out.value
-    } catch { /* fallback to raw */ }
-  } else if (!language) {
-    try {
-      const auto = hljs.highlightAuto(code)
-      highlighted = auto.value
-      usedLang = auto.language || ''
-    } catch { /* fallback to raw */ }
+      return {
+        html: hljs.highlight(code, { language, ignoreIllegals: true }).value,
+        label: language
+      }
+    } catch { /* plain text below */ }
   }
+  return { html: null, label: language || 'text' }
+}
 
-  const isHtml = highlighted !== code
+function CodeBlock({ language, code }: CodeBlockProps) {
+  const [copied, setCopied] = useState(false)
+  const { html, label } = highlightForBlock(language, code)
 
   async function copy() {
     try {
@@ -79,10 +76,10 @@ function CodeBlock({ language, code }: CodeBlockProps) {
   return (
     <div className="gg-code-block">
       <div className="gg-code-header">
-        <span>{usedLang || 'text'}</span>
-        <button className="gg-code-copy" onClick={copy}>{copied ? 'скопировано' : 'копировать'}</button>
+        <span>{label}</span>
+        <button type="button" className="gg-code-copy" onClick={copy}>{copied ? 'скопировано' : 'копировать'}</button>
       </div>
-      <pre><code className="hljs" dangerouslySetInnerHTML={isHtml ? { __html: highlighted } : undefined}>{isHtml ? undefined : code}</code></pre>
+      <pre><code className={html ? 'hljs' : undefined}>{html ? <span dangerouslySetInnerHTML={{ __html: html }} /> : code}</code></pre>
     </div>
   )
 }
@@ -101,11 +98,11 @@ export const Markdown = memo(function Markdown({ text }: MarkdownProps) {
         components={{
           code(props) {
             const { className, children } = props
-            const inline = !className
-            if (inline) return <code>{children}</code>
-            const language = (className ?? '').replace(/^language-/, '')
             const code = String(children).replace(/\n$/, '')
-            return <CodeBlockMemo language={language} code={code} />
+            if (!isMarkdownCodeBlock(className, code)) {
+              return <code className={className}>{children}</code>
+            }
+            return <CodeBlockMemo language={markdownCodeLanguage(className)} code={code} />
           },
           pre({ children }) {
             return <>{children}</>
@@ -117,4 +114,3 @@ export const Markdown = memo(function Markdown({ text }: MarkdownProps) {
     </div>
   )
 })
-

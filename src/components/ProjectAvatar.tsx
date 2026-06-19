@@ -1,3 +1,4 @@
+import { projectAvatarLetterStyle } from '../lib/project-avatar'
 import { projectIconSrc } from '../lib/project-icon'
 import type { ProjectMeta } from '../types/api'
 
@@ -16,11 +17,11 @@ export function ProjectAvatar({
   size?: number
 }) {
   const iconSrc = projectIconSrc(project.iconPath)
-  const style = size
-    ? { width: size, height: size, ...(iconSrc ? {} : { background: project.color }) }
-    : iconSrc
-      ? undefined
-      : { background: project.color }
+  const style = iconSrc
+    ? size
+      ? { width: size, height: size }
+      : undefined
+    : projectAvatarLetterStyle(project.color, size)
 
   if (iconSrc) {
     return (

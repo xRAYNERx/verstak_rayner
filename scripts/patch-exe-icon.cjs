@@ -43,6 +43,28 @@ module.exports = async function afterPack(context) {
   const exe = path.join(context.appOutDir, `${name}.exe`)
   const ico = path.join(context.packager.projectDir, 'resources', 'icon.ico')
   await patchExeIcon(exe, ico)
+  stageNativeFix(context.appOutDir)
+}
+
+function stageNativeFix(appOutDir) {
+  const src = path.join(
+    appOutDir,
+    'resources',
+    'app.asar.unpacked',
+    'node_modules',
+    'better-sqlite3',
+    'build',
+    'Release',
+    'better_sqlite3.node',
+  )
+  if (!fs.existsSync(src)) {
+    console.warn('[afterPack] skip native-fix: better_sqlite3.node not found')
+    return
+  }
+  const destDir = path.join(appOutDir, 'resources', 'native-fix')
+  fs.mkdirSync(destDir, { recursive: true })
+  fs.copyFileSync(src, path.join(destDir, 'better_sqlite3.node'))
+  console.log('OK: native-fix →', destDir)
 }
 
 if (require.main === module) {

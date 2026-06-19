@@ -21,9 +21,12 @@
   "asar": true,
   "extraResources": [
     {
-      "from": "release/app-payload-staging",
-      "to": "app-payload",
-      "filter": ["**/*"]
+      "from": "release/app-payload.7z",
+      "to": "app-payload.7z"
+    },
+    {
+      "from": "node_modules/7zip-bin/win/x64/7za.exe",
+      "to": "7za.exe"
     }
   ],
   "win": {

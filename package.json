@@ -40,6 +40,14 @@
       {
         "from": "resources/app-update.yml",
         "to": "app-update.yml"
+      },
+      {
+        "from": "node_modules/7zip-bin/win/x64/7za.exe",
+        "to": "7za.exe"
+      },
+      {
+        "from": "scripts/apply-silent-update.cjs",
+        "to": "apply-silent-update.cjs"
       }
     ],
     "files": [

@@ -24,6 +24,123 @@ const ENTRIES = [
     ],
   },
   {
+    deployed: '19.06.2026',
+    treeVersion: '1.5.15',
+    title: 'Обновления: whats-new, release notes, тихая установка без сбоев',
+    changes: [
+      'Окно «Что нового» после апдейта снова показывает список изменений (встроенный changelog + 1.5.16).',
+      'Вкладка «Обновления» — «Посмотреть описание» для текущей и доступной версии без GitHub API.',
+      'Кнопка «Установить»: Verstak закрывается, payload копируется тихо, приложение перезапускается.',
+      'Фикс ошибки ~9%: удаление stale app.asar.unpacked перед копированием файлов.',
+      'generate-official-changelog: учёт treeVersion; 7za.exe в ресурсах приложения.',
+    ],
+  },
+  {
+    version: '1.5.16',
+    build: '19.06.2026',
+    deployed: '19.06.2026',
+    title: 'Verstak 1.5.16 — Pipeline Brief→Proof',
+    changes: [
+      'Флагманский сценарий: задача с доказательством. Кнопка «Pipeline» в композере — бриф → план → выполнение → проверка → Proof Pack (HTML: diff + проверки + стоимость).',
+      'Баннер «Pipeline · N/5» — видно, на каком шаге.',
+      'Шаг Проверки читает реальный статус верификации, даёт дожать.',
+      'Только для API-провайдеров (полный контроль + Proof); на CLI кнопка подсказывает переключиться.',
+      'Новым пользователям — «Попробовать Pipeline» в онбординге с готовым примером.',
+      'Под капотом: миграция 22 (pipeline_runs), 33 теста на фичу.',
+    ],
+  },
+  {
+    deployed: '19.06.2026',
+    treeVersion: '1.5.15',
+    title: 'Тихое обновление в фоне (без мастера установщика)',
+    changes: [
+      'После скачивания — автоустановка: watchdog ждёт выход Verstak, тихо запускает Setup, перезапуск.',
+      'Setup: --silent --install-dir=… --restart (без окна мастера).',
+      'Фазы installing в UI; кнопка «Установить» — ускорить, если авто ещё не стартовало.',
+      'update-install.ts, updater.ts, installer/main.ts, silent-args.ts.'
+    ]
+  },
+  {
+    deployed: '19.06.2026',
+    treeVersion: '1.5.15',
+    title: 'Аватарки проектов — единый цвет (unified)',
+    changes: [
+      'Буквенные аватары одного цвета: bg-elevated/bg-overlay + border-default, text-secondary.',
+      'Переключатель AVATAR_LETTER_STYLE в project-avatar.ts: original | variant1 | unified.',
+      'original — яркие цвета; variant1 — приглушённый hue per-path; unified — текущий.',
+      'project-avatar.ts, тесты.'
+    ]
+  },
+  {
+    deployed: '19.06.2026',
+    treeVersion: '1.5.15',
+    title: 'Аватарки проектов — приглушённая палитра',
+    changes: [
+      'Буквенные аватары: фон color-mix 20% оттенка + bg-overlay, не яркая заливка.',
+      'Буква — text-secondary, рамка с лёгким hue; вес 600 вместо 700.',
+      'Палитра новых проектов — Nord (5e81ac, 88c0d0, a3be8c…), без кислотных цветов.',
+      'Старые проекты в БД тоже приглушаются при отрисовке — миграция не нужна.',
+      'project-avatar.ts, ProjectAvatar.tsx, projects.ts, layout.css.'
+    ]
+  },
+  {
+    commit: '93a393d',
+    deployed: '19.06.2026',
+    treeVersion: '1.5.15',
+    title: 'Описание обновлений без GitHub API',
+    changes: [
+      'Release notes больше не тянутся только с api.github.com: встроенный каталог из журнала (1.5.0–1.5.15).',
+      'Работает при лимите GitHub API и когда у Павла на Releases пустое описание.',
+      'Генерация: node scripts/generate-official-changelog.cjs (авто при sync:changelog).',
+    ],
+  },
+  {
+    commit: 'cc54f98',
+    deployed: '19.06.2026',
+    treeVersion: '1.5.15',
+    title: 'Upstream 1.5.15 + фикс установщика (app-payload.7z)',
+    changes: [
+      'Подтянут релиз Павла 1.5.15: справка, черновики композера, вкладка «Файлы», умное автообновление.',
+      'Локальные правки сохранены: таймер ответа, markdown code blocks, native-fix SQLite, deploy:local.',
+      'Установщик: payload упакован в app-payload.7z — исправлен ENOENT на app.asar при установке в Programs\\Verstak.',
+      'Собран Verstak-Setup-1.5.15-x64.exe с распаковкой payload в runtime.',
+    ],
+  },
+  {
+    commit: 'a5ef302',
+    deployed: '19.06.2026',
+    treeVersion: '1.5.14',
+    title: 'Старт после обновления: авто-починка SQLite native-модуля',
+    changes: [
+      'Причина ошибки БД: robocopy /MIR оставлял старый better_sqlite3.node (Node ABI вместо Electron).',
+      'deploy:local — обязательный деплой: удаляет stale app.asar.unpacked + проверка ABI.',
+      'При старте: ensureBetterSqlite3Healthy() восстанавливает .node из resources/native-fix/.',
+      'Резервная копия .node кладётся в сборку в afterPack (patch-exe-icon).',
+    ],
+  },
+  {
+    commit: '3c20b0a',
+    deployed: '19.06.2026',
+    treeVersion: '1.5.14',
+    title: 'Чат: текст под заголовками в блоках кода',
+    changes: [
+      'Многострочные ```блоки``` без языка снова рендерятся как code block, не как inline.',
+      'Промпты и plain text в блоках — без hljs-подсветки (не пропадают на светлой теме).',
+      'Блоки кода — тёмный фон, читаемый текст в Nord и Light.',
+    ],
+  },
+  {
+    commit: 'fe92bc0',
+    deployed: '19.06.2026',
+    treeVersion: '1.5.14',
+    title: 'Чат: время выполнения ответа',
+    changes: [
+      'Пока агент отвечает — в шапке сообщения «выполняется N с» (обновляется каждую секунду).',
+      'После завершения — «за N с» рядом с временем; работает в проекте, ветках и справке.',
+      'При остановке Esc и ошибке длительность тоже фиксируется.',
+    ],
+  },
+  {
     version: '1.5.15',
     build: '19.06.2026',
     deployed: '19.06.2026',
@@ -1392,6 +1509,7 @@ async function main() {
   const buf = await Packer.toBuffer(doc)
   const docxPath = path.join(OUT_DIR, `${BASE_NAME}.docx`)
   fs.writeFileSync(docxPath, buf)
+  require('./generate-official-changelog.cjs')
   console.log('OK:', docxPath)
 }
 

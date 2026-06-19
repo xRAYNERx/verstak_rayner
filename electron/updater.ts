@@ -21,6 +21,7 @@ import {
   clearPendingUpdateCache,
   reconcileCachedDownload,
 } from './updater-cache'
+import { beginSilentUpdateAndQuit } from './update-install'
 
 autoUpdater.logger = null
 autoUpdater.autoDownload = false
@@ -31,8 +32,10 @@ const PERIODIC_CHECK_MS = 4 * 60 * 60 * 1000
 const DOWNLOAD_STALL_MS = 3 * 60 * 1000
 const CHECK_TIMEOUT_MS = 45_000
 const UPDATER_RPC_TIMEOUT_MS = 25_000
+/** Пауза после скачивания — пользователь видит «Устанавливаю…» перед перезапуском. */
+const AUTO_INSTALL_DELAY_MS = 1200
 
-export type UpdatePhase = 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
+export type UpdatePhase = 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'installing' | 'error'
 
 export type UpdateErrorCode = 'network' | 'github-rate-limit'
 
@@ -62,7 +65,10 @@ let quittingForInstall = false
 let shuttingDown = false
 let periodicCheckTimer: ReturnType<typeof setInterval> | null = null
 let checkPromise: Promise<void> | null = null
+let installInFlight = false
+let autoInstallTimer: ReturnType<typeof setTimeout> | null = null
 const NETWORK_CHECK_ERROR = 'Не удалось проверить обновления. Проверьте интернет и попробуйте снова.'
+const INSTALL_ERROR = 'Не удалось установить обновление. Попробуйте снова или скачайте установщик с GitHub Releases.'
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -91,8 +97,13 @@ function shutdownUpdater(): void {
     periodicCheckTimer = null
   }
   clearStallTimer()
+  if (autoInstallTimer) {
+    clearTimeout(autoInstallTimer)
+    autoInstallTimer = null
+  }
   checkInFlight = false
   downloadInFlight = false
+  installInFlight = false
   try {
     autoUpdater.removeAllListeners()
   } catch (err) {
@@ -190,12 +201,59 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     sendToRenderer(mainWindow, 'update:not-available')
   }
 
+  const clearAutoInstallTimer = () => {
+    if (autoInstallTimer) {
+      clearTimeout(autoInstallTimer)
+      autoInstallTimer = null
+    }
+  }
+
+  const runSilentInstall = async (version: string): Promise<{ ok: boolean; reason?: string }> => {
+    if (!isNewerThanInstalled(version)) {
+      reconcileStaleDownloadedUpdate(version)
+      announceNotAvailable()
+      return { ok: false, reason: 'already-current' }
+    }
+    if (installInFlight) return { ok: false, reason: 'in-flight' }
+
+    installInFlight = true
+    clearAutoInstallTimer()
+    setSnapshot({ phase: 'installing', version, percent: 100, pendingRelease: false })
+
+    try {
+      quittingForInstall = true
+      const result = await beginSilentUpdateAndQuit(version)
+      if (!result.ok) {
+        installInFlight = false
+        quittingForInstall = false
+        announceDownloadError(version, INSTALL_ERROR)
+        return result
+      }
+      return { ok: true }
+    } catch (err) {
+      installInFlight = false
+      quittingForInstall = false
+      const message = err instanceof Error ? err.message : String(err)
+      announceDownloadError(version, message || INSTALL_ERROR)
+      return { ok: false, reason: 'error' }
+    }
+  }
+
+  const scheduleAutoInstall = (version: string) => {
+    clearAutoInstallTimer()
+    autoInstallTimer = setTimeout(() => {
+      autoInstallTimer = null
+      void runSilentInstall(version)
+    }, AUTO_INSTALL_DELAY_MS)
+  }
+
   const announceDownloaded = (version: string) => {
     clearStallTimer()
     downloadInFlight = false
     downloadForVersion = null
     setSnapshot({ phase: 'downloaded', version, percent: 100, pendingRelease: false })
     sendToRenderer(mainWindow, 'update:downloaded', { version })
+    scheduleAutoInstall(version)
   }
 
   const announceDownloadError = (
@@ -394,9 +452,11 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
     downloadForVersion = null
     checkInFlight = false
     checkPromise = null
+    installInFlight = false
     lastProbeVersion = null
     lastProbePending = false
     clearStallTimer()
+    clearAutoInstallTimer()
     snapshot = { phase: 'idle' }
     pushSnapshot()
   }
@@ -480,16 +540,11 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
   if (!updaterIpcRegistered) {
     updaterIpcRegistered = true
 
-    ipcMain.handle('update:install', () => {
+    ipcMain.handle('update:install', async () => {
       const target = snapshot.version ?? lastProbeVersion
-      if (!isNewerThanInstalled(target)) {
-        reconcileStaleDownloadedUpdate(target)
-        announceNotAvailable()
-        return { ok: false as const, reason: 'already-current' as const }
-      }
-      quittingForInstall = true
-      autoUpdater.quitAndInstall(false, true)
-      return { ok: true as const }
+      if (!target) return { ok: false as const, reason: 'no-version' as const }
+      clearAutoInstallTimer()
+      return runSilentInstall(target)
     })
 
     ipcMain.handle('update:get-state', () => ({
