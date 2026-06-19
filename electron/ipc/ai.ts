@@ -22,6 +22,7 @@ import { pickReviewProvider, buildCrossVerifyPrompt, runCrossVerify, getConfigur
 import { shouldFallback, getNextFallback } from '../ai/smart-fallback'
 import { estimateComplexity, recommendModel, complexityLabel } from '../ai/smart-router'
 import { type ExitReason, callSignature, detectVerifyScriptsForHint, writeSessionJournal } from '../ai/session-journal'
+import { isTypeScriptFile, shouldAutoDiagnose, formatDiagnosticHint } from '../ai/diagnostic-loop'
 import type { AgentRuns, AgentRunOwner, AgentRunStatus } from '../storage/agent-runs'
 import { pickResumeGuardTool } from '../storage/agent-runs'
 import { expandOfficeAttachments } from '../ai/attachment-text'
@@ -1381,6 +1382,7 @@ export async function runApiConversation(
     // auto_capture_memory: по умолчанию включено; выключается настройкой 'false'
     const autoCaptureEnabled = getSecretForDelegate?.('auto_capture_memory') !== 'false'
     let acceptedWritesThisTurn = 0
+    let tsWritesThisTurn = 0  // Diagnostic Loop v2: правки .ts/.tsx → авто-tsc
     for (let i = 0; i < toolCalls.length; i++) {
       const call = toolCalls[i]
       const result = toolResults[i]
@@ -1388,12 +1390,13 @@ export async function runApiConversation(
       // #12: propose_edits (и любой тул с filesWritten) — принятые файлы в
       // filesTouched, иначе attest-сверка claimed-vs-actual их не видела.
       if (result.filesWritten?.length) {
-        for (const p of result.filesWritten) { filesTouched.add(p); acceptedWritesThisTurn++ }
+        for (const p of result.filesWritten) { filesTouched.add(p); acceptedWritesThisTurn++; if (isTypeScriptFile(p)) tsWritesThisTurn++ }
       }
       if ((call.name === 'write_file' || call.name === 'apply_patch') && !result.error) {
         const p = String(call.args.path ?? '')
         if (p) {
           filesTouched.add(p)
+          if (isTypeScriptFile(p)) tsWritesThisTurn++
           // Track content for cross-verify (write_file has 'content', apply_patch has 'patch')
           const content = String(call.args.content ?? call.args.patch ?? '')
           if (content && sessionChanges.length < 5) {
@@ -1436,9 +1439,28 @@ export async function runApiConversation(
     // pays attention this turn specifically.
     let verifyHint = ''
     if (acceptedWritesThisTurn > 0) {
-      const hints = await detectVerifyScriptsForHint(projectPath)
-      if (hints.length > 0) {
-        verifyHint = `[system: пользователь принял ${acceptedWritesThisTurn} write(s). Перед "готово" запусти проверку через run_command — варианты: ${hints.slice(0, 2).join(' / ')}. Если уверен что проверка избыточна — объясни почему.]`
+      // Diagnostic Loop v2: после правок .ts/.tsx авто-прогоняем check_diagnostics
+      // (tsc) и подсовываем РЕАЛЬНЫЕ ошибки в следующий ход — не надеемся, что
+      // модель сама вспомнит проверить. Выключается diagnostic_loop='false'.
+      const diagnosticEnabled = getSecretForDelegate?.('diagnostic_loop') !== 'false'
+      const modelCheckedThisTurn = toolCalls.some(c => c.name === 'check_diagnostics')
+      if (shouldAutoDiagnose({ enabled: diagnosticEnabled, tsWritesThisTurn, modelCheckedThisTurn })) {
+        try {
+          const diagHandler = lookupHandler('check_diagnostics', ctx)
+          if (diagHandler) {
+            const diag = await diagHandler.handle({ id: 'auto-diag', name: 'check_diagnostics', args: {} }, ctx)
+            const hint = formatDiagnosticHint(typeof diag.result === 'string' ? diag.result : '')
+            if (hint) verifyHint = hint
+          }
+        } catch { /* Diagnostic Loop — best-effort, не ломает цикл */ }
+      }
+      // Фолбэк: если авто-диагностика не дала нудж (выключена / чисто / не TS) —
+      // мягкое напоминание запустить проверку, как было.
+      if (!verifyHint) {
+        const hints = await detectVerifyScriptsForHint(projectPath)
+        if (hints.length > 0) {
+          verifyHint = `[system: пользователь принял ${acceptedWritesThisTurn} write(s). Перед "готово" запусти проверку через run_command — варианты: ${hints.slice(0, 2).join(' / ')}. Если уверен что проверка избыточна — объясни почему.]`
+        }
       }
     }
     const nextUserMsg: ChatMessage = { role: 'user', content: verifyHint, toolResults }

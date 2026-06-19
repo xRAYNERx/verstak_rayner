@@ -114,6 +114,18 @@ describe('agent-loop (runApiConversation) — харнес', () => {
     expect(runs.finish).toHaveBeenCalledWith('r1', 'done', expect.objectContaining({ filesCount: 1 }))
   }, 15000)
 
+  // Diagnostic Loop v2: правка .ts → авто check_diagnostics в цикле. В temp-dir нет
+  // tsconfig, диагностика возвращается gracefully и цикл доходит до done — тест
+  // гарантирует, что хук авто-tsc не роняет agent-loop.
+  it('Diagnostic Loop: write_file .ts → авто-диагностика не ломает цикл', async () => {
+    const runs = mockRuns()
+    const p = provider('p1', (turn) => turn === 1
+      ? [{ type: 'tool-call', call: { id: 'w1', name: 'write_file', args: { path: 'a.ts', content: 'export const x = 1\n' } } }, { type: 'done' }]
+      : [{ type: 'text', text: 'готово' }, { type: 'done' }])
+    await runApiConversation(...(args(dir, { provider: p, providerId: 'gemini-api', model: 'gemini-3-flash', costGuard: createCostGuard(100), agentRuns: runs, runId: 'r1' }) as Parameters<typeof runApiConversation>))
+    expect(runs.finish).toHaveBeenCalledWith('r1', 'done', expect.anything())
+  }, 20000)
+
   // #14: supplement, догруженный во время plain-ответа, перезапускает turn и
   // попадает в контекст следующего хода (раньше continue гасил стрим, не turn).
   it('supplement после plain-ответа перезапускает turn и доходит до провайдера', async () => {
