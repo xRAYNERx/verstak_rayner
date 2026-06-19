@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useProject } from '../store/projectStore'
 import { useT } from '../i18n'
+import { sortFileTree } from '../lib/file-tree-sort'
 import type { FileNode } from '../types/api'
 
 function touchMarker(kind: 'read' | 'write' | 'list'): { icon: string; title: string } {
@@ -48,6 +49,8 @@ function FileTreeNode({ node, depth }: { node: FileNode; depth: number }) {
 export function FilesView() {
   const t = useT()
   const { path, tree } = useProject()
+  // Папки→файлы по алфавиту (NodeJS отдаёт в произвольном порядке).
+  const sortedTree = useMemo(() => sortFileTree(tree), [tree])
 
   if (!path) {
     return (
@@ -68,7 +71,7 @@ export function FilesView() {
           <div className="gg-panel-empty">{t.sidebar.openFolder}</div>
         ) : (
           <div className="gg-files-view-tree">
-            {tree.map(node => <FileTreeNode key={node.path} node={node} depth={0} />)}
+            {sortedTree.map(node => <FileTreeNode key={node.path} node={node} depth={0} />)}
           </div>
         )}
       </div>
