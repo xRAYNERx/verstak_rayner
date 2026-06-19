@@ -3,6 +3,7 @@ import { marketingAudit } from './marketing-audit'
 import { ydirectMetrikaAudit } from './ydirect-metrika-audit'
 import { bitrixStaleDeals } from './bitrix-stale-deals'
 import { onecSheetsReconcile } from './onec-sheets-reconcile'
+import { ozonWbSnapshot } from './ozon-wb-snapshot'
 
 // Единый источник истины списка workflow'ов. Новый сценарий = одна строка здесь.
 export const WORKFLOWS: WorkflowDefinition[] = [
@@ -10,7 +11,8 @@ export const WORKFLOWS: WorkflowDefinition[] = [
   // F9: RU Agency Pack — готовые сценарии поверх коннекторов.
   ydirectMetrikaAudit,
   bitrixStaleDeals,
-  onecSheetsReconcile
+  onecSheetsReconcile,
+  ozonWbSnapshot
 ]
 
 /** Найти workflow по id (или undefined, если такого нет). */

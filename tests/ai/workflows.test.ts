@@ -35,6 +35,7 @@ describe('workflows registry', () => {
     expect(ids).toContain('ydirect-metrika-audit')
     expect(ids).toContain('bitrix-stale-deals')
     expect(ids).toContain('onec-sheets-reconcile')
+    expect(ids).toContain('ozon-wb-snapshot')
   })
 
   it('у всех workflow уникальные id и непустые шаги с уникальными step.id', () => {
