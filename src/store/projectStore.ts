@@ -479,6 +479,8 @@ export const useProject = create<ProjectState>((set, get) => ({
       artifacts: [],
       // Crash-resume: сбрасываем баннер предыдущего проекта; перезагрузим ниже.
       resumableRuns: [],
+      // Pipeline: не тащим прогон другого проекта; подгрузим активный для path.
+      activePipeline: null,
       helpMode: false,
     })
     if (needsDbHydrate && activeChatId != null) {
@@ -498,6 +500,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     // Crash-resume: подгружаем зависшие после краха прогоны этого проекта для
     // баннера «сессия прервана». Fire-and-forget.
     void get().loadResumableRuns(path)
+    void get().loadActivePipeline(path)
   },
   closeProject: () => set({
     path: null,
@@ -505,7 +508,8 @@ export const useProject = create<ProjectState>((set, get) => ({
     messages: [],
     activity: [],
     pendingWrites: [],
-    pendingCommand: null
+    pendingCommand: null,
+    activePipeline: null,
   }),
   refreshProjectList: async () => {
     const projectList = await window.api.projects.list()

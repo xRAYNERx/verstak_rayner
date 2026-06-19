@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { EMPTY_BRIEF, SAMPLE_BRIEF, isBriefReady, buildPlanPrompt, buildExecutePrompt, pipelineStepIndex, buildPipelineSend, verifyState, resolveProofRunId } from '../../src/lib/pipeline-brief'
+import { EMPTY_BRIEF, SAMPLE_BRIEF, isBriefReady, buildPlanPrompt, buildExecutePrompt, pipelineStepIndex, buildPipelineSend, verifyState, resolveProofRunId, resolvePipelineRunId } from '../../src/lib/pipeline-brief'
 
 describe('pipeline-brief', () => {
   it('EMPTY_BRIEF не готов', () => {
@@ -80,5 +80,15 @@ describe('pipeline-brief', () => {
     expect(resolveProofRunId(null, 5, runs)).toBe('r-chat')
     expect(resolveProofRunId(null, 99, runs)).toBe('r-new')
     expect(resolveProofRunId(null, 1, [])).toBeNull()
+  })
+
+  it('resolvePipelineRunId: sendId точнее fallback по чату', () => {
+    const runs = [
+      { runId: 'r-exec', chatId: 5, sendId: 42 },
+      { runId: 'r-other', chatId: 5, sendId: 7 },
+    ]
+    expect(resolvePipelineRunId(null, 42, 5, runs)).toBe('r-exec')
+    expect(resolvePipelineRunId('r-pinned', 42, 5, runs)).toBe('r-pinned')
+    expect(resolvePipelineRunId(null, 99, 5, runs)).toBe('r-exec')
   })
 })

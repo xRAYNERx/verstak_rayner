@@ -82,6 +82,21 @@ export function resolveProofRunId(
   return sameChat?.runId ?? runs[0]?.runId ?? null
 }
 
+/** runId для pipeline после Execute: приоритет — уже привязанный, затем sendId, затем fallback. */
+export function resolvePipelineRunId(
+  agentRunId: string | null,
+  sendId: number | null,
+  chatId: number | null,
+  runs: ReadonlyArray<{ runId: string; chatId: number | null; sendId?: number | null }>,
+): string | null {
+  if (agentRunId) return agentRunId
+  if (sendId != null) {
+    const bySend = runs.find(r => r.sendId === sendId)
+    if (bySend) return bySend.runId
+  }
+  return resolveProofRunId(null, chatId, runs)
+}
+
 /** Режим агента для авто-send шага pipeline. */
 export type PipelineSendMode = 'plan' | 'accept-edits'
 

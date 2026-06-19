@@ -30,7 +30,7 @@ import { formatDuration } from '../lib/format-duration'
 import { VisionAttachmentBanner } from './VisionAttachmentBanner'
 import { isImageAttachment, providerSupportsVision } from '../lib/vision-support'
 import { resolveSkillOverride } from '../lib/skill-override'
-import { buildPipelineSend, resolveProofRunId, SAMPLE_BRIEF } from '../lib/pipeline-brief'
+import { buildPipelineSend, resolvePipelineRunId, resolveProofRunId, SAMPLE_BRIEF } from '../lib/pipeline-brief'
 import { isCliProvider } from '../lib/model-catalog'
 import type { PipelineRun, PipelineStep, PipelineBrief } from '../types/api'
 import type { ProviderId } from '../hooks/useProvider'
@@ -274,6 +274,10 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
   // Pipeline (спек D5): авто-send шага. Держит желаемый режим — авто-send
   // срабатывает только когда agentMode реально применился (без race).
   const pipelineSendModeRef = useRef<'plan' | 'accept-edits' | null>(null)
+  /** Шаг pipeline, для которого сейчас идёт авто-send (plan | execute). */
+  const pipelineAutoSendStepRef = useRef<'plan' | 'execute' | null>(null)
+  /** sendId Execute-шага — для точной привязки agentRunId. */
+  const pipelineExecuteSendIdRef = useRef<number | null>(null)
   const [pipelineWizardOpen, setPipelineWizardOpen] = useState(false)
   const [pipelineInitialBrief, setPipelineInitialBrief] = useState<PipelineBrief | undefined>(undefined)
   const activePipeline = useProject(s => s.activePipeline)
@@ -650,6 +654,15 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
           })
           store.setRunningPlanStep(null)
         }
+        const pendingPipelineStep = pipelineAutoSendStepRef.current
+        if (pendingPipelineStep === 'plan' || pendingPipelineStep === 'execute') {
+          pipelineAutoSendStepRef.current = null
+        }
+        if (pendingPipelineStep === 'execute') {
+          const execSendId = pipelineExecuteSendIdRef.current
+          pipelineExecuteSendIdRef.current = null
+          void finalizePipelineExecute(store, execSendId)
+        }
         store.finalizeActiveStreamDuration()
         setStreaming(false)
         setPendingSupplements([])
@@ -674,6 +687,10 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
         if (store.path) {
           void window.api.journal.append(store.path, 'note', 'AI-ошибка',
             ('message' in event ? event.message : '').slice(0, 600))
+        }
+        if (pipelineAutoSendStepRef.current === 'plan' || pipelineAutoSendStepRef.current === 'execute') {
+          pipelineAutoSendStepRef.current = null
+          pipelineExecuteSendIdRef.current = null
         }
         store.finalizeActiveStreamDuration()
         setStreaming(false)
@@ -911,7 +928,24 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
   // Plan-промпт; «План OK» в баннере → двигаем шаг + шлём Execute-промпт.
   function dispatchPipelineSend(step: PipelineStep, brief: PipelineRun['brief'], planId: number | null) {
     const params = buildPipelineSend(step, brief, planId)
-    if (params) window.dispatchEvent(new CustomEvent('gg-pipeline-send', { detail: params }))
+    if (!params) return
+    if (step === 'plan' || step === 'execute') pipelineAutoSendStepRef.current = step
+    window.dispatchEvent(new CustomEvent('gg-pipeline-send', { detail: params }))
+  }
+
+  async function finalizePipelineExecute(store: ReturnType<typeof useProject.getState>, sendId: number | null) {
+    const pipeline = store.activePipeline
+    if (!pipeline || pipeline.step !== 'execute' || !store.path) return
+    try {
+      const runs = await window.api.agentRuns.list(store.path, { limit: 10 })
+      const runId = resolvePipelineRunId(
+        pipeline.agentRunId,
+        sendId,
+        pipeline.chatId ?? store.activeChatId,
+        runs,
+      )
+      await store.advancePipeline({ step: 'verify', agentRunId: runId })
+    } catch { /* best-effort */ }
   }
   function onPipelineStarted(run: PipelineRun) {
     useProject.getState().startPipeline(run)
@@ -1323,6 +1357,9 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, onOpenSid
       }
     }
     currentSendIdRef.current = sendId
+    if (pipelineAutoSendStepRef.current === 'execute') {
+      pipelineExecuteSendIdRef.current = sendId
+    }
     // Bind this send to the chat that initiated it — if user switches to
     // another chat mid-stream, the event handler will route events into
     // chatSnapshots[activeChatId] rather than corrupting the new active chat.
