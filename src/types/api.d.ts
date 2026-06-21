@@ -302,10 +302,8 @@ declare global {
       }
       journal: {
         list: (projectPath: string, limit?: number) => Promise<JournalEntry[]>
+        currentSession: (projectPath: string) => Promise<JournalEntry | null>
         append: (projectPath: string, kind: JournalKind, title: string, detail?: string | null) => Promise<JournalEntry>
-        updateManual: (id: number, title: string, detail?: string | null) => Promise<JournalEntry | null>
-        remove: (id: number) => Promise<void>
-        clear: (projectPath: string) => Promise<number>
       }
       reminders: {
         list: (projectPath: string, limit?: number) => Promise<Reminder[]>

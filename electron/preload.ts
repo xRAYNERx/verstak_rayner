@@ -192,12 +192,9 @@ contextBridge.exposeInMainWorld('api', {
   },
   journal: {
     list: (projectPath: string, limit?: number) => ipcRenderer.invoke('journal:list', projectPath, limit),
+    currentSession: (projectPath: string) => ipcRenderer.invoke('journal:currentSession', projectPath),
     append: (projectPath: string, kind: string, title: string, detail?: string | null) =>
-      ipcRenderer.invoke('journal:append', projectPath, kind, title, detail),
-    updateManual: (id: number, title: string, detail?: string | null) =>
-      ipcRenderer.invoke('journal:updateManual', id, title, detail),
-    remove: (id: number) => ipcRenderer.invoke('journal:remove', id),
-    clear: (projectPath: string) => ipcRenderer.invoke('journal:clear', projectPath)
+      ipcRenderer.invoke('journal:append', projectPath, kind, title, detail)
   },
   reminders: {
     list: (projectPath: string, limit?: number) => ipcRenderer.invoke('reminders:list', projectPath, limit),

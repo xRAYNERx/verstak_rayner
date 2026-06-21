@@ -22,12 +22,12 @@ describe('journal session summaries', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
-  it('creates a detailed summary from the real chat dialog', () => {
+  it('creates a concise structured summary from the real chat dialog', () => {
     vi.setSystemTime(new Date('2026-06-21T09:15:00'))
     db = openDb(join(dir, 'test.db'))
     const journal = createJournal(db)
     insertChat('client-a', 'user', 'Что нужно добавить в программу, а что убрать?')
-    insertChat('client-a', 'assistant', 'Добавить стоит журнал решений, настройки автообновления и понятные статусы. Убрать можно лишние всплывающие окна и дубли в панели.')
+    insertChat('client-a', 'assistant', 'Добавить стоит журнал решений, настройки автообновления и понятные статусы. Убрать можно лишние всплывающие окна.')
     journal.append('client-a', 'tool', 'Изменён файл src/App.tsx', 'Обновлена страница журнала')
 
     vi.setSystemTime(new Date('2026-06-21T11:42:00'))
@@ -36,11 +36,31 @@ describe('journal session summaries', () => {
     expect(summaries).toHaveLength(1)
     expect(summaries[0].kind).toBe('session')
     expect(summaries[0].title).toContain('Сводка сессии')
-    expect(summaries[0].detail).toContain('Что спрашивал пользователь:')
-    expect(summaries[0].detail).toContain('Что нужно добавить в программу, а что убрать?')
-    expect(summaries[0].detail).toContain('Что было предложено или отвечено:')
-    expect(summaries[0].detail).toContain('Добавить стоит журнал решений')
-    expect(summaries[0].detail).toContain('Изменено:')
+    const summary = parseSummary(summaries[0].detail)
+    expect(summary.type).toBe('session-summary')
+    expect(summary.stats.userMessages).toBe(1)
+    expect(summary.turns[0].user).toBe('уточнил, что стоит добавить и что убрать в проекте')
+    expect(summary.turns[0].assistant).toContain('Дала рекомендации, что добавить или убрать')
+    expect(summary.turns[0].assistant).toContain('Зафиксировала выполненные изменения')
+    expect(summary.changed[0]).toContain('Изменён файл src/App.tsx')
+  })
+
+  it('summarizes an ad campaign audit without keeping the raw answer', () => {
+    vi.setSystemTime(new Date('2026-06-21T10:00:00'))
+    db = openDb(join(dir, 'test.db'))
+    const journal = createJournal(db)
+    insertChat('westers', 'user', 'Сделай краткий аудит по РК за неделю')
+    insertChat('westers', 'assistant', 'Аудит за 14.06-21.06: есть просадка по CTR, слабые объявления и проблемы с бюджетом. План решения: обновить креативы, перераспределить бюджет и проверить посадочные страницы.')
+
+    vi.setSystemTime(new Date('2026-06-21T10:20:00'))
+    const summaries = journal.flushSessionSummaries('close')
+
+    const summary = parseSummary(summaries[0].detail)
+    expect(summary.turns[0].user).toBe('запросил краткий аудит по РК за неделю')
+    expect(summary.turns[0].assistant).toContain('Отправила краткий аудит')
+    expect(summary.turns[0].assistant).toContain('Указала на недостатки и риски')
+    expect(summary.turns[0].assistant).toContain('Предоставила план решения проблемы')
+    expect(summary.turns[0].assistant).not.toContain('CTR')
   })
 
   it('hides legacy session fragments from the journal list', () => {
@@ -67,8 +87,27 @@ describe('journal session summaries', () => {
     const summaries = journal.flushSessionSummaries('close')
 
     expect(summaries).toHaveLength(1)
-    expect(summaries[0].detail).toContain('Какие функции в Запрете лишние?')
-    expect(summaries[0].detail).toContain('Лишними выглядят')
+    const summary = parseSummary(summaries[0].detail)
+    expect(summary.turns[0].user).toContain('что стоит добавить и что убрать')
+    expect(summary.turns[0].assistant).toContain('Дала рекомендации, что добавить или убрать')
+    expect(summary.stats.toolEvents).toBe(0)
+  })
+
+  it('returns a current session preview without persisting it', () => {
+    vi.setSystemTime(new Date('2026-06-21T14:00:00'))
+    db = openDb(join(dir, 'test.db'))
+    const journal = createJournal(db)
+    insertChat('client-a', 'user', 'Собери краткую сводку по клиенту.')
+    insertChat('client-a', 'assistant', 'Сводка будет состоять из вопросов пользователя, ответа AI и выполненных действий.')
+
+    const current = journal.currentSession('client-a')
+
+    expect(current?.id).toBe(0)
+    expect(current?.title).toContain('Текущая сессия')
+    const summary = parseSummary(current?.detail ?? null)
+    expect(summary.reason).toBe('current')
+    expect(summary.turns[0].user).toContain('запросил краткую сводку')
+    expect(journal.list('client-a')).toHaveLength(0)
   })
 
   it('rolls the active journal window over at local midnight', () => {
@@ -87,10 +126,10 @@ describe('journal session summaries', () => {
 
     expect(daySummaries).toHaveLength(1)
     expect(daySummaries[0].title).toBe('Сводка дня · 21.06.2026')
-    expect(daySummaries[0].detail).toContain('Подготовь дневной отчёт')
+    expect(parseSummary(daySummaries[0].detail).turns[0].user).toContain('запросил краткую сводку')
     expect(closeSummaries).toHaveLength(1)
     expect(closeSummaries[0].title).toContain('22.06.2026')
-    expect(closeSummaries[0].detail).toContain('Продолжим новый день')
+    expect(parseSummary(closeSummaries[0].detail).turns[0].user).toContain('написал: Продолжим новый день')
   })
 
   function insertChat(projectPath: string, role: 'user' | 'assistant', content: string): void {
@@ -99,3 +138,8 @@ describe('journal session summaries', () => {
     ).run(projectPath, role, content, Date.now())
   }
 })
+
+function parseSummary(detail: string | null): any {
+  expect(detail).toBeTruthy()
+  return JSON.parse(detail!)
+}
