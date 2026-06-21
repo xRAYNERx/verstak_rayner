@@ -2928,6 +2928,14 @@ html[data-theme="light"] .gg-thinking-body { background: rgba(0,0,0,0.03); }
 .gg-msg-assistant .gg-msg-author::before { background: var(--accent); }
 .gg-msg-user      .gg-msg-author::before { background: var(--success); }
 
+.gg-msg-source-note {
+  align-self: flex-end;
+  max-width: min(780px, 86%);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .gg-msg-bubble {
   max-width: 78%;
   padding: 10px 14px;
@@ -4009,6 +4017,42 @@ html.gg-atelier .gg-settings-shell .gg-btn-primary:hover,
   flex-wrap: wrap;
   width: 100%;
 }
+.gg-composer-insights {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  width: 100%;
+  min-height: 28px;
+  padding: 2px 0;
+}
+.gg-composer-insights .gg-usage-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 11px;
+  box-sizing: border-box;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1;
+  flex-shrink: 0;
+  margin: 0;
+}
+.gg-composer-insights .gg-usage-pill.is-preview {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
+  background: color-mix(in srgb, var(--accent-muted) 45%, var(--bg-base));
+}
+.gg-composer-insights .gg-usage-pill.is-preview.is-cost-hint {
+  padding: 0 8px;
+  min-width: 0;
+}
 .gg-composer-meta-cluster {
   display: inline-flex;
   align-items: center;
@@ -4019,6 +4063,81 @@ html.gg-atelier .gg-settings-shell .gg-btn-primary:hover,
 .gg-composer-meta-cluster--end {
   margin-left: auto;
   justify-content: flex-end;
+}
+.gg-composer-meta-cluster--end > :not(.gg-chat-settings-wrap) {
+  display: none !important;
+}
+.gg-chat-settings-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.gg-chat-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  min-height: 28px;
+  max-width: 180px;
+  padding: 0 11px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  font-family: var(--font-ui, inherit);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+.gg-chat-settings-btn:hover,
+.gg-chat-settings-btn.is-active {
+  background: var(--bg-hover);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+.gg-chat-settings-popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 80;
+  width: min(360px, calc(100vw - 32px));
+  padding: 10px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-base);
+  background-color: var(--bg-base);
+  background-image: none;
+  opacity: 1;
+  backdrop-filter: none;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42), 0 0 0 1px var(--border-subtle);
+  color: var(--text-primary);
+  font-family: var(--font-ui, inherit);
+}
+.gg-chat-settings-grid {
+  display: grid;
+  gap: 8px;
+}
+.gg-chat-settings-item {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+}
+.gg-chat-settings-label {
+  color: var(--text-tertiary);
+  font-family: var(--font-ui, inherit);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+html[data-theme="light"] .gg-chat-settings-popover {
+  background: #ffffff;
+  background-color: #ffffff;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18), 0 0 0 1px var(--border-subtle);
 }
 .gg-composer-meta > button,
 .gg-composer-meta .gg-composer-meta-cluster > button,
@@ -5201,6 +5320,60 @@ html.gg-atelier .gg-settings-shell .gg-btn-primary:hover,
   line-height: 1.5;
 }
 .gg-journal-compose .gg-btn { align-self: flex-end; }
+
+.gg-reminder-compose {
+  display: grid;
+  gap: 10px;
+  max-width: 680px;
+  padding: 14px;
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.gg-reminder-compose-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 240px);
+  gap: 10px;
+}
+
+.gg-reminder-compose .gg-journal-detail {
+  min-height: 72px;
+}
+
+.gg-reminder-compose .gg-btn {
+  justify-self: end;
+}
+
+.gg-reminder-message {
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 13px;
+  border: 1px solid;
+}
+
+.gg-reminder-message.is-error {
+  color: var(--error);
+  border-color: color-mix(in srgb, var(--error) 40%, transparent);
+  background: color-mix(in srgb, var(--error) 10%, transparent);
+}
+
+.gg-reminder-message.is-ok {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 40%, transparent);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+}
+
+@media (max-width: 760px) {
+  .gg-reminder-compose {
+    max-width: none;
+  }
+
+  .gg-reminder-compose-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 .gg-journal-toolbar {
   display: flex;
@@ -9585,7 +9758,8 @@ textarea.gg-input {
 /* === Tier Recommendation === */
 /* Pill рядом с ModelPicker в тулбаре composer'а: рекомендует тир+провайдера+модель
    под текст задачи. Рекомендация, не autopilot — переключает только «применить». */
-.gg-composer-meta .gg-tier-rec {
+.gg-composer-meta .gg-tier-rec,
+.gg-composer-insights .gg-tier-rec {
   cursor: default;
   min-width: 0;
   max-width: min(320px, 100%);
@@ -9595,13 +9769,16 @@ textarea.gg-input {
   align-items: center;
   animation: gg-fade-in 140ms ease-out;
 }
-.gg-composer-meta .gg-tier-rec.tier-cheap {
+.gg-composer-meta .gg-tier-rec.tier-cheap,
+.gg-composer-insights .gg-tier-rec.tier-cheap {
   border-color: color-mix(in srgb, var(--success) 45%, var(--border-subtle));
 }
-.gg-composer-meta .gg-tier-rec.tier-frontier {
+.gg-composer-meta .gg-tier-rec.tier-frontier,
+.gg-composer-insights .gg-tier-rec.tier-frontier {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border-subtle));
 }
-.gg-composer-meta .gg-tier-rec.tier-private {
+.gg-composer-meta .gg-tier-rec.tier-private,
+.gg-composer-insights .gg-tier-rec.tier-private {
   border-color: color-mix(in srgb, var(--warning) 45%, var(--border-subtle));
 }
 .gg-tier-rec-text {
@@ -9613,7 +9790,8 @@ textarea.gg-input {
   text-overflow: ellipsis;
   font-weight: 500;
 }
-.gg-composer-meta .gg-tier-rec .gg-tier-rec-apply {
+.gg-composer-meta .gg-tier-rec .gg-tier-rec-apply,
+.gg-composer-insights .gg-tier-rec .gg-tier-rec-apply {
   align-self: center;
   flex-shrink: 0;
   border: 1px solid color-mix(in srgb, var(--border-default) 55%, var(--border-subtle));
@@ -9633,7 +9811,8 @@ textarea.gg-input {
   line-height: 18px;
   box-sizing: border-box;
 }
-.gg-composer-meta .gg-tier-rec .gg-tier-rec-apply:hover {
+.gg-composer-meta .gg-tier-rec .gg-tier-rec-apply:hover,
+.gg-composer-insights .gg-tier-rec .gg-tier-rec-apply:hover {
   background: color-mix(in srgb, var(--bg-hover) 65%, var(--bg-base));
   border-color: var(--border-default);
   color: var(--text-primary);

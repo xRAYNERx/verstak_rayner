@@ -23,7 +23,7 @@ export function JournalView() {
   const [entries, setEntries] = useState<JournalEntry[]>([])
   const [draft, setDraft] = useState('')
   const [draftDetail, setDraftDetail] = useState('')
-  const [filter, setFilter] = useState<KindFilter>('all')
+  const [filter, setFilter] = useState<KindFilter>('session')
   const [search, setSearch] = useState('')
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editTitle, setEditTitle] = useState('')

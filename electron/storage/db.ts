@@ -584,6 +584,30 @@ const MIGRATIONS: Array<{ version: number; description: string; run: (db: DB) =>
         db.exec('ALTER TABLE projects ADD COLUMN remote_json TEXT')
       }
     }
+  },
+  {
+    version: 24,
+    description: 'project reminders: scheduled notifications or chat messages',
+    run: (db: DB) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS reminders (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          project_path TEXT NOT NULL,
+          title TEXT NOT NULL,
+          body TEXT,
+          due_at INTEGER NOT NULL,
+          target TEXT NOT NULL CHECK(target IN ('notification','chat')),
+          chat_id INTEGER,
+          status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','delivered','dismissed')),
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          delivered_at INTEGER,
+          dismissed_at INTEGER
+        );
+        CREATE INDEX IF NOT EXISTS idx_reminders_project ON reminders(project_path, due_at);
+        CREATE INDEX IF NOT EXISTS idx_reminders_pending ON reminders(status, due_at);
+      `)
+    }
   }
 ]
 
