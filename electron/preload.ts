@@ -34,6 +34,9 @@ contextBridge.exposeInMainWorld('api', {
     isFocused: () => ipcRenderer.invoke('app:is-focused') as Promise<boolean>,
     openExternal: (url: string) => ipcRenderer.invoke('app:open-external', url) as Promise<boolean>
   },
+  runtimeLogs: {
+    info: () => ipcRenderer.invoke('runtime-logs:info') as Promise<{ dir: string; runtime: string; errors: string }>
+  },
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize') as Promise<void>,
     maximize: () => ipcRenderer.invoke('window:maximize') as Promise<boolean>,
@@ -177,7 +180,11 @@ contextBridge.exposeInMainWorld('api', {
   chats: {
     list: (sessionId: number) => ipcRenderer.invoke('chats:list', sessionId),
     append: (sessionId: number, projectPath: string, role: 'user' | 'assistant', content: string) =>
-      ipcRenderer.invoke('chats:append', sessionId, projectPath, role, content)
+      ipcRenderer.invoke('chats:append', sessionId, projectPath, role, content),
+    updateMessage: (messageId: number, content: string) =>
+      ipcRenderer.invoke('chats:update-message', messageId, content),
+    updateThinking: (messageId: number, thinking: string) =>
+      ipcRenderer.invoke('chats:update-thinking', messageId, thinking)
   },
   handoff: {
     generate: (sessionId: number, parentId?: string | null) =>
@@ -208,6 +215,7 @@ contextBridge.exposeInMainWorld('api', {
     }) => ipcRenderer.invoke('reminders:create', input),
     snooze: (id: number, minutes?: number) => ipcRenderer.invoke('reminders:snooze', id, minutes),
     dismiss: (id: number) => ipcRenderer.invoke('reminders:dismiss', id),
+    markChatDelivered: (id: number) => ipcRenderer.invoke('reminders:mark-chat-delivered', id),
     remove: (id: number) => ipcRenderer.invoke('reminders:remove', id)
   },
   undo: {

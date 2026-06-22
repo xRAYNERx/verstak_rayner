@@ -14,8 +14,8 @@ export interface DependencyMapDTO {
   files: Record<string, { imports: string[]; importedBy: string[]; exports: string[] }>
 }
 export interface Attachment { name: string; mimeType: string; data: string; size: number }
-export interface ChatMessage { role: 'user' | 'assistant' | 'system'; content: string; attachments?: Attachment[]; thinking?: string; createdAt?: number; source?: 'reminder'; /** Длительность ответа ассистента (мс), только в UI сессии. */ responseDurationMs?: number }
-export interface StoredChatMessage { id: number; role: 'user' | 'assistant' | 'system'; content: string; createdAt: number }
+export interface ChatMessage { role: 'user' | 'assistant' | 'system'; content: string; attachments?: Attachment[]; thinking?: string; createdAt?: number; source?: 'reminder'; dbId?: number; /** Длительность ответа ассистента (мс), только в UI сессии. */ responseDurationMs?: number }
+export interface StoredChatMessage { id: number; role: 'user' | 'assistant' | 'system'; content: string; thinking?: string; createdAt: number }
 export type ChatKind = 'main' | 'review' | 'help'
 export interface ChatSession {
   id: number
@@ -140,6 +140,9 @@ export type ChatEvent =
   | { type: 'artifact-created'; callId: string; kind: 'html' | 'docx' | 'verification'; filename: string; path: string; sizeBytes: number }
   | { type: 'verification-attested'; callId: string; overall: 'passed' | 'failed' | 'partial' | 'not_run'; checksTotal: number; checksPassed: number; changedFilesCount: number }
   | { type: 'usage'; usage: UsageDelta }
+  | { type: 'context-compact'; phase: 'start'; reason: 'context-window' }
+  | { type: 'context-compact'; phase: 'done'; beforeChars: number; afterChars: number; droppedTurns: number; keptTurns: number; reason: 'context-window' }
+  | { type: 'context-compact'; phase: 'cancel'; reason: 'context-window' }
   | { type: 'info'; text: string }
   | { type: 'cross-verify'; result: string; provider: string; ok: boolean }
   | { type: 'done' }
@@ -183,6 +186,9 @@ declare global {
         getVersion: () => Promise<string>
         isFocused: () => Promise<boolean>
         openExternal: (url: string) => Promise<boolean>
+      }
+      runtimeLogs: {
+        info: () => Promise<{ dir: string; runtime: string; errors: string }>
       }
       window: {
         minimize: () => Promise<void>
@@ -288,7 +294,9 @@ declare global {
       }
       chats: {
         list: (sessionId: number) => Promise<StoredChatMessage[]>
-        append: (sessionId: number, projectPath: string, role: 'user' | 'assistant', content: string) => Promise<void>
+        append: (sessionId: number, projectPath: string, role: 'user' | 'assistant', content: string) => Promise<StoredChatMessage>
+        updateMessage: (messageId: number, content: string) => Promise<boolean>
+        updateThinking: (messageId: number, thinking: string) => Promise<boolean>
       }
       handoff: {
         generate: (sessionId: number, parentId?: string | null) => Promise<string>
@@ -317,6 +325,7 @@ declare global {
         }) => Promise<Reminder>
         snooze: (id: number, minutes?: number) => Promise<Reminder | null>
         dismiss: (id: number) => Promise<Reminder | null>
+        markChatDelivered: (id: number) => Promise<Reminder | null>
         remove: (id: number) => Promise<void>
       }
       undo: {
@@ -711,7 +720,7 @@ export interface SessionTodo {
  * тип дублируется здесь. Один ai:send = одна строка.
  */
 export type AgentRunOwner = 'main' | 'review' | 'delegate' | 'background'
-export type AgentRunStatus = 'queued' | 'running' | 'waiting_review' | 'done' | 'failed' | 'stopped'
+export type AgentRunStatus = 'queued' | 'running' | 'waiting_review' | 'done' | 'failed' | 'stopped' | 'interrupted'
 
 export interface AgentRun {
   runId: string

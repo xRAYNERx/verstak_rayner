@@ -130,11 +130,33 @@ function countVisible(
   return ungrouped.length + groups.reduce((sum, g) => sum + g.projects.length, 0)
 }
 
+function hasInterruptedPlaceholderSnapshot(snapshot: {
+  messages?: Array<{ role: string; content: string; thinking?: string }>
+  isStreaming?: boolean
+} | undefined): boolean {
+  const messages = snapshot?.messages ?? []
+  if (messages.length < 2) return false
+  const last = messages[messages.length - 1]
+  return last?.role === 'assistant'
+    && !last.content.trim()
+    && messages.slice(0, -1).some(m => m.role === 'user' && m.content.trim())
+    && !snapshot?.isStreaming
+}
+
+function hasInterruptedStoredMessages(messages: Array<{ role: string; content: string; thinking?: string }>): boolean {
+  if (messages.length < 2) return false
+  const last = messages[messages.length - 1]
+  return last?.role === 'assistant'
+    && !last.content.trim()
+    && messages.slice(0, -1).some(m => m.role === 'user' && m.content.trim())
+}
+
 interface ProjectChipProps {
   project: ProjectMeta
   active: boolean
   unread: boolean
   streaming: boolean
+  interrupted: boolean
   shellExpanded: boolean
   contentExpanded: boolean
   nested?: boolean
@@ -147,6 +169,7 @@ function ProjectChip({
   active,
   unread,
   streaming,
+  interrupted,
   shellExpanded,
   contentExpanded,
   nested,
@@ -154,7 +177,7 @@ function ProjectChip({
   onSettings
 }: ProjectChipProps) {
   const [hover, setHover] = useState(false)
-  const status = streaming ? 'streaming' : unread ? 'unread' : null
+  const status = interrupted ? 'interrupted' : streaming ? 'streaming' : unread ? 'unread' : null
 
   return (
     <div
@@ -172,8 +195,8 @@ function ProjectChip({
           <ProjectAvatar project={project} className="gg-rail-avatar" size={34} />
           {status && (
             <span
-              className={`gg-rail-status ${status === 'streaming' ? 'is-streaming' : 'is-unread'}`}
-              title={streaming ? 'AI работает в этом проекте' : 'Есть новый ответ'}
+              className={`gg-rail-status ${status === 'interrupted' ? 'is-interrupted' : status === 'streaming' ? 'is-streaming' : 'is-unread'}`}
+              title={interrupted ? 'Работа была прервана - открой проект для восстановления' : streaming ? 'AI работает в этом проекте' : 'Есть новый ответ'}
             />
           )}
         </span>
@@ -201,6 +224,7 @@ interface ProjectGroupBlockProps {
   projects: ProjectMeta[]
   activePath: string | null
   sessions: Record<string, { hasUnread?: boolean; isStreaming?: boolean } | undefined>
+  isProjectInterrupted: (projectPath: string) => boolean
   shellExpanded: boolean
   contentExpanded: boolean
   onToggleCollapsed: (group: ProjectGroup) => void
@@ -215,6 +239,7 @@ function ProjectGroupBlock({
   projects,
   activePath,
   sessions,
+  isProjectInterrupted,
   shellExpanded,
   contentExpanded,
   onToggleCollapsed,
@@ -304,6 +329,7 @@ function ProjectGroupBlock({
                 active={activePath === p.path}
                 unread={!!session?.hasUnread}
                 streaming={!!session?.isStreaming}
+                interrupted={isProjectInterrupted(p.path)}
                 shellExpanded={shellExpanded}
                 contentExpanded={contentExpanded}
                 nested
@@ -328,7 +354,47 @@ interface ProjectRailProps {
 
 export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, onOpenHelp, sidebarOpen, onToggleSidebar }: ProjectRailProps) {
   const t = useT()
-  const { path, projectList, sessions, setProject, refreshProjectList, helpMode, help } = useProject()
+  const {
+    path,
+    projectList,
+    sessions,
+    setProject,
+    refreshProjectList,
+    helpMode,
+    help,
+    resumableRuns,
+    messages,
+    activeChatId,
+    isStreaming,
+    streamStartedAt,
+    sendOwners
+  } = useProject()
+  const [startupInterruptedPaths, setStartupInterruptedPaths] = useState<Set<string>>(() => new Set())
+  const hasLiveActiveChatOwner = activeChatId != null && Object.values(sendOwners).some(
+    owner => owner.kind === 'chat' && !owner.isHelp && owner.chatId === activeChatId
+  )
+  const freshActiveStreaming = isStreaming && streamStartedAt != null && Date.now() - streamStartedAt < 15000
+  const interruptedPaths = useMemo(() => {
+    const paths = new Set<string>()
+    for (const [projectPath, snapshot] of Object.entries(sessions)) {
+      if (hasInterruptedPlaceholderSnapshot(snapshot)) paths.add(projectPath)
+    }
+    if (path && resumableRuns.length > 0) paths.add(path)
+    return paths
+  }, [path, resumableRuns.length, sessions])
+  const hasInterruptedPlaceholder = !helpMode
+    && path
+    && messages.length >= 2
+    && messages[messages.length - 1]?.role === 'assistant'
+    && !messages[messages.length - 1]?.content.trim()
+    && messages.slice(0, -1).some(m => m.role === 'user' && m.content.trim())
+    && !freshActiveStreaming
+    && (!isStreaming || !hasLiveActiveChatOwner)
+  const activeInterruptedPath = !helpMode && path && (resumableRuns.length > 0 || hasInterruptedPlaceholder) ? path : null
+  const isProjectInterrupted = (projectPath: string) => {
+    if (!helpMode && path === projectPath) return activeInterruptedPath === projectPath
+    return interruptedPaths.has(projectPath) || startupInterruptedPaths.has(projectPath)
+  }
   const [bootstrapped, setBootstrapped] = useState(false)
   const initialRailExpanded = readRailExpanded()
   const [railExpanded, setRailExpanded] = useState(initialRailExpanded)
@@ -357,6 +423,51 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, onOpenHe
   const showSearchTool = !contentExpanded && showSearch
   const toolbarToolCount = 2 + (showSearchTool ? 1 : 0)
   const listEmpty = railView.visibleCount === 0
+
+  useEffect(() => {
+    const projectPaths = projectList.map(p => p.path)
+    if (projectPaths.length === 0) {
+      setStartupInterruptedPaths(new Set())
+      return
+    }
+
+    let cancelled = false
+    void (async () => {
+      const found = new Set<string>()
+      await Promise.all(projectPaths.map(async projectPath => {
+        try {
+          const resumable = await window.api.agentRuns.listResumable(projectPath)
+          if (resumable.length > 0) {
+            found.add(projectPath)
+            return
+          }
+
+          const chatSessions = await window.api.chatSessions.list(projectPath)
+          for (const session of chatSessions) {
+            const history = await window.api.chats.list(session.id)
+            if (hasInterruptedStoredMessages(history)) {
+              found.add(projectPath)
+              return
+            }
+          }
+        } catch {
+          // Startup indicator scan is best-effort; opening the project still hydrates exact state.
+        }
+      }))
+      if (!cancelled) setStartupInterruptedPaths(found)
+    })()
+
+    return () => { cancelled = true }
+  }, [projectList])
+
+  useEffect(() => {
+    if (!path || activeInterruptedPath || !startupInterruptedPaths.has(path)) return
+    setStartupInterruptedPaths(prev => {
+      const next = new Set(prev)
+      next.delete(path)
+      return next
+    })
+  }, [activeInterruptedPath, path, startupInterruptedPaths])
 
   async function refreshGroups() {
     const list = await window.api.projects.listGroups()
@@ -543,6 +654,7 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, onOpenHe
             projects={projects}
             activePath={helpMode ? null : path}
             sessions={sessions}
+            isProjectInterrupted={isProjectInterrupted}
             shellExpanded={shellExpanded}
             contentExpanded={contentExpanded}
             onToggleCollapsed={g => void handleToggleGroupCollapsed(g)}
@@ -561,6 +673,7 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, onOpenHe
               active={!helpMode && path === p.path}
               unread={!!session?.hasUnread}
               streaming={!!session?.isStreaming}
+              interrupted={isProjectInterrupted(p.path)}
               shellExpanded={shellExpanded}
               contentExpanded={contentExpanded}
               onClick={() => { if (helpMode || path !== p.path) void setProject(p.path) }}
@@ -600,6 +713,7 @@ export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, onOpenHe
                   active={!helpMode && path === p.path}
                   unread={!!session?.hasUnread}
                   streaming={!!session?.isStreaming}
+                  interrupted={isProjectInterrupted(p.path)}
                   shellExpanded={shellExpanded}
                   contentExpanded={contentExpanded}
                   nested

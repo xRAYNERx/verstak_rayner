@@ -8,6 +8,7 @@ import type { ChatProvider, ChatMessage, ChatEvent, ToolDefinition, ToolResult }
 import { buildCliPrompt } from './cli-prompt'
 import { describeAttachments } from './history-serializer'
 import { treeKill } from './child-kill'
+import type { AgentMode } from './mode-policy'
 
 /**
  * Grok-4 / Grok Build (xAI) в режиме `streaming-json` стримит ВСЁ как обычный
@@ -110,6 +111,7 @@ interface GrokCliOptions {
   /** Промпт активного скилла — наслаивается секцией <skill_layer> в buildCliPrompt. */
   skillPrompt?: string | null
   memories?: Array<{ type: string; content: string; tags: string[] }>
+  agentMode?: AgentMode
 }
 
 export const GROK_CLI_MODELS = [
@@ -190,7 +192,8 @@ export function createGrokCliProvider(opts: GrokCliOptions = {}): ChatProvider {
             messages,
             projectSystemPrompt: opts.projectSystemPrompt,
             skillPrompt: opts.skillPrompt,
-            memories: opts.memories
+            memories: opts.memories,
+            agentMode: opts.agentMode
           })
         } catch (err) {
           yield { type: 'error', message: err instanceof Error ? err.message : String(err) }
@@ -272,7 +275,11 @@ export function createGrokCliProvider(opts: GrokCliOptions = {}): ChatProvider {
         }
         // Error event
         else if (ev.type === 'error' || ev.type === 'fatal') {
-          queue.push({ type: 'error', message: ev.error ?? ev.data ?? 'Grok CLI error' })
+          const detail = ev.error ?? ev.data ?? ev.text ?? ev.content ?? ev.message?.content
+          queue.push({
+            type: 'error',
+            message: detail ? `Grok CLI error: ${detail}` : `Grok CLI error: ${JSON.stringify(ev).slice(0, 500)}`
+          })
           wake()
         }
       }

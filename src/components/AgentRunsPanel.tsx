@@ -271,7 +271,7 @@ function RunCard({ run, providerLabel, expanded, onToggle, onStop, onResume }: {
   const cost = fmtCost(run.costCents)
   const liveProgress = formatLiveProgress(run, t)
   const canStop = run.status === 'running' || run.status === 'queued'
-  const canResume = run.status === 'failed' || run.status === 'stopped'
+  const canResume = run.status === 'failed' || run.status === 'stopped' || run.status === 'interrupted'
   const ownerLabel = t.agentRuns.owner[run.owner as keyof typeof t.agentRuns.owner] ?? run.owner
 
   return (
@@ -361,6 +361,15 @@ export function AgentRunsPanel() {
     const timer = setInterval(() => { if (!document.hidden) void refresh() }, 2000)
     return () => clearInterval(timer)
   }, [refresh])
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const runId = (event as CustomEvent<string>).detail
+      if (typeof runId === 'string' && runId) setExpanded(runId)
+    }
+    window.addEventListener('gg-open-agent-run', handler)
+    return () => window.removeEventListener('gg-open-agent-run', handler)
+  }, [])
 
   const handleStop = useCallback((runId: string) => {
     void window.api.agentRuns.stop(runId).catch(() => {}).finally(() => void refresh())

@@ -174,6 +174,7 @@ export const ru: Translations = {
       done: 'готово',
       failed: 'ошибка',
       stopped: 'остановлен',
+      interrupted: 'прерван',
     },
     owner: {
       main: 'основной',

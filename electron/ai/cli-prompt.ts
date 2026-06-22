@@ -17,8 +17,9 @@
 
 import { SYSTEM_LAYER_PROMPT } from './system-layer'
 import { prepareParts } from './compose-system'
-import { serializeHistory, describeAttachments } from './history-serializer'
+import { serializeHistory, describeAttachments, type SerializeHistoryOpts } from './history-serializer'
 import { detectVerifyScriptsForHint } from './session-journal'
+import type { AgentMode } from './mode-policy'
 import type { ChatMessage } from './types'
 
 export type CliProviderId = 'claude-cli' | 'gemini-cli' | 'grok-cli' | 'codex-cli'
@@ -51,6 +52,42 @@ interface BuildCliPromptOpts {
    *  «запусти проверку (npm test/type)». CLI one-shot — не имеет цикла, поэтому
    *  вызывающий код выставляет флаг, когда в истории были write'ы. */
   appendVerifyHint?: boolean
+  /** Current chat mode. Used only for prompt-size policy: destructive/auto modes
+   *  keep a wider history, plain ask/plan can use a low-latency window. */
+  agentMode?: AgentMode
+}
+
+const DEFAULT_HISTORY_OPTS: SerializeHistoryOpts = {}
+const LOW_LATENCY_HISTORY_OPTS: SerializeHistoryOpts = {
+  charBudget: 12_000,
+  minTurns: 8,
+  perMsgBodyCap: 1200,
+  perToolResultCap: 700,
+  perToolCallArgsCap: 180
+}
+
+function isLikelySimpleConversationTurn(text: string): boolean {
+  const normalized = text.trim().toLowerCase()
+  if (!normalized) return false
+  if (normalized.length > 220) return false
+
+  const complexSignals = [
+    'fix', 'debug', 'implement', 'build', 'create', 'refactor', 'rewrite',
+    'test', 'deploy', 'release', 'push', 'commit', 'merge', 'migrate',
+    'исправ', 'почин', 'сдела', 'добав', 'удал', 'собер', 'запуш',
+    'задепло', 'пересоб', 'перепиш', 'реализ', 'проверь код', 'заливай'
+  ]
+
+  return !complexSignals.some(signal => normalized.includes(signal))
+}
+
+function historyOptsForPrompt(opts: BuildCliPromptOpts, lastUserText: string): SerializeHistoryOpts {
+  if (opts.agentMode === 'auto' || opts.agentMode === 'bypass' || opts.agentMode === 'accept-edits') {
+    return DEFAULT_HISTORY_OPTS
+  }
+  return isLikelySimpleConversationTurn(lastUserText)
+    ? LOW_LATENCY_HISTORY_OPTS
+    : DEFAULT_HISTORY_OPTS
 }
 
 /**
@@ -121,7 +158,8 @@ export async function buildCliPrompt(opts: BuildCliPromptOpts): Promise<string> 
   const turns = messages.filter(m => m.role !== 'system')
   // Drop the very last user message — we'll send it separately as the prompt
   const candidates = turns.slice(0, -1)
-  const { transcript, includedCount, droppedCount } = serializeHistory(candidates)
+  const historyOpts = historyOptsForPrompt(opts, lastUser.content)
+  const { transcript, includedCount, droppedCount } = serializeHistory(candidates, historyOpts)
   if (includedCount > 0) {
     const droppedNote = droppedCount > 0
       ? ` dropped="${droppedCount}" reason="budget"`

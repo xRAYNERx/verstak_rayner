@@ -142,7 +142,7 @@ export function SideChat({ sideChatId, onSessionCreated, onClose }: SideChatProp
       if (cancelled) return
       const current = useProject.getState().chatSnapshots[sideChatId]
       if (current && current.messages.length > 0) return
-      store.seedChatSnapshot(sideChatId, history.map(m => ({ role: m.role, content: m.content })))
+      store.seedChatSnapshot(sideChatId, history.map(m => ({ role: m.role, content: m.content, thinking: m.thinking, createdAt: m.createdAt, dbId: m.id })))
     }).catch(() => {})
     return () => { cancelled = true }
   }, [sideChatId])
@@ -206,7 +206,7 @@ export function SideChat({ sideChatId, onSessionCreated, onClose }: SideChatProp
     )
     sendIdRef.current = sendId
     if (sendId > 0) {
-      store.registerSendOwner(sendId, { kind: 'chat', chatId })
+      store.registerSendOwner(sendId, { kind: 'chat', chatId, projectPath: path })
     } else {
       store.applyEventToChat(chatId, { type: 'error', message: 'Провайдер недоступен' })
     }

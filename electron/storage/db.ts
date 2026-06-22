@@ -19,6 +19,7 @@ export function openDb(path: string): DB {
       project_path TEXT NOT NULL,
       role TEXT NOT NULL,
       content TEXT NOT NULL,
+      thinking TEXT NOT NULL DEFAULT '',
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_chats_project ON chats(project_path, created_at);
@@ -607,6 +608,89 @@ const MIGRATIONS: Array<{ version: number; description: string; run: (db: DB) =>
         CREATE INDEX IF NOT EXISTS idx_reminders_project ON reminders(project_path, due_at);
         CREATE INDEX IF NOT EXISTS idx_reminders_pending ON reminders(status, due_at);
       `)
+    }
+  },
+  {
+    version: 25,
+    description: 'agent_runs.status: add interrupted for runs restored after app close/restart',
+    run: (db: DB) => {
+      const table = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='agent_runs'").get()
+      if (!table) return
+      const createSql = (db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='agent_runs'").get() as { sql?: string } | undefined)?.sql ?? ''
+      if (createSql.includes("'interrupted'")) return
+      db.exec(`
+        ALTER TABLE agent_runs RENAME TO agent_runs_old_25;
+
+        CREATE TABLE agent_runs (
+          run_id TEXT PRIMARY KEY,
+          project_path TEXT NOT NULL,
+          chat_id INTEGER,
+          owner TEXT NOT NULL DEFAULT 'main' CHECK(owner IN ('main','review','delegate','background')),
+          title TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'running' CHECK(status IN ('queued','running','waiting_review','done','failed','stopped','interrupted')),
+          provider_id TEXT, model TEXT, send_id INTEGER,
+          agents_count INTEGER NOT NULL DEFAULT 0, tool_count INTEGER NOT NULL DEFAULT 0,
+          files_count INTEGER NOT NULL DEFAULT 0, cost_cents INTEGER NOT NULL DEFAULT 0,
+          error TEXT, started_at INTEGER NOT NULL, ended_at INTEGER,
+          turn_index INTEGER DEFAULT 0,
+          last_tool_name TEXT,
+          last_checkpoint_id INTEGER,
+          agent_mode TEXT,
+          updated_at INTEGER
+        );
+
+        INSERT INTO agent_runs (
+          run_id, project_path, chat_id, owner, title, status,
+          provider_id, model, send_id,
+          agents_count, tool_count, files_count, cost_cents,
+          error, started_at, ended_at,
+          turn_index, last_tool_name, last_checkpoint_id, agent_mode, updated_at
+        )
+        SELECT
+          run_id, project_path, chat_id, owner, title, status,
+          provider_id, model, send_id,
+          agents_count, tool_count, files_count, cost_cents,
+          error, started_at, ended_at,
+          COALESCE(turn_index, 0), last_tool_name, last_checkpoint_id, agent_mode, updated_at
+        FROM agent_runs_old_25
+        ORDER BY rowid ASC;
+
+        DROP TABLE agent_runs_old_25;
+        CREATE INDEX IF NOT EXISTS idx_agent_runs_project ON agent_runs(project_path, started_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_agent_runs_status ON agent_runs(project_path, status);
+      `)
+    }
+  },
+  {
+    version: 26,
+    description: 'chats_fts: keep index in sync when streaming assistant messages are updated',
+    run: (db: DB) => {
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS chats_fts_au AFTER UPDATE OF content ON chats BEGIN
+          INSERT INTO chats_fts(chats_fts, rowid, content) VALUES('delete', old.rowid, old.content);
+          INSERT INTO chats_fts(rowid, content) VALUES (new.rowid, new.content);
+        END;
+      `)
+    }
+  },
+  {
+    version: 27,
+    description: 'chats.thinking: persist streamed reasoning for crash-resume banners',
+    run: (db: DB) => {
+      const cols = (db.prepare('PRAGMA table_info(chats)').all() as Array<{ name: string }>).map(c => c.name)
+      if (!cols.includes('thinking')) {
+        db.exec("ALTER TABLE chats ADD COLUMN thinking TEXT NOT NULL DEFAULT ''")
+      }
+    }
+  },
+  {
+    version: 28,
+    description: 'chats.thinking repair: add missing column even if v27 was marked applied',
+    run: (db: DB) => {
+      const cols = (db.prepare('PRAGMA table_info(chats)').all() as Array<{ name: string }>).map(c => c.name)
+      if (!cols.includes('thinking')) {
+        db.exec("ALTER TABLE chats ADD COLUMN thinking TEXT NOT NULL DEFAULT ''")
+      }
     }
   }
 ]
