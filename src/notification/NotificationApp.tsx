@@ -140,6 +140,8 @@ export function NotificationApp() {
           className={`gg-app-toast ${toast.isError ? 'is-error' : 'is-ok'}`}
           data-theme={toast.theme ?? 'nord'}
           role="alert"
+          onMouseEnter={() => window.toastApi.setMousePassthrough(false)}
+          onMouseLeave={() => window.toastApi.setMousePassthrough(true)}
           onClick={() => openMain(toast.id, toast)}
         >
           <div className="gg-app-toast-head">

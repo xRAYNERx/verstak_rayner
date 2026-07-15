@@ -10,6 +10,9 @@ import type { FileNode } from '../shared-types'
 export type { FileNode }
 
 const IGNORE = new Set(['node_modules', '.git', 'out', 'dist', '.verstak-data', '.superpowers'])
+const COLLAPSE_DIRS = new Set(['logs', 'agent-tools', 'terminals', 'reports', 'campaigns', 'creatives'])
+const MAX_TREE_NODES = 350
+const MAX_DIR_ENTRIES = 120
 const MAX_READ_BYTES = 2 * 1024 * 1024  // 2 MB safety cap
 const SKILL_PREVIEW_ROOTS = [
   join(homedir(), '.verstak', 'skills'),
@@ -130,6 +133,27 @@ function relForPolicy(abs: string, deps: FilesIpcDeps): string {
 // export для regression-теста (ревью F4): symlink-директория наружу не должна
 // раскрываться listTree (lstat + isSymbolicLink continue).
 export async function listTree(current: string, depth: number): Promise<FileNode[]> {
+  let nodeBudget = MAX_TREE_NODES
+  return listTreeInner(current, depth, () => nodeBudget-- > 0)
+}
+
+async function summarizeDirectory(abs: string): Promise<{ fileCount: number; sizeBytes: number; truncated: boolean }> {
+  try {
+    const entries = await readdir(abs)
+    let sizeBytes = 0
+    for (const name of entries.slice(0, MAX_DIR_ENTRIES)) {
+      try {
+        const st = await lstat(join(abs, name))
+        if (!st.isSymbolicLink()) sizeBytes += st.size
+      } catch { /* ignore unreadable child */ }
+    }
+    return { fileCount: entries.length, sizeBytes, truncated: entries.length > MAX_DIR_ENTRIES }
+  } catch {
+    return { fileCount: 0, sizeBytes: 0, truncated: false }
+  }
+}
+
+async function listTreeInner(current: string, depth: number, takeNode: () => boolean): Promise<FileNode[]> {
   if (depth > 5) return []
   let entries: string[]
   try {
@@ -138,17 +162,25 @@ export async function listTree(current: string, depth: number): Promise<FileNode
     return []
   }
   const nodes: FileNode[] = []
-  for (const name of entries) {
+  for (const name of entries.slice(0, MAX_DIR_ENTRIES)) {
+    if (!takeNode()) break
     if (IGNORE.has(name) || name.startsWith('.')) continue
     const abs = join(current, name)
     let lst
     try { lst = await lstat(abs) } catch { continue }
     if (lst.isSymbolicLink()) continue // Игнорируем символические ссылки во избежание обхода дерева наружу или бесконечных циклов
     if (lst.isDirectory()) {
-      nodes.push({ name, path: abs, isDirectory: true, children: await listTree(abs, depth + 1) })
+      if (depth === 0 && COLLAPSE_DIRS.has(name)) {
+        nodes.push({ name, path: abs, isDirectory: true, collapsed: true, ...(await summarizeDirectory(abs)) })
+      } else {
+        nodes.push({ name, path: abs, isDirectory: true, children: await listTreeInner(abs, depth + 1, takeNode) })
+      }
     } else {
       nodes.push({ name, path: abs, isDirectory: false })
     }
+  }
+  if (entries.length > MAX_DIR_ENTRIES) {
+    nodes.push({ name: `... еще ${entries.length - MAX_DIR_ENTRIES} файлов`, path: join(current, `__truncated_${depth}`), isDirectory: false, truncated: true })
   }
   nodes.sort((a, b) => Number(b.isDirectory) - Number(a.isDirectory) || a.name.localeCompare(b.name))
   return nodes

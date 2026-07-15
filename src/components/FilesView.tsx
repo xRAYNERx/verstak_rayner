@@ -13,11 +13,16 @@ function touchMarker(kind: 'read' | 'write' | 'list'): { icon: string; title: st
 function FileTreeNode({ node, depth }: { node: FileNode; depth: number }) {
   const [open, setOpen] = useState(depth < 1)
   const isDir = node.isDirectory
+  const isCollapsed = isDir && node.collapsed
   const touched = useProject(s => s.touchedFiles[node.path])
   const marker = touched ? touchMarker(touched) : null
+  const meta = isCollapsed && node.fileCount != null
+    ? `${node.fileCount} файлов${node.sizeBytes ? `, ${formatBytes(node.sizeBytes)}` : ''}`
+    : null
 
   function onClick() {
-    if (isDir) {
+    if (node.truncated) return
+    if (isDir && !isCollapsed) {
       setOpen(o => !o)
       return
     }
@@ -37,13 +42,20 @@ function FileTreeNode({ node, depth }: { node: FileNode; depth: number }) {
       >
         <span className="gg-tree-icon">{isDir ? (open ? '▾' : '▸') : '·'}</span>
         <span className="gg-tree-name">{node.name}</span>
+        {meta && <span className="gg-tree-meta">{meta}</span>}
         {marker && <span className="gg-tree-touch" aria-hidden>{marker.icon}</span>}
       </div>
-      {isDir && open && node.children?.map(child => (
+      {isDir && !isCollapsed && open && node.children?.map(child => (
         <FileTreeNode key={child.path} node={child} depth={depth + 1} />
       ))}
     </>
   )
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 export function FilesView() {

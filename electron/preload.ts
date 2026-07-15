@@ -122,6 +122,9 @@ contextBridge.exposeInMainWorld('api', {
     docxToHtml: (path: string) => ipcRenderer.invoke('files:docx-to-html', path),
     xlsxToMarkdown: (path: string) => ipcRenderer.invoke('files:xlsx-to-markdown', path)
   },
+  clipboard: {
+    writeText: (text: string) => ipcRenderer.invoke('clipboard:write-text', text) as Promise<{ ok: boolean }>
+  },
   projectMap: {
     warm: (root: string) => ipcRenderer.invoke('project-map:warm', root),
     get: (root: string, refresh?: boolean) => ipcRenderer.invoke('project-map:get', root, refresh),
@@ -220,6 +223,8 @@ contextBridge.exposeInMainWorld('api', {
   },
   chats: {
     list: (sessionId: number) => ipcRenderer.invoke('chats:list', sessionId),
+    listWindow: (sessionId: number, opts?: { limit?: number; beforeId?: number; includeThinking?: boolean }) =>
+      ipcRenderer.invoke('chats:list-window', sessionId, opts),
     append: (sessionId: number, projectPath: string, role: 'user' | 'assistant', content: string, meta?: { appliedSkills?: Array<{ id: string; name?: string; icon?: string; description?: string }> }) =>
       ipcRenderer.invoke('chats:append', sessionId, projectPath, role, content, meta),
     maxMessageId: (sessionId: number) => ipcRenderer.invoke('chats:max-message-id', sessionId) as Promise<number>,

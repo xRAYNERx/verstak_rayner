@@ -17,6 +17,7 @@ html, body, #root {
   width: 100%;
   height: 100%;
   justify-content: flex-start;
+  pointer-events: none;
 }
 
 .gg-app-toast {
@@ -39,6 +40,7 @@ html, body, #root {
   cursor: pointer;
   animation: gg-app-toast-in 220ms ease-out;
   user-select: none;
+  pointer-events: auto;
 }
 
 .gg-app-toast[data-theme='light'] {

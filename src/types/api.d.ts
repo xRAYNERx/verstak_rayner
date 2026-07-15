@@ -1,4 +1,4 @@
-export interface FileNode { name: string; path: string; isDirectory: boolean; children?: FileNode[] }
+export interface FileNode { name: string; path: string; isDirectory: boolean; children?: FileNode[]; collapsed?: boolean; fileCount?: number; sizeBytes?: number; truncated?: boolean }
 
 // ── Карта проекта (mirror типов из electron/ai/project-map.ts; renderer не
 //    может импортировать из electron/, поэтому форма продублирована) ──
@@ -15,8 +15,9 @@ export interface DependencyMapDTO {
 }
 export interface Attachment { name: string; mimeType: string; data: string; size: number }
 export interface AppliedSkillRef { id: string; name?: string; icon?: string; description?: string }
-export interface ChatMessage { role: 'user' | 'assistant' | 'system'; content: string; attachments?: Attachment[]; thinking?: string; createdAt?: number; source?: 'reminder'; appliedSkills?: AppliedSkillRef[]; dbId?: number; /** Длительность ответа ассистента (мс), только в UI сессии. */ responseDurationMs?: number }
-export interface StoredChatMessage { id: number; role: 'user' | 'assistant' | 'system'; content: string; thinking?: string; appliedSkills?: AppliedSkillRef[]; createdAt: number }
+export interface ChatMessage { role: 'user' | 'assistant' | 'system'; content: string; attachments?: Attachment[]; thinking?: string; thinkingLength?: number; createdAt?: number; source?: 'reminder'; appliedSkills?: AppliedSkillRef[]; dbId?: number; /** Длительность ответа ассистента (мс), только в UI сессии. */ responseDurationMs?: number }
+export interface StoredChatMessage { id: number; role: 'user' | 'assistant' | 'system'; content: string; thinking?: string; thinkingLength?: number; appliedSkills?: AppliedSkillRef[]; createdAt: number }
+export interface StoredChatWindow { messages: StoredChatMessage[]; totalCount: number; hasMoreBefore: boolean }
 export type ChatKind = 'main' | 'review' | 'help'
 export interface ChatSession {
   id: number
@@ -406,6 +407,9 @@ declare global {
         docxToHtml: (path: string) => Promise<{ ok: true; html: string; warnings: string[] } | { ok: false; error: string }>
         xlsxToMarkdown: (path: string) => Promise<{ ok: true; markdown: string } | { ok: false; error: string }>
       }
+      clipboard: {
+        writeText: (text: string) => Promise<{ ok: boolean }>
+      }
       projectMap: {
         /** Фоновый прогрев карты+графа (non-blocking). Возвращает сразу. */
         warm: (root: string) => Promise<{ started: boolean }>
@@ -491,6 +495,7 @@ declare global {
       }
       chats: {
         list: (sessionId: number) => Promise<StoredChatMessage[]>
+        listWindow: (sessionId: number, opts?: { limit?: number; beforeId?: number; includeThinking?: boolean }) => Promise<StoredChatWindow>
         append: (sessionId: number, projectPath: string, role: 'user' | 'assistant', content: string, meta?: { appliedSkills?: AppliedSkillRef[] }) => Promise<StoredChatMessage>
         maxMessageId: (sessionId: number) => Promise<number>
         truncateAfter: (sessionId: number, afterMessageId: number) => Promise<number>

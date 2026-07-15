@@ -416,6 +416,7 @@ export function AgentRunsPanel() {
   const [ownerFilter, setOwnerFilter] = useState<string>('')
   const [expanded, setExpanded] = useState<string | null>(null)
   const [providerMeta, setProviderMeta] = useState<Record<string, string>>({})
+  const [limit, setLimit] = useState(20)
 
   useEffect(() => {
     void window.api.providers.list().then((list: ProviderDescriptorDTO[]) => {
@@ -433,16 +434,21 @@ export function AgentRunsPanel() {
   const refresh = useCallback(async () => {
     if (!path) return
     try {
-      const list = await window.api.agentRuns.list(path)
+      const list = await window.api.agentRuns.list(path, { limit })
       setRuns(list)
     } catch { /* IPC недоступен в dev */ }
-  }, [path])
+  }, [path, limit])
 
   useEffect(() => {
     void refresh()
+  }, [refresh])
+
+  useEffect(() => {
+    const hasActiveRun = runs.some(r => r.status === 'running' || r.status === 'queued')
+    if (!hasActiveRun) return
     const timer = setInterval(() => { if (!document.hidden) void refresh() }, 2000)
     return () => clearInterval(timer)
-  }, [refresh])
+  }, [refresh, runs])
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -537,6 +543,11 @@ export function AgentRunsPanel() {
                 onResume={(id, status) => void handleResume(id, status)}
               />
             ))}
+            {runs.length >= limit && (
+              <button type="button" className="gg-btn gg-btn-ghost" onClick={() => setLimit(n => n + 20)}>
+                Показать еще
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -3,212 +3,188 @@
 Last updated: 2026-07-15
 Source branch: `codex/reapply-1.9.5`
 Target use: pull these changes from Rayner's fork into Pavel's main Verstak repository
-Local version alignment: `2.0.5`
+Local version alignment: `2.0.6`
 
 ## Read This First
 
-This push contains several connected changes from Rayner's local build. Do not cherry-pick only CSS or only React components without the matching IPC, preload, storage, type, and style changes.
+This package contains several connected renderer, IPC, storage, and type changes. Do not cherry-pick only React/CSS files without the matching Electron IPC, preload, storage, and type updates.
 
-Keep Pavel's release version unless the release owner explicitly bumps it. Rayner's local `package.json` and lockfile are aligned to installed Verstak `2.0.5`.
+Keep Pavel's target release version unless the release owner explicitly bumps it. Rayner's local `package.json` and `package-lock.json` are aligned to installed Verstak `2.0.6`.
 
-Do not include the untracked `mcps/chrome-devtools/` folder unless Pavel explicitly wants that local tooling copied into the main repo.
+Do not include the untracked `mcps/chrome-devtools/` folder unless Pavel explicitly wants that local tooling copied into the main repository.
 
 ## What Changed
 
-### 1. Project Settings
+### 1. Chat Performance And Long Histories
+
+Main files:
+
+- `electron/ipc/chats.ts`
+- `electron/storage/chats.ts`
+- `src/store/projectStore.ts`
+- `src/components/Chat.tsx`
+- `src/styles/layout.css`
+- `src/types/api.d.ts`
+
+Important behavior:
+
+- Chat history can now load by windows through `chats:list-window` instead of always hydrating the full session.
+- Project/chat switching loads an initial window of recent messages and exposes a "show earlier messages" control when older messages exist.
+- Long `thinking` content can stay out of initial window loads unless explicitly requested.
+- Side work during project switch is deferred so switching projects is less likely to block the visible transition.
+- Chat rendering is memoized to reduce input lag in long conversations.
+
+Verify:
+
+- Open a long chat and confirm only recent messages render first.
+- Click "Показать ранние сообщения" and confirm older messages prepend without losing the current chat.
+- Switch between large projects and confirm the UI remains responsive.
+- Send a message after loading older history and confirm the full stored chat context is still used for the model.
+
+### 2. Stop Button And Concurrent Runs
+
+Main files:
+
+- `src/components/Chat.tsx`
+- `src/components/SideChat.tsx`
+- `electron/ipc/ai.ts`
+
+Important behavior:
+
+- The stop button now clears the visible run immediately and sends the abort to main asynchronously.
+- Manual stop is scoped to the current `sendId`; it should not clear a different chat/project stream.
+- Queued follow-up messages are not auto-started immediately after manual stop.
+- Plain/CLI provider runs receive the abort signal so `ai:stop` can actually interrupt them.
+
+Verify:
+
+- Start two runs in different projects/chats.
+- Stop one run and confirm the other remains running.
+- Press stop while a queued follow-up exists and confirm the stopped run does not immediately start the next queued item.
+- Stop a Grok CLI run and confirm it exits instead of continuing to stream.
+
+### 3. Copyable Text Blocks
+
+Main files:
+
+- `electron/ipc/clipboard.ts`
+- `electron/main.ts`
+- `electron/preload.ts`
+- `src/components/Markdown.tsx`
+- `src/types/api.d.ts`
+
+Important behavior:
+
+- Markdown code blocks and `copy`/plain text blocks can copy through Electron clipboard IPC.
+- Browser clipboard and legacy textarea copy remain as fallbacks.
+
+Verify:
+
+- Ask the model to return a copyable text block.
+- Click copy and paste into another field.
+- Confirm numbered lists copy as plain text with numbering intact.
+
+### 4. File Preview And File Tree Stability
+
+Main files:
+
+- `electron/ipc/files.ts`
+- `electron/shared-types.ts`
+- `src/components/FilesView.tsx`
+- `src/types/api.d.ts`
+- `src/styles/layout.css`
+
+Important behavior:
+
+- Large project folders are bounded by node and per-directory limits.
+- Heavy top-level folders such as logs, reports, campaigns, creatives, terminals, and agent tools are summarized instead of recursively expanded.
+- Truncated directory entries are marked so the UI does not try to open fake paths.
+- Collapsed folder rows show lightweight metadata.
+
+Verify:
+
+- Open the Files view in a large project.
+- Confirm tree loading is faster and heavy folders appear as summaries.
+- Click regular files and confirm preview still works.
+- Click summarized/truncated rows and confirm no broken file-open action occurs.
+
+### 5. Project Settings Encoding And Layout
 
 Main files:
 
 - `src/components/ProjectSettings.tsx`
-- `electron/ipc/projects.ts`
-- `electron/storage/db.ts`
-- `electron/storage/projects.ts`
-- `src/components/ProjectAvatar.tsx`
-- `src/components/ProjectRail.tsx`
-- `src/styles/layout.css`
-- `src/types/api.d.ts`
 
 Important behavior:
 
-- Project settings were rebuilt into a cleaner modal with notes, labels, group, project folder, status, project color, notifications, project data, archive, and project-management actions.
-- Project labels are stored as shared label entities but applied per project.
-- Project status supports active, paused, and done.
-- Project accent color is shown on the avatar ring only when no stronger state is active. Streaming, unread/completed, interrupted/error, and active-project states must override the custom color.
-- Duplicate project creates a copy named `Копия <project name>` and should preserve project settings.
-- Project cleanup removes temporary/cache data only, not project files, chats, tasks, or logs.
-- The modal uses the same action bar pattern as global settings: changed-state text plus close/save actions.
+- Mojibake/Russian text corruption in project settings was fixed.
+- Project settings keep the new modal structure: identity, notes, summary, labels, group, location, status, color, remote checks, project data, and management actions.
+- This package does not rewrite the whole settings system again; it preserves the already-applied design direction and fixes broken copy.
 
 Verify:
 
-- Open project settings from a project gear.
-- Change notes, labels, group, status, color, mute notifications, and save.
-- Confirm changes apply only after save where applicable.
-- Confirm accent color appears on the avatar ring when the project is idle and inactive.
-- Confirm active/streaming/unread/error states override the custom color.
-- Confirm duplicate project copies settings.
+- Open project settings and confirm Russian labels are readable.
+- Check labels, group, status, color, project data actions, archive, notifications, and delete confirmation.
+- Confirm close/save buttons still work.
 
-### 2. Project Rail And Project Sidebar
+### 6. Notification Window Click-Through
 
 Main files:
 
-- `src/components/ProjectRail.tsx`
+- `electron/notification-window.ts`
+- `electron/preload-notification.ts`
+- `src/notification/NotificationApp.tsx`
+- `src/notification/notification.css`
+- `src/notification/toast-api.d.ts`
+
+Important behavior:
+
+- The transparent notification window ignores mouse events outside the visible toast.
+- Hovering the toast temporarily enables mouse handling so the toast can still be clicked.
+
+Verify:
+
+- Show a completion notification.
+- Confirm screen areas outside the visible toast remain clickable.
+- Hover and click the toast itself and confirm it still opens the app/project.
+
+### 7. Project Sidebar Sections
+
+Main files:
+
 - `src/components/Sidebar.tsx`
-- `src/styles/layout.css`
-- `src/styles/atelier-global.css`
+- `src/i18n/ru.ts`
 
 Important behavior:
 
-- "Projects" and the project-side panel were visually aligned.
-- The project rail can be resized between the old width and a wider maximum.
-- In collapsed mode, clicking a group folder expands/collapses its projects.
-- Project chips keep stable selected background while project status is shown through avatar rings and thin borders.
-- The project rail has filters for default, active, paused, done, and archive views.
-- Project hover should not show folder paths as native browser tooltips.
+- The project-side panel title is now "Управление проектом".
+- Browser and Design items are marked as "Скоро" and are not active project tools yet.
 
 Verify:
 
-- Resize the project rail and restart app.
-- Collapse rail and expand/collapse folders.
-- Switch projects quickly and ensure no white ring flashes before the active ring.
-- Start/finish/error a project task and confirm state colors behave as described.
+- Open the project-side panel and confirm the title.
+- Confirm Browser and Design show the "Скоро" state and cannot be opened as unfinished tools.
 
-### 3. File Preview From Chat
+### 8. Agent Runs Panel
 
 Main files:
 
-- `src/App.tsx`
-- `src/components/Chat.tsx`
-- `src/components/Markdown.tsx`
-- `src/components/FilePreviewPanel.tsx`
-- `electron/ipc/files.ts`
-- `electron/preload.ts`
-- `src/types/api.d.ts`
-- `src/styles/markdown.css`
-- `src/styles/layout.css`
+- `src/components/AgentRunsPanel.tsx`
 
 Important behavior:
 
-- Paths in assistant messages can open in a right-side file preview panel.
-- The preview can read project files, known project roots, and skill folders.
-- `SKILL.md` paths from skill names should resolve correctly.
-- Text/Markdown/code files show readable content.
-- `.docx` converts to HTML using the existing document conversion path.
-- `.xlsx` converts to readable Markdown using the existing office reader.
-- Unsupported or missing files show a clear user-facing error instead of raw IPC/ENOENT output.
-- The right-side preview shares sizing behavior with the parallel chat panel.
+- Agent runs load with a limit and can show more on demand.
+- Auto-refresh is active only while a run is queued or running.
 
 Verify:
 
-- Click a Markdown inline code path like `direct-search-minusation/SKILL.md`.
-- Click a project file path, an `.xlsx`, and a `.docx`.
-- Confirm missing files show a clear explanation and the "show in explorer" action handles allowed paths.
+- Open "Прогоны" / history of AI work.
+- Confirm the first page loads and "Показать еще" expands the list.
+- Start a run and confirm active status refreshes.
 
-### 4. Copyable Text Blocks In Chat
+## Transfer Notes
 
-Main files:
-
-- `src/components/Markdown.tsx`
-- `src/styles/markdown.css`
-
-Important behavior:
-
-- Code blocks marked as `copy`, `text`, `plain`, or `plaintext` render as a separate copyable text panel.
-- The user can copy the whole text with one button, including numbered lists.
-- Existing code blocks with real language highlighting still render as code.
-
-Verify:
-
-- Send a Markdown block with ```copy and numbered lines.
-- Confirm the copy button copies the exact text, including numbering.
-
-### 5. Performance Optimizations
-
-Main files:
-
-- `src/components/Chat.tsx`
-- `src/store/projectStore.ts`
-- `electron/storage/projects.ts`
-
-Important behavior:
-
-- Composer token preview is now a cheap local estimate and no longer sends the full message history through IPC while typing.
-- Project file tree is loaded lazily when the Files tab opens, not every time a project is selected.
-- `projects.list()` avoids per-project N+1 queries for labels and last assistant timestamp.
-
-Verify:
-
-- Type in a long chat and delete text quickly.
-- Switch between projects with large histories.
-- Open Files tab and confirm the tree still loads.
-
-### 6. Long Agent Runs And Windows Shortcuts
-
-Main files:
-
-- `electron/ai/run-lifecycle.ts`
-- `scripts/sync-windows-shortcuts.cjs`
-- `package.json`
-- `package-lock.json`
-
-Important behavior:
-
-- Default agent run timeout is now 90 minutes.
-- Local deploy syncs Start Menu, Desktop, and pinned Taskbar shortcuts to the installed `Verstak.exe`.
-- Shortcut repair is part of deploy because Rayner's Start/taskbar shortcuts previously pointed to stale backup paths.
-
-Verify:
-
-- Check `DEFAULT_AGENT_RUN_TIMEOUT_MS` is 90 minutes.
-- Run local deploy and confirm Start Menu/Desktop/Taskbar shortcuts point to `C:\Users\RAYNER\AppData\Local\Programs\Verstak\Verstak.exe`.
-
-### 7. Visual Guardrails
-
-Main files:
-
-- `docs/UI_DESIGN_GUIDE.md`
-- `src/styles/layout.css`
-- `src/styles/atelier-global.css`
-- `src/styles/shell-atelier.css`
-- `src/styles/theme.css`
-
-Important behavior:
-
-- Preserve the Verstak card/button style: thin accent borders, subtle depth, no random heavy hover shadows, no nested frame-in-frame panels for simple content, no oversized badges.
-- Project settings typography must not fall back to the old heavy mono/uppercase label style.
-- Compact UI helper text should avoid final periods unless it is a full paragraph.
-
-## Files To Inspect First
-
-1. `docs/PATCHNOTES_DRAFT.md`
-2. `src/components/ProjectSettings.tsx`
-3. `src/components/ProjectRail.tsx`
-4. `src/components/FilePreviewPanel.tsx`
-5. `src/components/Markdown.tsx`
-6. `electron/ipc/files.ts`
-7. `electron/storage/projects.ts`
-8. `src/store/projectStore.ts`
-9. `src/styles/layout.css`
-10. `scripts/sync-windows-shortcuts.cjs`
-
-## Verification Checklist
-
-Run:
-
-- `npm.cmd run type`
-- `npm.cmd run build`
-
-Manual checks:
-
-- Project settings save flow
-- Project color/status rail states
-- File preview for project files and skill files
-- Copyable chat text block
-- Typing in a long chat
-- Switching large projects
-- Start Menu/Desktop/Taskbar shortcut launch
-
-## Patch Note Rule For Release
-
-Use `docs/PATCHNOTES_DRAFT.md` as the public release-note base.
-
-Patch notes must be human-readable and concrete. Do not include file paths, CSS/React names, internal implementation notes, or tiny visual fixes.
+- Preserve `2.0.6` version alignment unless Pavel intentionally changes release metadata.
+- Preserve the design guide decisions already present in the repo: no old hover shadows, no nested card stacks, no oversized badges, no one-off hardcoded colors.
+- Keep user-facing copy concise and human-readable.
+- Do not reintroduce native browser title tooltips for project paths.
+- After transfer, run `npm.cmd run type` and `npm.cmd run build`, then manually check the changed app sections above.

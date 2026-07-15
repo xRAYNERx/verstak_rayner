@@ -541,23 +541,44 @@ function composeSkillSystemPrompt(activeSkill: Skill | null, appliedSkills: Skil
 
 export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSettingsOpen = false, onOpenSideChat, onOpenFilePreview }: ChatProps) {
   const t = useT()
-  const {
-    helpMode, help, helpChatId,
-    messages: projectMessages, addMessage, insertMessageBeforeLast, updateLastAssistant,
-    isStreaming: projectIsStreaming, setStreaming, streamStartedAt: projectStreamStartedAt,
-    finalizeActiveStreamDuration, finalizeHelpStreamDuration,
-    activity: projectActivity, preflights, subagentRuns,
-    agentProgress: projectAgentProgress,
-    sessionUsage: projectSessionUsage,
-    path: activePath, chatSessions, activeChatId, resumableRuns,
-    addHelpMessage, insertHelpMessageBeforeLast, updateHelpLastAssistant,
-    setHelpStreaming, clearHelpActivity, pushHelpActivity, setHelpAgentProgress, addHelpUsage,
-    appendHelpLastAssistantThinking,
-    setAgentProgress,
-    setComposerDraft,
-    clearComposerDraft,
-    setActiveView,
-  } = useProject()
+  const helpMode = useProject(s => s.helpMode)
+  const help = useProject(s => s.help)
+  const helpChatId = useProject(s => s.helpChatId)
+  const projectMessages = useProject(s => s.messages)
+  const addMessage = useProject(s => s.addMessage)
+  const insertMessageBeforeLast = useProject(s => s.insertMessageBeforeLast)
+  const updateLastAssistant = useProject(s => s.updateLastAssistant)
+  const projectIsStreaming = useProject(s => s.isStreaming)
+  const setStreaming = useProject(s => s.setStreaming)
+  const projectStreamStartedAt = useProject(s => s.streamStartedAt)
+  const finalizeActiveStreamDuration = useProject(s => s.finalizeActiveStreamDuration)
+  const finalizeHelpStreamDuration = useProject(s => s.finalizeHelpStreamDuration)
+  const projectActivity = useProject(s => s.activity)
+  const preflights = useProject(s => s.preflights)
+  const subagentRuns = useProject(s => s.subagentRuns)
+  const projectAgentProgress = useProject(s => s.agentProgress)
+  const projectSessionUsage = useProject(s => s.sessionUsage)
+  const activePath = useProject(s => s.path)
+  const chatSessions = useProject(s => s.chatSessions)
+  const activeChatId = useProject(s => s.activeChatId)
+  const chatTotalCount = useProject(s => s.chatTotalCount)
+  const chatHasMoreBefore = useProject(s => s.chatHasMoreBefore)
+  const isLoadingOlderMessages = useProject(s => s.isLoadingOlderMessages)
+  const loadOlderMessages = useProject(s => s.loadOlderMessages)
+  const resumableRuns = useProject(s => s.resumableRuns)
+  const addHelpMessage = useProject(s => s.addHelpMessage)
+  const insertHelpMessageBeforeLast = useProject(s => s.insertHelpMessageBeforeLast)
+  const updateHelpLastAssistant = useProject(s => s.updateHelpLastAssistant)
+  const setHelpStreaming = useProject(s => s.setHelpStreaming)
+  const clearHelpActivity = useProject(s => s.clearHelpActivity)
+  const pushHelpActivity = useProject(s => s.pushHelpActivity)
+  const setHelpAgentProgress = useProject(s => s.setHelpAgentProgress)
+  const addHelpUsage = useProject(s => s.addHelpUsage)
+  const appendHelpLastAssistantThinking = useProject(s => s.appendHelpLastAssistantThinking)
+  const setAgentProgress = useProject(s => s.setAgentProgress)
+  const setComposerDraft = useProject(s => s.setComposerDraft)
+  const clearComposerDraft = useProject(s => s.clearComposerDraft)
+  const setActiveView = useProject(s => s.setActiveView)
   const isHelpChat = helpMode
   const [skillSuggestionsEnabled, setSkillSuggestionsEnabled] = useState(() => readSkillSuggestionsEnabled(activePath))
   const messages = helpMode ? help.messages : projectMessages
@@ -952,6 +973,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
   const pendingBarExpandedRef = useRef(false)
   const [pendingBarExpanded, setPendingBarExpandedRaw] = useState(false)
   const flushQueueRef = useRef<() => void>(() => {})
+  const suppressAutoFlushScopeRef = useRef<string | null>(null)
   // Resume задачи (Фаза 4): взводится при gg-resume-send, эффект ниже шлёт send().
   const resumeAutoSendRef = useRef(false)
   // Crash-resume Фаза 2: runId прерванного прогона для re-send с полным контекстом
@@ -2225,7 +2247,9 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
       : null
     addMessage({ role: 'assistant', content: '', ...(assistantRow ? { dbId: assistantRow.id } : {}) })
     setStreaming(true)
-    const msgs = [...useProject.getState().messages].slice(0, -1)
+    const msgs: ChatMessage[] = activeChatId != null
+      ? (await window.api.chats.list(activeChatId)).map(m => ({ role: m.role, content: m.content, thinking: m.thinking, appliedSkills: m.appliedSkills, createdAt: m.createdAt, dbId: m.id })).slice(0, -1)
+      : [...useProject.getState().messages].slice(0, -1)
     const sendId = await window.api.ai.sendWithBudget(msgs, store.path, newBudget)
     if (activeChatId != null) registerChatSendOwner(sendId, activeChatId, false, store.path)
     if (assistantRow && sendId > 0) registerPersistedAssistant(sendId, assistantRow.id)
@@ -2268,16 +2292,10 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
       return true
     }
 
-    let priorMessages: ChatMessage[] | undefined = sameProject
-      ? store.chatSnapshots[chatId]?.messages
-      : undefined
-
-    if (!priorMessages) {
-      const history = await window.api.chats.list(chatId)
-      priorMessages = history.map(m => ({ role: m.role, content: m.content, thinking: m.thinking, appliedSkills: m.appliedSkills, createdAt: m.createdAt, dbId: m.id }))
-      if (sameProject) {
-        useProject.getState().seedChatSnapshot(chatId, priorMessages)
-      }
+    const historyRows = await window.api.chats.list(chatId)
+    const priorMessages: ChatMessage[] = historyRows.map(m => ({ role: m.role, content: m.content, thinking: m.thinking, appliedSkills: m.appliedSkills, createdAt: m.createdAt, dbId: m.id }))
+    if (sameProject && !store.chatSnapshots[chatId]) {
+      useProject.getState().seedChatSnapshot(chatId, priorMessages)
     }
 
     const history = compactMessagesForSend(priorMessages)
@@ -2419,6 +2437,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
 
   useEffect(() => {
     if (isStreaming || queuedMessages.length === 0) return
+    if (pendingScopeKeyRef.current === suppressAutoFlushScopeRef.current) return
     const timer = window.setTimeout(() => flushQueueRef.current(), 0)
     return () => window.clearTimeout(timer)
   }, [isStreaming, queuedMessages.length, pendingScopeKey])
@@ -2757,13 +2776,15 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
     addMessage({ role: 'assistant', content: '', ...(assistantRow ? { dbId: assistantRow.id } : {}) })
     setStreaming(true)
     setAgentProgress(activateModelProgress(useProject.getState().agentProgress, provider.label))
-    const allMessages = [...useProject.getState().messages].slice(0, -1)
+    let allMessages: ChatMessage[] = activeChatId
+      ? (await window.api.chats.list(activeChatId)).map(m => ({ role: m.role, content: m.content, thinking: m.thinking, appliedSkills: m.appliedSkills, createdAt: m.createdAt, dbId: m.id })).slice(0, -1)
+      : [...useProject.getState().messages].slice(0, -1)
     if (opts?.internalResume) {
       while (allMessages.length > 0 && allMessages[allMessages.length - 1].role === 'assistant') {
         allMessages.pop()
       }
       allMessages.push({ role: 'user', content: enrichedText })
-    } else if (opts?.modelText) {
+    } else {
       const lastUserIndex = allMessages.map(m => m.role).lastIndexOf('user')
       if (lastUserIndex >= 0) {
         allMessages[lastUserIndex] = { ...allMessages[lastUserIndex], content: enrichedText }
@@ -2948,36 +2969,49 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
     return off
   }, [])
 
-  async function stop(asSuspend = false) {
+  function stop(asSuspend = false) {
     const id = currentSendIdRef.current
     if (id == null) return
-    // #4 suspend: та же очистка, что Stop, но прогон помечается 'suspended' с
-    // сохранённым чекпойнтом для ↻ Продолжить (резюм через resumeFromRunId).
-    if (asSuspend) await window.api.ai.suspend(id)
-    else await window.api.ai.stop(id)
+    const storeBeforeStop = useProject.getState()
+    const owner = storeBeforeStop.lookupSendOwner(id)
+    const ownerScope = pendingScopeKeyFor(owner)
+    const shouldClearVisibleStream = owner?.kind === 'chat'
+      ? owner.isHelp
+        ? storeBeforeStop.helpMode
+        : !storeBeforeStop.helpMode
+          && storeBeforeStop.activeChatId === owner.chatId
+          && !!storeBeforeStop.path
+          && !!owner.projectPath
+          && normalizeProjectPath(storeBeforeStop.path) === normalizeProjectPath(owner.projectPath)
+      : true
+
+    if (ownerScope) suppressAutoFlushScopeRef.current = ownerScope
+
     const st = useProject.getState()
-    if (st.helpMode) {
-      st.finalizeHelpStreamDuration()
-      setHelpStreaming(false)
-    } else {
-      st.finalizeActiveStreamDuration()
-      setStreaming(false)
+    if (shouldClearVisibleStream) {
+      if (owner?.kind === 'chat' && owner.isHelp) {
+        st.finalizeHelpStreamDuration()
+        setHelpStreaming(false)
+      } else if (!st.helpMode) {
+        st.finalizeActiveStreamDuration()
+        setStreaming(false)
+      }
     }
     setPendingSupplements([])
     setPendingBarExpanded(false)
-    // sendOwners cleanup: stop() = главное место где renderer знает, что
-    // больше событий по этому sendId не придёт. Без этого owner повисал бы
-    // в мапе, потому что done event на abort иногда теряется.
     finishPersistedAssistant(id)
-    useProject.getState().forgetSendOwner(id)
-    // Снять висящую модалку CommandConfirm этого прогона: Stop во время ожидания
-    // подтверждения команды → main зарезолвил pendingCommand в false, но command-result
-    // мог дропнуться (owner забыт выше) → модалка осталась бы (ревью 24.06).
+    st.forgetSendOwner(id)
     const cur = useProject.getState()
     if (cur.pendingCommand?.sendId === id) cur.setPendingCommand(null)
     if (cur.pendingPlan?.sendId === id) cur.setPendingPlan(null) // #3 plan-gate: снять модалку плана при Stop
-    currentSendIdRef.current = null
-    flushQueueRef.current()
+    if (currentSendIdRef.current === id) currentSendIdRef.current = null
+
+    // #4 suspend: та же очистка, что Stop, но прогон помечается 'suspended' с
+    // сохранённым чекпойнтом для ↻ Продолжить (резюм через resumeFromRunId).
+    const abortPromise = asSuspend ? window.api.ai.suspend(id) : window.api.ai.stop(id)
+    void abortPromise.catch(err => {
+      console.warn('[chat] failed to stop send', id, err)
+    })
   }
 
   /**
@@ -3000,240 +3034,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
   const hasMessages = messages.length > 0
   const canSend = !isStreaming && (input.trim().length > 0 || attachments.length > 0)
 
-  return (
-    <div
-      ref={chatRootRef}
-      className={`gg-chat ${dragOver ? 'is-drag-over' : ''}`}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-    >
-      {dragOver && (
-        <div className="gg-drop-overlay">
-          <div className="gg-drop-overlay-inner">
-            <div className="gg-drop-icon">📎</div>
-            <div>Брось файлы сюда — изображения, PDF, текст</div>
-          </div>
-        </div>
-      )}
-
-      {isHelpChat ? (
-        <div className="gg-chat-project-bar gg-chat-project-bar-help" role="note">
-          <span className="gg-chat-project-icon" aria-hidden>❓</span>
-          <span className="gg-chat-project-name">{t.help.emptyTitle}</span>
-        </div>
-      ) : projectName ? (
-        <div className="gg-chat-project-bar" title={activePath ?? ''}>
-          <span className="gg-chat-project-icon gg-folder-icon" aria-hidden="true" />
-          <span className="gg-chat-project-name">{projectName}</span>
-          {activeChatTitle && (
-            <>
-              <span className="gg-chat-project-sep">·</span>
-              <span className="gg-chat-project-chat">{activeChatTitle}</span>
-            </>
-          )}
-          {activePath && (
-            <div className="gg-chat-project-actions">
-              <button
-                type="button"
-                className={`gg-terminal-bar-btn ${rightPanel === 'terminal' ? 'is-open' : ''}`}
-                onClick={() => onSelectRightPanel(rightPanel === 'terminal' ? 'none' : 'terminal')}
-                title={t.chat.dockTerminal}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <polyline points="4 17 10 11 4 5" />
-                  <line x1="12" y1="19" x2="20" y2="19" />
-                </svg>
-                <span>{t.chat.dockTerminal}</span>
-              </button>
-              <button
-                type="button"
-                className={`gg-terminal-bar-btn gg-terminal-bar-btn-sidechat ${rightPanel === 'sidechat' ? 'is-open' : ''}`}
-                onClick={() => {
-                  if (rightPanel === 'sidechat') onSelectRightPanel('none')
-                  else onOpenSideChat()
-                }}
-                title={t.chat.dockSideChat}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <rect x="3" y="4" width="8" height="16" rx="1.5" />
-                  <path d="M13 8h6a2 2 0 0 1 2 2v8l-3-2.5H13a2 2 0 0 1-2-2V8z" />
-                </svg>
-                <span>{t.chat.dockSideChat}</span>
-              </button>
-            </div>
-          )}
-        </div>
-      ) : null}
-
-      {!isHelpChat && chatReminderPins.length > 0 && (
-        <div
-          className={`gg-chat-reminder-pins ${reminderPinsPrefs.collapsed ? 'is-collapsed' : ''}`}
-          aria-label="Напоминания проекта"
-          style={{ left: reminderPinsPrefs.x, top: reminderPinsPrefs.y }}
-        >
-          <div
-            className="gg-chat-reminder-pins-head"
-            onPointerDown={onReminderPinsDragStart}
-            onPointerMove={onReminderPinsDragMove}
-            onPointerUp={onReminderPinsDragEnd}
-            onPointerCancel={onReminderPinsDragEnd}
-          >
-            <button
-              type="button"
-              className="gg-chat-reminder-pins-toggle"
-              onClick={() => setReminderPinsCollapsed(!reminderPinsPrefs.collapsed)}
-              title={reminderPinsPrefs.collapsed ? 'Развернуть напоминания' : 'Свернуть напоминания'}
-            >
-              {reminderPinsPrefs.collapsed ? '+' : '-'}
-            </button>
-            <span className="gg-chat-reminder-pins-grip" aria-hidden>::</span>
-            <button
-              type="button"
-              className="gg-chat-reminder-pins-title"
-              onClick={() => setActiveView('reminders')}
-              title="Открыть напоминания"
-            >
-              <span>Напоминания</span>
-              <span className="gg-chat-reminder-pins-count">{chatReminderPins.length}</span>
-            </button>
-          </div>
-          {!reminderPinsPrefs.collapsed && (
-            <div className="gg-chat-reminder-pins-list">
-              {visibleReminderPins.map(reminder => (
-                <div key={reminder.id} className="gg-chat-reminder-pin">
-                  <button
-                    type="button"
-                    className="gg-chat-reminder-pin-body"
-                    onClick={() => setActiveView('reminders')}
-                    title="Открыть напоминания"
-                  >
-                    <span className="gg-chat-reminder-pin-kicker">Напоминание</span>
-                    <span className="gg-chat-reminder-pin-title">{reminder.title}</span>
-                    <span className="gg-chat-reminder-pin-time">{formatReminderPinTime(reminder.dueAt)}</span>
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="gg-chat-stream-area">
-        <div className="gg-chat-stream" ref={streamRef}>
-        <div className="gg-chat-stream-inner">
-        {isHelpChat && (
-          <div className="gg-help-chat-banner" role="note">
-            <span className="gg-help-chat-banner-icon" aria-hidden>❓</span>
-            <span>{t.help.banner}</span>
-          </div>
-        )}
-        {!hasMessages && isHelpChat && (
-          <div className="gg-chat-empty gg-chat-empty-help">
-            <div className="gg-chat-empty-title">{t.help.emptyTitle}</div>
-            <div className="gg-chat-empty-hint">{t.help.emptyHint}</div>
-            <div className="gg-chat-empty-quick">
-              {['Как устроен сайдбар?', 'Чем чеклист отличается от прогонов?', 'Как поставить задачу в очередь?'].map(q => (
-                <button key={q} type="button" className="gg-quick-action" onClick={() => setInput(q)}>{q}</button>
-              ))}
-            </div>
-          </div>
-        )}
-        {!hasMessages && !isHelpChat && (
-          <div className="gg-chat-empty">
-            <img src={iconUrl} alt="Verstak" className="gg-chat-empty-mark-img" />
-            <div className="gg-chat-empty-title">Готов к работе</div>
-            <div className="gg-chat-empty-hint">
-              Открой проект слева и напиши задачу. Можно прикрепить файл, бросить скриншот через Ctrl+V или drag-and-drop.
-            </div>
-            <div className="gg-chat-empty-modes">
-              <div className="gg-chat-empty-modes-title">5 режимов агента — переключаются цифрами 1-5</div>
-              <div className="gg-chat-empty-modes-row">
-                <span><b>1</b> 🛡 Запрос — каждый шаг через подтверждение</span>
-                <span><b>2</b> ✏ Принимать правки — файлы авто, команды спрашивает</span>
-                <span><b>3</b> 📋 План — только чтение и план, без правок</span>
-                <span><b>4</b> ⚡ Авто — всё авто-принимается</span>
-                <span><b>5</b> 🚀 Без подтверждения — для CI / опытных</span>
-              </div>
-              <div className="gg-chat-empty-modes-tip">
-                <b>Shift+Esc</b> — экстренный стоп всех сессий. Кнопка <b>📍 Чекпоинт</b> внизу — запомнить состояние файлов и откатить одним кликом.
-              </div>
-            </div>
-            {activePath && (
-              <div className="gg-chat-empty-quick">
-                <button
-                  className="gg-quick-action"
-                  onClick={() => { setPipelineWizardMode('agency'); setPipelineWizardOpen(true) }}
-                  disabled={isCliProvider(provider.id)}
-                  title={isCliProvider(provider.id) ? t.pipeline.cliGate : t.pipeline.title}
-                >
-                  ▶ Agency task
-                </button>
-                <button
-                  className="gg-quick-action"
-                  onClick={() => setInput('/code-review')}
-                  title="Запустить скилл «Code Review» — анализ изменений, поиск багов и регрессий"
-                >
-                  🔍 {t.chat.codeReview}
-                </button>
-                <button
-                  className="gg-quick-action"
-                  onClick={() => setInput('/git-summary')}
-                  title="Запустить скилл «Git Summary» — краткая сводка последних коммитов"
-                >
-                  📝 {t.chat.gitSummary}
-                </button>
-                <button
-                  className="gg-quick-action"
-                  onClick={() => setInput('/explain')}
-                  title="Запустить скилл «Explain Code» — объяснение выбранного кода"
-                >
-                  💡 {t.chat.explainCode}
-                </button>
-                <button
-                  className="gg-quick-action"
-                  onClick={() => setInput(GOAL_CYCLE_PROMPT)}
-                  title="AI прочитает журнал работы, карту проекта и предложит 3 конкретных улучшения с планом"
-                >
-                  💡 {t.chat.whatToImprove}
-                </button>
-                <button
-                  className="gg-quick-action"
-                  onClick={() => setInput('Сделай аудит последних изменений за вчера-сегодня: вызови read_journal с kind="session" на 10 записей, выдели риски и регрессии.')}
-                  title="AI прочитает свежие сессии и поищет регрессии"
-                >
-                  🔍 Аудит изменений
-                </button>
-                <button
-                  className="gg-quick-action"
-                  onClick={() => setInput('Покажи карту проекта: вызови get_project_map с format=text.')}
-                  title="Быстрый обзор структуры проекта"
-                >
-                  🗺 Карта проекта
-                </button>
-                {/* Мультиагент (orchestrate/swarm) — НЕ кнопки. Агент сам решает
-                    разбить многогранную задачу на параллельные подзадачи и
-                    вызывает delegate_parallel/orchestrate/swarm (см. промпт-правило
-                    fan-out в compose-system). Юзер описывает результат, не стратегию. */}
-              </div>
-            )}
-            {suggestions.length > 0 && (
-              <div className="gg-suggestions">
-                <div className="gg-suggestions-title">💡 Suggestions</div>
-                {suggestions.map((s, i) => (
-                  <button key={i} className="gg-suggestion-card" onClick={() => setInput(s.title)}>
-                    <span className="gg-suggestion-priority" data-priority={s.priority} />
-                    <div>
-                      <div className="gg-suggestion-title">{s.title}</div>
-                      {s.description && <div className="gg-suggestion-desc">{s.description}</div>}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-        {messages.map((m, i) => {
+  const renderedMessages = useMemo(() => messages.map((m, i) => {
           const isLast = i === messages.length - 1
           const isStreamingAssistant = isLast && m.role === 'assistant' && isStreaming
           const hasAgentProgress = isLast && m.role === 'assistant' && agentProgress.length > 0
@@ -3520,7 +3321,278 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
             </div>
             </Fragment>
           )
-        })}
+        }), [
+    messages,
+    isStreaming,
+    agentProgress,
+    activity,
+    preflights,
+    subagentRuns,
+    lastAssistantInfo?.index,
+    animatedAssistantText,
+    lastAssistantAnimationKey,
+    resumableRuns.length,
+    provider.label,
+    agentProgressDurationMs,
+    agentProgressFinishedAt,
+    streamStartedAt,
+    t.chat.responseRunningTitle,
+    t.chat.responseRunning,
+    t.chat.responseDoneTitle,
+    t.chat.responseDone,
+    tickNow,
+    onOpenFilePreview,
+    crossVerify,
+    cvExpanded,
+  ])
+
+  return (
+    <div
+      ref={chatRootRef}
+      className={`gg-chat ${dragOver ? 'is-drag-over' : ''}`}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
+      {dragOver && (
+        <div className="gg-drop-overlay">
+          <div className="gg-drop-overlay-inner">
+            <div className="gg-drop-icon">📎</div>
+            <div>Брось файлы сюда — изображения, PDF, текст</div>
+          </div>
+        </div>
+      )}
+
+      {isHelpChat ? (
+        <div className="gg-chat-project-bar gg-chat-project-bar-help" role="note">
+          <span className="gg-chat-project-icon" aria-hidden>❓</span>
+          <span className="gg-chat-project-name">{t.help.emptyTitle}</span>
+        </div>
+      ) : projectName ? (
+        <div className="gg-chat-project-bar" title={activePath ?? ''}>
+          <span className="gg-chat-project-icon gg-folder-icon" aria-hidden="true" />
+          <span className="gg-chat-project-name">{projectName}</span>
+          {activeChatTitle && (
+            <>
+              <span className="gg-chat-project-sep">·</span>
+              <span className="gg-chat-project-chat">{activeChatTitle}</span>
+            </>
+          )}
+          {activePath && (
+            <div className="gg-chat-project-actions">
+              <button
+                type="button"
+                className={`gg-terminal-bar-btn ${rightPanel === 'terminal' ? 'is-open' : ''}`}
+                onClick={() => onSelectRightPanel(rightPanel === 'terminal' ? 'none' : 'terminal')}
+                title={t.chat.dockTerminal}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <polyline points="4 17 10 11 4 5" />
+                  <line x1="12" y1="19" x2="20" y2="19" />
+                </svg>
+                <span>{t.chat.dockTerminal}</span>
+              </button>
+              <button
+                type="button"
+                className={`gg-terminal-bar-btn gg-terminal-bar-btn-sidechat ${rightPanel === 'sidechat' ? 'is-open' : ''}`}
+                onClick={() => {
+                  if (rightPanel === 'sidechat') onSelectRightPanel('none')
+                  else onOpenSideChat()
+                }}
+                title={t.chat.dockSideChat}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <rect x="3" y="4" width="8" height="16" rx="1.5" />
+                  <path d="M13 8h6a2 2 0 0 1 2 2v8l-3-2.5H13a2 2 0 0 1-2-2V8z" />
+                </svg>
+                <span>{t.chat.dockSideChat}</span>
+              </button>
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {!isHelpChat && chatReminderPins.length > 0 && (
+        <div
+          className={`gg-chat-reminder-pins ${reminderPinsPrefs.collapsed ? 'is-collapsed' : ''}`}
+          aria-label="Напоминания проекта"
+          style={{ left: reminderPinsPrefs.x, top: reminderPinsPrefs.y }}
+        >
+          <div
+            className="gg-chat-reminder-pins-head"
+            onPointerDown={onReminderPinsDragStart}
+            onPointerMove={onReminderPinsDragMove}
+            onPointerUp={onReminderPinsDragEnd}
+            onPointerCancel={onReminderPinsDragEnd}
+          >
+            <button
+              type="button"
+              className="gg-chat-reminder-pins-toggle"
+              onClick={() => setReminderPinsCollapsed(!reminderPinsPrefs.collapsed)}
+              title={reminderPinsPrefs.collapsed ? 'Развернуть напоминания' : 'Свернуть напоминания'}
+            >
+              {reminderPinsPrefs.collapsed ? '+' : '-'}
+            </button>
+            <span className="gg-chat-reminder-pins-grip" aria-hidden>::</span>
+            <button
+              type="button"
+              className="gg-chat-reminder-pins-title"
+              onClick={() => setActiveView('reminders')}
+              title="Открыть напоминания"
+            >
+              <span>Напоминания</span>
+              <span className="gg-chat-reminder-pins-count">{chatReminderPins.length}</span>
+            </button>
+          </div>
+          {!reminderPinsPrefs.collapsed && (
+            <div className="gg-chat-reminder-pins-list">
+              {visibleReminderPins.map(reminder => (
+                <div key={reminder.id} className="gg-chat-reminder-pin">
+                  <button
+                    type="button"
+                    className="gg-chat-reminder-pin-body"
+                    onClick={() => setActiveView('reminders')}
+                    title="Открыть напоминания"
+                  >
+                    <span className="gg-chat-reminder-pin-kicker">Напоминание</span>
+                    <span className="gg-chat-reminder-pin-title">{reminder.title}</span>
+                    <span className="gg-chat-reminder-pin-time">{formatReminderPinTime(reminder.dueAt)}</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="gg-chat-stream-area">
+        <div className="gg-chat-stream" ref={streamRef}>
+        <div className="gg-chat-stream-inner">
+        {isHelpChat && (
+          <div className="gg-help-chat-banner" role="note">
+            <span className="gg-help-chat-banner-icon" aria-hidden>❓</span>
+            <span>{t.help.banner}</span>
+          </div>
+        )}
+        {!isHelpChat && chatHasMoreBefore && (
+          <div className="gg-chat-history-window">
+            <button
+              type="button"
+              className="gg-btn gg-btn-ghost"
+              onClick={() => void loadOlderMessages()}
+              disabled={isLoadingOlderMessages}
+            >
+              {isLoadingOlderMessages ? 'Загружаю...' : 'Показать ранние сообщения'}
+            </button>
+            <span>{messages.length} из {chatTotalCount}</span>
+          </div>
+        )}
+        {!hasMessages && isHelpChat && (
+          <div className="gg-chat-empty gg-chat-empty-help">
+            <div className="gg-chat-empty-title">{t.help.emptyTitle}</div>
+            <div className="gg-chat-empty-hint">{t.help.emptyHint}</div>
+            <div className="gg-chat-empty-quick">
+              {['Как устроен сайдбар?', 'Чем чеклист отличается от прогонов?', 'Как поставить задачу в очередь?'].map(q => (
+                <button key={q} type="button" className="gg-quick-action" onClick={() => setInput(q)}>{q}</button>
+              ))}
+            </div>
+          </div>
+        )}
+        {!hasMessages && !isHelpChat && (
+          <div className="gg-chat-empty">
+            <img src={iconUrl} alt="Verstak" className="gg-chat-empty-mark-img" />
+            <div className="gg-chat-empty-title">Готов к работе</div>
+            <div className="gg-chat-empty-hint">
+              Открой проект слева и напиши задачу. Можно прикрепить файл, бросить скриншот через Ctrl+V или drag-and-drop.
+            </div>
+            <div className="gg-chat-empty-modes">
+              <div className="gg-chat-empty-modes-title">5 режимов агента — переключаются цифрами 1-5</div>
+              <div className="gg-chat-empty-modes-row">
+                <span><b>1</b> 🛡 Запрос — каждый шаг через подтверждение</span>
+                <span><b>2</b> ✏ Принимать правки — файлы авто, команды спрашивает</span>
+                <span><b>3</b> 📋 План — только чтение и план, без правок</span>
+                <span><b>4</b> ⚡ Авто — всё авто-принимается</span>
+                <span><b>5</b> 🚀 Без подтверждения — для CI / опытных</span>
+              </div>
+              <div className="gg-chat-empty-modes-tip">
+                <b>Shift+Esc</b> — экстренный стоп всех сессий. Кнопка <b>📍 Чекпоинт</b> внизу — запомнить состояние файлов и откатить одним кликом.
+              </div>
+            </div>
+            {activePath && (
+              <div className="gg-chat-empty-quick">
+                <button
+                  className="gg-quick-action"
+                  onClick={() => { setPipelineWizardMode('agency'); setPipelineWizardOpen(true) }}
+                  disabled={isCliProvider(provider.id)}
+                  title={isCliProvider(provider.id) ? t.pipeline.cliGate : t.pipeline.title}
+                >
+                  ▶ Agency task
+                </button>
+                <button
+                  className="gg-quick-action"
+                  onClick={() => setInput('/code-review')}
+                  title="Запустить скилл «Code Review» — анализ изменений, поиск багов и регрессий"
+                >
+                  🔍 {t.chat.codeReview}
+                </button>
+                <button
+                  className="gg-quick-action"
+                  onClick={() => setInput('/git-summary')}
+                  title="Запустить скилл «Git Summary» — краткая сводка последних коммитов"
+                >
+                  📝 {t.chat.gitSummary}
+                </button>
+                <button
+                  className="gg-quick-action"
+                  onClick={() => setInput('/explain')}
+                  title="Запустить скилл «Explain Code» — объяснение выбранного кода"
+                >
+                  💡 {t.chat.explainCode}
+                </button>
+                <button
+                  className="gg-quick-action"
+                  onClick={() => setInput(GOAL_CYCLE_PROMPT)}
+                  title="AI прочитает журнал работы, карту проекта и предложит 3 конкретных улучшения с планом"
+                >
+                  💡 {t.chat.whatToImprove}
+                </button>
+                <button
+                  className="gg-quick-action"
+                  onClick={() => setInput('Сделай аудит последних изменений за вчера-сегодня: вызови read_journal с kind="session" на 10 записей, выдели риски и регрессии.')}
+                  title="AI прочитает свежие сессии и поищет регрессии"
+                >
+                  🔍 Аудит изменений
+                </button>
+                <button
+                  className="gg-quick-action"
+                  onClick={() => setInput('Покажи карту проекта: вызови get_project_map с format=text.')}
+                  title="Быстрый обзор структуры проекта"
+                >
+                  🗺 Карта проекта
+                </button>
+                {/* Мультиагент (orchestrate/swarm) — НЕ кнопки. Агент сам решает
+                    разбить многогранную задачу на параллельные подзадачи и
+                    вызывает delegate_parallel/orchestrate/swarm (см. промпт-правило
+                    fan-out в compose-system). Юзер описывает результат, не стратегию. */}
+              </div>
+            )}
+            {suggestions.length > 0 && (
+              <div className="gg-suggestions">
+                <div className="gg-suggestions-title">💡 Suggestions</div>
+                {suggestions.map((s, i) => (
+                  <button key={i} className="gg-suggestion-card" onClick={() => setInput(s.title)}>
+                    <span className="gg-suggestion-priority" data-priority={s.priority} />
+                    <div>
+                      <div className="gg-suggestion-title">{s.title}</div>
+                      {s.description && <div className="gg-suggestion-desc">{s.description}</div>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {renderedMessages}
         {/* Crash-resume: keep it next to the latest interrupted answer, not above the scrolled history. */}
         <ResumeBanner />
         </div>

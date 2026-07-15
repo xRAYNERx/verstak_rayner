@@ -49,6 +49,34 @@ interface CodeBlockProps {
   code: string
 }
 
+async function copyTextToClipboard(text: string): Promise<boolean> {
+  try {
+    if (window.api?.clipboard?.writeText) {
+      await window.api.clipboard.writeText(text)
+      return true
+    }
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    try {
+      const area = document.createElement('textarea')
+      area.value = text
+      area.setAttribute('readonly', 'true')
+      area.style.position = 'fixed'
+      area.style.left = '-9999px'
+      area.style.top = '0'
+      document.body.appendChild(area)
+      area.focus()
+      area.select()
+      const ok = document.execCommand('copy')
+      document.body.removeChild(area)
+      return ok
+    } catch {
+      return false
+    }
+  }
+}
+
 function isCopyableTextLanguage(language: string): boolean {
   return ['copy', 'text', 'plain', 'plaintext'].includes(language.toLowerCase())
 }
@@ -70,11 +98,10 @@ function CodeBlock({ language, code }: CodeBlockProps) {
   const { html, label } = highlightForBlock(language, code)
 
   async function copy() {
-    try {
-      await navigator.clipboard.writeText(code)
+    if (await copyTextToClipboard(code)) {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
-    } catch { /* clipboard denied */ }
+    }
   }
 
   return (
@@ -94,11 +121,10 @@ function CopyableTextBlock({ code }: { code: string }) {
   const [copied, setCopied] = useState(false)
 
   async function copy() {
-    try {
-      await navigator.clipboard.writeText(code)
+    if (await copyTextToClipboard(code)) {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
-    } catch { /* clipboard denied */ }
+    }
   }
 
   return (

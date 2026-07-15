@@ -103,6 +103,7 @@ import { registerSuggestionsIpc } from './ipc/suggestions'
 import { initAutoUpdater, registerReleaseNotesIpc } from './updater'
 import { registerNotifyIpc } from './ipc/notify'
 import { bindWindowChromeEvents, registerWindowIpc } from './ipc/window'
+import { registerClipboardIpc } from './ipc/clipboard'
 import { bindReminderToastActions, initNotificationWindow, registerNotificationWindowIpc } from './notification-window'
 import { createReminderService } from './reminders-service'
 import { isInsideProjectIcons } from './storage/project-icons'
@@ -495,6 +496,7 @@ app.whenReady().then(() => {
   registerProjectIpc(projects, projectGroups, db)
   registerProjectMapIpc(knownRoots)
   registerFilesIpc({ getProjectRoot: getActiveProjectPath, getKnownRoots: knownRoots })
+  registerClipboardIpc()
   registerChatsIpc(chats, chatSessions, db)
   logRuntime('startup.minimal_ipc.ready')
 

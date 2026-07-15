@@ -3,4 +3,8 @@ export interface FileNode {
   path: string  // absolute
   isDirectory: boolean
   children?: FileNode[]
+  collapsed?: boolean
+  fileCount?: number
+  sizeBytes?: number
+  truncated?: boolean
 }

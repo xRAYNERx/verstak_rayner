@@ -56,6 +56,11 @@ function flushPending(win: BrowserWindow): void {
   pending = []
 }
 
+function setToastMousePassthrough(passthrough: boolean): void {
+  if (!toastWin || toastWin.isDestroyed()) return
+  toastWin.setIgnoreMouseEvents(passthrough, { forward: true })
+}
+
 function ensureToastWindow(): BrowserWindow {
   if (toastShutdown) {
     throw new Error('toast window unavailable after shutdown')
@@ -91,6 +96,7 @@ function ensureToastWindow(): BrowserWindow {
   }
 
   positionToastWindow(toastWin)
+  setToastMousePassthrough(true)
 
   onDisplayMetricsChanged = () => {
     if (toastWin && !toastWin.isDestroyed()) positionToastWindow(toastWin)
@@ -179,7 +185,12 @@ export function registerNotificationWindowIpc(): void {
   })
 
   ipcMain.on('toast:hide-window', () => {
+    setToastMousePassthrough(true)
     if (toastWin && !toastWin.isDestroyed()) toastWin.hide()
+  })
+
+  ipcMain.on('toast:set-mouse-passthrough', (_e, passthrough: unknown) => {
+    setToastMousePassthrough(passthrough !== false)
   })
 
   ipcMain.on('toast:reminder-snooze', (_e, id: unknown) => {

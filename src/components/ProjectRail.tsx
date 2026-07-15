@@ -429,17 +429,15 @@ interface ProjectRailProps {
 
 export function ProjectRail({ onOpenProjectSettings, onOpenAppSettings, onOpenHelp, sidebarOpen, onToggleSidebar }: ProjectRailProps) {
   const t = useT()
-  const {
-    path,
-    projectList,
-    sessions,
-    setProject,
-    refreshProjectList,
-    helpMode,
-    help,
-    resumableRuns,
-    isStreaming,
-  } = useProject()
+  const path = useProject(s => s.path)
+  const projectList = useProject(s => s.projectList)
+  const sessions = useProject(s => s.sessions)
+  const setProject = useProject(s => s.setProject)
+  const refreshProjectList = useProject(s => s.refreshProjectList)
+  const helpMode = useProject(s => s.helpMode)
+  const help = useProject(s => s.help)
+  const resumableRuns = useProject(s => s.resumableRuns)
+  const isStreaming = useProject(s => s.isStreaming)
   const [startupInterruptedPaths, setStartupInterruptedPaths] = useState<Set<string>>(() => new Set())
   const interruptedPaths = useMemo(() => {
     const paths = new Set<string>()

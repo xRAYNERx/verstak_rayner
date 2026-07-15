@@ -7,8 +7,15 @@ export interface ChatMessage {
   role: Role
   content: string
   thinking: string
+  thinkingLength?: number
   appliedSkills: AppliedSkillRef[]
   createdAt: number
+}
+
+export interface ChatMessageWindow {
+  messages: ChatMessage[]
+  totalCount: number
+  hasMoreBefore: boolean
 }
 
 export interface AppliedSkillRef {
@@ -32,6 +39,7 @@ type ChatMessageRow = Omit<ChatMessage, 'appliedSkills'> & {
 export interface Chats {
   /** List messages — new API: by sessionId. */
   listBySession: (sessionId: number) => ChatMessage[]
+  listWindowBySession: (sessionId: number, opts?: { limit?: number; beforeId?: number; includeThinking?: boolean }) => ChatMessageWindow
   /** Legacy: list all messages of a project (across sessions) — left for back-compat callers. */
   list: (projectPath: string) => ChatMessage[]
   /** Append a message to a specific session. */
@@ -98,6 +106,7 @@ export function createChats(db: Database): Chats {
       role: row.role,
       content: row.content,
       thinking: row.thinking,
+      thinkingLength: row.thinkingLength,
       appliedSkills: parseAppliedSkills(row.appliedSkillsJson),
       createdAt: row.createdAt
     }
@@ -109,6 +118,32 @@ export function createChats(db: Database): Chats {
         `SELECT id, role, content, ${thinkingSelect} as thinking, ${appliedSkillsSelect} as appliedSkillsJson, created_at as createdAt FROM chats WHERE session_id = ? ORDER BY id ASC`
       ).all(sessionId) as ChatMessageRow[]
       return rows.map(mapMessage)
+    },
+    listWindowBySession(sessionId, opts) {
+      const limit = Math.max(1, Math.min(200, Number(opts?.limit ?? 50)))
+      const includeThinking = opts?.includeThinking === true
+      const beforeId = Number.isFinite(opts?.beforeId) ? Number(opts?.beforeId) : null
+      const where = beforeId != null ? 'session_id = ? AND id < ?' : 'session_id = ?'
+      const args: unknown[] = beforeId != null ? [sessionId, beforeId, limit] : [sessionId, limit]
+      const rows = db.prepare(
+        `SELECT id, role, content,
+                ${includeThinking ? `${thinkingSelect}` : "''"} as thinking,
+                LENGTH(${thinkingSelect}) as thinkingLength,
+                ${appliedSkillsSelect} as appliedSkillsJson,
+                created_at as createdAt
+         FROM chats
+         WHERE ${where}
+         ORDER BY id DESC
+         LIMIT ?`
+      ).all(...args) as ChatMessageRow[]
+      const messages = rows.reverse().map(mapMessage)
+      const totalRow = db.prepare('SELECT COUNT(*) as count FROM chats WHERE session_id = ?').get(sessionId) as { count: number } | undefined
+      const totalCount = Number(totalRow?.count ?? 0)
+      const firstId = messages[0]?.id ?? null
+      const hasMoreBefore = firstId != null
+        ? Boolean(db.prepare('SELECT 1 FROM chats WHERE session_id = ? AND id < ? LIMIT 1').get(sessionId, firstId))
+        : false
+      return { messages, totalCount, hasMoreBefore }
     },
     list(projectPath) {
       const rows = db.prepare(

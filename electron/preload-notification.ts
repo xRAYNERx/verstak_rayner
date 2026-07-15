@@ -27,5 +27,6 @@ contextBridge.exposeInMainWorld('toastApi', {
   reminderSnooze: (id: number) => { ipcRenderer.send('toast:reminder-snooze', id) },
   reminderDismiss: (id: number) => { ipcRenderer.send('toast:reminder-dismiss', id) },
   reminderOpen: (id: number) => { ipcRenderer.send('toast:reminder-open', id) },
+  setMousePassthrough: (passthrough: boolean) => { ipcRenderer.send('toast:set-mouse-passthrough', passthrough) },
   hideWindow: () => { ipcRenderer.send('toast:hide-window') }
 })

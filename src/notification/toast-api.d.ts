@@ -19,6 +19,7 @@ declare global {
       reminderSnooze: (id: number) => void
       reminderDismiss: (id: number) => void
       reminderOpen: (id: number) => void
+      setMousePassthrough: (passthrough: boolean) => void
       hideWindow: () => void
     }
   }

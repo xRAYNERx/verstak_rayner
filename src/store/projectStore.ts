@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { FileNode, ChatMessage, ProjectMeta, ChatSession, DevTask, ResumableRun } from '../types/api'
+import type { FileNode, ChatMessage, ProjectMeta, ChatSession, DevTask, ResumableRun, StoredChatMessage } from '../types/api'
 import { sortProjectsByName } from '../lib/project-sort'
 import { isModelValidForProvider } from '../hooks/useProvider'
 import { isGenericChatTitle, titleFromFirstMessage } from '../lib/chat-session-title'
@@ -90,6 +90,9 @@ export interface ProjectState extends PipelineSlice, ReviewSlice {
   chatSessions: ChatSession[]
   /** Currently active chat session id within the project. */
   activeChatId: number | null
+  chatTotalCount: number
+  chatHasMoreBefore: boolean
+  isLoadingOlderMessages: boolean
   /** Глобальный чат справки (kind=help) — отдельно от проектов. */
   helpChatId: number | null
   /** Пользователь смотрит экран справки, а не рабочий чат проекта. */
@@ -125,6 +128,7 @@ export interface ProjectState extends PipelineSlice, ReviewSlice {
   removeProject: (path: string, options?: { deleteData?: boolean }) => Promise<{ ok: boolean; error?: string }>
   setActiveView: (v: ViewId) => void
   refreshFileTree: (path?: string | null) => Promise<void>
+  loadOlderMessages: () => Promise<void>
   addMessage: (msg: ChatMessage) => void
   /** Вставить сообщение перед последним (обычно — перед стримящим assistant). */
   insertMessageBeforeLast: (msg: ChatMessage) => void
@@ -256,6 +260,40 @@ let setProjectToken = 0
 let switchChatSessionToken = 0
 
 export const LAST_PROJECT_PATH_KEY = 'last_project_path'
+const CHAT_WINDOW_SIZE = 50
+
+function storedMessageToChatMessage(m: StoredChatMessage): ChatMessage {
+  return {
+    role: m.role,
+    content: m.content,
+    thinking: m.thinking,
+    thinkingLength: m.thinkingLength,
+    appliedSkills: m.appliedSkills,
+    createdAt: m.createdAt,
+    dbId: m.id,
+  }
+}
+
+async function listChatWindow(sessionId: number, opts?: { limit?: number; beforeId?: number; includeThinking?: boolean }) {
+  const api = window.api.chats as typeof window.api.chats & {
+    listWindow?: typeof window.api.chats.listWindow
+  }
+  if (typeof api.listWindow === 'function') return api.listWindow(sessionId, opts)
+  const all = await window.api.chats.list(sessionId)
+  const beforeId = opts?.beforeId
+  const filtered = beforeId != null ? all.filter(m => m.id < beforeId) : all
+  const limit = Math.max(1, Math.min(200, Number(opts?.limit ?? CHAT_WINDOW_SIZE)))
+  const messages = filtered.slice(-limit)
+  return { messages, totalCount: all.length, hasMoreBefore: filtered.length > messages.length }
+}
+
+function deferProjectSideWork(fn: () => void): void {
+  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(() => window.setTimeout(fn, 0))
+    return
+  }
+  setTimeout(fn, 0)
+}
 
 function hasInflightChatSend(
   sendOwners: ProjectState['sendOwners'],
@@ -316,6 +354,9 @@ export const useProject = create<ProjectState>((set, get, store) => ({
   projectList: [],
   chatSessions: [],
   activeChatId: null,
+  chatTotalCount: 0,
+  chatHasMoreBefore: false,
+  isLoadingOlderMessages: false,
   helpChatId: null,
   helpMode: false,
   help: freshSnapshot(),
@@ -411,6 +452,9 @@ export const useProject = create<ProjectState>((set, get, store) => ({
       activeView: 'chat',
       chatSessions: [],
       activeChatId: optimisticChatId,
+      chatTotalCount: optimisticMessages.length,
+      chatHasMoreBefore: false,
+      isLoadingOlderMessages: false,
       sessions: nextSessions,
       touchedFiles: {},
       activeDevTaskId: null,
@@ -424,11 +468,13 @@ export const useProject = create<ProjectState>((set, get, store) => ({
       helpMode: false,
     })
 
-    void window.api.projects.list().then(projectList => {
-      if (myToken !== setProjectToken) return
-      if (get().path !== path) return
-      set({ projectList })
-    }).catch(() => { /* project list stays cached */ })
+    deferProjectSideWork(() => {
+      void window.api.projects.list().then(projectList => {
+        if (myToken !== setProjectToken) return
+        if (get().path !== path) return
+        set({ projectList })
+      }).catch(() => { /* project list stays cached */ })
+    })
 
     const chatSessionsRaw = await window.api.chatSessions.list(path)
     if (myToken !== setProjectToken) return
@@ -470,6 +516,9 @@ export const useProject = create<ProjectState>((set, get, store) => ({
       activeView: 'chat',
       chatSessions,
       activeChatId,
+      chatTotalCount: initialMessages.length,
+      chatHasMoreBefore: false,
+      isLoadingOlderMessages: false,
       sessions: nextSessions,
       // touchedFiles/artifacts НЕ в bundle — сбрасываем при смене проекта
       // (scoped to active conversation, не к проекту).
@@ -495,22 +544,30 @@ export const useProject = create<ProjectState>((set, get, store) => ({
     if (needsDbHydrate && activeChatId != null) {
       const hydrateChatId = activeChatId
       void (async () => {
-        const history = await window.api.chats.list(hydrateChatId)
+        const windowed = await listChatWindow(hydrateChatId, { limit: CHAT_WINDOW_SIZE })
         if (myToken !== setProjectToken) return
         const cur = get()
         if (cur.path !== path || cur.activeChatId !== hydrateChatId) return
-        set({ messages: history.map(m => ({ role: m.role, content: m.content, thinking: m.thinking, appliedSkills: m.appliedSkills, createdAt: m.createdAt, dbId: m.id })) })
+        set({
+          messages: windowed.messages.map(storedMessageToChatMessage),
+          chatTotalCount: windowed.totalCount,
+          chatHasMoreBefore: windowed.hasMoreBefore,
+        })
       })()
     }
 
-    if (activeChatId != null) {
-      void get().refreshReviewsFor(activeChatId)
-    }
-    // Crash-resume: подгружаем зависшие после краха прогоны этого проекта для
-    // баннера «сессия прервана». Fire-and-forget.
-    void get().loadResumableRuns(path)
-    void get().reconcileStreamingState(path)
-    void get().loadActivePipeline(path)
+    deferProjectSideWork(() => {
+      if (myToken !== setProjectToken) return
+      if (get().path !== path) return
+      if (activeChatId != null) {
+        void get().refreshReviewsFor(activeChatId)
+      }
+      // Crash-resume: подгружаем зависшие после краха прогоны этого проекта для
+      // баннера «сессия прервана». Fire-and-forget.
+      void get().loadResumableRuns(path)
+      void get().reconcileStreamingState(path)
+      void get().loadActivePipeline(path)
+    })
   },
   closeProject: () => set({
     // 5.3 (review P0): нет проекта = чистый лист. Раньше сбрасывалась лишь часть
@@ -532,6 +589,9 @@ export const useProject = create<ProjectState>((set, get, store) => ({
     sessionUsage: { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 },
     runningPlanStep: null,
     activeChatId: null,
+    chatTotalCount: 0,
+    chatHasMoreBefore: false,
+    isLoadingOlderMessages: false,
     chatSessions: [],
     chatSnapshots: {},
     sessions: {},
@@ -567,7 +627,7 @@ export const useProject = create<ProjectState>((set, get, store) => ({
     const state = get()
     const composerDrafts = pruneComposerDraftsForProject(state.composerDrafts, path)
     if (state.path === path) {
-      set({ path: null, tree: [], messages: [], agentProgress: [], projectList, activeChatId: null, chatSessions: [], composerDrafts })
+      set({ path: null, tree: [], messages: [], agentProgress: [], projectList, activeChatId: null, chatTotalCount: 0, chatHasMoreBefore: false, isLoadingOlderMessages: false, chatSessions: [], composerDrafts })
     } else {
       set({ projectList, composerDrafts })
     }
@@ -588,8 +648,28 @@ export const useProject = create<ProjectState>((set, get, store) => ({
       // The files panel will keep its empty state if the tree cannot be loaded.
     }
   },
+  loadOlderMessages: async () => {
+    const state = get()
+    const chatId = state.activeChatId
+    const beforeId = state.messages.find(m => typeof m.dbId === 'number')?.dbId
+    if (!chatId || !beforeId || state.isLoadingOlderMessages || !state.chatHasMoreBefore) return
+    set({ isLoadingOlderMessages: true })
+    try {
+      const windowed = await listChatWindow(chatId, { limit: CHAT_WINDOW_SIZE, beforeId })
+      const cur = get()
+      if (cur.activeChatId !== chatId) return
+      set({
+        messages: [...windowed.messages.map(storedMessageToChatMessage), ...cur.messages],
+        chatTotalCount: windowed.totalCount,
+        chatHasMoreBefore: windowed.hasMoreBefore,
+      })
+    } finally {
+      if (get().activeChatId === chatId) set({ isLoadingOlderMessages: false })
+    }
+  },
   addMessage: (msg) => set(s => ({
     messages: [...s.messages, { ...msg, createdAt: msg.createdAt ?? Date.now() }],
+    chatTotalCount: s.helpMode ? s.chatTotalCount : Math.max(s.chatTotalCount + 1, s.messages.length + 1),
   })),
   insertMessageBeforeLast: (msg) => set(s => {
     const stamped = { ...msg, createdAt: msg.createdAt ?? Date.now() }
@@ -726,6 +806,9 @@ export const useProject = create<ProjectState>((set, get, store) => ({
       set({
         ...restoreBundle(restoredSafe),
         activeChatId: id,
+        chatTotalCount: restoredSafe.messages.length,
+        chatHasMoreBefore: false,
+        isLoadingOlderMessages: false,
         chatSnapshots: nextSnapshots,
         openedReviewId: null,
         // Эти поля НЕ входят в bundle (top-level стора) — без явного сброса они
@@ -742,6 +825,9 @@ export const useProject = create<ProjectState>((set, get, store) => ({
       set({
         activeChatId: id,
         messages: [],
+        chatTotalCount: 0,
+        chatHasMoreBefore: false,
+        isLoadingOlderMessages: false,
         isStreaming: false,
         streamStartedAt: null,
         pendingWrites: [],
@@ -760,10 +846,14 @@ export const useProject = create<ProjectState>((set, get, store) => ({
         subagentRuns: []
       })
       void (async () => {
-        const history = await window.api.chats.list(id)
+        const windowed = await listChatWindow(id, { limit: CHAT_WINDOW_SIZE })
         if (myToken !== switchChatSessionToken) return
         if (get().activeChatId !== id) return
-        set({ messages: history.map(m => ({ role: m.role, content: m.content, thinking: m.thinking, appliedSkills: m.appliedSkills, createdAt: m.createdAt, dbId: m.id })) })
+        set({
+          messages: windowed.messages.map(storedMessageToChatMessage),
+          chatTotalCount: windowed.totalCount,
+          chatHasMoreBefore: windowed.hasMoreBefore,
+        })
       })()
     }
 

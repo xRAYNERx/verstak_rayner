@@ -231,13 +231,15 @@ export function SideChat({ sideChatId, width, onResizeStart, onSessionCreated, o
     }
   }
 
-  async function stop() {
+  function stop() {
     const id = sendIdRef.current
     if (id == null || sideChatId == null) return
-    await window.api.ai.stop(id).catch(() => {})
     useProject.getState().applyEventToChat(sideChatId, { type: 'done' })
     useProject.getState().forgetSendOwner(id)
     sendIdRef.current = null
+    void window.api.ai.stop(id).catch(err => {
+      console.warn('[sidechat] failed to stop send', id, err)
+    })
   }
 
   const streamingLabel = sideProvider?.shortLabel ?? sideProvider?.name ?? provider.label

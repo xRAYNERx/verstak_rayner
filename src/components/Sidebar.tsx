@@ -21,7 +21,18 @@ function clampChatMenuPos(x: number, y: number): { left: number; top: number } {
 
 function ChatNavSection() {
   const t = useT()
-  const { path, chatSessions, activeChatId, activeView, setActiveView, switchChatSession, newChatSession, forkChat, refreshChatSessions, chatSnapshots, patchChatSession, cleanupReviewsFor } = useProject()
+  const path = useProject(s => s.path)
+  const chatSessions = useProject(s => s.chatSessions)
+  const activeChatId = useProject(s => s.activeChatId)
+  const activeView = useProject(s => s.activeView)
+  const setActiveView = useProject(s => s.setActiveView)
+  const switchChatSession = useProject(s => s.switchChatSession)
+  const newChatSession = useProject(s => s.newChatSession)
+  const forkChat = useProject(s => s.forkChat)
+  const refreshChatSessions = useProject(s => s.refreshChatSessions)
+  const chatSnapshots = useProject(s => s.chatSnapshots)
+  const patchChatSession = useProject(s => s.patchChatSession)
+  const cleanupReviewsFor = useProject(s => s.cleanupReviewsFor)
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editTitle, setEditTitle] = useState('')
@@ -544,7 +555,12 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onOpenSettings, 'aria-hidden': ariaHidden }: SidebarProps) {
-  const { path, projectList, setProject, activeView, setActiveView, refreshProjectList } = useProject()
+  const path = useProject(s => s.path)
+  const projectList = useProject(s => s.projectList)
+  const setProject = useProject(s => s.setProject)
+  const activeView = useProject(s => s.activeView)
+  const setActiveView = useProject(s => s.setActiveView)
+  const refreshProjectList = useProject(s => s.refreshProjectList)
   const t = useT()
   const [showCreateClient, setShowCreateClient] = useState(false)
 
@@ -574,8 +590,8 @@ export function Sidebar({ onOpenSettings, 'aria-hidden': ariaHidden }: SidebarPr
   ]
 
   const TOOLS_NAV: NavItem[] = [
-    { id: 'browser',  label: t.sidebar.browser,  icon: BrowserIcon },
-    { id: 'design',   label: t.sidebar.design,   icon: DesignIcon },
+    { id: 'browser',  label: t.sidebar.browser,  icon: BrowserIcon, soon: true, soonReason: 'Браузер пока дорабатывается: нужно довести просмотр, безопасность и сценарии работы внутри проекта' },
+    { id: 'design',   label: t.sidebar.design,   icon: DesignIcon, soon: true, soonReason: 'Дизайн пока дорабатывается: нужно довести создание и просмотр макетов внутри проекта' },
     { id: 'feedback', label: t.sidebar.feedback, icon: FeedbackIcon },
   ]
 
