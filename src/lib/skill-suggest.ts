@@ -23,6 +23,7 @@ export const SUGGEST_THRESHOLD = 3
 export interface SkillTokenIndex {
   skill: Skill
   promptTokens: Set<string>
+  tagTokens: Set<string>
   metaTokens: Set<string>
   autoSuggestable: boolean
   domain: 'client-marketing' | 'client-account' | 'wordstat' | 'metrika' | 'direct-search-minusation' | 'direct-rsya-sites-minusation' | 'direct-semantics' | 'direct-cross-minusation' | 'metrika-conversions-audit' | 'direct-campaign-setup' | 'client-weekly-report' | null
@@ -191,7 +192,13 @@ function scoreSkillEntry(
   metrikaScore: number
 ): number {
   let score = 0
+  const text = draft.toLowerCase()
+  for (const tag of entry.skill.user_tags ?? []) {
+    const normalizedTag = tag.trim().toLowerCase()
+    if (normalizedTag.length >= 3 && text.includes(normalizedTag)) score += 8
+  }
   for (const t of draftTokens) {
+    if (entry.tagTokens.has(t)) score += 5
     if (entry.promptTokens.has(t)) score += 2
     else if (entry.metaTokens.has(t)) score += 1
   }
@@ -228,6 +235,7 @@ export function buildSkillIndex(skills: Skill[]): SkillTokenIndex[] {
   return skills.map(sk => ({
     skill: sk,
     promptTokens: new Set((sk.suggested_prompts ?? []).flatMap(tokenize)),
+    tagTokens: new Set((sk.user_tags ?? []).flatMap(tokenize)),
     metaTokens: new Set([...tokenize(sk.name ?? ''), ...tokenize(sk.description ?? '')]),
     autoSuggestable: isAutoSuggestableSkill(sk),
     domain: skillDomain(sk),

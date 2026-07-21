@@ -574,8 +574,8 @@ export function Sidebar({ onOpenSettings, 'aria-hidden': ariaHidden }: SidebarPr
   ]
 
   const TOOLS_NAV: NavItem[] = [
-    { id: 'browser',  label: t.sidebar.browser,  icon: BrowserIcon },
-    { id: 'design',   label: t.sidebar.design,   icon: DesignIcon },
+    { id: 'browser',  label: t.sidebar.browser,  icon: BrowserIcon, soon: true, soonReason: 'Браузер пока закрыт на доработку: нужно довести понятный сценарий просмотра и проверки страниц' },
+    { id: 'design',   label: t.sidebar.design,   icon: DesignIcon, soon: true, soonReason: 'Дизайн пока закрыт на доработку: нужно довести генерацию и просмотр дизайн-артефактов' },
     { id: 'feedback', label: t.sidebar.feedback, icon: FeedbackIcon },
   ]
 

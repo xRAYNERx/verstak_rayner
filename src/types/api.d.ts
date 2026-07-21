@@ -225,6 +225,8 @@ export interface Skill {
   slash?: string
   tools_allow?: string[]
   suggested_prompts?: string[]
+  /** User-defined local tags used by Verstak UI search and chat skill suggestions. */
+  user_tags?: string[]
   context_loaders?: Array<{ id: string; impl: string; runs_on: 'chat_open' | 'slash_arg'; args?: Record<string, unknown> }>
   systemPrompt: string
   source: 'server' | 'user' | 'built-in'

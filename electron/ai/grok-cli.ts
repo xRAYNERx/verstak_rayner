@@ -124,132 +124,12 @@ interface GrokCliOptions {
 
 export const GROK_CLI_MODELS = [
   'grok-4.5',
-  'grok-composer-2.5-fast',
 ]
 
 export const DEFAULT_GROK_CLI_MODEL = 'grok-4.5'
 
-const GROK_COMPOSER_MODEL = 'grok-composer-2.5-fast'
 const NO_VISIBLE_ANSWER_MESSAGE =
   'Grok CLI завершил ответ без видимого текста. Попробуй повторить запрос или переключи чат на Grok API.'
-
-function stripAnsi(input: string): string {
-  return input
-    .replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '')
-    .replace(/\x1B\][^\x07]*(?:\x07|\x1B\\)/g, '')
-}
-
-function normalizePlainGrokOutput(raw: string): string {
-  return stripAnsi(raw)
-    .replace(/\r/g, '\n')
-    .split('\n')
-    .map(line => line.trimEnd())
-    .join('\n')
-    .trim()
-}
-
-async function* runGrokComposerPlain(opts: {
-  binary: string
-  cwd: string
-  payload: string
-  model: string
-  signal?: AbortSignal
-}): AsyncIterable<ChatEvent> {
-  const args = [
-    '--output-format', 'plain',
-    '--no-alt-screen',
-    '--no-plan',
-    '--no-subagents',
-    '--no-wait-for-background',
-    '--verbatim',
-    '-m', opts.model
-  ]
-  const ARGV_CAP = 8000
-  let promptFile: string | null = null
-  if (opts.payload.length > ARGV_CAP) {
-    promptFile = join(tmpdir(), `grok-composer-prompt-${randomUUID()}.txt`)
-    writeFileSync(promptFile, opts.payload, 'utf8')
-    args.push('--prompt-file', promptFile)
-  } else {
-    args.push('-p', opts.payload)
-  }
-
-  const child = spawn(opts.binary, args, {
-    cwd: opts.cwd,
-    shell: opts.binary.endsWith('.cmd') || opts.binary.endsWith('.ps1'),
-    windowsHide: true,
-    stdio: ['pipe', 'pipe', 'pipe']
-  })
-
-  try { child.stdin.end() } catch { /* noop */ }
-
-  let stdoutBuffer = ''
-  let stderrBuffer = ''
-  let closeCode: number | null = null
-  let closed = false
-  let wake: (() => void) | null = null
-  let abortListener: (() => void) | null = null
-
-  if (opts.signal) {
-    abortListener = () => { treeKill(child) }
-    opts.signal.addEventListener('abort', abortListener, { once: true })
-  }
-
-  child.stdout.setEncoding('utf8')
-  child.stdout.on('data', (chunk: string) => { stdoutBuffer += chunk })
-  child.stderr.setEncoding('utf8')
-  child.stderr.on('data', (chunk: string) => { stderrBuffer += chunk })
-  child.on('error', (err) => {
-    stderrBuffer += `\n${err.message}`
-    closed = true
-    if (wake) { const r = wake; wake = null; r() }
-  })
-  child.on('close', (code) => {
-    closeCode = code
-    closed = true
-    if (promptFile) {
-      try { unlinkSync(promptFile) } catch { /* noop */ }
-    }
-    if (wake) { const r = wake; wake = null; r() }
-  })
-
-  try {
-    while (!closed) await new Promise<void>(r => { wake = r })
-
-    const answer = normalizePlainGrokOutput(stdoutBuffer)
-    logRuntime('grok-cli.composer-plain.complete', {
-      model: opts.model,
-      code: closeCode,
-      stdoutChars: stdoutBuffer.length,
-      stderrChars: stderrBuffer.length
-    }, closeCode === 0 ? 'info' : 'warn')
-
-    if (closeCode !== 0) {
-      yield { type: 'error', message: normalizeGrokCliError(stderrBuffer || `Grok CLI exit ${closeCode}`) }
-      return
-    }
-    if (!answer) {
-      logRuntime('grok-cli.no-visible-answer', {
-        model: opts.model,
-        reason: 'composer-plain-empty',
-        code: closeCode,
-        stderr: stderrBuffer.slice(0, 1000)
-      }, 'warn')
-      yield { type: 'error', message: NO_VISIBLE_ANSWER_MESSAGE }
-      return
-    }
-
-    yield { type: 'text', text: answer }
-    yield { type: 'done' }
-  } finally {
-    if (promptFile) {
-      try { unlinkSync(promptFile) } catch { /* noop */ }
-    }
-    if (opts.signal && abortListener) {
-      try { opts.signal.removeEventListener('abort', abortListener) } catch { /* noop */ }
-    }
-  }
-}
 
 // Экспортирован для Model Doctor (2.0.7-E): discovery-путь (`grok models`) должен искать
 // бинарь той же логикой, что и send-путь, иначе доктор и прогон разошлись бы.
@@ -368,6 +248,9 @@ export function createGrokCliProvider(opts: GrokCliOptions = {}): ChatProvider {
       }
 
       const requestedModel = opts.model && opts.model !== 'auto' ? opts.model : DEFAULT_GROK_CLI_MODEL
+      const selectedModel = GROK_CLI_MODELS.includes(requestedModel)
+        ? requestedModel
+        : DEFAULT_GROK_CLI_MODEL
 
       // 2.0.7-E: гейт по ЖИВОМУ каталогу ДО child-процесса. Если аутентифицированный
       // свежий каталог подтверждает, что модели нет — НЕ подменяем молча на дефолт
@@ -376,19 +259,11 @@ export function createGrokCliProvider(opts: GrokCliOptions = {}): ChatProvider {
       // Ревью F2: гейтим ИСХОДНЫЙ выбор пользователя (opts.model), а НЕ резолвнутый
       // requestedModel — иначе 'auto'/пусто (→ хардкод-дефолт) мог бы заблокироваться, хотя
       // 'auto' означает «пусть CLI выберет сам» и блокировке не подлежит.
-      const gate = opts.checkModel?.(opts.model ?? 'auto')
+      const gate = opts.checkModel?.(selectedModel)
       if (gate && !gate.ok) {
         const avail = gate.available?.length ? ` Доступные: ${gate.available.join(', ')}.` : ''
         const sugg = gate.suggested ? ` Рекомендуется: ${gate.suggested}.` : ''
         yield { type: 'error', message: `Модель «${requestedModel}» больше не доступна в Grok Build.${avail}${sugg} Выберите доступную в Настройках → Модели.` }
-        return
-      }
-
-      const selectedModel = GROK_CLI_MODELS.includes(requestedModel)
-        ? requestedModel
-        : DEFAULT_GROK_CLI_MODEL
-      if (selectedModel === GROK_COMPOSER_MODEL) {
-        yield* runGrokComposerPlain({ binary, cwd, payload, model: selectedModel, signal: opts.signal })
         return
       }
 

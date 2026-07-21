@@ -87,6 +87,31 @@ function normalizeProjectPath(p: string): string {
   return p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
 }
 
+function fallbackProviderLabel(id: string): string {
+  if (id === 'grok-cli') return 'Grok Build'
+  if (id === 'grok') return 'Grok'
+  return id
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map(part => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function progressProviderLabel(
+  provider: { id?: string; label: string; model?: string | null },
+  session?: { providerId?: string | null; model?: string | null } | null
+): string {
+  const sessionProviderId = typeof session?.providerId === 'string' ? session.providerId.trim() : ''
+  const label = sessionProviderId && sessionProviderId !== provider.id
+    ? fallbackProviderLabel(sessionProviderId)
+    : provider.label
+  const sessionModel = typeof session?.model === 'string' ? session.model.trim() : ''
+  const providerModel = typeof provider.model === 'string' ? provider.model.trim() : ''
+  const model = sessionModel || providerModel
+  if (!model || model === label) return label
+  return `${label} · ${model}`
+}
+
 function projectNameForPath(projectPath: string | null | undefined): string | undefined {
   if (!projectPath) return undefined
   const norm = normalizeProjectPath(projectPath)
@@ -738,10 +763,17 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
   }, [activeChatId, isStreaming, helpMode])
   const { mode: agentMode, setMode: setAgentMode } = useAgentMode(activeChatId, helpMode)
   const projectName = activePath ? activePath.replace(/^.*[\\/]/, '') : null
+  const activeChatSession = !isHelpChat
+    ? chatSessions.find(s => s.id === activeChatId) ?? null
+    : null
   const activeChatTitle = isHelpChat
     ? t.help.emptyTitle
-    : (chatSessions.find(s => s.id === activeChatId)?.title ?? null)
+    : (activeChatSession?.title ?? null)
   const provider = useProvider()
+  const agentModelLabel = useMemo(
+    () => progressProviderLabel(provider, activeChatSession),
+    [provider.id, provider.label, provider.model, activeChatSession?.providerId, activeChatSession?.model]
+  )
   // ось 3 A: смена режима свопит модель по привязке mode_models_<provider> (plan →
   // reasoning-модель, act/auto → дешёвый кодер). Идёт через onChange ModePicker —
   // ловит И клики, И клавиши 1-5. Нет привязки для режима → модель не трогаем.
@@ -772,6 +804,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
   // Авто-предложение скилла: матчим черновик к скиллам, предлагаем активацию (с апрувом).
   const allSkills = useSkillsStore(s => s.skills)
   const activeSkillId = useSkillsStore(s => s.activeSkillId)
+  const pendingDraftSkillId = useSkillsStore(s => s.pendingDraftSkillId)
   const activeSkillForComposer = useMemo(() => {
     if (!activeSkillId) return null
     return allSkills.find(skill => skill.id === activeSkillId) ?? null
@@ -895,6 +928,17 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
     }, 140)
     return () => window.clearTimeout(timer)
   }, [input])
+
+  useEffect(() => {
+    if (!pendingDraftSkillId) return
+    const skill = allSkills.find(item => item.id === pendingDraftSkillId)
+    if (!skill) {
+      void useSkillsStore.getState().refresh().catch(() => {})
+      return
+    }
+    applySkillToCurrentMessage(skill)
+    useSkillsStore.getState().consumeDraftSkill()
+  }, [pendingDraftSkillId, allSkills])
 
   useEffect(() => {
     const key = composerDraftKeyRef.current
@@ -2676,7 +2720,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
       : []
     const skillCatalog = useSkillsStore.getState().skills
     const messageAppliedSkillDetails = resolveAppliedSkillDetails(messageAppliedSkills, skillCatalog)
-    const activeSkillIdForSend = useSkillsStore.getState().activeSkillId
+    const activeSkillIdForSend: string | null = null
     const autoBoundSkillDetails = !opts?.internalResume
       ? suggestScoredFromIndex(
           modelText,
@@ -2698,7 +2742,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
       }
       const userAttachments = attachments
       store.clearHelpActivity()
-      store.setHelpAgentProgress(buildInitialAgentProgress(displayText || text || 'Новый запрос', provider.label))
+      store.setHelpAgentProgress(buildInitialAgentProgress(displayText || text || 'Новый запрос', agentModelLabel))
       setExhausted(null)
       setCrossVerify(null)
       if (!opts?.text) {
@@ -2729,7 +2773,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
       const assistantRow = await window.api.chats.append(helpChatId, HELP_PROJECT_PATH, 'assistant', '')
       addHelpMessage({ role: 'assistant', content: '', dbId: assistantRow.id })
       setHelpStreaming(true)
-      setHelpAgentProgress(activateModelProgress(useProject.getState().help.agentProgress, provider.label))
+      setHelpAgentProgress(activateModelProgress(useProject.getState().help.agentProgress, agentModelLabel))
       const allMessages = [...useProject.getState().help.messages].slice(0, -1)
       const activeSkill = useSkillsStore.getState().activeSkillId
         ? useSkillsStore.getState().skills.find(s => s.id === useSkillsStore.getState().activeSkillId)
@@ -2764,7 +2808,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
         currentSendIdRef.current = null
         return
       }
-      useProject.getState().setHelpAgentProgress(activateModelProgress(useProject.getState().help.agentProgress ?? [], provider.label))
+      useProject.getState().setHelpAgentProgress(activateModelProgress(useProject.getState().help.agentProgress ?? [], agentModelLabel))
       registerChatSendOwner(sendId, helpChatId, true, null)
       if (sendId > 0) registerPersistedAssistant(sendId, assistantRow.id)
       return
@@ -2782,7 +2826,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
       return
     }
     store.clearActivity()
-    store.setAgentProgress(buildInitialAgentProgress(displayText || text || 'Новый запрос', provider.label))
+    store.setAgentProgress(buildInitialAgentProgress(displayText || text || 'Новый запрос', agentModelLabel))
     const skillBindingProgressDetail = buildSkillBindingProgressDetail(messageAppliedSkillDetails, autoBoundSkillDetails)
     if (skillBindingProgressDetail) {
       setAgentProgress(reduceAgentProgress(useProject.getState().agentProgress, {
@@ -2869,7 +2913,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
       : null
     addMessage({ role: 'assistant', content: '', ...(assistantRow ? { dbId: assistantRow.id } : {}) })
     setStreaming(true)
-    setAgentProgress(activateModelProgress(useProject.getState().agentProgress, provider.label))
+    setAgentProgress(activateModelProgress(useProject.getState().agentProgress, agentModelLabel))
     const allMessages = [...useProject.getState().messages].slice(0, -1)
     if (opts?.internalResume) {
       while (allMessages.length > 0 && allMessages[allMessages.length - 1].role === 'assistant') {
@@ -2969,7 +3013,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
     if (pipelineAutoSendStepRef.current === 'execute') {
       pipelineExecuteSendIdRef.current = sendId
     }
-    useProject.getState().setAgentProgress(activateModelProgress(useProject.getState().agentProgress ?? [], provider.label))
+    useProject.getState().setAgentProgress(activateModelProgress(useProject.getState().agentProgress ?? [], agentModelLabel))
     // Bind this send to the chat that initiated it — if user switches to
     // another chat mid-stream, the event handler will route events into
     // chatSnapshots[activeChatId] rather than corrupting the new active chat.
@@ -3444,7 +3488,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
                 >
                   <div className="gg-agent-progress-inline is-standalone">
                     <AgentProgressPanel
-                      entries={buildInterruptedAnswerProgress(m.createdAt, provider.label)}
+                      entries={buildInterruptedAnswerProgress(m.createdAt, agentModelLabel)}
                       isStreaming={false}
                       finishedAt={m.createdAt ?? null}
                       onToggleOpen={handleAgentProgressToggle}

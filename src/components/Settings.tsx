@@ -19,7 +19,6 @@ import { UpdatesSettings } from './UpdatesSettings'
 import { SubscriptionsTab } from './settings/SubscriptionsTab'
 import { UsageTab } from './settings/UsageTab'
 import { SubscriptionAccountsPanel } from './SubscriptionAccountsPanel'
-import { ProfilesTab } from './ProfilesTab'
 import {
   buildCatalog,
   connectionStatus,
@@ -178,6 +177,76 @@ function SettingsNavIcon({ name }: { name: SettingsNavIconName }) {
     default:
       return null
   }
+}
+
+type SecretInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'>
+
+function SecretInput({ className, ...props }: SecretInputProps) {
+  const [visible, setVisible] = useState(false)
+  const label = visible ? 'Скрыть токен' : 'Показать токен'
+  return (
+    <div className="gg-secret-input-wrap">
+      <input
+        {...props}
+        className={['gg-input', 'gg-secret-input', className].filter(Boolean).join(' ')}
+        type={visible ? 'text' : 'password'}
+      />
+      <button
+        type="button"
+        className={`gg-secret-toggle${visible ? ' is-visible' : ''}`}
+        aria-label={label}
+        title={label}
+        onClick={event => {
+          event.preventDefault()
+          event.stopPropagation()
+          setVisible(value => !value)
+        }}
+      >
+        {visible ? (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3.8 12s3-5.2 8.2-5.2 8.2 5.2 8.2 5.2-3 5.2-8.2 5.2S3.8 12 3.8 12Z" />
+            <circle cx="12" cy="12" r="2.55" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3.8 12s3-5.2 8.2-5.2c1.6 0 3 .48 4.18 1.15M20.2 12s-3 5.2-8.2 5.2c-1.55 0-2.9-.43-4.03-1.04" />
+            <path d="M4.8 4.8 19.2 19.2" />
+            <path d="M9.86 9.86a2.55 2.55 0 0 0 3.28 3.28" />
+            <path d="M14.25 10.02A2.55 2.55 0 0 0 12 9.45" />
+          </svg>
+        )}
+      </button>
+    </div>
+  )
+}
+
+function ProfileSoonPage() {
+  return (
+    <div className="gg-profile-soon-page">
+      <section className="gg-profile-soon-card">
+        <span className="gg-profile-soon-kicker">Скоро</span>
+        <h3>Профили готовятся к командной работе</h3>
+        <p>
+          Этот раздел будет связан с регистрацией, организациями и ролями пользователей. Сейчас он закрыт,
+          чтобы не включать неполную механику аккаунтов в рабочем интерфейсе.
+        </p>
+        <div className="gg-profile-soon-grid">
+          <div>
+            <span>Пользователи</span>
+            <p>Отдельные участники команды с ролями и доступами</p>
+          </div>
+          <div>
+            <span>Организации</span>
+            <p>Рабочие пространства компаний и клиентов</p>
+          </div>
+          <div>
+            <span>Права доступа</span>
+            <p>Управление тем, кто видит проекты, ключи и историю работы</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  )
 }
 
 function ProviderSettingsToggleIcon({ open }: { open: boolean }) {
@@ -1397,8 +1466,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
       { id: 'appearance', label: t.settings.appearance, icon: 'appearance', keywords: 'theme ui вид внешний вид тема светлая темная тёмная ночь день масштаб размер интерфейс плотность компактно анимации полный выключены оформление шрифт панель' },
       { id: 'notifications', label: t.settings.notifications, icon: 'notifications', keywords: 'toast push telegram уведомления всплывающее всплывающие звук проект тихие часы режим всегда вне фокуса окно проверка сигналы ошибки напоминания ответы' },
       { id: 'updates', label: t.settings.updates, icon: 'updates', keywords: 'release installer автообновление версия обновление обновить патчноут патч ноут список изменений загрузка установка временные файлы очистка кэш кеш диагностика' },
-      // 2.0.8-G: живая вкладка (ProfilesTab поверх userProfiles API) — «Скоро»/disabled сняты.
-      { id: 'profiles', label: t.settings.profiles, icon: 'profiles', keywords: 'user profile профиль аккаунт пользователь организация команда компания роль доступ участники приглашение почта регистрация' }
+      { id: 'profiles', label: t.settings.profiles, icon: 'profiles', soon: true, disabled: true, keywords: 'user profile профиль аккаунт пользователь организация команда компания роль доступ участники приглашение почта регистрация' }
     ] },
     { title: 'AI', tabs: [
       { id: 'providers', label: t.settings.providers, icon: 'providers', keywords: 'api key gateway cli ключи провайдеры подключение авторизация токен где взять ключ grok grok build composer chatgpt openai claude codex gemini deepseek kimi qwen openrouter ollama lm studio' },
@@ -2246,9 +2314,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
         <>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Long-lived OAuth token</label>
-            <input
-              className="gg-input"
-              type="password"
+            <SecretInput
               value={claudeOauthToken}
               onChange={e => setClaudeOauthToken(e.target.value)}
               placeholder="sk-ant-oat01-... (из `claude setup-token` в PowerShell)"
@@ -2288,9 +2354,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
           </div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Пароль</label>
-            <input
-              className="gg-input"
-              type="password"
+            <SecretInput
               value={onec.pass}
               onChange={e => setOneC(s => ({ ...s, pass: e.target.value }))}
               autoComplete="new-password"
@@ -2322,7 +2386,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
               </div>
               <div className="gg-settings-row">
                 <label className="gg-settings-label">Authorization</label>
-                <input className="gg-input" type="password" value={ep.auth} placeholder='напр. "Bearer ghp_…"'
+                <SecretInput value={ep.auth} placeholder='напр. "Bearer ghp_…"'
                   onChange={e => setHttpEndpoints(arr => arr.map((x, j) => j === i ? { ...x, auth: e.target.value } : x))}
                   autoComplete="new-password" />
               </div>
@@ -2367,9 +2431,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
         <>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Bot token</label>
-            <input
-              className="gg-input"
-              type="password"
+            <SecretInput
               value={telegramBotToken}
               onChange={e => setTelegramBotToken(e.target.value)}
               placeholder="1234567890:AAH... (от @BotFather)"
@@ -2438,9 +2500,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
         <>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Incoming webhook URL</label>
-            <input
-              className="gg-input"
-              type="password"
+            <SecretInput
               value={bitrixWebhook}
               onChange={e => { setBitrixWebhook(e.target.value); markConnectorDirty('bitrix') }}
               placeholder="https://your-portal.bitrix24.ru/rest/USER_ID/TOKEN/"
@@ -2457,9 +2517,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
         <>
           <div className="gg-settings-row">
             <label className="gg-settings-label">OAuth token</label>
-            <input
-              className="gg-input"
-              type="password"
+            <SecretInput
               value={yDirectToken}
               onChange={e => setYDirectToken(e.target.value)}
               placeholder="Получить: oauth.yandex.ru, scope: direct:api"
@@ -2486,9 +2544,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
         <>
           <div className="gg-settings-row">
             <label className="gg-settings-label">API key</label>
-            <input
-              className="gg-input"
-              type="password"
+            <SecretInput
               value={dadataApiKey}
               onChange={e => setDadataApiKey(e.target.value)}
               placeholder="Token из dadata.ru/profile/#info"
@@ -2497,9 +2553,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
           </div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Secret (опц.)</label>
-            <input
-              className="gg-input"
-              type="password"
+            <SecretInput
               value={dadataSecret}
               onChange={e => setDadataSecret(e.target.value)}
               placeholder="Нужен только для clean_address (стандартизация)"
@@ -2517,9 +2571,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
         <>
           <div className="gg-settings-row">
             <label className="gg-settings-label">OAuth token</label>
-            <input
-              className="gg-input"
-              type="password"
+            <SecretInput
               value={yMetrikaToken}
               onChange={e => setYMetrikaToken(e.target.value)}
               placeholder="oauth.yandex.ru, scope metrika:read"
@@ -2546,9 +2598,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
           </div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Client Secret</label>
-            <input
-              className="gg-input"
-              type="password"
+            <SecretInput
               value={avitoClientSecret}
               onChange={e => setAvitoClientSecret(e.target.value)}
               placeholder="client_secret"
@@ -2565,9 +2615,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
         <>
           <div className="gg-settings-row">
             <label className="gg-settings-label">OAuth token</label>
-            <input
-              className="gg-input"
-              type="password"
+            <SecretInput
               value={yWebmasterToken}
               onChange={e => setYWebmasterToken(e.target.value)}
               placeholder="oauth.yandex.ru, scope webmaster:hostinfo"
@@ -2595,9 +2643,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
           </div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">{yWordstatAuthType === 'iam' ? 'IAM-токен' : 'API-ключ Yandex AI Studio'}</label>
-            <input
-              className="gg-input"
-              type="password"
+            <SecretInput
               value={yWordstatToken}
               onChange={e => { setYWordstatToken(e.target.value); markConnectorDirty('ywordstat') }}
               placeholder={yWordstatAuthType === 'iam' ? 'Bearer IAM-токен' : 'API-ключ Yandex AI Studio с областью yc.search-api.execute'}
@@ -2623,7 +2669,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
         <>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Token</label>
-            <input className="gg-input" type="password" value={moyskladToken} onChange={e => setMoyskladToken(e.target.value)} placeholder="Bearer-токен МойСклад (Настройки → API)" autoComplete="new-password" />
+            <SecretInput value={moyskladToken} onChange={e => setMoyskladToken(e.target.value)} placeholder="Bearer-токен МойСклад (Настройки → API)" autoComplete="new-password" />
           </div>
           <div className="gg-settings-hint">Операции: list_products, list_orders, get_stock.</div>
         </>
@@ -2632,7 +2678,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
         <>
           <div className="gg-settings-row">
             <label className="gg-settings-label">OAuth token</label>
-            <input className="gg-input" type="password" value={yTrackerToken} onChange={e => setYTrackerToken(e.target.value)} placeholder="oauth.yandex.ru, доступ к Трекеру" autoComplete="new-password" />
+            <SecretInput value={yTrackerToken} onChange={e => setYTrackerToken(e.target.value)} placeholder="oauth.yandex.ru, доступ к Трекеру" autoComplete="new-password" />
           </div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">X-Org-ID</label>
@@ -2649,7 +2695,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
           </div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Client Secret</label>
-            <input className="gg-input" type="password" value={sendpulseClientSecret} onChange={e => setSendpulseClientSecret(e.target.value)} placeholder="Secret" autoComplete="new-password" />
+            <SecretInput value={sendpulseClientSecret} onChange={e => setSendpulseClientSecret(e.target.value)} placeholder="Secret" autoComplete="new-password" />
           </div>
           <div className="gg-settings-hint">OAuth2 client_credentials (токен кэшируется). Операции: list_mailing_lists, list_campaigns, get_balance.</div>
         </>
@@ -2658,7 +2704,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
         <>
           <div className="gg-settings-row">
             <label className="gg-settings-label">API key</label>
-            <input className="gg-input" type="password" value={unisenderApiKey} onChange={e => setUnisenderApiKey(e.target.value)} placeholder="Личный кабинет → Настройки → API" autoComplete="new-password" />
+            <SecretInput value={unisenderApiKey} onChange={e => setUnisenderApiKey(e.target.value)} placeholder="Личный кабинет → Настройки → API" autoComplete="new-password" />
           </div>
           <div className="gg-settings-hint">Операции: get_lists, get_campaigns, get_campaign_stats.</div>
         </>
@@ -2667,7 +2713,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
         <>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Access token</label>
-            <input className="gg-input" type="password" value={ga4Token} onChange={e => setGa4Token(e.target.value)} placeholder="OAuth Bearer, scope analytics.readonly" autoComplete="new-password" />
+            <SecretInput value={ga4Token} onChange={e => setGa4Token(e.target.value)} placeholder="OAuth Bearer, scope analytics.readonly" autoComplete="new-password" />
           </div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Property ID</label>
@@ -2680,7 +2726,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
         <>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Integration token</label>
-            <input className="gg-input" type="password" value={notionToken} onChange={e => setNotionToken(e.target.value)} placeholder="notion.so/my-integrations (Internal)" autoComplete="new-password" />
+            <SecretInput value={notionToken} onChange={e => setNotionToken(e.target.value)} placeholder="notion.so/my-integrations (Internal)" autoComplete="new-password" />
           </div>
           <div className="gg-settings-hint">Подключи интеграцию к нужным страницам. Операции: search, query_database, get_page.</div>
         </>
@@ -2689,7 +2735,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
         <>
           <div className="gg-settings-row">
             <label className="gg-settings-label">API key</label>
-            <input className="gg-input" type="password" value={konturFocusKey} onChange={e => setKonturFocusKey(e.target.value)} placeholder="Ключ Focus API 3.0" autoComplete="new-password" />
+            <SecretInput value={konturFocusKey} onChange={e => setKonturFocusKey(e.target.value)} placeholder="Ключ Focus API 3.0" autoComplete="new-password" />
           </div>
           <div className="gg-settings-hint">Операции: req (реквизиты по ИНН/ОГРН), analytics (риск-маркеры).</div>
         </>
@@ -2698,7 +2744,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
         <>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Token</label>
-            <input className="gg-input" type="password" value={mpstatsToken} onChange={e => setMpstatsToken(e.target.value)} placeholder="X-Mpstats-TOKEN" autoComplete="new-password" />
+            <SecretInput value={mpstatsToken} onChange={e => setMpstatsToken(e.target.value)} placeholder="X-Mpstats-TOKEN" autoComplete="new-password" />
           </div>
           <div className="gg-settings-hint">⚠️ Бета — проверь на своём аккаунте. Операции: аналитика категорий/товаров WB.</div>
         </>
@@ -2711,7 +2757,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
           </div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Client Secret</label>
-            <input className="gg-input" type="password" value={ozonPerfClientSecret} onChange={e => setOzonPerfClientSecret(e.target.value)} placeholder="client_secret" autoComplete="new-password" />
+            <SecretInput value={ozonPerfClientSecret} onChange={e => setOzonPerfClientSecret(e.target.value)} placeholder="client_secret" autoComplete="new-password" />
           </div>
           <div className="gg-settings-hint">⚠️ Бета — проверь на аккаунте. Операции: list_campaigns, list_objects.</div>
         </>
@@ -2728,7 +2774,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
           </div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">API token</label>
-            <input className="gg-input" type="password" value={jiraApiToken} onChange={e => setJiraApiToken(e.target.value)} placeholder="id.atlassian.com → API tokens" autoComplete="new-password" />
+            <SecretInput value={jiraApiToken} onChange={e => setJiraApiToken(e.target.value)} placeholder="id.atlassian.com → API tokens" autoComplete="new-password" />
           </div>
           <div className="gg-settings-hint">Операции: search_issues (JQL), get_issue, list_projects.</div>
         </>
@@ -2741,7 +2787,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
           </div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Token</label>
-            <input className="gg-input" type="password" value={trelloToken} onChange={e => setTrelloToken(e.target.value)} placeholder="токен авторизации Trello" autoComplete="new-password" />
+            <SecretInput value={trelloToken} onChange={e => setTrelloToken(e.target.value)} placeholder="токен авторизации Trello" autoComplete="new-password" />
           </div>
           <div className="gg-settings-hint">Операции: list_boards, list_lists (board_id), list_cards (list_id).</div>
         </>
@@ -2754,7 +2800,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
           </div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Api-Key</label>
-            <input className="gg-input" type="password" value={ozonApiKey} onChange={e => setOzonApiKey(e.target.value)} placeholder="Api-Key (Seller → Настройки → API-ключи)" autoComplete="new-password" />
+            <SecretInput value={ozonApiKey} onChange={e => setOzonApiKey(e.target.value)} placeholder="Api-Key (Seller → Настройки → API-ключи)" autoComplete="new-password" />
           </div>
           <div className="gg-settings-hint">Операции: list_products, get_stocks, get_analytics (date_from/date_to), get_transactions.</div>
         </>
@@ -2763,7 +2809,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
         <>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Token (Статистика)</label>
-            <input className="gg-input" type="password" value={wbToken} onChange={e => setWbToken(e.target.value)} placeholder="ЛК WB → Доступ к API → категория «Статистика»" autoComplete="new-password" />
+            <SecretInput value={wbToken} onChange={e => setWbToken(e.target.value)} placeholder="ЛК WB → Доступ к API → категория «Статистика»" autoComplete="new-password" />
           </div>
           <div className="gg-settings-hint">Операции: get_sales, get_orders, get_stocks (date_from, по умолчанию 7 дней назад).</div>
         </>
@@ -2776,7 +2822,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
           </div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Секретный ключ</label>
-            <input className="gg-input" type="password" value={yookassaSecretKey} onChange={e => setYookassaSecretKey(e.target.value)} placeholder="live_… / test_…" autoComplete="new-password" />
+            <SecretInput value={yookassaSecretKey} onChange={e => setYookassaSecretKey(e.target.value)} placeholder="live_… / test_…" autoComplete="new-password" />
           </div>
           <div className="gg-settings-hint">Только чтение: list_payments, get_payment, list_refunds. Создание платежей намеренно недоступно.</div>
         </>
@@ -2785,7 +2831,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
         <>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Access token</label>
-            <input className="gg-input" type="password" value={vkToken} onChange={e => setVkToken(e.target.value)} placeholder="oauth/сервисный токен VK" autoComplete="new-password" />
+            <SecretInput value={vkToken} onChange={e => setVkToken(e.target.value)} placeholder="oauth/сервисный токен VK" autoComplete="new-password" />
           </div>
           <div className="gg-settings-hint">Операции: group_info, wall_get (owner_id для группы отрицательный), users_get.</div>
         </>
@@ -2798,7 +2844,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
           </div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Access token</label>
-            <input className="gg-input" type="password" value={amocrmToken} onChange={e => setAmocrmToken(e.target.value)} placeholder="long-lived токен интеграции" autoComplete="new-password" />
+            <SecretInput value={amocrmToken} onChange={e => setAmocrmToken(e.target.value)} placeholder="long-lived токен интеграции" autoComplete="new-password" />
           </div>
           <div className="gg-settings-hint">Операции: list_leads, list_contacts, list_pipelines, get_lead.</div>
         </>
@@ -2807,9 +2853,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
         <>
           <div className="gg-settings-row">
             <label className="gg-settings-label">OAuth token</label>
-            <input
-              className="gg-input"
-              type="password"
+            <SecretInput
               value={yDiskToken}
               onChange={e => setYDiskToken(e.target.value)}
               placeholder="oauth.yandex.ru со scope cloud_api:disk.write"
@@ -2846,9 +2890,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
         <>
           <div className="gg-settings-row">
             <label className="gg-settings-label">Personal Access Token</label>
-            <input
-              className="gg-input"
-              type="password"
+            <SecretInput
               value={githubToken}
               onChange={e => setGithubToken(e.target.value)}
               placeholder="ghp_... (Settings → Developer settings → Personal access tokens)"
@@ -2881,9 +2923,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
           </div>
           <div className="gg-settings-row">
             <label className="gg-settings-label">VK token</label>
-            <input
-              className="gg-input"
-              type="password"
+            <SecretInput
               value={socialVkToken}
               onChange={e => setSocialVkToken(e.target.value)}
               placeholder="User token со scope wall (vk.com/dev, oauth.vk.com)"
@@ -3915,7 +3955,7 @@ export function Settings({ onClose, initialTab }: { onClose: () => void; initial
         </div>
         )}
 
-        {tab === 'profiles' && (<ProfilesTab />)}
+        {tab === 'profiles' && (<ProfileSoonPage />)}
 
         {tab === 'appearance' && (
         <div className="gg-settings-extra gg-appearance-panel">

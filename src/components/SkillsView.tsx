@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useT } from '../i18n'
 import { useSkills } from '../store/skillStore'
 import type { Skill, SkillImportPreviewResult, SkillUsageRecord } from '../types/api'
+import { normalizeSkillUserTags, withSkillsUserTags, writeSkillUserTags } from '../lib/skill-user-tags'
 
 const SOURCE_LABELS: Record<Skill['source'] | 'archived', string> = {
   'built-in': 'Встроенные',
@@ -50,6 +51,7 @@ function skillHaystack(skill: Skill): string {
     skill.description ?? '',
     skill.slash ?? '',
     ...(skill.suggested_prompts ?? []),
+    ...(skill.user_tags ?? []),
     ...(skill.tools_allow ?? []),
     skill.systemPrompt
   ].join(' '))
@@ -223,13 +225,14 @@ export function SkillsView({ onActivateSkill }: { onActivateSkill: (slash: strin
   const [preview, setPreview] = useState<Extract<SkillImportPreviewResult, { ok: true }> | null>(null)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const [tagDraft, setTagDraft] = useState('')
 
   const refresh = useCallback(async () => {
     const [nextSkills, nextUsage] = await Promise.all([
       window.api.skills.list(),
       window.api.skills.usage()
     ])
-    setSkills(Array.isArray(nextSkills) ? nextSkills : [])
+    setSkills(Array.isArray(nextSkills) ? withSkillsUserTags(nextSkills) : [])
     setUsage(Array.isArray(nextUsage) ? nextUsage : [])
   }, [])
 
@@ -273,6 +276,10 @@ export function SkillsView({ onActivateSkill }: { onActivateSkill: (slash: strin
     return filtered[0] ?? null
   }, [filtered, selectedSkillId, skills])
   const selectedUsage = selectedSkill ? usageById.get(selectedSkill.id) : undefined
+
+  useEffect(() => {
+    setTagDraft((selectedSkill?.user_tags ?? []).join(', '))
+  }, [selectedSkill?.id, selectedSkill?.user_tags?.join('\n')])
 
   useEffect(() => {
     if (selectedSkillId && !skills.some(skill => skill.id === selectedSkillId)) {
@@ -326,6 +333,14 @@ export function SkillsView({ onActivateSkill }: { onActivateSkill: (slash: strin
     await refresh()
   }
 
+  const saveSkillTags = async () => {
+    if (!selectedSkill) return
+    const nextTags = writeSkillUserTags(selectedSkill.id, normalizeSkillUserTags(tagDraft))
+    setSkills(prev => prev.map(skill => skill.id === selectedSkill.id ? { ...skill, user_tags: nextTags } : skill))
+    await refreshStore()
+    setNotice(nextTags.length ? 'Теги скилла сохранены' : 'Теги скилла очищены')
+  }
+
   return (
     <div className="gg-skills-view">
       <div className="gg-skills-header">
@@ -366,6 +381,11 @@ export function SkillsView({ onActivateSkill }: { onActivateSkill: (slash: strin
                         <div className="gg-skill-card-body">
                           <div className="gg-skill-card-name">{s.name ?? s.id}</div>
                           <div className="gg-skill-card-desc">{s.description ?? ''}</div>
+                          {(s.user_tags?.length ?? 0) > 0 && (
+                            <div className="gg-skill-card-tags">
+                              {s.user_tags!.slice(0, 4).map(tag => <span key={tag}>{tag}</span>)}
+                            </div>
+                          )}
                         </div>
                       </button>
                       <div className="gg-skill-card-meta">
@@ -447,8 +467,33 @@ export function SkillsView({ onActivateSkill }: { onActivateSkill: (slash: strin
               <div className="gg-skill-detail-section">
                 <div className="gg-skill-detail-section-title">Как будет применён</div>
                 <div className="gg-skill-detail-note">
-                  После нажатия скилл станет активным для следующего сообщения в чате и будет передан модели как рабочая инструкция.
+                  После нажатия скилл добавится к текущему черновику сообщения и будет передан модели только вместе с ним
                 </div>
+              </div>
+              <div className="gg-skill-detail-section">
+                <div className="gg-skill-detail-section-title">Теги для рекомендаций</div>
+                <div className="gg-skill-detail-note">
+                  Добавь слова и фразы, по которым Verstak должен предлагать этот скилл при наборе задачи в чате
+                </div>
+                <div className="gg-skill-tags-editor">
+                  <input
+                    className="gg-input"
+                    value={tagDraft}
+                    onChange={event => setTagDraft(event.target.value)}
+                    onKeyDown={event => {
+                      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') void saveSkillTags()
+                    }}
+                    placeholder="минусация, аудит за неделю, РСЯ"
+                  />
+                  <button type="button" className="gg-btn gg-btn-primary" onClick={() => void saveSkillTags()}>
+                    Сохранить
+                  </button>
+                </div>
+                {(selectedSkill.user_tags?.length ?? 0) > 0 && (
+                  <div className="gg-skill-detail-tag-list">
+                    {selectedSkill.user_tags!.map(tag => <span key={tag}>{tag}</span>)}
+                  </div>
+                )}
               </div>
               {(selectedSkill.tools_allow?.length ?? 0) > 0 && (
                 <div className="gg-skill-detail-section">
