@@ -36,13 +36,13 @@ Important behavior:
 
 - Grok Build now uses the live `grok-4.5` model id and no longer exposes or routes to removed `grok-composer-2.5-fast`.
 - The CLI gate validates the resolved selected Grok model before starting the child process.
-- The chat work-progress panel now labels runs from the active chat session's saved provider/model first, so it should show `Grok Build · grok-4.5` when that model is selected.
+- The chat work-progress panel now labels runs from the active chat session, but ignores removed/stale model ids such as `grok-composer-2.5-fast` and repairs that saved chat session model to the current provider model.
 - Do not restore the removed composer plain-output path unless Grok reintroduces that model and it is verified live.
 
 Verify:
 
 - Open Grok Build model settings and confirm only current live model ids are shown.
-- Select Grok Build `grok-4.5`, send a chat request, and confirm `Ход работы` shows the selected model, not `grok-composer-2.5-fast`.
+- Select Grok Build `grok-4.5`, send a chat request from a chat that previously used composer, and confirm `Ход работы` shows the selected model, not `grok-composer-2.5-fast`.
 - Run the model discovery/registry/provider doctor tests listed below.
 
 ### Skills: manual recommendation tags and per-message application

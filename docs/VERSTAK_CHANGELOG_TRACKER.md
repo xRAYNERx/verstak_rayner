@@ -135,13 +135,14 @@ Status: added locally
 Expected behavior:
 - The `Ход работы` panel shows the provider/model selected for the active chat session.
 - If Grok Build `grok-4.5` is selected, progress should not display removed `grok-composer-2.5-fast`.
-- Chat session provider/model should win over stale provider hook state.
+- Chat session provider/model should win over stale provider hook state, but removed saved model ids must be ignored and repaired to the current provider model.
 
 Files:
 - `src/components/Chat.tsx`
 
 Fast code markers:
 - `progressProviderLabel`
+- `isStaleProgressModel`
 - `activeChatSession`
 - `agentModelLabel`
 

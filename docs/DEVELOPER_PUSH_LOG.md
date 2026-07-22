@@ -2,6 +2,40 @@
 
 ## Latest Push Package
 
+- Date: 2026-07-22
+- Branch: `codex/reapply-2.0.11`
+- Commit: after commit
+- Title: Hotfix Grok work-progress model label
+
+### Included
+
+- Chat work-progress now ignores stale saved Grok model ids such as `grok-composer-2.5-fast`.
+- If a chat session still stores a removed model id for the active provider, Verstak repairs that session to the current provider model before future runs.
+- The visible work-progress label should now show the selected Grok Build model instead of the old composer id.
+
+### Files To Inspect First
+
+- `src/components/Chat.tsx`
+- `docs/AI_HANDOFF.md`
+- `docs/PATCHNOTES_DRAFT.md`
+
+### Validation
+
+- `npm.cmd run check:mojibake`
+- `npm.cmd run build`
+- `npm.cmd run deploy:local`
+
+### Transfer Notes For Pavel's AI
+
+- Do not reintroduce `grok-composer-2.5-fast` in work-progress labels or saved-session repair.
+- Keep the work-progress label tied to the actual current chat/provider model, not a stale chat history value.
+
+### Patchnote Source
+
+- Use `docs/PATCHNOTES_DRAFT.md`
+
+## Previous Push Package
+
 - Date: 2026-07-21
 - Branch: `codex/reapply-2.0.11`
 - Commit: after commit

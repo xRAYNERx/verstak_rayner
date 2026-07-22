@@ -97,17 +97,27 @@ function fallbackProviderLabel(id: string): string {
     .join(' ')
 }
 
+function isStaleProgressModel(model: string): boolean {
+  return model === 'grok-composer-2.5-fast' || model === 'grok-build'
+}
+
 function progressProviderLabel(
-  provider: { id?: string; label: string; model?: string | null },
+  provider: { id?: string; label: string; model?: string | null; models?: string[] },
   session?: { providerId?: string | null; model?: string | null } | null
 ): string {
   const sessionProviderId = typeof session?.providerId === 'string' ? session.providerId.trim() : ''
+  const sameProvider = !sessionProviderId || sessionProviderId === provider.id
   const label = sessionProviderId && sessionProviderId !== provider.id
     ? fallbackProviderLabel(sessionProviderId)
     : provider.label
-  const sessionModel = typeof session?.model === 'string' ? session.model.trim() : ''
-  const providerModel = typeof provider.model === 'string' ? provider.model.trim() : ''
-  const model = sessionModel || providerModel
+  const rawSessionModel = typeof session?.model === 'string' ? session.model.trim() : ''
+  const rawProviderModel = typeof provider.model === 'string' ? provider.model.trim() : ''
+  const sessionModel = isStaleProgressModel(rawSessionModel) ? '' : rawSessionModel
+  const providerModel = isStaleProgressModel(rawProviderModel) ? '' : rawProviderModel
+  const providerModels = provider.models ?? []
+  const hasProviderCatalog = providerModels.length > 0
+  const sessionModelValid = Boolean(sessionModel) && (!sameProvider || !hasProviderCatalog || providerModels.includes(sessionModel))
+  const model = sessionModelValid ? sessionModel : (sameProvider ? providerModel : '')
   if (!model || model === label) return label
   return `${label} · ${model}`
 }
@@ -770,10 +780,37 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
     ? t.help.emptyTitle
     : (activeChatSession?.title ?? null)
   const provider = useProvider()
+  const providerModelsKey = provider.models.join('\n')
   const agentModelLabel = useMemo(
     () => progressProviderLabel(provider, activeChatSession),
-    [provider.id, provider.label, provider.model, activeChatSession?.providerId, activeChatSession?.model]
+    [provider.id, provider.label, provider.model, providerModelsKey, activeChatSession?.providerId, activeChatSession?.model]
   )
+  useEffect(() => {
+    if (isHelpChat || activeChatId == null) return
+    if (!activeChatSession?.providerId || !activeChatSession.model) return
+    if (activeChatSession.providerId !== provider.id) return
+
+    const sessionModel = activeChatSession.model.trim()
+    const isUnavailable = provider.models.length > 0 && !provider.models.includes(sessionModel)
+    if (!isStaleProgressModel(sessionModel) && !isUnavailable) return
+
+    const replacement = provider.model && !isStaleProgressModel(provider.model)
+      ? provider.model
+      : provider.models.find(model => !isStaleProgressModel(model)) ?? ''
+    if (!replacement || replacement === sessionModel) return
+
+    void window.api.chatSessions.setModel(activeChatId, provider.id, replacement)
+      .then(() => useProject.getState().refreshChatSessions())
+      .catch(() => {})
+  }, [
+    isHelpChat,
+    activeChatId,
+    activeChatSession?.providerId,
+    activeChatSession?.model,
+    provider.id,
+    provider.model,
+    providerModelsKey,
+  ])
   // ось 3 A: смена режима свопит модель по привязке mode_models_<provider> (plan →
   // reasoning-модель, act/auto → дешёвый кодер). Идёт через onChange ModePicker —
   // ловит И клики, И клавиши 1-5. Нет привязки для режима → модель не трогаем.
