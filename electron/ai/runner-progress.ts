@@ -7,7 +7,7 @@
 
 import { PROVIDERS, type ProviderId } from './registry'
 import type { TaggedSender } from '../ipc/tool-handlers/shared'
-import { formatModelProgressLabel, normalizeSelectedModel } from '../../shared/contracts/provider'
+import { formatModelProgressLabel, normalizeSelectedModel, sanitizeStaleModelText } from '../../shared/contracts/provider'
 
 export type { TaggedSender }
 
@@ -53,7 +53,8 @@ export function compactProgressText(value: unknown, max = 220): string | undefin
     .replace(/\s+/g, ' ')
     .trim()
   if (!clean) return undefined
-  return clean.length > max ? `${clean.slice(0, max - 1)}...` : clean
+  const sanitized = sanitizeStaleModelText(clean)
+  return sanitized.length > max ? `${sanitized.slice(0, max - 1)}...` : sanitized
 }
 
 export function modelProgressLabel(providerId?: ProviderId, model?: string | null): string {
@@ -62,7 +63,7 @@ export function modelProgressLabel(providerId?: ProviderId, model?: string | nul
   const cleanModel = descriptor
     ? normalizeSelectedModel(model, descriptor)
     : model
-  return formatModelProgressLabel(providerName, cleanModel)
+  return sanitizeStaleModelText(formatModelProgressLabel(providerName, cleanModel), descriptor?.defaultModel)
 }
 
 export function emitAgentProgress(sender: TaggedSender, sendId: number, payload: AgentProgressPayload): void {
@@ -73,7 +74,7 @@ export function emitAgentProgress(sender: TaggedSender, sendId: number, payload:
         type: 'agent-progress',
         id: payload.id,
         phase: payload.phase,
-        title: payload.title,
+        title: sanitizeStaleModelText(payload.title),
         detail: compactProgressText(payload.detail),
         status: payload.status ?? 'running'
       }
@@ -90,6 +91,7 @@ export function createModelWaitHeartbeat(
 ): { stop: (status?: AgentProgressStatus, detail?: string) => void } {
   const startedAt = Date.now()
   const intervalMs = opts.intervalMs ?? 12000
+  const label = sanitizeStaleModelText(opts.label, PROVIDERS['grok-cli'].defaultModel)
   let stopped = false
   let lastStageKey: string | null = null
 
@@ -97,7 +99,7 @@ export function createModelWaitHeartbeat(
     if (elapsedSec < 18) {
       return {
         key: 'accepted',
-        title: `${opts.label} анализирует запрос`,
+        title: `${label} анализирует запрос`,
         detail: opts.detail ?? 'Задача и контекст переданы модели. Жду первый видимый фрагмент или служебный сигнал.',
         checkpointTitle: 'Запрос передан модели',
         checkpointDetail: 'Verstak отправил задачу внешнему агенту и держит активный поток.'
@@ -106,7 +108,7 @@ export function createModelWaitHeartbeat(
     if (elapsedSec < 45) {
       return {
         key: 'forming',
-        title: `${opts.label} формирует ответ`,
+        title: `${label} формирует ответ`,
         detail: `${elapsedSec} сек. Модель работает внутри внешнего агента; Verstak пока не получил новый текст, инструмент или служебный сигнал хода работы.`,
         checkpointTitle: 'Жду первый видимый результат',
         checkpointDetail: 'Модель уже работает, но внешний агент пока не прислал текст, инструмент или понятный промежуточный статус.'
@@ -115,7 +117,7 @@ export function createModelWaitHeartbeat(
     if (elapsedSec < 90) {
       return {
         key: 'internal',
-        title: `${opts.label} выполняет долгий внутренний шаг`,
+        title: `${label} выполняет долгий внутренний шаг`,
         detail: `${elapsedSec} сек. Запрос активен. Точные промежуточные действия этот CLI-провайдер сейчас не отдаёт, поэтому показываю честный статус ожидания без засорения ленты.`,
         checkpointTitle: 'Долгий внутренний шаг',
         checkpointDetail: 'Внешний агент молчит дольше обычного, но процесс не закрыт и поток остаётся активным.'
@@ -123,7 +125,7 @@ export function createModelWaitHeartbeat(
     }
     return {
       key: 'long-wait',
-      title: `${opts.label} всё ещё работает`,
+      title: `${label} всё ещё работает`,
       detail: `${elapsedSec} сек. Verstak держит активный поток и ждёт первый видимый результат; если провайдер отдаст текст, служебный ход работы или инструмент, этап сразу сменится.`,
       checkpointTitle: 'Продолжаю ждать внешний агент',
       checkpointDetail: 'Это не новый запрос и не повтор. Verstak удерживает текущую задачу активной до первого результата или ошибки.'

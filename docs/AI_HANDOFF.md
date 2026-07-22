@@ -1,4 +1,4 @@
-# AI Handoff: Verstak 2.0.11 selected model and Wordstat first-run fixes
+# AI Handoff: Verstak 2.0.11 selected model, progress labels, and Wordstat fixes
 
 Last updated: 2026-07-22
 Source branch: `codex/reapply-2.0.11`
@@ -7,9 +7,10 @@ Local version alignment: `2.0.11`
 
 ## Read This First
 
-This push package contains two hotfixes on top of the existing 2.0.11 recovery branch:
+This push package contains hotfixes on top of the existing 2.0.11 recovery branch:
 
 - chat sends and work-progress labels now use the user's currently selected provider/model instead of stale saved chat-session model ids
+- stale Grok Composer ids are sanitized out of all progress titles/details, including renderer-created initial progress and backend heartbeat events
 - Wordstat keyword-collection tasks now get the right connector/skill context on the first message, including prompts like "собери ключи" that do not literally mention "вордстат"
 
 Do not include the untracked `mcps/chrome-devtools/` folder or `scripts/wordstat-connector-live.mjs` unless Pavel explicitly asks for that local tooling/probe.
@@ -32,10 +33,12 @@ Main files:
 - `src/hooks/useProvider.ts`
 - `electron/ipc/ai.ts`
 - `electron/ai/runner-progress.ts`
+- `src/lib/agent-progress.ts`
 - `electron/preload.ts`
 - `src/types/api.d.ts`
 - `tests/lib/model-selection.test.ts`
 - `tests/ai/runner-progress.test.ts`
+- `tests/lib/agent-progress.test.ts`
 
 Important behavior:
 
@@ -44,12 +47,14 @@ Important behavior:
 - Backend AI IPC treats explicit route/model overrides as highest priority, then resume data, then selected UI model, then stored provider default.
 - Smart routing must not override a user-selected model when `selectedModel` is present.
 - Work-progress labels use the normalized provider/model pair and must not display stale composer ids.
+- `sanitizeStaleModelText` is a final guard for progress copy. It rewrites `grok-composer-2.5-fast`, `grok-composer-2.5`, and `grok-build` to `grok-4.5` before titles/details reach the UI.
+- Frontend progress helpers sanitize labels generated before backend events arrive; backend progress emitter and heartbeat sanitize any label already assembled earlier.
 
 Verify:
 
 - Select a non-default model, send a chat request, and confirm the run uses that selected model.
-- Open a chat that previously stored `grok-composer-2.5-fast`; confirm `Ход работы` repairs to the current Grok Build model and does not show composer.
-- Run `tests/lib/model-selection.test.ts` and `tests/ai/runner-progress.test.ts`.
+- Open a chat that previously stored `grok-composer-2.5-fast`; confirm `Ход работы` shows `Grok Build · grok-4.5`, including the first "анализирует запрос" line.
+- Run `tests/lib/model-selection.test.ts`, `tests/ai/runner-progress.test.ts`, and `tests/lib/agent-progress.test.ts`.
 
 ### Wordstat first-message availability
 
@@ -78,8 +83,10 @@ Verify:
 ## Validation Run Locally
 
 - `npm.cmd run check:mojibake`
-- `npm.cmd run test:fast -- tests\lib\skill-suggest.test.ts tests\ai\tools-allow.test.ts tests\lib\model-selection.test.ts tests\ai\runner-progress.test.ts`
+- `npm.cmd run test:fast -- tests\ai\runner-progress.test.ts tests\lib\agent-progress.test.ts tests\lib\model-selection.test.ts tests\lib\skill-suggest.test.ts tests\ai\tools-allow.test.ts`
 - `npm.cmd run build`
+- `npm.cmd run dist:win`
+- `npm.cmd run deploy:local`
 - `git diff --check`
 
 Known local validation note:
@@ -91,6 +98,7 @@ Known local validation note:
 - Preserve the current installed/local version alignment at `2.0.11` unless Pavel is intentionally releasing a newer version.
 - Do not reintroduce old Grok IDs such as `grok-composer-2.5-fast` or `grok-build`.
 - Preserve explicit selected-model routing; do not let smart routing silently replace `selectedModel`.
+- Preserve the progress-copy sanitizer in both main and renderer; do not rely on only one layer to hide stale Grok ids.
 - Preserve Wordstat keyword-collection intent for prompts that say "собери ключи" without saying "вордстат".
 - Preserve fail-open behavior for connector pseudo names in `tools_allow`.
 - Keep user-facing patch notes human-readable and concrete. Use `docs/PATCHNOTES_DRAFT.md`.

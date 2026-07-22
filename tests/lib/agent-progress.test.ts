@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildInitialAgentProgress, reduceAgentProgress } from '../../src/lib/agent-progress'
+import { activateModelProgress, buildInitialAgentProgress, reduceAgentProgress } from '../../src/lib/agent-progress'
 import { applySnapshotEvent } from '../../src/store/apply-snapshot-event'
 import { freshSnapshot } from '../../src/store/session-snapshot'
 
@@ -51,5 +51,26 @@ describe('agent progress', () => {
     })
     const reasoning = next.find(item => item.id === 'reasoning')
     expect(reasoning?.detail).toContain('Проверь рекламу')
+  })
+
+  it('does not show stale Grok Composer ids in frontend progress labels', () => {
+    const staleLabel = 'Grok Build · grok-composer-2.5-fast'
+    const progress = buildInitialAgentProgress('Проверь модель', staleLabel)
+    expect(progress.find(item => item.id === 'model')?.title).toBe('Готовлю запуск Grok Build · grok-4.5')
+
+    const active = activateModelProgress(progress, staleLabel)
+    expect(active.find(item => item.id === 'model')?.title).toBe('Grok Build · grok-4.5 начал работу')
+
+    const reduced = reduceAgentProgress(active, {
+      type: 'agent-progress',
+      id: 'wait',
+      phase: 'model',
+      title: 'Grok Build · grok-composer-2.5-fast анализирует запрос',
+      detail: 'Запущен grok-composer-2.5-fast',
+      status: 'running'
+    })
+    const wait = reduced.find(item => item.id === 'wait')
+    expect(wait?.title).toBe('Grok Build · grok-4.5 анализирует запрос')
+    expect(wait?.detail).toBe('Запущен grok-4.5')
   })
 })

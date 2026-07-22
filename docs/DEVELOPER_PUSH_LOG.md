@@ -4,6 +4,67 @@
 
 - Date: 2026-07-22
 - Branch: `codex/reapply-2.0.11`
+- Commit: after commit
+- Title: Hard-block stale Grok Composer ids in progress UI
+
+### Included
+
+- Progress copy sanitization:
+  - Added shared stale Grok text sanitizer for `grok-composer-2.5-fast`, `grok-composer-2.5`, and `grok-build`.
+  - Backend `emitAgentProgress` sanitizes progress title/detail before sending events to the renderer.
+  - Backend `createModelWaitHeartbeat` sanitizes the ready-made label before generating "анализирует запрос", "формирует ответ", and later heartbeat titles.
+  - Renderer progress helpers sanitize initial/active progress labels before backend events arrive.
+  - Renderer progress reducer sanitizes incoming backend progress event titles/details as a last UI-side guard.
+- Regression coverage:
+  - Added backend test for `Grok Build · grok-composer-2.5-fast анализирует запрос`.
+  - Added frontend progress test for initial progress, active progress, and incoming backend progress event with stale composer id.
+- Local deployment correction:
+  - Confirmed the earlier `deploy:local` copied stale `release/win-unpacked/resources/app.asar` from 2026-07-21.
+  - Rebuilt `release/win-unpacked` with `npm.cmd run dist:win`, then reran `npm.cmd run deploy:local`.
+  - Verified installed `app.asar` now has renderer `index-x_5mhqXG.js`, `sanitizeStaleModelText` in main, and Wordstat/Grok markers in renderer.
+
+### Files To Inspect First
+
+- `shared/contracts/provider.ts`
+- `electron/ai/runner-progress.ts`
+- `src/lib/agent-progress.ts`
+- `tests/ai/runner-progress.test.ts`
+- `tests/lib/agent-progress.test.ts`
+- `docs/AI_HANDOFF.md`
+- `docs/PATCHNOTES_DRAFT.md`
+- `docs/DEVELOPER_PUSH_LOG.md`
+
+### Not Included
+
+- `mcps/chrome-devtools/` remains an untracked local folder and should not be transferred unless explicitly requested.
+- `scripts/wordstat-connector-live.mjs` remains an untracked local live probe and should not be transferred unless explicitly requested.
+- Built release artifacts are deployed locally but not committed.
+
+### Validation
+
+- `npm.cmd run test:fast -- tests\ai\runner-progress.test.ts tests\lib\agent-progress.test.ts tests\lib\model-selection.test.ts tests\lib\skill-suggest.test.ts tests\ai\tools-allow.test.ts` passed: 5 files, 42 tests.
+- `npm.cmd run check:mojibake` passed.
+- `git diff --check` passed.
+- `npm.cmd run build` passed.
+- `npm.cmd run dist:win` passed.
+- `npm.cmd run deploy:local` passed after rebuilding `release/win-unpacked`.
+- Installed `app.asar` verified after deploy: version `2.0.11`, renderer `index-x_5mhqXG.js`, main sanitizer present.
+
+### Transfer Notes For Pavel's AI
+
+- Preserve the shared stale Grok sanitizer and keep it wired in both main and renderer progress paths.
+- Do not rely only on selected-model normalization; stale ids can also enter through saved progress/session labels.
+- When locally deploying, rebuild `release/win-unpacked` first. `deploy:local` mirrors that folder and will copy stale code if `dist:win` was not rerun.
+- After transfer, manually verify the first `Ход работы` line: it must show `Grok Build · grok-4.5 анализирует запрос`, not composer.
+
+### Patchnote Source
+
+- Use `docs/PATCHNOTES_DRAFT.md`
+
+## Previous Push Package
+
+- Date: 2026-07-22
+- Branch: `codex/reapply-2.0.11`
 - Commit: after final amend; see pushed commit
 - Title: Hotfix selected model routing and Wordstat first-run availability
 
@@ -72,7 +133,7 @@
 
 - Use `docs/PATCHNOTES_DRAFT.md`
 
-## Previous Push Package
+## Earlier Push Package
 
 - Date: 2026-07-22
 - Branch: `codex/reapply-2.0.11`
