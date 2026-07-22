@@ -1,11 +1,61 @@
-# AI Handoff: Verstak 2.0.11 selected model, progress labels, and Wordstat fixes
+# AI Handoff: Verstak 2.0.11 local project tasks
 
-Last updated: 2026-07-22
+Last updated: 2026-07-23
 Source branch: `codex/reapply-2.0.11`
 Target use: pull Rayner's local fixes from the fork into Pavel's main Verstak repository
 Local version alignment: `2.0.11`
 
 ## Read This First
+
+This push package adds the first local task-manager layer inside project management. It replaces the user-facing "Reminders" project tab with "Tasks" while keeping the storage schema ready for future server sync and external task trackers.
+
+Do not include the untracked `mcps/chrome-devtools/` folder or `scripts/wordstat-connector-live.mjs` unless Pavel explicitly asks for that local tooling/probe.
+
+Before transferring, read:
+
+- `docs/VERSTAK_CHANGELOG_TRACKER.md`
+- `docs/RESTORE_AFTER_UPSTREAM_UPDATE.md`
+- `docs/DEVELOPER_PUSH_LOG.md`
+- `docs/PATCHNOTES_DRAFT.md`
+
+## What Changed
+
+### Local project task manager
+
+Main files:
+
+- `electron/storage/tasks.ts`
+- `electron/storage/db.ts`
+- `electron/ipc/tasks.ts`
+- `electron/preload.ts`
+- `src/types/api.d.ts`
+- `src/components/RemindersView.tsx`
+- `src/components/Chat.tsx`
+- `src/i18n/ru.ts`
+- `src/i18n/en.ts`
+- `src/styles/layout.css`
+
+Important behavior:
+
+- The project management tab formerly named "Reminders" is now shown as "Tasks" / "Задачи".
+- `RemindersView` remains the component name only for routing compatibility, but the UI is a local project task manager.
+- Existing legacy checklist calls still work: `tasks:list`, `tasks:add`, `tasks:toggle`, `tasks:remove`, `tasks:clear-done`.
+- New task IPC is available: `tasks:create`, `tasks:update`, `tasks:soft-delete`, `tasks:link`, `tasks:list-links`.
+- Task rows are soft-deleted through `deleted_at`; do not hard-delete user data in this flow.
+- The task schema includes server-ready fields: `uuid`, `project_id`, `workspace_id`, assignee/creator ids, external provider/task ids, external URL, sync state, status, priority and timestamps.
+- `task_links` can connect tasks to chat messages, sessions, files, skills and projects.
+- Chat message actions now include creating a project task from a message and link the created task back to that message when the message has a database id.
+- Keep this local-first. Do not add Bitrix polling or cloud sync in this transfer; those are later stages.
+
+Verify:
+
+- Open a project, go to project management, and confirm the old "Напоминания" tab is now "Задачи".
+- Create a task with title, description, priority and deadline; edit status/priority/deadline; confirm the task stays in the project after switching tabs.
+- Create a task from a chat message; confirm it appears in the same project tasks list.
+- Confirm the old technical checklist tab still works and is not mixed with the new project tasks tab.
+- Run `npm.cmd run check:mojibake`, `git diff --check`, and `npm.cmd run build`.
+
+## Previous Notes
 
 This push package contains hotfixes on top of the existing 2.0.11 recovery branch:
 

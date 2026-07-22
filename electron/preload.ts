@@ -256,6 +256,34 @@ contextBridge.exposeInMainWorld('api', {
   },
   tasks: {
     list: (projectPath: string) => ipcRenderer.invoke('tasks:list', projectPath),
+    create: (input: {
+      projectPath: string
+      title: string
+      description?: string | null
+      status?: string
+      priority?: string
+      deadlineAt?: number | null
+      assigneeId?: string | null
+      createdById?: string | null
+      source?: string
+      externalProviderId?: string | null
+      externalTaskId?: string | null
+      externalUrl?: string | null
+      syncState?: string
+    }) => ipcRenderer.invoke('tasks:create', input),
+    update: (id: number, patch: {
+      title?: string
+      description?: string | null
+      status?: string
+      priority?: string
+      deadlineAt?: number | null
+      assigneeId?: string | null
+      syncState?: string
+    }) => ipcRenderer.invoke('tasks:update', id, patch),
+    softDelete: (id: number) => ipcRenderer.invoke('tasks:soft-delete', id),
+    link: (input: { taskId: number; targetType: string; targetId: string; label?: string | null }) =>
+      ipcRenderer.invoke('tasks:link', input),
+    listLinks: (taskId: number) => ipcRenderer.invoke('tasks:list-links', taskId),
     add: (projectPath: string, text: string) => ipcRenderer.invoke('tasks:add', projectPath, text),
     toggle: (id: number, done: boolean) => ipcRenderer.invoke('tasks:toggle', id, done),
     remove: (id: number) => ipcRenderer.invoke('tasks:remove', id),

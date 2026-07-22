@@ -2,6 +2,62 @@
 
 ## Latest Push Package
 
+- Date: 2026-07-23
+- Branch: `codex/reapply-2.0.11`
+- Commit: after commit
+- Title: Local project task manager foundation
+
+### Included
+
+- Project management:
+  - Renamed the user-facing "Reminders" project tab to "Tasks" / "Задачи".
+  - Replaced the old reminders screen with a local project task manager.
+  - Added task creation, editing, status, priority, deadline, soft delete and project-level filtering.
+  - Added chat message action for creating a task from a message.
+- Task storage:
+  - Expanded the existing `tasks` table without dropping legacy data.
+  - Added server-ready task fields for future workspace/user sync and external task trackers.
+  - Added `task_links`, `local_users`, and `workspaces` tables.
+  - Kept legacy checklist IPC methods compatible.
+
+### Files To Inspect First
+
+- `electron/storage/tasks.ts`
+- `electron/storage/db.ts`
+- `electron/ipc/tasks.ts`
+- `electron/preload.ts`
+- `src/types/api.d.ts`
+- `src/components/RemindersView.tsx`
+- `src/components/Chat.tsx`
+- `src/styles/layout.css`
+- `docs/AI_HANDOFF.md`
+- `docs/PATCHNOTES_DRAFT.md`
+- `docs/DEVELOPER_PUSH_LOG.md`
+
+### Not Included
+
+- No Bitrix polling or external task sync yet.
+- No cloud organization/user registration yet.
+- `mcps/chrome-devtools/` remains untracked local tooling.
+- `scripts/wordstat-connector-live.mjs` remains an untracked local probe.
+- Built release artifacts are deployed locally but not committed.
+
+### Validation
+
+- `npm.cmd run check:mojibake` passed.
+- `git diff --check` passed.
+- `npm.cmd run build` passed.
+- `npm.cmd run deploy:local` passed.
+
+### Transfer Notes For Pavel's AI
+
+- Keep `RemindersView` as the component name unless routing is refactored across the app; the user-facing title is now "Задачи".
+- Preserve legacy task IPC methods because the old checklist still uses them.
+- New task deletion is soft delete through `deleted_at`; do not convert it to hard deletion.
+- Use `docs/PATCHNOTES_DRAFT.md` for the release notes text.
+
+## Previous Push Package
+
 - Date: 2026-07-22
 - Branch: `codex/reapply-2.0.11`
 - Commit: after commit

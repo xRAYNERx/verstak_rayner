@@ -74,7 +74,75 @@ export interface ChatSession {
   kind: ChatKind
   parentChatId: number | null
 }
-export interface Task { id: number; text: string; done: boolean; createdAt: number; doneAt: number | null }
+export type ProjectTaskStatus = 'new' | 'in_progress' | 'review' | 'done' | 'paused' | 'cancelled'
+export type ProjectTaskPriority = 'low' | 'normal' | 'high' | 'urgent'
+export type ProjectTaskSource = 'verstak' | 'bitrix24' | 'jira' | 'external'
+export type ProjectTaskSyncState = 'local' | 'synced' | 'pending' | 'conflict' | 'error'
+export type ProjectTaskLinkTarget = 'chat_message' | 'chat_session' | 'file' | 'skill' | 'project'
+export interface Task {
+  id: number
+  uuid: string
+  projectPath: string
+  projectId: string
+  workspaceId: string
+  title: string
+  text: string
+  description: string | null
+  status: ProjectTaskStatus
+  priority: ProjectTaskPriority
+  deadlineAt: number | null
+  assigneeId: string | null
+  createdById: string | null
+  source: ProjectTaskSource
+  externalProviderId: string | null
+  externalTaskId: string | null
+  externalUrl: string | null
+  syncState: ProjectTaskSyncState
+  done: boolean
+  createdAt: number
+  updatedAt: number
+  completedAt: number | null
+  doneAt: number | null
+  deletedAt: number | null
+}
+export interface TaskInput {
+  projectPath: string
+  title: string
+  description?: string | null
+  status?: ProjectTaskStatus
+  priority?: ProjectTaskPriority
+  deadlineAt?: number | null
+  assigneeId?: string | null
+  createdById?: string | null
+  source?: ProjectTaskSource
+  externalProviderId?: string | null
+  externalTaskId?: string | null
+  externalUrl?: string | null
+  syncState?: ProjectTaskSyncState
+}
+export interface TaskUpdate {
+  title?: string
+  description?: string | null
+  status?: ProjectTaskStatus
+  priority?: ProjectTaskPriority
+  deadlineAt?: number | null
+  assigneeId?: string | null
+  syncState?: ProjectTaskSyncState
+}
+export interface TaskLink {
+  id: number
+  taskId: number
+  targetType: ProjectTaskLinkTarget
+  targetId: string
+  label: string | null
+  createdAt: number
+}
+export interface TaskLinkInput {
+  taskId: number
+  targetType: ProjectTaskLinkTarget
+  targetId: string
+  label?: string | null
+}
 export type JournalKind = 'manual' | 'session' | 'tool' | 'note'
 export interface JournalEntry { id: number; kind: JournalKind; title: string; detail: string | null; createdAt: number }
 export interface WorktreeGitStateDTO { dirty: boolean; unpushed: boolean; clean: boolean; dirtyFiles?: number; unpushedCommits?: number }
@@ -622,6 +690,11 @@ declare global {
       }
       tasks: {
         list: (projectPath: string) => Promise<Task[]>
+        create: (input: TaskInput) => Promise<Task>
+        update: (id: number, patch: TaskUpdate) => Promise<Task | null>
+        softDelete: (id: number) => Promise<Task | null>
+        link: (input: TaskLinkInput) => Promise<TaskLink>
+        listLinks: (taskId: number) => Promise<TaskLink[]>
         add: (projectPath: string, text: string) => Promise<Task>
         toggle: (id: number, done: boolean) => Promise<void>
         remove: (id: number) => Promise<void>

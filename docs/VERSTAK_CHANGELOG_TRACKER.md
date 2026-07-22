@@ -16,6 +16,46 @@ Date: 2026-07-21
 Installed version checked: 2.0.11
 Local package version checked: 2.0.11
 
+### Added Final Changes
+
+#### Project Management: Reminders become local Tasks
+
+Status: added locally
+
+Section: left project management panel
+
+Expected behavior:
+- The former `Reminders` project tab is shown to users as `Задачи`.
+- A project has its own local task list with title, description, status, priority and deadline.
+- A chat message can be turned into a task from the message action row.
+- Tasks are stored locally now, but the schema keeps fields for future server sync and external task trackers.
+- Legacy checklist task methods keep working and must not be removed.
+
+Files:
+- `electron/storage/tasks.ts`
+- `electron/storage/db.ts`
+- `electron/ipc/tasks.ts`
+- `electron/preload.ts`
+- `src/types/api.d.ts`
+- `src/components/RemindersView.tsx`
+- `src/components/Chat.tsx`
+- `src/i18n/ru.ts`
+- `src/i18n/en.ts`
+- `src/styles/layout.css`
+
+Fast code markers:
+- `tasks:create`
+- `tasks:update`
+- `tasks:soft-delete`
+- `task_links`
+- `gg-project-tasks-panel`
+- `Создать задачу из этого сообщения`
+
+Manual check:
+- Open a project and the project management panel.
+- Open `Задачи`, create a task, edit it, switch tabs and confirm it remains.
+- Use a chat message action to create a task and confirm it appears in the same project.
+
 ### Lost After Upstream Update And Restored
 
 #### Project Management: Browser and Design are disabled as Soon

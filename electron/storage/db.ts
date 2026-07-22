@@ -1222,6 +1222,86 @@ const MIGRATIONS: Array<{ version: number; description: string; run: (db: DB) =>
       if (!has('before_hash')) db.exec('ALTER TABLE file_undo ADD COLUMN before_hash TEXT')
       if (!has('after_hash')) db.exec('ALTER TABLE file_undo ADD COLUMN after_hash TEXT')
     }
+  },
+  {
+    version: 54,
+    description: '2.0.11 local project task manager: expands legacy checklist tasks into server-ready tasks and adds task_links/local_users/workspaces placeholders.',
+    run: (db: DB) => {
+      const taskCols = (db.prepare('PRAGMA table_info(tasks)').all() as Array<{ name: string }>).map(c => c.name)
+      const has = (c: string) => taskCols.includes(c)
+      if (!has('uuid')) db.exec('ALTER TABLE tasks ADD COLUMN uuid TEXT')
+      if (!has('project_id')) db.exec('ALTER TABLE tasks ADD COLUMN project_id TEXT')
+      if (!has('workspace_id')) db.exec('ALTER TABLE tasks ADD COLUMN workspace_id TEXT')
+      if (!has('title')) db.exec('ALTER TABLE tasks ADD COLUMN title TEXT')
+      if (!has('description')) db.exec('ALTER TABLE tasks ADD COLUMN description TEXT')
+      if (!has('status')) db.exec("ALTER TABLE tasks ADD COLUMN status TEXT NOT NULL DEFAULT 'new'")
+      if (!has('priority')) db.exec("ALTER TABLE tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'")
+      if (!has('deadline_at')) db.exec('ALTER TABLE tasks ADD COLUMN deadline_at INTEGER')
+      if (!has('assignee_id')) db.exec('ALTER TABLE tasks ADD COLUMN assignee_id TEXT')
+      if (!has('created_by_id')) db.exec('ALTER TABLE tasks ADD COLUMN created_by_id TEXT')
+      if (!has('source')) db.exec("ALTER TABLE tasks ADD COLUMN source TEXT NOT NULL DEFAULT 'verstak'")
+      if (!has('external_provider_id')) db.exec('ALTER TABLE tasks ADD COLUMN external_provider_id TEXT')
+      if (!has('external_task_id')) db.exec('ALTER TABLE tasks ADD COLUMN external_task_id TEXT')
+      if (!has('external_url')) db.exec('ALTER TABLE tasks ADD COLUMN external_url TEXT')
+      if (!has('sync_state')) db.exec("ALTER TABLE tasks ADD COLUMN sync_state TEXT NOT NULL DEFAULT 'local'")
+      if (!has('updated_at')) db.exec('ALTER TABLE tasks ADD COLUMN updated_at INTEGER')
+      if (!has('completed_at')) db.exec('ALTER TABLE tasks ADD COLUMN completed_at INTEGER')
+      if (!has('deleted_at')) db.exec('ALTER TABLE tasks ADD COLUMN deleted_at INTEGER')
+
+      const now = Date.now()
+      db.prepare("UPDATE tasks SET uuid = 'task-' || id WHERE uuid IS NULL OR uuid = ''").run()
+      db.prepare("UPDATE tasks SET project_id = lower(replace(project_path, '\\', '/')) WHERE project_id IS NULL OR project_id = ''").run()
+      db.prepare("UPDATE tasks SET workspace_id = 'local' WHERE workspace_id IS NULL OR workspace_id = ''").run()
+      db.prepare("UPDATE tasks SET title = text WHERE title IS NULL OR title = ''").run()
+      db.prepare("UPDATE tasks SET status = CASE WHEN done = 1 THEN 'done' ELSE 'new' END WHERE status IS NULL OR status = ''").run()
+      db.prepare("UPDATE tasks SET priority = 'normal' WHERE priority IS NULL OR priority = ''").run()
+      db.prepare("UPDATE tasks SET source = 'verstak' WHERE source IS NULL OR source = ''").run()
+      db.prepare("UPDATE tasks SET sync_state = 'local' WHERE sync_state IS NULL OR sync_state = ''").run()
+      db.prepare("UPDATE tasks SET created_by_id = 'local-user' WHERE created_by_id IS NULL OR created_by_id = ''").run()
+      db.prepare('UPDATE tasks SET updated_at = COALESCE(done_at, created_at, ?) WHERE updated_at IS NULL').run(now)
+      db.prepare('UPDATE tasks SET completed_at = done_at WHERE completed_at IS NULL AND done = 1 AND done_at IS NOT NULL').run()
+      db.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_uuid ON tasks(uuid);
+        CREATE INDEX IF NOT EXISTS idx_tasks_project_status ON tasks(project_path, status, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_tasks_deleted ON tasks(deleted_at);
+        CREATE TABLE IF NOT EXISTS task_links (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          task_id INTEGER NOT NULL,
+          target_type TEXT NOT NULL,
+          target_id TEXT NOT NULL,
+          label TEXT,
+          created_at INTEGER NOT NULL,
+          FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_task_links_task ON task_links(task_id);
+        CREATE INDEX IF NOT EXISTS idx_task_links_target ON task_links(target_type, target_id);
+        CREATE TABLE IF NOT EXISTS local_users (
+          id TEXT PRIMARY KEY,
+          display_name TEXT NOT NULL,
+          email TEXT,
+          avatar TEXT,
+          is_local INTEGER NOT NULL DEFAULT 1,
+          created_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS workspaces (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL DEFAULT 'local',
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+      `)
+      db.prepare(`
+        INSERT INTO local_users (id, display_name, email, avatar, is_local, created_at)
+        VALUES ('local-user', 'Я', NULL, NULL, 1, ?)
+        ON CONFLICT(id) DO NOTHING
+      `).run(now)
+      db.prepare(`
+        INSERT INTO workspaces (id, name, type, created_at, updated_at)
+        VALUES ('local', 'Локальное пространство', 'local', ?, ?)
+        ON CONFLICT(id) DO NOTHING
+      `).run(now, now)
+    }
   }
 ]
 

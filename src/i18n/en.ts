@@ -109,7 +109,7 @@ export const en = {
     chat: 'Chat',
     tasks: 'Checklist',
     journal: 'Journal',
-    reminders: 'Reminders',
+    reminders: 'Tasks',
     plan: 'Plan',
     skills: 'Skills',
     projectRules: 'AI instructions',

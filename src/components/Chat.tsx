@@ -634,6 +634,27 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
     return () => window.clearInterval(id)
   }, [isStreaming, streamStartedAt])
 
+  const createTaskFromMessage = useCallback(async (text: string, messageId?: number) => {
+    if (!activePath) return
+    const clean = text.trim()
+    if (!clean) return
+    const title = clean.length > 80 ? `${clean.slice(0, 77).trim()}...` : clean
+    const task = await window.api.tasks.create({
+      projectPath: activePath,
+      title,
+      description: clean
+    })
+    if (messageId != null) {
+      await window.api.tasks.link({
+        taskId: task.id,
+        targetType: 'chat_message',
+        targetId: String(messageId),
+        label: 'Сообщение чата'
+      })
+    }
+    setActiveView('reminders')
+  }, [activePath, setActiveView])
+
   const assistantAnimationScope = helpMode
     ? 'help'
     : activeChatId != null
@@ -3321,7 +3342,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
       {!isHelpChat && chatReminderPins.length > 0 && (
         <div
           className={`gg-chat-reminder-pins ${reminderPinsPrefs.collapsed ? 'is-collapsed' : ''}`}
-          aria-label="Напоминания проекта"
+          aria-label="Задачи проекта"
           style={{ left: reminderPinsPrefs.x, top: reminderPinsPrefs.y }}
         >
           <div
@@ -3335,7 +3356,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
               type="button"
               className="gg-chat-reminder-pins-toggle"
               onClick={() => setReminderPinsCollapsed(!reminderPinsPrefs.collapsed)}
-              title={reminderPinsPrefs.collapsed ? 'Развернуть напоминания' : 'Свернуть напоминания'}
+              title={reminderPinsPrefs.collapsed ? 'Развернуть задачи' : 'Свернуть задачи'}
             >
               {reminderPinsPrefs.collapsed ? '+' : '-'}
             </button>
@@ -3346,7 +3367,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
               onClick={() => setActiveView('reminders')}
               title="Открыть напоминания"
             >
-              <span>Напоминания</span>
+              <span>Задачи</span>
               <span className="gg-chat-reminder-pins-count">{chatReminderPins.length}</span>
             </button>
           </div>
@@ -3360,7 +3381,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
                     onClick={() => setActiveView('reminders')}
                     title="Открыть напоминания"
                   >
-                    <span className="gg-chat-reminder-pin-kicker">Напоминание</span>
+                    <span className="gg-chat-reminder-pin-kicker">Задача</span>
                     <span className="gg-chat-reminder-pin-title">{reminder.title}</span>
                     <span className="gg-chat-reminder-pin-time">{formatReminderPinTime(reminder.dueAt)}</span>
                   </button>
@@ -3756,7 +3777,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
               </div>
               )}
               {m.role === 'user' && m.source === 'reminder' && (
-                <div className="gg-msg-source-note">Отправлено автоматически из раздела Напоминания</div>
+                <div className="gg-msg-source-note">Отправлено автоматически из раздела Задачи</div>
               )}
               {m.role === 'user' && !!m.appliedSkills?.length && (
                 <div className="gg-msg-skill-note" title="Эти скиллы были применены только к этому сообщению">
@@ -3780,6 +3801,9 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
                   // Видимость — единый гейт canEditMessage (в т.ч. НЕ в справке, ре-ревью D #2).
                   onEdit={canEditMessage(m, { activeChatId, helpMode })
                     ? () => { void useProject.getState().editViaFork(activeChatId!, m.dbId!) }
+                    : undefined}
+                  onCreateTask={!isHelpChat && activePath
+                    ? () => { void createTaskFromMessage(m.content, m.dbId) }
                     : undefined}
                 />
               )}
@@ -4460,7 +4484,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
  * Hidden by default; fades in on .gg-msg:hover (см. layout.css).
  * При наведении появляется кнопка копирования.
  */
-function MessageActions({ text, onEdit }: { text: string; onEdit?: () => void }) {
+function MessageActions({ text, onEdit, onCreateTask }: { text: string; onEdit?: () => void; onCreateTask?: () => void }) {
   const [copied, setCopied] = useState(false)
   async function copy() {
     try {
@@ -4485,6 +4509,20 @@ function MessageActions({ text, onEdit }: { text: string; onEdit?: () => void })
             <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
           </svg>
           <span>править</span>
+        </button>
+      )}
+      {onCreateTask && (
+        <button
+          type="button"
+          className="gg-msg-action"
+          onClick={onCreateTask}
+          title="Создать задачу из этого сообщения"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 11l2 2 4-5" />
+            <rect x="4" y="4" width="16" height="16" rx="3" />
+          </svg>
+          <span>в задачу</span>
         </button>
       )}
       <button
