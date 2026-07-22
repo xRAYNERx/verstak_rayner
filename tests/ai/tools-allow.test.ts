@@ -63,4 +63,28 @@ describe('selectAllowedToolDefs (M4 — enforce skill tools_allow)', () => {
     expect(names).toEqual(['mcp_fetch'])
     expect(names).not.toContain('write_file') // ключевое: ограничение держится
   })
+
+  it('псевдо-имена (id коннектора / files) → fail-open, даже если рядом есть connector_query', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // Реальный баг wordstat-keywords: yandex_wordstat + connector_query
+    // раньше оставлял только connector_query → агент «не видел» Вордстат.
+    const names = selectAllowedToolDefs(BASE, MCP, [
+      'yandex_wordstat',
+      'yandex_direct',
+      'connector_query',
+      'files'
+    ]).map(d => d.name)
+    expect(names).toEqual([...BASE, ...MCP].map(d => d.name))
+    expect(names).toContain('write_file')
+    expect(names).toContain('run_command')
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('чистый tools_allow из реальных имён по-прежнему режет', () => {
+    const names = selectAllowedToolDefs(BASE, MCP, ['connector_query', 'read_file']).map(d => d.name)
+    expect(names).toEqual(['read_file', 'connector_query'])
+    expect(names).not.toContain('write_file')
+    expect(names).not.toContain('run_command')
+  })
 })

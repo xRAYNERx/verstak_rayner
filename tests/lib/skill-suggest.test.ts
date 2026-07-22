@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { suggestSkill, suggestSkills, SUGGEST_THRESHOLD } from '../../src/lib/skill-suggest'
+import { buildSkillIndex, suggestScoredFromIndex, suggestSkill, suggestSkills, SUGGEST_THRESHOLD } from '../../src/lib/skill-suggest'
 import type { Skill } from '../../src/types/api'
 
 const mk = (over: Partial<Skill>): Skill => ({
@@ -89,6 +89,36 @@ describe('suggestSkill', () => {
       [clientMkt, wordstat],
       null
     )?.id).toBe('wordstat-api')
+  })
+
+  it('автопривязывает Wordstat для сбора ключей без слова вордстат', () => {
+    const clientMkt = mk({
+      id: 'client-mkt',
+      name: 'client-mkt',
+      description: '/client-mkt — маркетинговый штаб: Директ, настройка РК, аудит клиента, семантика.',
+      suggested_prompts: [],
+    })
+    const semantics = mk({
+      id: 'direct-semantics',
+      name: 'direct-semantics',
+      description: 'Сбор, расширение и группировка семантического ядра для Яндекс Директа.',
+      suggested_prompts: ['собрать семантику'],
+    })
+    const wordstat = mk({
+      id: 'wordstat-api',
+      name: 'wordstat-api',
+      description: 'Яндекс Вордстат API — частотность, топ запросов, динамика, регионы. Используй при задачах с семантикой, ключами, частотностью, подбором фраз для Директа/SEO.',
+      suggested_prompts: [],
+    })
+
+    const scored = suggestScoredFromIndex(
+      'Собери ключи для рекламной кампании по производству АБК',
+      buildSkillIndex([clientMkt, semantics, wordstat]),
+      null
+    )
+
+    expect(scored[0]?.skill.id).toBe('wordstat-api')
+    expect(scored[0]?.score).toBeGreaterThanOrEqual(14)
   })
 
   it('предпочитает Метрику широкому client-mkt при задаче про цели и конверсии', () => {

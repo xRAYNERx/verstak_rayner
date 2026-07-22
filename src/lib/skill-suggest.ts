@@ -85,6 +85,43 @@ function hasAnyNeedle(haystack: string, needles: readonly string[]): boolean {
   return needles.some(needle => haystack.includes(needle))
 }
 
+function hasKeywordCollectionIntent(draft: string): boolean {
+  const text = draft.toLowerCase()
+  const hasCollectionAction = hasAnyNeedle(text, [
+    'собери',
+    'собрать',
+    'сбор',
+    'подбери',
+    'подберите',
+    'подобрать',
+    'подбор',
+    'найди',
+    'найти',
+    'подготовь',
+    'подготовить',
+  ])
+  const hasKeywordNoun = hasAnyNeedle(text, [
+    'ключ',
+    'ключев',
+    'ключевые слова',
+    'ключевых слов',
+    'ключевые фразы',
+    'ключевых фраз',
+    'ключевые запросы',
+    'ключевых запросов',
+  ])
+  const hasPhraseCollection = hasAnyNeedle(text, [
+    'собери фраз',
+    'собрать фраз',
+    'сбор фраз',
+    'подбери фраз',
+    'подберите фраз',
+    'подобрать фраз',
+    'подбор фраз',
+  ])
+  return (hasCollectionAction && hasKeywordNoun) || hasPhraseCollection
+}
+
 function marketingIntentScore(draft: string, draftTokens: Set<string>): number {
   const text = draft.toLowerCase()
   let score = 0
@@ -101,6 +138,7 @@ function wordstatIntentScore(draft: string): number {
   const text = draft.toLowerCase()
   let score = 0
   if (hasAnyNeedle(text, ['вордстат', 'wordstat', 'toprequests', 'dynamics'])) score += 6
+  if (hasKeywordCollectionIntent(draft)) score += 8
   if (hasAnyNeedle(text, ['частотност', 'частота'])) score += 4
   if (hasAnyNeedle(text, ['семантик', 'семантическ'])) score += 4
   if (hasAnyNeedle(text, ['подбор фраз', 'подобрать фраз', 'собрать фраз'])) score += 3
@@ -111,7 +149,7 @@ function wordstatIntentScore(draft: string): number {
 
 function hasExplicitWordstatIntent(draft: string): boolean {
   const text = draft.toLowerCase()
-  return hasAnyNeedle(text, ['вордстат', 'wordstat', 'toprequests', 'dynamics', 'частотност', 'частота'])
+  return hasKeywordCollectionIntent(draft) || hasAnyNeedle(text, ['вордстат', 'wordstat', 'toprequests', 'dynamics', 'частотност', 'частота'])
 }
 
 function metrikaIntentScore(draft: string): number {

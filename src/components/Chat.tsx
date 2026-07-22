@@ -70,6 +70,7 @@ import {
   isLegacyDoc,
 } from '../lib/chat-attachments'
 import { activateModelProgress, buildInitialAgentProgress, reduceAgentProgress, type AgentProgressEntry } from '../lib/agent-progress'
+import { isStaleModelId, normalizeSelectedModel } from '../../shared/contracts/provider'
 
 interface ComposerPendingState {
   queuedMessages: QueuedComposerMessage[]
@@ -97,29 +98,48 @@ function fallbackProviderLabel(id: string): string {
     .join(' ')
 }
 
-function isStaleProgressModel(model: string): boolean {
-  return model === 'grok-composer-2.5-fast' || model === 'grok-build'
-}
-
 function progressProviderLabel(
-  provider: { id?: string; label: string; model?: string | null; models?: string[] },
+  provider: { id?: string; label: string; model?: string | null; models?: string[]; defaultModel?: string },
   session?: { providerId?: string | null; model?: string | null } | null
 ): string {
   const sessionProviderId = typeof session?.providerId === 'string' ? session.providerId.trim() : ''
   const sameProvider = !sessionProviderId || sessionProviderId === provider.id
-  const label = sessionProviderId && sessionProviderId !== provider.id
+  const label = !sameProvider && sessionProviderId
     ? fallbackProviderLabel(sessionProviderId)
     : provider.label
   const rawSessionModel = typeof session?.model === 'string' ? session.model.trim() : ''
   const rawProviderModel = typeof provider.model === 'string' ? provider.model.trim() : ''
-  const sessionModel = isStaleProgressModel(rawSessionModel) ? '' : rawSessionModel
-  const providerModel = isStaleProgressModel(rawProviderModel) ? '' : rawProviderModel
   const providerModels = provider.models ?? []
   const hasProviderCatalog = providerModels.length > 0
+  const defaultModel = provider.defaultModel || rawProviderModel || providerModels[0] || ''
+  const providerModel = defaultModel
+    ? normalizeSelectedModel(rawProviderModel, { models: providerModels, defaultModel })
+    : (isStaleModelId(rawProviderModel) ? '' : rawProviderModel)
+  const sessionModel = defaultModel
+    ? normalizeSelectedModel(rawSessionModel, { models: sameProvider ? providerModels : [], defaultModel })
+    : (isStaleModelId(rawSessionModel) ? '' : rawSessionModel)
   const sessionModelValid = Boolean(sessionModel) && (!sameProvider || !hasProviderCatalog || providerModels.includes(sessionModel))
-  const model = sessionModelValid ? sessionModel : (sameProvider ? providerModel : '')
+  const model = sameProvider
+    ? (providerModel || (sessionModelValid ? sessionModel : ''))
+    : (sessionModelValid ? sessionModel : '')
   if (!model || model === label) return label
   return `${label} · ${model}`
+}
+
+function selectedSendOverride(provider: { id?: string; model?: string | null; models?: string[]; defaultModel?: string }): {
+  selectedProviderId?: string
+  selectedModel?: string
+} {
+  if (!provider.id) return {}
+  const rawModel = typeof provider.model === 'string' ? provider.model.trim() : ''
+  const defaultModel = provider.defaultModel || provider.models?.[0] || rawModel
+  const selectedModel = defaultModel
+    ? normalizeSelectedModel(rawModel, { models: provider.models ?? [], defaultModel })
+    : (isStaleModelId(rawModel) ? '' : rawModel)
+  return {
+    selectedProviderId: provider.id,
+    ...(selectedModel ? { selectedModel } : {})
+  }
 }
 
 function projectNameForPath(projectPath: string | null | undefined): string | undefined {
@@ -783,7 +803,11 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
   const providerModelsKey = provider.models.join('\n')
   const agentModelLabel = useMemo(
     () => progressProviderLabel(provider, activeChatSession),
-    [provider.id, provider.label, provider.model, providerModelsKey, activeChatSession?.providerId, activeChatSession?.model]
+    [provider.id, provider.label, provider.model, provider.defaultModel, providerModelsKey, activeChatSession?.providerId, activeChatSession?.model]
+  )
+  const currentSendSelection = useMemo(
+    () => selectedSendOverride(provider),
+    [provider.id, provider.model, provider.defaultModel, providerModelsKey]
   )
   useEffect(() => {
     if (isHelpChat || activeChatId == null) return
@@ -792,11 +816,11 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
 
     const sessionModel = activeChatSession.model.trim()
     const isUnavailable = provider.models.length > 0 && !provider.models.includes(sessionModel)
-    if (!isStaleProgressModel(sessionModel) && !isUnavailable) return
+    if (!isStaleModelId(sessionModel) && !isUnavailable) return
 
-    const replacement = provider.model && !isStaleProgressModel(provider.model)
+    const replacement = provider.model && !isStaleModelId(provider.model)
       ? provider.model
-      : provider.models.find(model => !isStaleProgressModel(model)) ?? ''
+      : provider.models.find(model => !isStaleModelId(model)) ?? ''
     if (!replacement || replacement === sessionModel) return
 
     void window.api.chatSessions.setModel(activeChatId, provider.id, replacement)
@@ -2513,8 +2537,8 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
         [...history, userMsg],
         projectPath,
         {
-          ...(targetSession?.providerId ? { providerId: targetSession.providerId } : {}),
-          ...(targetSession?.model ? { model: targetSession.model } : {}),
+          ...(targetSession?.providerId ? { selectedProviderId: targetSession.providerId } : {}),
+          ...(targetSession?.model ? { selectedModel: targetSession.model } : {}),
           ...(effort !== 'standard' ? { effortLevel: effort } : {}),
           agentMode: await readAgentMode(chatId, false)
         },
@@ -2819,6 +2843,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
       const antiStallNudge = '\n\n---\nВАЖНО (Verstak): если пользователь дал ясный прямой запрос — выполни его прямо в этом чате и выдай результат. Не зацикливайся, прося оформить «пакет задачи», «одну фразу цели» или ждать отдельного «ок», если намерение уже понятно.'
       const helpOverrides: Parameters<typeof window.api.ai.sendWithOverrides>[2] = {
         ...HELP_CHAT_SEND_OVERRIDES,
+        ...currentSendSelection,
       }
       if (activeSkill) {
         const currentProvider = await window.api.settings.getKey('provider')
@@ -3016,6 +3041,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
         effortLevel: useProject.getState().effortLevel,
         agentMode: sendAgentMode,
         ...(resumeFromRunId ? { resumeFromRunId } : {}),
+        ...currentSendSelection,
         ...routeOverride
       }, sendChatId)
     } else if (resumeFromRunId) {
@@ -3025,6 +3051,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
         resumeFromRunId,
         agentMode: sendAgentMode,
         ...(effort !== 'standard' ? { effortLevel: effort } : {}),
+        ...currentSendSelection,
         ...routeOverride
       }, sendChatId)
     } else {
@@ -3032,6 +3059,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
       sendId = await window.api.ai.sendWithOverrides(modelMessages, path, {
         ...(effort !== 'standard' ? { effortLevel: effort } : {}),
         agentMode: sendAgentMode,
+        ...currentSendSelection,
         ...routeOverride
       }, sendChatId)
     }
@@ -3134,6 +3162,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
             [...history, userMsg],
             payload.projectPath,
             {
+              ...currentSendSelection,
               ...(effort !== 'standard' ? { effortLevel: effort } : {}),
               agentMode: await readAgentMode(payload.chatId, false)
             },

@@ -8,7 +8,7 @@ import { createFileTools, createToolsForProject, TOOL_DEFS } from '../ai/tools'
 import { isWithinKnownRoots } from '../ai/path-policy'
 import { createProvider, PROVIDERS, isCodexAuthProvider, type ProviderId } from '../ai/registry'
 import { loadLiveCatalog, checkModelAvailable } from '../ai/model-catalog-service'
-import { isKnownProviderId, type PromptRouteOverride } from '../../shared/contracts/provider'
+import { isKnownProviderId, normalizeSelectedModel, type PromptRouteOverride } from '../../shared/contracts/provider'
 import type { McpClient } from '../mcp/client'
 import { prepareSystemContext } from '../ai/compose-system'
 import { prepareHistoryForModel } from '../ai/history-preparation'
@@ -406,6 +406,8 @@ export function registerAiIpc(deps: AiDeps): void {
   interface AiSendOverrides {
     providerId?: ProviderId
     model?: string | null
+    selectedProviderId?: ProviderId
+    selectedModel?: string | null
     /** Force plain (no-tools) mode even if provider supports tools. */
     noTools?: boolean
     /** Replace assembled system prompt entirely. When set, project's user-layer
@@ -494,7 +496,9 @@ export function registerAiIpc(deps: AiDeps): void {
     // resume, тогда PROVIDERS[providerId]=undefined → descriptor.transport упал бы. Гардим.
     const resumedProvider: ProviderId | null =
       isKnownProviderId(checkpointRun?.requestedProviderId) ? checkpointRun!.requestedProviderId : null
-    const providerId = promptRoute?.providerId ?? overrides?.providerId ?? resumedProvider ?? deps.getProviderId()
+    const selectedProviderId: ProviderId | null =
+      isKnownProviderId(overrides?.selectedProviderId) ? overrides!.selectedProviderId : null
+    const providerId = promptRoute?.providerId ?? overrides?.providerId ?? resumedProvider ?? selectedProviderId ?? deps.getProviderId()
     const descriptor = PROVIDERS[providerId]
     const sendId = ++currentSendId
     const agentMode: AgentMode = overrides?.agentMode ?? deps.getAgentMode()
@@ -829,7 +833,8 @@ export function registerAiIpc(deps: AiDeps): void {
     // 2.0.7-F: сохранённая requested-модель прогона применяется при resume того же
     // провайдера (иначе взяли бы дефолт чата — потеря route). Только если провайдер совпал.
     const resumedModel = (resumedProvider && resumedProvider === providerId && checkpointRun?.requestedModel) || null
-    let model = (promptRoute?.model ?? overrides?.model ?? resumedModel ?? deps.getProviderModel(providerId)) ?? descriptor.defaultModel
+    let model = (promptRoute?.model ?? overrides?.model ?? resumedModel ?? overrides?.selectedModel ?? deps.getProviderModel(providerId)) ?? descriptor.defaultModel
+    model = normalizeSelectedModel(model, descriptor)
     logRuntime('ai.send.start', {
       sendId,
       runId,
@@ -850,6 +855,7 @@ export function registerAiIpc(deps: AiDeps): void {
     if (
       smartRoutingEnabled &&
       !overrides?.model &&
+      !overrides?.selectedModel &&
       !overrides?.providerId &&          // не в Explicit Review
       resolvedEffort === 'standard' &&
       descriptor.transport === 'API'

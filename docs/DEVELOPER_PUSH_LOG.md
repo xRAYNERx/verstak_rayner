@@ -4,6 +4,78 @@
 
 - Date: 2026-07-22
 - Branch: `codex/reapply-2.0.11`
+- Commit: after final amend; see pushed commit
+- Title: Hotfix selected model routing and Wordstat first-run availability
+
+### Included
+
+- Selected model routing:
+  - Chat sends now include `selectedProviderId` / `selectedModel` for normal sends, help sends, queued sends, retries, and resumes.
+  - Backend AI IPC prefers explicit route/model overrides, then resume model, then the currently selected UI model, then provider defaults.
+  - Smart routing no longer replaces a user-selected model when `selectedModel` is present.
+  - Work-progress labels normalize stale Grok ids and should show the current Grok Build model instead of old composer ids.
+- Wordstat first-run availability:
+  - Skill suggestion treats "собери/подбери/найди/подготовь ключи/ключевые фразы" as explicit Wordstat intent even when "вордстат" is not written.
+  - Wordstat suggestions now score high enough for chat auto-bound skill context on the first message.
+  - Generic "расширить семантическое" remains routed to `direct-semantics`, not Wordstat.
+  - `tools_allow` fail-opens on connector pseudo names such as `yandex_wordstat`, `ywordstat`, `files`, and related connector ids so partial allow lists do not hide required tools.
+  - `connector_query` description tells the assistant to call `id="yandex_wordstat"` directly and not claim Wordstat is unavailable without a live connector response.
+
+### Files To Inspect First
+
+- Selected model routing:
+  - `shared/contracts/provider.ts`
+  - `src/components/Chat.tsx`
+  - `src/hooks/useProvider.ts`
+  - `electron/ipc/ai.ts`
+  - `electron/ai/runner-progress.ts`
+  - `electron/preload.ts`
+  - `src/types/api.d.ts`
+  - `tests/lib/model-selection.test.ts`
+  - `tests/ai/runner-progress.test.ts`
+- Wordstat:
+  - `src/lib/skill-suggest.ts`
+  - `electron/ai/runner-util.ts`
+  - `electron/ai/tools.ts`
+  - `tests/lib/skill-suggest.test.ts`
+  - `tests/ai/tools-allow.test.ts`
+- Coordination docs:
+  - `docs/AI_HANDOFF.md`
+  - `docs/PATCHNOTES_DRAFT.md`
+  - `docs/DEVELOPER_PUSH_LOG.md`
+
+### Not Included
+
+- `mcps/chrome-devtools/` remains an untracked local folder and should not be transferred unless explicitly requested.
+- `scripts/wordstat-connector-live.mjs` remains an untracked local live probe and should not be transferred unless explicitly requested.
+- `package.json` was read/restored during installed-version verification and has no intended content diff.
+
+### Validation
+
+- Installed/local version alignment checked: installed `app.asar` package `2.0.11`, local `package.json` `2.0.11`.
+- `npm.cmd run test:fast -- tests\lib\skill-suggest.test.ts tests\ai\tools-allow.test.ts tests\lib\model-selection.test.ts tests\ai\runner-progress.test.ts` passed: 4 files, 35 tests.
+- `npm.cmd run check:mojibake` passed.
+- `git diff --check` passed.
+- `npm.cmd run build` passed when rerun outside sandbox; the sandboxed attempt failed with access denied while loading `electron.vite.config.ts`.
+- `npm.cmd run type` failed on existing missing `@testing-library/react` module/type declarations in component tests; this is outside this package.
+
+### Transfer Notes For Pavel's AI
+
+- Preserve current installed/local version alignment at `2.0.11`.
+- Preserve selected-model override priority and the `selectedProviderId` / `selectedModel` API shape.
+- Do not reintroduce stale Grok ids into labels or saved-session repair.
+- Keep "собери ключи" / "подбери ключевые фразы" routed to Wordstat on first send, while preserving `direct-semantics` for broad semantics expansion.
+- Preserve fail-open behavior for connector pseudo names in `tools_allow`; otherwise Wordstat can look unavailable while the connector is actually configured.
+- Keep `connector_query` guidance explicit: `id="yandex_wordstat"` is valid and `list_connectors` is not a gate.
+
+### Patchnote Source
+
+- Use `docs/PATCHNOTES_DRAFT.md`
+
+## Previous Push Package
+
+- Date: 2026-07-22
+- Branch: `codex/reapply-2.0.11`
 - Commit: after commit
 - Title: Hotfix Grok work-progress model label
 
@@ -34,7 +106,7 @@
 
 - Use `docs/PATCHNOTES_DRAFT.md`
 
-## Previous Push Package
+## Earlier Push Package
 
 - Date: 2026-07-21
 - Branch: `codex/reapply-2.0.11`

@@ -18,7 +18,13 @@ describe('runner-progress — извлечено из ai.ts при распил�
   describe('modelProgressLabel', () => {
     it('провайдер+модель, дефолт «модель»', () => {
       expect(modelProgressLabel(undefined, undefined)).toBe('модель')
-      expect(modelProgressLabel('claude', 'opus')).toContain('opus')
+      expect(modelProgressLabel('claude', 'opus')).toContain('Claude')
+    })
+    it('normalizes stale Grok Composer ids before showing progress labels', () => {
+      const label = modelProgressLabel('grok-cli', 'grok-composer-2.5-fast')
+      expect(label).toContain('Grok Build')
+      expect(label).toContain('grok-4.5')
+      expect(label).not.toContain('grok-composer')
     })
   })
 

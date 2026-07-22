@@ -7,6 +7,7 @@
 
 import { PROVIDERS, type ProviderId } from './registry'
 import type { TaggedSender } from '../ipc/tool-handlers/shared'
+import { formatModelProgressLabel, normalizeSelectedModel } from '../../shared/contracts/provider'
 
 export type { TaggedSender }
 
@@ -56,8 +57,12 @@ export function compactProgressText(value: unknown, max = 220): string | undefin
 }
 
 export function modelProgressLabel(providerId?: ProviderId, model?: string | null): string {
-  const providerName = providerId ? (PROVIDERS[providerId]?.name ?? providerId) : ''
-  return [providerName, model].filter(Boolean).join(' · ') || 'модель'
+  const descriptor = providerId ? PROVIDERS[providerId] : undefined
+  const providerName = descriptor?.name ?? providerId ?? ''
+  const cleanModel = descriptor
+    ? normalizeSelectedModel(model, descriptor)
+    : model
+  return formatModelProgressLabel(providerName, cleanModel)
 }
 
 export function emitAgentProgress(sender: TaggedSender, sendId: number, payload: AgentProgressPayload): void {

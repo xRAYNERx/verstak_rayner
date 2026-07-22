@@ -1,15 +1,18 @@
-# AI Handoff: Verstak 2.0.11 Grok, skills, connectors, and recovery transfer
+# AI Handoff: Verstak 2.0.11 selected model and Wordstat first-run fixes
 
-Last updated: 2026-07-21
+Last updated: 2026-07-22
 Source branch: `codex/reapply-2.0.11`
 Target use: pull Rayner's local fixes from the fork into Pavel's main Verstak repository
 Local version alignment: `2.0.11`
 
 ## Read This First
 
-This push package includes several local product decisions restored after Pavel upstream updates plus new chat/skills fixes. Preserve Rayner's accepted local behavior even if upstream currently differs.
+This push package contains two hotfixes on top of the existing 2.0.11 recovery branch:
 
-Do not include the untracked `mcps/chrome-devtools/` folder unless Pavel explicitly asks for that local tooling.
+- chat sends and work-progress labels now use the user's currently selected provider/model instead of stale saved chat-session model ids
+- Wordstat keyword-collection tasks now get the right connector/skill context on the first message, including prompts like "собери ключи" that do not literally mention "вордстат"
+
+Do not include the untracked `mcps/chrome-devtools/` folder or `scripts/wordstat-connector-live.mjs` unless Pavel explicitly asks for that local tooling/probe.
 
 Before transferring, read:
 
@@ -20,95 +23,76 @@ Before transferring, read:
 
 ## What Changed
 
-### Grok Build model catalog and run labels
+### Selected model routing and progress labels
 
 Main files:
 
-- `electron/ai/grok-cli.ts`
-- `electron/ai/model-discovery.ts`
-- `src/lib/model-catalog.ts`
+- `shared/contracts/provider.ts`
 - `src/components/Chat.tsx`
-- `tests/ai/model-discovery.test.ts`
-- `tests/ai/model-registry.test.ts`
-- `tests/ipc/provider-doctor.test.ts`
-
-Important behavior:
-
-- Grok Build now uses the live `grok-4.5` model id and no longer exposes or routes to removed `grok-composer-2.5-fast`.
-- The CLI gate validates the resolved selected Grok model before starting the child process.
-- The chat work-progress panel now labels runs from the active chat session, but ignores removed/stale model ids such as `grok-composer-2.5-fast` and repairs that saved chat session model to the current provider model.
-- Do not restore the removed composer plain-output path unless Grok reintroduces that model and it is verified live.
-
-Verify:
-
-- Open Grok Build model settings and confirm only current live model ids are shown.
-- Select Grok Build `grok-4.5`, send a chat request from a chat that previously used composer, and confirm `Ход работы` shows the selected model, not `grok-composer-2.5-fast`.
-- Run the model discovery/registry/provider doctor tests listed below.
-
-### Skills: manual recommendation tags and per-message application
-
-Main files:
-
-- `src/components/SkillsView.tsx`
-- `src/components/Chat.tsx`
-- `src/components/ComposerToolsMenu.tsx`
-- `src/components/SlashCommandPopup.tsx`
-- `src/store/skillStore.ts`
-- `src/lib/skill-suggest.ts`
-- `src/lib/skill-user-tags.ts`
+- `src/hooks/useProvider.ts`
+- `electron/ipc/ai.ts`
+- `electron/ai/runner-progress.ts`
+- `electron/preload.ts`
 - `src/types/api.d.ts`
-- `tests/lib/skill-suggest.test.ts`
-- `tests/store/skill-store.test.ts`
+- `tests/lib/model-selection.test.ts`
+- `tests/ai/runner-progress.test.ts`
 
 Important behavior:
 
-- Each skill card can have user-defined local tags.
-- Manual tags are included in skill search and chat suggestion scoring.
-- Selecting a skill from the Skills section, slash menu, or chat tools queues it for the current composer draft only.
-- The selected skill is attached to the current message and sent to the model with that message; it must not become a global skill across all chats.
-- Tags are stored in browser localStorage under `verstak.skillUserTags.v1`.
+- Shared provider helpers normalize selected models and strip stale Grok ids: `grok-composer-2.5-fast`, `grok-composer-2.5`, `grok-build`.
+- `Chat` sends `selectedProviderId` / `selectedModel` for normal sends, help sends, retries, queued sends, and resumes.
+- Backend AI IPC treats explicit route/model overrides as highest priority, then resume data, then selected UI model, then stored provider default.
+- Smart routing must not override a user-selected model when `selectedModel` is present.
+- Work-progress labels use the normalized provider/model pair and must not display stale composer ids.
 
 Verify:
 
-- Add tags to a skill card in the Skills section.
-- Type a matching task in chat and confirm the skill is suggested.
-- Select a skill in one chat, switch chats, and confirm it was not applied globally.
+- Select a non-default model, send a chat request, and confirm the run uses that selected model.
+- Open a chat that previously stored `grok-composer-2.5-fast`; confirm `Ход работы` repairs to the current Grok Build model and does not show composer.
+- Run `tests/lib/model-selection.test.ts` and `tests/ai/runner-progress.test.ts`.
 
-### Settings and project panel recovery
+### Wordstat first-message availability
 
 Main files:
 
-- `src/components/Settings.tsx`
-- `src/components/Sidebar.tsx`
-- `src/styles/layout.css`
-- `docs/VERSTAK_CHANGELOG_TRACKER.md`
-- `docs/RESTORE_AFTER_UPSTREAM_UPDATE.md`
+- `src/lib/skill-suggest.ts`
+- `electron/ai/runner-util.ts`
+- `electron/ai/tools.ts`
+- `tests/lib/skill-suggest.test.ts`
+- `tests/ai/tools-allow.test.ts`
 
 Important behavior:
 
-- Settings -> Profiles is intentionally disabled and marked `Soon`.
-- Project Management -> Browser and Design are intentionally disabled and marked `Soon`.
-- Connector secret fields use a flush-right show/hide eye button.
-- Preserve the recovery tracker; it is the fast audit source after future upstream updates.
+- Skill suggestion now treats "сбор/подбор/найти/подготовить ключи/ключевые фразы" as explicit Wordstat intent even without the word "вордстат".
+- The score is high enough to pass the chat auto-bound skill threshold, so Wordstat context is available on the first user message.
+- Generic "расширить семантическое" still prefers `direct-semantics`; do not make broad semantics prompts auto-bind Wordstat unless there is keyword collection or frequency/Wordstat intent.
+- `tools_allow` pseudo names such as `yandex_wordstat`, `ywordstat`, `files`, and connector ids are fail-open. This avoids a partial allow-list that leaves only `connector_query` and causes the model to claim Wordstat is unavailable.
+- The `connector_query` description explicitly allows direct `id="yandex_wordstat"` calls; `list_connectors` is optional and must not be treated as a gate.
 
 Verify:
 
-- Open Settings and confirm Profiles is closed as `Soon`.
-- Open Project Management and confirm Browser/Design are `Soon` and do not open unfinished panels.
-- Open connector settings and confirm secret fields reveal/hide values with the eye button at the right edge.
+- In chat, type "Собери ключи для рекламной кампании ..." and confirm Wordstat is suggested/auto-bound on the first send.
+- The assistant must try `connector_query` with `id="yandex_wordstat"` before saying Wordstat is unavailable.
+- Run `tests/lib/skill-suggest.test.ts` and `tests/ai/tools-allow.test.ts`.
 
 ## Validation Run Locally
 
 - `npm.cmd run check:mojibake`
-- `npm.cmd test -- tests/lib/skill-suggest.test.ts tests/store/skill-store.test.ts tests/ai/model-discovery.test.ts tests/ai/model-registry.test.ts tests/ipc/provider-doctor.test.ts`
+- `npm.cmd run test:fast -- tests\lib\skill-suggest.test.ts tests\ai\tools-allow.test.ts tests\lib\model-selection.test.ts tests\ai\runner-progress.test.ts`
 - `npm.cmd run build`
+- `git diff --check`
+
+Known local validation note:
+
+- `npm.cmd run type` currently fails because several existing component tests cannot resolve `@testing-library/react` type/module declarations. This is outside the hotfix diff; do not treat it as a selected-model or Wordstat regression.
 
 ## Transfer Notes For Pavel's AI
 
 - Preserve the current installed/local version alignment at `2.0.11` unless Pavel is intentionally releasing a newer version.
-- Preserve the tracker files; they are internal coordination docs, not user-facing release features.
 - Do not reintroduce old Grok IDs such as `grok-composer-2.5-fast` or `grok-build`.
-- Do not route manually selected skills through global `activeSkillId`; use the per-draft queue and applied-skill message context.
+- Preserve explicit selected-model routing; do not let smart routing silently replace `selectedModel`.
+- Preserve Wordstat keyword-collection intent for prompts that say "собери ключи" without saying "вордстат".
+- Preserve fail-open behavior for connector pseudo names in `tools_allow`.
 - Keep user-facing patch notes human-readable and concrete. Use `docs/PATCHNOTES_DRAFT.md`.
 
 ---
