@@ -14,6 +14,15 @@ type ResolvedPreviewPath = {
   displayPath: string
   source: 'project' | 'skill' | 'known-root' | 'absolute'
 }
+type LargePreviewState = {
+  path: string
+  size: number
+  nextOffset: number
+  loadedBytes: number
+  done: boolean
+}
+
+const PREVIEW_CHUNK_BYTES = 2 * 1024 * 1024
 
 function basename(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() || path
@@ -54,11 +63,24 @@ function friendlyPreviewError(err: unknown, requestedPath: string): string {
   return message
 }
 
+function isTooLargeReadError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err)
+  return /Файл слишком большой для чтения/i.test(message)
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} МБ`
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} КБ`
+  return `${bytes} Б`
+}
+
 export function FilePreviewPanel({ path, width, onResizeStart, onClose }: FilePreviewPanelProps) {
   const [mode, setMode] = useState<PreviewMode>('unsupported')
   const [content, setContent] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [chunkLoading, setChunkLoading] = useState(false)
+  const [largePreview, setLargePreview] = useState<LargePreviewState | null>(null)
   const [resolved, setResolved] = useState<ResolvedPreviewPath | null>(null)
   const fileName = basename(resolved?.path ?? path ?? 'Файл')
   const shownPath = resolved?.displayPath ?? path ?? ''
@@ -68,6 +90,8 @@ export function FilePreviewPanel({ path, width, onResizeStart, onClose }: FilePr
     setContent('')
     setError(null)
     setResolved(null)
+    setLargePreview(null)
+    setChunkLoading(false)
     if (!path) return
 
     setLoading(true)
@@ -85,6 +109,31 @@ export function FilePreviewPanel({ path, width, onResizeStart, onClose }: FilePr
         setResolved(resolvedResult)
         const actualPath = resolvedResult.path
         const ext = extension(actualPath)
+
+        async function readPreviewText(nextMode: PreviewMode) {
+          try {
+            const text = await window.api.files.read(actualPath)
+            if (!cancelled) {
+              setMode(nextMode)
+              setContent(text)
+              setLargePreview(null)
+            }
+          } catch (err) {
+            if (!isTooLargeReadError(err)) throw err
+            const chunk = await window.api.files.readChunk(actualPath, 0, PREVIEW_CHUNK_BYTES)
+            if (!cancelled) {
+              setMode('text')
+              setContent(chunk.content)
+              setLargePreview({
+                path: actualPath,
+                size: chunk.size,
+                nextOffset: chunk.nextOffset,
+                loadedBytes: chunk.bytesRead,
+                done: chunk.done
+              })
+            }
+          }
+        }
 
         if (ext === '.xlsx') {
           const res = await window.api.files.xlsxToMarkdown(actualPath)
@@ -107,35 +156,24 @@ export function FilePreviewPanel({ path, width, onResizeStart, onClose }: FilePr
         }
 
         if (ext === '.html' || ext === '.htm') {
-          const html = await window.api.files.read(actualPath)
-          if (!cancelled) {
-            setMode('html')
-            setContent(html)
-          }
+          await readPreviewText('html')
           return
         }
 
         if (ext === '.md') {
-          const markdown = await window.api.files.read(actualPath)
-          if (!cancelled) {
-            setMode('markdown')
-            setContent(markdown)
-          }
+          await readPreviewText('markdown')
           return
         }
 
         if (isTextPreviewExt(ext)) {
-          const text = await window.api.files.read(actualPath)
-          if (!cancelled) {
-            setMode('text')
-            setContent(text)
-          }
+          await readPreviewText('text')
           return
         }
 
         if (!cancelled) {
           setMode('unsupported')
           setContent('')
+          setLargePreview(null)
         }
       } catch (err) {
         if (!cancelled) {
@@ -152,6 +190,28 @@ export function FilePreviewPanel({ path, width, onResizeStart, onClose }: FilePr
 
   function reveal() {
     if (resolved?.path) void window.api.files.revealInExplorer(resolved.path)
+  }
+
+  async function loadMore() {
+    if (!largePreview || largePreview.done || chunkLoading) return
+    setChunkLoading(true)
+    try {
+      const chunk = await window.api.files.readChunk(largePreview.path, largePreview.nextOffset, PREVIEW_CHUNK_BYTES)
+      setContent(prev => prev + chunk.content)
+      setLargePreview(prev => prev
+        ? {
+            ...prev,
+            size: chunk.size,
+            nextOffset: chunk.nextOffset,
+            loadedBytes: prev.loadedBytes + chunk.bytesRead,
+            done: chunk.done
+          }
+        : null)
+    } catch (err) {
+      setError(friendlyPreviewError(err, largePreview.path))
+    } finally {
+      setChunkLoading(false)
+    }
   }
 
   return (
@@ -193,6 +253,16 @@ export function FilePreviewPanel({ path, width, onResizeStart, onClose }: FilePr
       <div className="gg-file-preview-body">
         {loading && <div className="gg-file-preview-state">Загружаю файл...</div>}
         {!loading && error && <div className="gg-file-preview-state is-error">{error}</div>}
+        {!loading && !error && largePreview && (
+          <div className="gg-file-preview-large-note">
+            <span>Файл большой: {formatBytes(largePreview.size)}. Загружено {formatBytes(largePreview.loadedBytes)}</span>
+            {!largePreview.done && (
+              <button className="gg-terminal-bar-btn" type="button" onClick={() => void loadMore()} disabled={chunkLoading}>
+                {chunkLoading ? 'Загружаю...' : 'Загрузить ещё'}
+              </button>
+            )}
+          </div>
+        )}
         {!loading && !error && mode === 'unsupported' && (
           <div className="gg-file-preview-state">
             Для этого формата пока нет встроенного предпросмотра. Файл можно открыть через проводник
@@ -204,6 +274,9 @@ export function FilePreviewPanel({ path, width, onResizeStart, onClose }: FilePr
         )}
         {!loading && !error && mode === 'html' && (
           <iframe className="gg-file-preview-iframe" srcDoc={content} sandbox="allow-same-origin" title={fileName} />
+        )}
+        {!loading && !error && largePreview && largePreview.done && (
+          <div className="gg-file-preview-large-done">Файл загружен полностью</div>
         )}
       </div>
     </aside>

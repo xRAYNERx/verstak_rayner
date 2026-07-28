@@ -716,6 +716,13 @@ app.whenReady().then(() => {
     getContextSnapshot: chatId => {
       const snap = activeContextSnapshot(db, chatId)
       return snap ? { summary: snap.summary, throughMessageId: snap.throughMessageId } : null
+    },
+    markInterruptedAssistant: (chatId, message) => {
+      const window = chats.listWindowBySession(chatId, { limit: 20 })
+      const latestEmptyAssistant = [...window.messages]
+        .reverse()
+        .find(m => m.role === 'assistant' && !m.content.trim())
+      return latestEmptyAssistant ? chats.updateMessage(latestEmptyAssistant.id, message) : false
     }
   }
   registerAiIpc(aiDeps)

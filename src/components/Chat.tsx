@@ -2880,7 +2880,19 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
       } else if (store.effortLevel !== 'standard') {
         helpOverrides.effortLevel = store.effortLevel
       }
-      sendId = await window.api.ai.sendWithOverrides(allMessages, null, helpOverrides, String(helpChatId))
+      try {
+        sendId = await window.api.ai.sendWithOverrides(allMessages, null, helpOverrides, String(helpChatId))
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        const errorText = `\n\n[Ошибка: ${message || 'не удалось запустить модель'}]`
+        console.error('[help] failed to start AI run:', err)
+        updateHelpLastAssistant(errorText)
+        void window.api.chats.updateMessage(assistantRow.id, errorText).catch(() => {})
+        useProject.getState().applyEventToHelp({ type: 'error', message: message || 'не удалось запустить модель' })
+        setHelpStreaming(false)
+        currentSendIdRef.current = null
+        return
+      }
       currentSendIdRef.current = sendId
       if (sendId <= 0) {
         const errorText = '\n\n[Ошибка: провайдер недоступен]'
@@ -3019,6 +3031,14 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
     const activeSkill = activeSkillIdForSend
       ? useSkillsStore.getState().skills.find(s => s.id === activeSkillIdForSend)
       : null
+    const failPendingAssistant = (message: string) => {
+      const errorText = `\n\n[Ошибка: ${message}]`
+      updateLastAssistant(errorText)
+      if (assistantRow) void window.api.chats.updateMessage(assistantRow.id, errorText).catch(() => {})
+      useProject.getState().applyAgentProgressEvent({ type: 'error', message })
+      setStreaming(false)
+      currentSendIdRef.current = null
+    }
     const skillSystemPrompt = composeSkillSystemPrompt(activeSkill ?? null, messageAppliedSkillDetails, modelText, autoBoundSkillDetails)
     const toolsAllow = mergeToolAllow([activeSkill, ...messageAppliedSkillDetails, ...autoBoundSkillDetails])
     const recipe = firstRecipe([activeSkill, ...messageAppliedSkillDetails, ...autoBoundSkillDetails])
@@ -3037,6 +3057,7 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
     // и изоляция worktree. Фоновые пути его передавали, главный — забывал, и все три
     // молча не работали в основном чате. Страж: tests/contracts/chat-send-chatid-contract.
     const sendChatId = activeChatId != null ? String(activeChatId) : undefined
+    try {
     if (activeSkill || skillSystemPrompt) {
       // Узнаём текущий provider пользователя — чтобы решить override или нет
       const currentProvider = activeSkill ? await window.api.settings.getKey('provider') : null
@@ -3083,6 +3104,12 @@ export function Chat({ onOpenSettings, rightPanel, onSelectRightPanel, isSetting
         ...currentSendSelection,
         ...routeOverride
       }, sendChatId)
+    }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      console.error('[chat] failed to start AI run:', err)
+      failPendingAssistant(message || 'не удалось запустить модель')
+      return
     }
     // one-shot: маршрут действовал только на эту отправку — снимаем.
     if (oneShotRoute) useProject.getState().setPromptRouteOverride(null)

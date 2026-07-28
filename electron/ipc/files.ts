@@ -1,5 +1,5 @@
 import { ipcMain, shell } from 'electron'
-import { readdir, stat, readFile, lstat } from 'fs/promises'
+import { readdir, stat, readFile, lstat, open as openFile } from 'fs/promises'
 import { extname, join, isAbsolute, resolve, basename, relative } from 'path'
 import { homedir } from 'os'
 import { safeRealJoin, isWithinKnownRoots } from '../ai/path-policy'
@@ -14,6 +14,7 @@ const COLLAPSE_DIRS = new Set(['logs', 'agent-tools', 'terminals', 'reports', 'c
 const MAX_TREE_NODES = 300
 const MAX_DIR_ENTRIES = 80
 const MAX_READ_BYTES = 2 * 1024 * 1024  // 2 MB safety cap
+const PREVIEW_CHUNK_BYTES = 2 * 1024 * 1024
 const SKILL_PREVIEW_ROOTS = [
   join(homedir(), '.verstak', 'skills'),
   join(homedir(), '.claude', 'skills'),
@@ -27,6 +28,17 @@ type PreviewPathResult =
   | { ok: false; error: string; requestedPath: string; searched: string[] }
 
 type PreviewSource = 'project' | 'skill' | 'known-root' | 'absolute'
+
+async function resolveSafeReadableFile(path: string, deps: FilesIpcDeps): Promise<{ abs: string; relPath: string }> {
+  const abs = await resolveReadablePreviewPath(path, deps)
+  const root = containingPreviewRoot(abs, deps)
+  if (!root) throw new Error('Проект не открыт')
+  const relPath = root ? relative(root, abs).replace(/\\/g, '/') : abs
+  if (isForbiddenPath(relPath)) {
+    throw new Error(`Доступ запрещён политикой безопасности: ${relPath} (secrets/credentials)`)
+  }
+  return { abs, relPath }
+}
 
 function normalizePreviewInput(value: string): string {
   return String(value || '').trim().replace(/^["'`]+|["'`.,;:!?]+$/g, '')
@@ -265,16 +277,7 @@ export function registerFilesIpc(deps: FilesIpcDeps): void {
   })
 
   ipcMain.handle('files:read', async (_e, path: string) => {
-    const abs = await resolveReadablePreviewPath(path, deps)
-    const root = containingPreviewRoot(abs, deps)
-    if (!root) throw new Error('Проект не открыт')
-    // SECURITY: symlink-safe resolution (was: textual-only resolve + relative).
-    // We must compute the relative path against the project root for both the
-    // forbidden-path policy check and the realpath escape check.
-    const relPath = root ? relative(root, abs).replace(/\\/g, '/') : abs
-    if (isForbiddenPath(relPath)) {
-      throw new Error(`Доступ запрещён политикой безопасности: ${relPath} (secrets/credentials)`)
-    }
+    const { abs } = await resolveSafeReadableFile(path, deps)
     const st = await stat(abs)
     if (!st.isFile()) throw new Error(`Не файл: ${path}`)
     if (st.size > MAX_READ_BYTES) {
@@ -291,5 +294,41 @@ export function registerFilesIpc(deps: FilesIpcDeps): void {
       return `[secret-scanner: redacted ${scan.hits.join(', ')} — открой файл в редакторе вне приложения для raw-доступа]\n${scan.redacted}`
     }
     return raw
+  })
+
+  ipcMain.handle('files:read-chunk', async (_e, path: string, offsetValue?: number, limitValue?: number) => {
+    const { abs } = await resolveSafeReadableFile(path, deps)
+    const st = await stat(abs)
+    if (!st.isFile()) throw new Error(`Не файл: ${path}`)
+
+    const size = st.size
+    const offset = Math.max(0, Math.min(Number(offsetValue) || 0, size))
+    const limit = Math.max(1, Math.min(Number(limitValue) || PREVIEW_CHUNK_BYTES, PREVIEW_CHUNK_BYTES))
+    const bytesToRead = Math.min(limit, size - offset)
+    if (bytesToRead <= 0) {
+      return { content: '', offset, bytesRead: 0, nextOffset: offset, size, done: true }
+    }
+
+    const file = await openFile(abs, 'r')
+    try {
+      const buffer = Buffer.allocUnsafe(bytesToRead)
+      const result = await file.read(buffer, 0, bytesToRead, offset)
+      const raw = buffer.subarray(0, result.bytesRead).toString('utf8')
+      const scan = scanText(raw)
+      const prefix = scan.hits.length > 0
+        ? `[secret-scanner: redacted ${scan.hits.join(', ')}]\n`
+        : ''
+      const nextOffset = offset + result.bytesRead
+      return {
+        content: prefix + scan.redacted,
+        offset,
+        bytesRead: result.bytesRead,
+        nextOffset,
+        size,
+        done: nextOffset >= size
+      }
+    } finally {
+      await file.close()
+    }
   })
 }

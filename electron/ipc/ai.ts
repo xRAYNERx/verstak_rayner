@@ -157,11 +157,30 @@ export interface AiDeps {
    *  границы] вместо всей истории. null/не передан → история как есть (прежнее поведение).
    *  Сжатие НЕ трогает видимую переписку — только то, что уходит в запрос. */
   getContextSnapshot?: (chatId: number) => { summary: string; throughMessageId: number } | null
+  /** Ставит понятный текст в последний пустой assistant-плейсхолдер чата при аварийном stop/shutdown. */
+  markInterruptedAssistant?: (chatId: number, message: string) => boolean
 }
 
 let currentSendId = 0
-const activeAborts = new Map<number, AbortController>()
+const activeAborts = new Map<number, { ctrl: AbortController; chatId: number | null }>()
 const autoProofReportsSent = new Set<string>()
+
+let markInterruptedAssistant: AiDeps['markInterruptedAssistant'] | null = null
+
+function markActiveRunsInterrupted(reason: string): void {
+  const seenChats = new Set<number>()
+  const message = `\n\n[Ошибка: ${reason}]`
+  for (const entry of activeAborts.values()) {
+    if (typeof entry.chatId !== 'number' || !Number.isFinite(entry.chatId)) continue
+    if (seenChats.has(entry.chatId)) continue
+    seenChats.add(entry.chatId)
+    try {
+      markInterruptedAssistant?.(entry.chatId, message)
+    } catch (err) {
+      logRuntimeError('ai.abort.mark_interrupted_failed', err, { chatId: entry.chatId })
+    }
+  }
+}
 
 // Cost-cap на СУТКИ (Илья): лимит переносится через рестарт — дата+накопленные центы
 // в settings. Новый день → сброс. UI пишет cost_cap_usd_per_day; legacy per_session
@@ -253,19 +272,20 @@ type TaggedSender = HandlerTaggedSender
 export function abortSend(sendId: number): boolean {
   logRuntime('ai.abort.request', { sendId, activeCount: activeAborts.size })
   if (sendId <= 0) {
-    for (const [k, c] of activeAborts) { c.abort(); activeAborts.delete(k) }
+    markActiveRunsInterrupted('ответ был прерван до получения видимого текста')
+    for (const [k, entry] of activeAborts) { entry.ctrl.abort(); activeAborts.delete(k) }
     for (const [k, p] of pendingWrites) { p.resolve(false); pendingWrites.delete(k) }
     for (const [k, p] of pendingCommands) { p.resolve(false); pendingCommands.delete(k) }
     for (const [k, p] of pendingPlans) { p.resolve({ decision: 'reject' }); pendingPlans.delete(k) }
     logRuntime('ai.abort.all')
     return true
   }
-  const ctrl = activeAborts.get(sendId)
-  if (!ctrl) {
+  const entry = activeAborts.get(sendId)
+  if (!entry) {
     logRuntime('ai.abort.miss', { sendId }, 'warn')
     return false
   }
-  ctrl.abort()
+  entry.ctrl.abort()
   activeAborts.delete(sendId)
   clearRunUntilGreenForSend(sendId) // ось 3 E: счётчик run_until_green этого прогона
   // Reject ONLY this session's pending confirmations — other concurrent
@@ -396,6 +416,7 @@ export function resolveCodexHome(
 }
 
 export function registerAiIpc(deps: AiDeps): void {
+  markInterruptedAssistant = deps.markInterruptedAssistant ?? null
   /**
    * Optional overrides for ai:send. Used by Explicit Review feature: the
    * reviewer needs a DIFFERENT provider from the chat's main provider, must
@@ -507,7 +528,7 @@ export function registerAiIpc(deps: AiDeps): void {
     // явно, а не по эвристике (gap/chatId). Закладка под Debug Packet / Workflow.
     const runId = randomUUID()
     const ctrl = new AbortController()
-    activeAborts.set(sendId, ctrl)
+    activeAborts.set(sendId, { ctrl, chatId: chatIdNum ?? null })
     let runTimeout: ReturnType<typeof setTimeout> | null = null
     const clearRunTimeout = () => {
       if (runTimeout) {

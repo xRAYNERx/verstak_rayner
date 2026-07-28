@@ -122,6 +122,7 @@ contextBridge.exposeInMainWorld('api', {
     tree: (root: string) => ipcRenderer.invoke('files:tree', root),
     resolvePreviewPath: (path: string) => ipcRenderer.invoke('files:resolve-preview-path', path),
     read: (path: string) => ipcRenderer.invoke('files:read', path),
+    readChunk: (path: string, offset?: number, limit?: number) => ipcRenderer.invoke('files:read-chunk', path, offset, limit),
     resolveMentions: (projectPath: string, paths: string[]) => ipcRenderer.invoke('files:resolveMentions', projectPath, paths),
     revealInExplorer: (path: string) => ipcRenderer.invoke('files:reveal', path),
     docxToHtml: (path: string) => ipcRenderer.invoke('files:docx-to-html', path),

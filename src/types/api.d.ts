@@ -565,6 +565,14 @@ declare global {
           | { ok: false; error: string; requestedPath: string; searched: string[] }
         >
         read: (path: string) => Promise<string>
+        readChunk: (path: string, offset?: number, limit?: number) => Promise<{
+          content: string
+          offset: number
+          bytesRead: number
+          nextOffset: number
+          size: number
+          done: boolean
+        }>
         /** F6: прочитать @-упомянутые файлы → контекст-блок (path-policy + redaction). */
         resolveMentions: (projectPath: string, paths: string[]) => Promise<string>
         /** Открыть папку в системном проводнике через electron.shell.openPath. */
